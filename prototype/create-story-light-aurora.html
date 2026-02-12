@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>序话Story - 创建故事 (Aurora Glassmorphism)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            primary: '#6366F1',
+            'primary-hover': '#4F46E5',
+            cta: '#EC4899',
+            'cta-hover': '#DB2777',
+            'text-primary': '#1E293B',
+            'text-secondary': '#475569',
+            'text-muted': '#64748B',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: linear-gradient(135deg, #F0F4FF 0%, #FFF0F5 50%, #F0FFF4 100%);
+      background-size: 400% 400%;
+      animation: aurora 12s ease infinite;
+      min-height: 100vh;
+    }
+    @keyframes aurora {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    .step-hidden { display: none; }
+    .step-active { display: block; }
+    .glass-card {
+      background: rgba(255,255,255,0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.5);
+      border-radius: 16px;
+      transition: all 200ms ease;
+    }
+    .glass-card:hover {
+      background: rgba(255,255,255,0.8);
+      border-color: rgba(255,255,255,0.7);
+    }
+    .glass-nav {
+      background: rgba(255,255,255,0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255,255,255,0.5);
+    }
+    .glass-input {
+      background: rgba(255,255,255,0.5);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.6);
+    }
+    .glass-input:focus {
+      background: rgba(255,255,255,0.7);
+      border-color: #6366F1;
+    }
+    .style-card {
+      background: rgba(255,255,255,0.5);
+      backdrop-filter: blur(8px);
+      border: 2px solid rgba(255,255,255,0.6);
+      transition: all 200ms ease;
+    }
+    .style-card:hover {
+      background: rgba(255,255,255,0.7);
+      border-color: #6366F1;
+      transform: translateY(-2px);
+    }
+    .mood-chip {
+      background: rgba(255,255,255,0.5);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.6);
+      transition: all 200ms ease;
+    }
+    .mood-chip:hover {
+      background: rgba(255,255,255,0.7);
+      border-color: #6366F1;
+    }
+    .mood-chip.selected {
+      background: linear-gradient(135deg, #6366F1, #EC4899);
+      color: white;
+      border-color: transparent;
+    }
+    .inspiration-chip {
+      background: rgba(255,255,255,0.5);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.6);
+      transition: all 200ms ease;
+    }
+    .inspiration-chip:hover {
+      background: rgba(255,255,255,0.7);
+      border-color: #6366F1;
+      color: #6366F1;
+    }
+    .voice-btn {
+      background: rgba(255,255,255,0.5);
+      backdrop-filter: blur(8px);
+      border: 2px solid rgba(255,255,255,0.6);
+      transition: all 200ms ease;
+    }
+    .voice-btn:hover {
+      background: rgba(255,255,255,0.7);
+      border-color: #6366F1;
+    }
+    .fade-in { animation: fadeIn 0.3s ease-out; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .gradient-text {
+      background: linear-gradient(135deg, #6366F1, #EC4899);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .gradient-btn {
+      background: linear-gradient(135deg, #6366F1, #8B5CF6);
+      transition: all 200ms ease;
+    }
+    .gradient-btn:hover {
+      background: linear-gradient(135deg, #4F46E5, #7C3AED);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+    }
+    .cta-btn {
+      background: linear-gradient(135deg, #EC4899, #F43F5E);
+      transition: all 200ms ease;
+    }
+    .cta-btn:hover {
+      background: linear-gradient(135deg, #DB2777, #E11D48);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(236,72,153,0.3);
+    }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(255,255,255,0.3); }
+    ::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); border-radius: 3px; }
+  </style>
+</head>
+<body class="text-text-primary">
+
+  <!-- 顶部导航 -->
+  <nav class="fixed top-0 left-0 right-0 z-50 glass-nav">
+    <div class="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 bg-gradient-to-br from-primary to-cta rounded-xl"></div>
+        <span class="font-semibold text-lg gradient-text">序话Story</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <a href="#" class="text-text-secondary hover:text-primary transition-colors text-sm cursor-pointer">我的项目</a>
+        <div class="w-8 h-8 bg-white/50 backdrop-blur rounded-full border border-white/60"></div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 主内容区 -->
+  <main class="pt-24 pb-12 px-6">
+    <div class="max-w-3xl mx-auto">
+
+      <!-- 进度指示器 -->
+      <div class="mb-8">
+        <div class="flex items-center justify-center gap-2 mb-4">
+          <div id="step-indicator-1" class="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-cta text-white flex items-center justify-center text-sm font-medium shadow-lg">1</div>
+          <div class="w-16 h-0.5 bg-white/50 rounded" id="line-1-2"></div>
+          <div id="step-indicator-2" class="w-8 h-8 rounded-full bg-white/50 backdrop-blur text-text-muted flex items-center justify-center text-sm font-medium border border-white/60">2</div>
+          <div class="w-16 h-0.5 bg-white/50 rounded" id="line-2-3"></div>
+          <div id="step-indicator-3" class="w-8 h-8 rounded-full bg-white/50 backdrop-blur text-text-muted flex items-center justify-center text-sm font-medium border border-white/60">3</div>
+        </div>
+        <div class="flex justify-center">
+          <span id="step-label" class="text-text-secondary text-sm">输入创意</span>
+        </div>
+      </div>
+
+      <!-- Step 1: 输入创意 -->
+      <div id="step-1" class="step-active fade-in">
+        <div class="glass-card p-8">
+          <h1 class="text-2xl font-semibold mb-2 text-center">用一句话描述你想讲的故事</h1>
+          <p class="text-text-secondary text-center mb-8">不用想太多，就像跟朋友聊天一样说出你的想法</p>
+
+          <textarea
+            id="idea-input"
+            class="w-full h-32 glass-input rounded-2xl p-4 text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none transition-all"
+            placeholder="例如：一个程序员加班到深夜，在便利店遇见了同样疲惫的女医生，两人在泡面区相视而笑的治愈故事"
+          ></textarea>
+
+          <div class="mt-6">
+            <p class="text-text-muted text-sm mb-3">需要灵感？试试这些：</p>
+            <div class="flex flex-wrap gap-2">
+              <button onclick="setIdea('一只流浪猫找到新家的温暖故事')" class="inspiration-chip px-4 py-2 rounded-full text-sm text-text-secondary cursor-pointer">
+                流浪猫找到新家
+              </button>
+              <button onclick="setIdea('古代侠客为救师父闯入皇宫的惊险冒险')" class="inspiration-chip px-4 py-2 rounded-full text-sm text-text-secondary cursor-pointer">
+                侠客闯皇宫
+              </button>
+              <button onclick="setIdea('外星人第一次来地球，被广场舞大妈惊呆了')" class="inspiration-chip px-4 py-2 rounded-full text-sm text-text-secondary cursor-pointer">
+                外星人看广场舞
+              </button>
+              <button onclick="setIdea('小镇女孩在大城市追逐音乐梦想的奋斗历程')" class="inspiration-chip px-4 py-2 rounded-full text-sm text-text-secondary cursor-pointer">
+                追梦音乐人
+              </button>
+            </div>
+          </div>
+
+          <div class="mt-8 flex justify-end">
+            <button onclick="goToStep(2)" class="gradient-btn px-6 py-3 text-white rounded-xl font-medium flex items-center gap-2 cursor-pointer">
+              下一步
+              <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: 选择风格 -->
+      <div id="step-2" class="step-hidden fade-in">
+        <div class="glass-card p-8">
+          <h1 class="text-2xl font-semibold mb-2 text-center">选择视觉风格</h1>
+          <p class="text-text-secondary text-center mb-8">可以之后再改，先选一个感觉对的</p>
+
+          <!-- 视觉风格 -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div onclick="selectStyle(this, 'realistic')" class="style-card cursor-pointer rounded-2xl p-4">
+              <div class="aspect-square bg-gradient-to-br from-slate-300 to-slate-500 rounded-xl mb-3 flex items-center justify-center">
+                <i data-lucide="camera" class="w-8 h-8 text-white"></i>
+              </div>
+              <p class="text-center font-medium">写实</p>
+              <p class="text-center text-text-muted text-xs mt-1">真实感摄影</p>
+            </div>
+            <div onclick="selectStyle(this, 'cartoon')" class="style-card cursor-pointer rounded-2xl p-4">
+              <div class="aspect-square bg-gradient-to-br from-violet-400 to-purple-500 rounded-xl mb-3 flex items-center justify-center">
+                <i data-lucide="smile" class="w-8 h-8 text-white"></i>
+              </div>
+              <p class="text-center font-medium">3D卡通</p>
+              <p class="text-center text-text-muted text-xs mt-1">皮克斯风格</p>
+            </div>
+            <div onclick="selectStyle(this, 'anime')" class="style-card cursor-pointer rounded-2xl p-4">
+              <div class="aspect-square bg-gradient-to-br from-pink-400 to-rose-500 rounded-xl mb-3 flex items-center justify-center">
+                <i data-lucide="sparkles" class="w-8 h-8 text-white"></i>
+              </div>
+              <p class="text-center font-medium">日式动漫</p>
+              <p class="text-center text-text-muted text-xs mt-1">动漫美学</p>
+            </div>
+            <div onclick="selectStyle(this, 'ink')" class="style-card cursor-pointer rounded-2xl p-4">
+              <div class="aspect-square bg-gradient-to-br from-gray-200 to-gray-400 rounded-xl mb-3 flex items-center justify-center">
+                <i data-lucide="pen-tool" class="w-8 h-8 text-gray-700"></i>
+              </div>
+              <p class="text-center font-medium">水墨</p>
+              <p class="text-center text-text-muted text-xs mt-1">中国传统</p>
+            </div>
+          </div>
+
+          <!-- 情绪基调 -->
+          <div class="mb-8">
+            <p class="text-text-secondary text-sm mb-3">故事的情绪是？<span class="text-text-muted">（可选）</span></p>
+            <div class="flex flex-wrap gap-2">
+              <button onclick="selectMood(this, 'warm')" class="mood-chip px-4 py-2 rounded-full text-sm cursor-pointer">温馨治愈</button>
+              <button onclick="selectMood(this, 'sad')" class="mood-chip px-4 py-2 rounded-full text-sm cursor-pointer">伤感催泪</button>
+              <button onclick="selectMood(this, 'tense')" class="mood-chip px-4 py-2 rounded-full text-sm cursor-pointer">紧张刺激</button>
+              <button onclick="selectMood(this, 'funny')" class="mood-chip px-4 py-2 rounded-full text-sm cursor-pointer">搞笑欢乐</button>
+              <button onclick="selectMood(this, 'inspiring')" class="mood-chip px-4 py-2 rounded-full text-sm cursor-pointer">励志热血</button>
+              <button onclick="selectMood(this, 'mystery')" class="mood-chip px-4 py-2 rounded-full text-sm cursor-pointer">悬疑烧脑</button>
+            </div>
+          </div>
+
+          <!-- 旁白语音 -->
+          <div class="mb-8">
+            <p class="text-text-secondary text-sm mb-3">旁白语音</p>
+            <div class="grid grid-cols-2 gap-3">
+              <button onclick="selectVoice(this, 'female')" class="voice-btn px-4 py-3 rounded-2xl text-sm cursor-pointer flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-pink-400 to-rose-400 rounded-full flex items-center justify-center shadow-lg">
+                  <i data-lucide="user" class="w-5 h-5 text-white"></i>
+                </div>
+                <div class="text-left">
+                  <p class="font-medium">温柔女声</p>
+                  <p class="text-text-muted text-xs">适合治愈、情感故事</p>
+                </div>
+              </button>
+              <button onclick="selectVoice(this, 'male')" class="voice-btn px-4 py-3 rounded-2xl text-sm cursor-pointer flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-indigo-400 to-violet-400 rounded-full flex items-center justify-center shadow-lg">
+                  <i data-lucide="user" class="w-5 h-5 text-white"></i>
+                </div>
+                <div class="text-left">
+                  <p class="font-medium">磁性男声</p>
+                  <p class="text-text-muted text-xs">适合悬疑、冒险故事</p>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex justify-between">
+            <button onclick="goToStep(1)" class="px-6 py-3 bg-white/50 backdrop-blur hover:bg-white/70 text-text-secondary rounded-xl font-medium transition-all cursor-pointer border border-white/60">
+              上一步
+            </button>
+            <button onclick="goToStep(3)" class="gradient-btn px-6 py-3 text-white rounded-xl font-medium flex items-center gap-2 cursor-pointer">
+              生成大纲
+              <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: 确认大纲 -->
+      <div id="step-3" class="step-hidden fade-in">
+        <div class="glass-card p-8">
+          <h1 class="text-2xl font-semibold mb-2 text-center">确认故事大纲</h1>
+          <p class="text-text-secondary text-center mb-8">AI已为你生成大纲，可以点击编辑调整</p>
+
+          <!-- 故事标题 -->
+          <div class="mb-6">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-text-muted text-sm">故事标题</span>
+              <button class="text-primary text-xs hover:underline cursor-pointer">编辑</button>
+            </div>
+            <h2 class="text-xl font-semibold gradient-text">《深夜便利店》</h2>
+          </div>
+
+          <!-- 角色 -->
+          <div class="mb-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-text-muted text-sm">角色</span>
+              <button class="text-primary text-xs hover:underline cursor-pointer">+ 添加角色</button>
+            </div>
+            <div class="space-y-3">
+              <div class="flex items-center gap-4 p-4 bg-white/40 backdrop-blur rounded-2xl border border-white/50 transition-all cursor-pointer group hover:bg-white/60">
+                <div class="w-12 h-12 bg-gradient-to-br from-indigo-400 to-violet-500 rounded-full flex items-center justify-center shadow-lg">
+                  <i data-lucide="monitor" class="w-6 h-6 text-white"></i>
+                </div>
+                <div class="flex-1">
+                  <p class="font-medium">李明</p>
+                  <p class="text-text-muted text-sm">28岁程序员，戴眼镜，格子衫</p>
+                </div>
+                <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button class="text-text-muted hover:text-primary text-sm cursor-pointer">编辑</button>
+                  <button class="text-text-muted hover:text-primary text-sm cursor-pointer">换一个</button>
+                </div>
+              </div>
+              <div class="flex items-center gap-4 p-4 bg-white/40 backdrop-blur rounded-2xl border border-white/50 transition-all cursor-pointer group hover:bg-white/60">
+                <div class="w-12 h-12 bg-gradient-to-br from-pink-400 to-rose-500 rounded-full flex items-center justify-center shadow-lg">
+                  <i data-lucide="heart" class="w-6 h-6 text-white"></i>
+                </div>
+                <div class="flex-1">
+                  <p class="font-medium">张薇</p>
+                  <p class="text-text-muted text-sm">26岁女医生，马尾，白大褂</p>
+                </div>
+                <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button class="text-text-muted hover:text-primary text-sm cursor-pointer">编辑</button>
+                  <button class="text-text-muted hover:text-primary text-sm cursor-pointer">换一个</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 场景 -->
+          <div class="mb-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-text-muted text-sm">场景</span>
+            </div>
+            <div class="p-4 bg-white/40 backdrop-blur rounded-2xl border border-white/50 transition-all cursor-pointer group hover:bg-white/60">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-400 rounded-xl flex items-center justify-center shadow-lg">
+                  <i data-lucide="store" class="w-5 h-5 text-white"></i>
+                </div>
+                <div class="flex-1">
+                  <p class="font-medium">深夜便利店</p>
+                  <p class="text-text-muted text-sm">暖黄灯光，货架整齐，泡面区</p>
+                </div>
+                <button class="text-text-muted hover:text-primary text-sm opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">换场景</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 情节线 -->
+          <div class="mb-8">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-text-muted text-sm">情节线</span>
+            </div>
+            <div class="space-y-2">
+              <div class="flex items-center gap-3 p-4 bg-white/40 backdrop-blur rounded-2xl border border-white/50 transition-all cursor-pointer group hover:bg-white/60">
+                <span class="w-6 h-6 bg-gradient-to-br from-primary to-cta text-white rounded-full flex items-center justify-center text-xs font-medium">1</span>
+                <p class="flex-1 text-sm">李明加班到深夜，疲惫地走进便利店</p>
+                <button class="text-text-muted hover:text-primary text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">调整</button>
+              </div>
+              <div class="flex items-center gap-3 p-4 bg-white/40 backdrop-blur rounded-2xl border border-white/50 transition-all cursor-pointer group hover:bg-white/60">
+                <span class="w-6 h-6 bg-gradient-to-br from-primary to-cta text-white rounded-full flex items-center justify-center text-xs font-medium">2</span>
+                <p class="flex-1 text-sm">泡面区偶遇同样疲惫的张薇</p>
+                <button class="text-text-muted hover:text-primary text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">调整</button>
+              </div>
+              <div class="flex items-center gap-3 p-4 bg-white/40 backdrop-blur rounded-2xl border border-white/50 transition-all cursor-pointer group hover:bg-white/60">
+                <span class="w-6 h-6 bg-gradient-to-br from-primary to-cta text-white rounded-full flex items-center justify-center text-xs font-medium">3</span>
+                <p class="flex-1 text-sm">两人相视而笑，开始聊天</p>
+                <button class="text-text-muted hover:text-primary text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">调整</button>
+              </div>
+              <div class="flex items-center gap-3 p-4 bg-white/40 backdrop-blur rounded-2xl border border-white/50 transition-all cursor-pointer group hover:bg-white/60">
+                <span class="w-6 h-6 bg-gradient-to-br from-primary to-cta text-white rounded-full flex items-center justify-center text-xs font-medium">4</span>
+                <p class="flex-1 text-sm">互相鼓励，带着微笑各自离开</p>
+                <button class="text-text-muted hover:text-primary text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">调整</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 预估信息 -->
+          <div class="bg-white/40 backdrop-blur rounded-2xl p-4 mb-8 border border-white/50">
+            <div class="flex items-center justify-between text-sm">
+              <div class="flex items-center gap-6">
+                <div>
+                  <span class="text-text-muted">预计时长</span>
+                  <span class="ml-2 font-medium">2-3 分钟</span>
+                </div>
+                <div>
+                  <span class="text-text-muted">预计镜头</span>
+                  <span class="ml-2 font-medium">16-20 个</span>
+                </div>
+                <div>
+                  <span class="text-text-muted">生成时间</span>
+                  <span class="ml-2 font-medium">约 5 分钟</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-between">
+            <button onclick="goToStep(2)" class="px-6 py-3 bg-white/50 backdrop-blur hover:bg-white/70 text-text-secondary rounded-xl font-medium transition-all cursor-pointer border border-white/60">
+              修改风格
+            </button>
+            <button onclick="startGeneration()" class="cta-btn px-8 py-3 text-white rounded-xl font-semibold flex items-center gap-2 cursor-pointer">
+              开始生成
+              <i data-lucide="play-circle" class="w-5 h-5"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 生成中模态框 -->
+      <div id="generation-modal" class="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 hidden items-center justify-center">
+        <div class="glass-card p-8 max-w-md w-full mx-4">
+          <div class="text-center">
+            <div class="w-16 h-16 bg-gradient-to-br from-primary to-cta rounded-full mx-auto mb-6 flex items-center justify-center animate-pulse shadow-lg">
+              <i data-lucide="play" class="w-8 h-8 text-white"></i>
+            </div>
+            <h2 class="text-xl font-semibold mb-2">正在创作《深夜便利店》</h2>
+            <p class="text-text-secondary mb-6">AI正在为你生成故事，请稍候...</p>
+
+            <!-- 进度条 -->
+            <div class="w-full bg-white/40 backdrop-blur rounded-full h-2 mb-4 border border-white/50">
+              <div id="progress-bar" class="bg-gradient-to-r from-primary to-cta h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+
+            <!-- 进度状态 -->
+            <div class="text-left space-y-2 text-sm">
+              <div id="status-1" class="flex items-center gap-2 text-text-muted">
+                <div id="status-1-icon" class="w-4 h-4 border-2 border-current rounded-full"></div>
+                <span>生成角色设计</span>
+              </div>
+              <div id="status-2" class="flex items-center gap-2 text-text-muted">
+                <div id="status-2-icon" class="w-4 h-4 border-2 border-current rounded-full"></div>
+                <span>编写分场剧本</span>
+              </div>
+              <div id="status-3" class="flex items-center gap-2 text-text-muted">
+                <div id="status-3-icon" class="w-4 h-4 border-2 border-current rounded-full"></div>
+                <span>绘制分镜画面</span>
+              </div>
+              <div id="status-4" class="flex items-center gap-2 text-text-muted">
+                <div id="status-4-icon" class="w-4 h-4 border-2 border-current rounded-full"></div>
+                <span>合成语音旁白</span>
+              </div>
+              <div id="status-5" class="flex items-center gap-2 text-text-muted">
+                <div id="status-5-icon" class="w-4 h-4 border-2 border-current rounded-full"></div>
+                <span>生成最终视频</span>
+              </div>
+            </div>
+
+            <p class="text-text-muted text-xs mt-6">你可以离开页面，完成后会通知你</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    // 初始化 Lucide 图标
+    lucide.createIcons();
+
+    let currentStep = 1;
+    let selectedStyle = null;
+    let selectedMood = null;
+    let selectedVoice = null;
+
+    function setIdea(text) {
+      document.getElementById('idea-input').value = text;
+    }
+
+    function goToStep(step) {
+      // 隐藏所有步骤
+      document.querySelectorAll('[id^="step-"]').forEach(function(el) {
+        if (/^step-\d+$/.test(el.id)) {
+          el.classList.remove('step-active');
+          el.classList.add('step-hidden');
+        }
+      });
+
+      // 显示目标步骤
+      document.getElementById('step-' + step).classList.remove('step-hidden');
+      document.getElementById('step-' + step).classList.add('step-active');
+
+      // 更新进度指示器
+      for (var i = 1; i <= 3; i++) {
+        var indicator = document.getElementById('step-indicator-' + i);
+        if (i < step) {
+          indicator.className = 'w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center text-sm font-medium shadow-lg';
+          indicator.textContent = '\u2713';
+        } else if (i === step) {
+          indicator.className = 'w-8 h-8 rounded-full bg-gradient-to-br from-primary to-cta text-white flex items-center justify-center text-sm font-medium shadow-lg';
+          indicator.textContent = i;
+        } else {
+          indicator.className = 'w-8 h-8 rounded-full bg-white/50 backdrop-blur text-text-muted flex items-center justify-center text-sm font-medium border border-white/60';
+          indicator.textContent = i;
+        }
+      }
+
+      // 更新连接线
+      document.getElementById('line-1-2').className = step > 1 ? 'w-16 h-0.5 bg-green-500 rounded' : 'w-16 h-0.5 bg-white/50 rounded';
+      document.getElementById('line-2-3').className = step > 2 ? 'w-16 h-0.5 bg-green-500 rounded' : 'w-16 h-0.5 bg-white/50 rounded';
+
+      // 更新步骤标签
+      var labels = ['输入创意', '选择风格', '确认大纲'];
+      document.getElementById('step-label').textContent = labels[step - 1];
+
+      currentStep = step;
+    }
+
+    function selectStyle(el, style) {
+      document.querySelectorAll('.style-card').forEach(function(card) {
+        card.style.borderColor = 'rgba(255,255,255,0.6)';
+        card.style.background = 'rgba(255,255,255,0.5)';
+      });
+      el.style.borderColor = '#6366F1';
+      el.style.background = 'rgba(255,255,255,0.8)';
+      selectedStyle = style;
+    }
+
+    function selectMood(el, mood) {
+      document.querySelectorAll('.mood-chip').forEach(function(chip) {
+        chip.classList.remove('selected');
+      });
+      el.classList.add('selected');
+      selectedMood = mood;
+    }
+
+    function selectVoice(el, voice) {
+      document.querySelectorAll('.voice-btn').forEach(function(btn) {
+        btn.style.borderColor = 'rgba(255,255,255,0.6)';
+        btn.style.background = 'rgba(255,255,255,0.5)';
+      });
+      el.style.borderColor = '#6366F1';
+      el.style.background = 'rgba(255,255,255,0.8)';
+      selectedVoice = voice;
+    }
+
+    function startGeneration() {
+      var modal = document.getElementById('generation-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      // 模拟进度
+      var statuses = [
+        { id: 'status-1', iconId: 'status-1-icon', progress: 20 },
+        { id: 'status-2', iconId: 'status-2-icon', progress: 40 },
+        { id: 'status-3', iconId: 'status-3-icon', progress: 60 },
+        { id: 'status-4', iconId: 'status-4-icon', progress: 80 },
+        { id: 'status-5', iconId: 'status-5-icon', progress: 100 },
+      ];
+
+      var currentStatus = 0;
+      var interval = setInterval(function() {
+        if (currentStatus < statuses.length) {
+          var status = statuses[currentStatus];
+          document.getElementById('progress-bar').style.width = status.progress + '%';
+          document.getElementById(status.id).classList.remove('text-text-muted');
+          document.getElementById(status.id).classList.add('text-primary');
+          var icon = document.getElementById(status.iconId);
+          icon.textContent = '\u2713';
+          icon.classList.add('bg-gradient-to-br', 'from-primary', 'to-cta', 'text-white', 'text-xs', 'flex', 'items-center', 'justify-center');
+          icon.classList.remove('border-2', 'border-current');
+          currentStatus++;
+        } else {
+          clearInterval(interval);
+          setTimeout(function() {
+            alert('视频生成完成！\n\n（这是概念原型，实际产品会跳转到预览页面）');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+          }, 500);
+        }
+      }, 1500);
+    }
+  </script>
+
+</body>
+</html>

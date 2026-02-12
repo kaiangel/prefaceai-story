@@ -1,0 +1,51 @@
+# ==============================
+# 序话Story .gitignore
+# DEC-007 (2026-02-12)
+# ==============================
+
+# --- 安全红线：绝对不能进仓库 ---
+.env
+*.db
+
+# --- 大型生成产物 (2.4GB) ---
+test_output/
+storage/
+
+# --- 依赖和虚拟环境 ---
+venv/
+node_modules/
+
+# --- 历史参考文件（非代码） ---
+forclaudeweb/
+still_image_storyref/
+
+# --- Python 缓存 ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# --- macOS ---
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# --- Next.js / Frontend ---
+.next/
+out/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- 测试产物 ---
+test_story_output.json
+
+# --- 其他 ---
+*.log

@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>序话Story - 创建故事 (沉浸式卡片)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'] },
+          colors: {
+            primary: '#FF6600',
+            'primary-hover': '#E65C00',
+            cta: '#FF6600',
+            'cta-hover': '#E65C00',
+            background: '#F5F5F7',
+            surface: '#FFFFFF',
+            'text-primary': '#1D1D1F',
+            'text-secondary': '#6E6E73',
+            'text-muted': '#86868B',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+    .carousel-container {
+      perspective: 1000px;
+      overflow: hidden;
+    }
+    .slide {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.6s ease;
+      transform-style: preserve-3d;
+      backface-visibility: hidden;
+    }
+    .slide.active { transform: translateX(0) rotateY(0); opacity: 1; z-index: 10; }
+    .slide.prev { transform: translateX(-100%) rotateY(15deg); opacity: 0; z-index: 5; }
+    .slide.next { transform: translateX(100%) rotateY(-15deg); opacity: 0; z-index: 5; }
+    .slide-content {
+      animation: slideUp 0.5s ease-out 0.2s both;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .dot-indicator {
+      transition: all 0.3s ease;
+    }
+    .dot-indicator.active {
+      transform: scale(1.3);
+      background-color: #FF6600;
+    }
+    .style-card {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .style-card:hover {
+      transform: scale(1.05);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+    }
+    .style-card.selected {
+      transform: scale(1.05);
+      box-shadow: 0 0 0 3px #FF6600, 0 12px 40px rgba(255,102,0,0.2);
+    }
+    .mood-chip {
+      transition: all 0.2s ease;
+    }
+    .mood-chip:hover { transform: translateY(-2px); }
+    .mood-chip.selected {
+      background: linear-gradient(135deg, #FF6600, #FF8533);
+      color: white;
+      border-color: transparent;
+    }
+    .swipe-hint {
+      animation: swipeHint 2s ease-in-out infinite;
+    }
+    @keyframes swipeHint {
+      0%, 100% { transform: translateX(0); opacity: 0.5; }
+      50% { transform: translateX(10px); opacity: 1; }
+    }
+  </style>
+</head>
+<body class="bg-background text-text-primary min-h-screen flex flex-col overflow-hidden">
+
+  <nav class="fixed top-0 left-0 right-0 z-50 px-6 py-4">
+    <div class="flex items-center justify-between">
+      <button onclick="prevSlide()" class="w-10 h-10 bg-white/80 backdrop-blur rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-all cursor-pointer" id="prev-btn">
+        <i data-lucide="chevron-left" class="w-5 h-5"></i>
+      </button>
+      <div class="text-center">
+        <span id="step-label" class="text-text-secondary text-sm">(1/4) 输入创意</span>
+      </div>
+      <button onclick="nextSlide()" class="w-10 h-10 bg-white/80 backdrop-blur rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-all cursor-pointer" id="next-btn">
+        <i data-lucide="chevron-right" class="w-5 h-5"></i>
+      </button>
+    </div>
+  </nav>
+
+  <main class="flex-1 flex items-center justify-center px-6 pt-20 pb-24">
+    <div class="carousel-container w-full max-w-lg h-[500px] relative">
+
+      <div id="slide-1" class="slide active">
+        <div class="slide-content bg-surface rounded-3xl p-8 h-full shadow-2xl flex flex-col">
+          <div class="flex-1 flex flex-col justify-center">
+            <div class="w-16 h-16 bg-gradient-to-br from-primary to-orange-400 rounded-2xl mx-auto mb-6 flex items-center justify-center">
+              <i data-lucide="lightbulb" class="w-8 h-8 text-white"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-center mb-2">说说你的故事</h1>
+            <p class="text-text-secondary text-center mb-8">一句话就够，剩下的交给AI</p>
+            <textarea id="idea-input" class="w-full h-32 bg-background rounded-2xl p-4 text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary resize-none text-center" placeholder="比如：程序员和女医生在便利店相遇的治愈故事"></textarea>
+            <div class="flex flex-wrap justify-center gap-2 mt-4">
+              <button onclick="setIdea('流浪猫找到新家')" class="px-3 py-1 bg-background rounded-full text-xs text-text-muted hover:text-primary transition-all cursor-pointer">流浪猫找到新家</button>
+              <button onclick="setIdea('侠客闯皇宫救师父')" class="px-3 py-1 bg-background rounded-full text-xs text-text-muted hover:text-primary transition-all cursor-pointer">侠客闯皇宫</button>
+            </div>
+          </div>
+          <div class="flex items-center justify-center gap-2 text-text-muted text-sm">
+            <span>滑动继续</span>
+            <i data-lucide="chevron-right" class="w-4 h-4 swipe-hint"></i>
+          </div>
+        </div>
+      </div>
+
+      <div id="slide-2" class="slide next">
+        <div class="slide-content bg-surface rounded-3xl p-8 h-full shadow-2xl flex flex-col">
+          <div class="flex-1">
+            <h1 class="text-2xl font-bold text-center mb-2">选择视觉风格</h1>
+            <p class="text-text-secondary text-center mb-6">决定你故事的画面感</p>
+            <div class="grid grid-cols-2 gap-4" id="style-grid">
+              <button onclick="selectStyle(this,'realistic','写实')" class="style-card bg-background rounded-2xl p-4 cursor-pointer">
+                <div class="aspect-square bg-gradient-to-br from-slate-300 to-slate-500 rounded-xl mb-3 flex items-center justify-center">
+                  <i data-lucide="camera" class="w-10 h-10 text-white"></i>
+                </div>
+                <p class="font-semibold text-center">写实</p>
+                <p class="text-text-muted text-xs text-center">真实感摄影</p>
+              </button>
+              <button onclick="selectStyle(this,'cartoon','3D卡通')" class="style-card bg-background rounded-2xl p-4 cursor-pointer">
+                <div class="aspect-square bg-gradient-to-br from-blue-400 to-purple-500 rounded-xl mb-3 flex items-center justify-center">
+                  <i data-lucide="smile" class="w-10 h-10 text-white"></i>
+                </div>
+                <p class="font-semibold text-center">3D卡通</p>
+                <p class="text-text-muted text-xs text-center">皮克斯风格</p>
+              </button>
+              <button onclick="selectStyle(this,'anime','日式动漫')" class="style-card bg-background rounded-2xl p-4 cursor-pointer">
+                <div class="aspect-square bg-gradient-to-br from-pink-400 to-rose-500 rounded-xl mb-3 flex items-center justify-center">
+                  <i data-lucide="sparkles" class="w-10 h-10 text-white"></i>
+                </div>
+                <p class="font-semibold text-center">日式动漫</p>
+                <p class="text-text-muted text-xs text-center">动漫美学</p>
+              </button>
+              <button onclick="selectStyle(this,'ink','水墨')" class="style-card bg-background rounded-2xl p-4 cursor-pointer">
+                <div class="aspect-square bg-gradient-to-br from-gray-200 to-gray-400 rounded-xl mb-3 flex items-center justify-center">
+                  <i data-lucide="pen-tool" class="w-10 h-10 text-gray-600"></i>
+                </div>
+                <p class="font-semibold text-center">水墨</p>
+                <p class="text-text-muted text-xs text-center">中国传统</p>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="slide-3" class="slide next">
+        <div class="slide-content bg-surface rounded-3xl p-8 h-full shadow-2xl flex flex-col">
+          <div class="flex-1">
+            <h1 class="text-2xl font-bold text-center mb-2">故事氛围</h1>
+            <p class="text-text-secondary text-center mb-6">选择情绪基调和旁白</p>
+
+            <div class="mb-6">
+              <p class="text-text-muted text-sm mb-3 text-center">情绪基调</p>
+              <div class="flex flex-wrap justify-center gap-2" id="mood-grid">
+                <button onclick="selectMood(this,'温馨治愈')" class="mood-chip px-4 py-2 bg-background border border-slate-200 rounded-full text-sm cursor-pointer">温馨治愈</button>
+                <button onclick="selectMood(this,'伤感催泪')" class="mood-chip px-4 py-2 bg-background border border-slate-200 rounded-full text-sm cursor-pointer">伤感催泪</button>
+                <button onclick="selectMood(this,'紧张刺激')" class="mood-chip px-4 py-2 bg-background border border-slate-200 rounded-full text-sm cursor-pointer">紧张刺激</button>
+                <button onclick="selectMood(this,'搞笑欢乐')" class="mood-chip px-4 py-2 bg-background border border-slate-200 rounded-full text-sm cursor-pointer">搞笑欢乐</button>
+                <button onclick="selectMood(this,'励志热血')" class="mood-chip px-4 py-2 bg-background border border-slate-200 rounded-full text-sm cursor-pointer">励志热血</button>
+                <button onclick="selectMood(this,'悬疑烧脑')" class="mood-chip px-4 py-2 bg-background border border-slate-200 rounded-full text-sm cursor-pointer">悬疑烧脑</button>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-text-muted text-sm mb-3 text-center">旁白语音</p>
+              <div class="flex gap-3 justify-center" id="voice-grid">
+                <button onclick="selectVoice(this,'female','温柔女声')" class="voice-btn flex-1 max-w-40 bg-background rounded-2xl p-4 cursor-pointer border-2 border-transparent hover:border-primary transition-all">
+                  <div class="w-12 h-12 bg-gradient-to-br from-pink-400 to-rose-400 rounded-full mx-auto mb-2 flex items-center justify-center">
+                    <i data-lucide="user" class="w-6 h-6 text-white"></i>
+                  </div>
+                  <p class="font-medium text-sm text-center">温柔女声</p>
+                </button>
+                <button onclick="selectVoice(this,'male','磁性男声')" class="voice-btn flex-1 max-w-40 bg-background rounded-2xl p-4 cursor-pointer border-2 border-transparent hover:border-primary transition-all">
+                  <div class="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full mx-auto mb-2 flex items-center justify-center">
+                    <i data-lucide="user" class="w-6 h-6 text-white"></i>
+                  </div>
+                  <p class="font-medium text-sm text-center">磁性男声</p>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="slide-4" class="slide next">
+        <div class="slide-content bg-surface rounded-3xl p-6 h-full shadow-2xl flex flex-col overflow-hidden">
+          <h1 class="text-xl font-bold text-center mb-1">确认故事大纲</h1>
+          <p class="text-text-secondary text-center text-sm mb-4">AI已为你生成，可点击调整</p>
+
+          <div class="flex-1 overflow-y-auto space-y-4">
+            <div class="text-center">
+              <h2 class="text-lg font-semibold" id="story-title">《深夜便利店》</h2>
+              <p class="text-text-muted text-xs" id="story-meta">写实 · 温馨治愈 · 温柔女声</p>
+            </div>
+
+            <div>
+              <p class="text-text-muted text-xs mb-2">角色</p>
+              <div class="flex gap-2">
+                <div class="flex-1 bg-background rounded-xl p-3 flex items-center gap-2">
+                  <div class="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex-shrink-0"></div>
+                  <div>
+                    <p class="font-medium text-sm">李明</p>
+                    <p class="text-text-muted text-xs">28岁程序员</p>
+                  </div>
+                </div>
+                <div class="flex-1 bg-background rounded-xl p-3 flex items-center gap-2">
+                  <div class="w-10 h-10 bg-gradient-to-br from-pink-400 to-rose-500 rounded-full flex-shrink-0"></div>
+                  <div>
+                    <p class="font-medium text-sm">张薇</p>
+                    <p class="text-text-muted text-xs">26岁女医生</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-text-muted text-xs mb-2">情节线</p>
+              <div class="space-y-2">
+                <div class="flex items-start gap-2 bg-background rounded-xl p-3">
+                  <span class="w-5 h-5 bg-primary/20 text-primary rounded-full flex items-center justify-center text-xs flex-shrink-0 mt-0.5">1</span>
+                  <p class="text-sm">李明加班到深夜，疲惫地走进便利店</p>
+                </div>
+                <div class="flex items-start gap-2 bg-background rounded-xl p-3">
+                  <span class="w-5 h-5 bg-primary/20 text-primary rounded-full flex items-center justify-center text-xs flex-shrink-0 mt-0.5">2</span>
+                  <p class="text-sm">泡面区偶遇同样疲惫的张薇</p>
+                </div>
+                <div class="flex items-start gap-2 bg-background rounded-xl p-3">
+                  <span class="w-5 h-5 bg-primary/20 text-primary rounded-full flex items-center justify-center text-xs flex-shrink-0 mt-0.5">3</span>
+                  <p class="text-sm">两人相视而笑，开始聊天</p>
+                </div>
+                <div class="flex items-start gap-2 bg-background rounded-xl p-3">
+                  <span class="w-5 h-5 bg-primary/20 text-primary rounded-full flex items-center justify-center text-xs flex-shrink-0 mt-0.5">4</span>
+                  <p class="text-sm">互相鼓励，带着微笑各自离开</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button onclick="startGeneration()" class="w-full py-4 bg-gradient-to-r from-primary to-orange-500 hover:from-primary-hover hover:to-orange-600 text-white rounded-2xl font-semibold text-lg transition-all cursor-pointer shadow-lg mt-4 flex items-center justify-center gap-2">
+            <i data-lucide="play" class="w-5 h-5"></i>
+            开始生成视频
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="fixed bottom-8 left-0 right-0 flex justify-center gap-3">
+    <span class="dot-indicator w-2 h-2 bg-text-muted rounded-full active" data-slide="1"></span>
+    <span class="dot-indicator w-2 h-2 bg-text-muted rounded-full" data-slide="2"></span>
+    <span class="dot-indicator w-2 h-2 bg-text-muted rounded-full" data-slide="3"></span>
+    <span class="dot-indicator w-2 h-2 bg-text-muted rounded-full" data-slide="4"></span>
+  </div>
+
+  <div id="generation-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden items-center justify-center">
+    <div class="bg-surface rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl">
+      <div class="text-center">
+        <div class="w-20 h-20 bg-gradient-to-br from-primary to-orange-400 rounded-full mx-auto mb-6 flex items-center justify-center animate-pulse">
+          <i data-lucide="film" class="w-10 h-10 text-white"></i>
+        </div>
+        <h2 class="text-2xl font-bold mb-2">创作中...</h2>
+        <p class="text-text-secondary mb-6">AI正在为你生成精彩短视频</p>
+        <div class="w-full bg-background rounded-full h-3 mb-6">
+          <div id="progress-bar" class="bg-gradient-to-r from-primary to-orange-400 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+        </div>
+        <div class="text-left space-y-3">
+          <div id="status-1" class="flex items-center gap-3 text-text-muted"><div id="status-1-icon" class="w-5 h-5 border-2 border-current rounded-full flex-shrink-0"></div><span>生成角色设计</span></div>
+          <div id="status-2" class="flex items-center gap-3 text-text-muted"><div id="status-2-icon" class="w-5 h-5 border-2 border-current rounded-full flex-shrink-0"></div><span>编写分场剧本</span></div>
+          <div id="status-3" class="flex items-center gap-3 text-text-muted"><div id="status-3-icon" class="w-5 h-5 border-2 border-current rounded-full flex-shrink-0"></div><span>绘制分镜画面</span></div>
+          <div id="status-4" class="flex items-center gap-3 text-text-muted"><div id="status-4-icon" class="w-5 h-5 border-2 border-current rounded-full flex-shrink-0"></div><span>合成语音旁白</span></div>
+          <div id="status-5" class="flex items-center gap-3 text-text-muted"><div id="status-5-icon" class="w-5 h-5 border-2 border-current rounded-full flex-shrink-0"></div><span>生成最终视频</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    var currentSlide = 1;
+    var totalSlides = 4;
+    var storyData = { idea: '', style: '', mood: '', voice: '' };
+    var labels = ['(1/4) 输入创意', '(2/4) 选择风格', '(3/4) 故事氛围', '(4/4) 确认大纲'];
+
+    var startX = 0;
+    var isDragging = false;
+    var carousel = document.querySelector('.carousel-container');
+
+    carousel.addEventListener('touchstart', function(e) { startX = e.touches[0].clientX; isDragging = true; });
+    carousel.addEventListener('touchend', function(e) {
+      if (!isDragging) return;
+      var endX = e.changedTouches[0].clientX;
+      var diff = startX - endX;
+      if (Math.abs(diff) > 50) {
+        if (diff > 0) nextSlide();
+        else prevSlide();
+      }
+      isDragging = false;
+    });
+
+    carousel.addEventListener('mousedown', function(e) { startX = e.clientX; isDragging = true; });
+    carousel.addEventListener('mouseup', function(e) {
+      if (!isDragging) return;
+      var diff = startX - e.clientX;
+      if (Math.abs(diff) > 50) {
+        if (diff > 0) nextSlide();
+        else prevSlide();
+      }
+      isDragging = false;
+    });
+
+    function updateSlides() {
+      for (var i = 1; i <= totalSlides; i++) {
+        var slide = document.getElementById('slide-' + i);
+        slide.classList.remove('active', 'prev', 'next');
+        if (i === currentSlide) slide.classList.add('active');
+        else if (i < currentSlide) slide.classList.add('prev');
+        else slide.classList.add('next');
+      }
+      document.querySelectorAll('.dot-indicator').forEach(function(dot, index) {
+        dot.classList.toggle('active', index + 1 === currentSlide);
+      });
+      document.getElementById('step-label').textContent = labels[currentSlide - 1];
+      document.getElementById('prev-btn').style.opacity = currentSlide === 1 ? '0.3' : '1';
+      document.getElementById('prev-btn').style.pointerEvents = currentSlide === 1 ? 'none' : 'auto';
+    }
+
+    function nextSlide() {
+      if (currentSlide < totalSlides) {
+        currentSlide++;
+        updateSlides();
+        if (currentSlide === 4) updateOutline();
+      }
+    }
+
+    function prevSlide() {
+      if (currentSlide > 1) {
+        currentSlide--;
+        updateSlides();
+      }
+    }
+
+    function setIdea(text) {
+      document.getElementById('idea-input').value = text;
+      storyData.idea = text;
+    }
+
+    function selectStyle(el, id, name) {
+      document.querySelectorAll('#style-grid .style-card').forEach(function(c) { c.classList.remove('selected'); });
+      el.classList.add('selected');
+      storyData.style = name;
+    }
+
+    function selectMood(el, mood) {
+      document.querySelectorAll('#mood-grid .mood-chip').forEach(function(c) { c.classList.remove('selected'); });
+      el.classList.add('selected');
+      storyData.mood = mood;
+    }
+
+    function selectVoice(el, id, name) {
+      document.querySelectorAll('#voice-grid .voice-btn').forEach(function(c) { c.style.borderColor = 'transparent'; });
+      el.style.borderColor = '#FF6600';
+      storyData.voice = name;
+    }
+
+    function updateOutline() {
+      var meta = (storyData.style || '写实') + ' · ' + (storyData.mood || '温馨治愈') + ' · ' + (storyData.voice || '温柔女声');
+      document.getElementById('story-meta').textContent = meta;
+    }
+
+    function startGeneration() {
+      var modal = document.getElementById('generation-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      var statuses = [
+        { id: 'status-1', iconId: 'status-1-icon', progress: 20 },
+        { id: 'status-2', iconId: 'status-2-icon', progress: 40 },
+        { id: 'status-3', iconId: 'status-3-icon', progress: 60 },
+        { id: 'status-4', iconId: 'status-4-icon', progress: 80 },
+        { id: 'status-5', iconId: 'status-5-icon', progress: 100 }
+      ];
+      var currentStatus = 0;
+      var interval = setInterval(function() {
+        if (currentStatus < statuses.length) {
+          var status = statuses[currentStatus];
+          document.getElementById('progress-bar').style.width = status.progress + '%';
+          document.getElementById(status.id).classList.remove('text-text-muted');
+          document.getElementById(status.id).classList.add('text-primary');
+          var icon = document.getElementById(status.iconId);
+          icon.textContent = '\u2713';
+          icon.classList.add('bg-primary', 'text-white', 'text-xs', 'flex', 'items-center', 'justify-center');
+          icon.classList.remove('border-2', 'border-current');
+          currentStatus++;
+        } else {
+          clearInterval(interval);
+          setTimeout(function() {
+            alert('视频生成完成！\n\n（这是概念原型，实际产品会跳转到预览页面）');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+          }, 500);
+        }
+      }, 1500);
+    }
+
+    updateSlides();
+  </script>
+</body>
+</html>

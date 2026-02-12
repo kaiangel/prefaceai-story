@@ -1,0 +1,216 @@
+{
+  "version": "2.0.0",
+  "description": "Character type definitions for xuhua_story character consistency system",
+  "total_types": 19,
+  "types": {
+    "human": {
+      "name_zh": "人类",
+      "name_en": "Human",
+      "description": "Regular human characters including children, adults, elderly",
+      "examples": ["小朋友", "老奶奶", "公主", "王子", "探险家"],
+      "type_declaration": "This is a HUMAN character.",
+      "appearance_fields": {
+        "required": ["age_stage", "gender", "skin_tone"],
+        "optional": ["height", "build", "hair_color", "hair_style", "hair_length", "eye_color", "eye_shape", "face_shape", "nose", "mouth", "distinctive_features", "clothing_style", "clothing_colors", "accessories", "default_expression", "special_notes"]
+      }
+    },
+    "animal": {
+      "name_zh": "动物",
+      "name_en": "Animal",
+      "description": "Real-world animals including pets, wildlife, farm animals",
+      "examples": ["小猫", "小狗", "兔子", "麻雀", "老虎", "大象"],
+      "type_declaration": "This is an ANIMAL character, NOT a human.",
+      "appearance_fields": {
+        "required": ["species", "size", "fur_type"],
+        "optional": ["fur_color", "fur_pattern", "eye_color", "eye_type", "nose_beak", "ears", "tail", "distinctive_marks", "default_expression", "special_notes"]
+      }
+    },
+    "fantasy_creature": {
+      "name_zh": "幻想生物",
+      "name_en": "Fantasy Creature",
+      "description": "Fictional creatures from fantasy settings",
+      "examples": ["精灵", "小仙子", "妖精", "魔法生物"],
+      "type_declaration": "This is a FANTASY CREATURE, NOT a regular human or animal.",
+      "appearance_fields": {
+        "required": ["creature_type", "size"],
+        "optional": ["body_shape", "skin_covering", "coloring", "special_features", "magical_elements", "wings", "aura", "distinctive_marks", "default_expression", "special_notes"]
+      }
+    },
+    "robot": {
+      "name_zh": "机器人/机甲",
+      "name_en": "Robot/Mecha",
+      "description": "Mechanical beings, androids, and mecha",
+      "examples": ["机器人", "AI助手", "机甲战士", "智能管家"],
+      "type_declaration": "This is a ROBOT/MECHANICAL character, NOT organic.",
+      "appearance_fields": {
+        "required": ["robot_type", "size"],
+        "optional": ["body_material", "color_scheme", "head_design", "eye_sensors", "limb_design", "special_features", "power_source", "accessories", "default_expression", "special_notes"]
+      }
+    },
+    "object": {
+      "name_zh": "拟人化物品",
+      "name_en": "Personified Object",
+      "description": "Everyday objects given personality and character",
+      "examples": ["会说话的茶壶", "有表情的太阳", "拟人化的书本"],
+      "type_declaration": "This is a PERSONIFIED OBJECT character.",
+      "appearance_fields": {
+        "required": ["object_type", "size"],
+        "optional": ["material", "color", "face_placement", "limb_style", "special_features", "wear_accessories", "default_expression", "special_notes"]
+      }
+    },
+    "hybrid": {
+      "name_zh": "混合生物",
+      "name_en": "Hybrid Creature",
+      "description": "Creatures combining traits from multiple species",
+      "examples": ["半人马", "狮鹫", "人鱼战士"],
+      "type_declaration": "This is a HYBRID character combining multiple creature types.",
+      "appearance_fields": {
+        "required": ["primary_type", "secondary_type", "size"],
+        "optional": ["blend_style", "primary_features", "secondary_features", "transition_area", "coloring", "distinctive_marks", "default_expression", "special_notes"]
+      }
+    },
+    "insect": {
+      "name_zh": "昆虫",
+      "name_en": "Insect",
+      "description": "Insects and arthropods including bees, butterflies, ants",
+      "examples": ["蜜蜂", "蝴蝶", "蚂蚁", "萤火虫", "蜻蜓", "瓢虫"],
+      "type_declaration": "This is an INSECT character, NOT a human or mammal.",
+      "appearance_fields": {
+        "required": ["species", "size"],
+        "optional": ["body_segments", "exoskeleton_color", "wing_type", "wing_pattern", "antenna_type", "eye_type", "leg_count", "distinctive_marks", "bioluminescence", "default_expression", "special_notes"]
+      }
+    },
+    "aquatic": {
+      "name_zh": "水生生物",
+      "name_en": "Aquatic Creature",
+      "description": "Marine and freshwater creatures",
+      "examples": ["小鱼", "章鱼", "海豚", "美人鱼", "海龟", "鲸鱼"],
+      "type_declaration": "This is an AQUATIC character, a creature of the water.",
+      "appearance_fields": {
+        "required": ["species", "size"],
+        "optional": ["body_shape", "scale_type", "scale_color", "fin_types", "tail_type", "eye_type", "gill_type", "distinctive_marks", "bioluminescence", "default_expression", "special_notes"]
+      }
+    },
+    "plant": {
+      "name_zh": "植物",
+      "name_en": "Plant Character",
+      "description": "Sentient plants, tree spirits, flower fairies",
+      "examples": ["树精灵", "花仙子", "蘑菇人", "向日葵", "智慧之树"],
+      "type_declaration": "This is a PLANT character, NOT an animal or human.",
+      "appearance_fields": {
+        "required": ["plant_type", "size"],
+        "optional": ["stem_trunk", "leaf_type", "flower_fruit", "root_visible", "face_placement", "coloring", "seasonal_state", "magical_elements", "distinctive_marks", "default_expression", "special_notes"]
+      }
+    },
+    "mythological": {
+      "name_zh": "神话生物",
+      "name_en": "Mythological Creature",
+      "description": "Creatures from mythology and legends",
+      "examples": ["龙", "凤凰", "独角兽", "麒麟", "九尾狐", "年兽"],
+      "type_declaration": "This is a MYTHOLOGICAL creature from legend and folklore.",
+      "appearance_fields": {
+        "required": ["creature_type", "origin_mythology", "size"],
+        "optional": ["body_type", "scale_fur_feathers", "coloring", "horns_antlers", "wings", "tail", "special_powers", "aura", "elemental_affinity", "distinctive_marks", "default_expression", "special_notes"]
+      }
+    },
+    "supernatural": {
+      "name_zh": "超自然存在",
+      "name_en": "Supernatural Being",
+      "description": "Divine, angelic, demonic, or spiritual entities",
+      "examples": ["天使", "神仙", "恶魔", "精灵", "守护神", "土地公"],
+      "type_declaration": "This is a SUPERNATURAL being with divine or otherworldly nature.",
+      "appearance_fields": {
+        "required": ["being_type", "alignment", "size"],
+        "optional": ["form", "aura_color", "wings", "halo_horns", "divine_marks", "clothing_robes", "held_items", "elemental_association", "distinctive_marks", "default_expression", "special_notes"]
+      }
+    },
+    "undead": {
+      "name_zh": "亡灵",
+      "name_en": "Undead",
+      "description": "Ghosts, spirits, zombies, and other undead beings",
+      "examples": ["幽灵", "僵尸", "骷髅", "吸血鬼", "亡魂"],
+      "type_declaration": "This is an UNDEAD character, no longer among the living.",
+      "appearance_fields": {
+        "required": ["undead_type", "size"],
+        "optional": ["corporeal_state", "decay_level", "ghostly_color", "original_form", "death_cause_marks", "clothing_remains", "special_abilities", "haunting_elements", "distinctive_marks", "default_expression", "special_notes"]
+      }
+    },
+    "elemental": {
+      "name_zh": "元素生物",
+      "name_en": "Elemental Being",
+      "description": "Beings made of or representing natural elements",
+      "examples": ["火元素", "水精灵", "冰霜巨人", "风之子", "岩石怪"],
+      "type_declaration": "This is an ELEMENTAL being made of pure elemental force.",
+      "appearance_fields": {
+        "required": ["element_type", "size"],
+        "optional": ["form_stability", "core_appearance", "body_composition", "color_intensity", "energy_effects", "temperature_visual", "containment", "distinctive_marks", "default_expression", "special_notes"]
+      }
+    },
+    "alien": {
+      "name_zh": "外星生物",
+      "name_en": "Alien",
+      "description": "Extraterrestrial beings from science fiction",
+      "examples": ["外星人", "异星生物", "星际旅行者", "火星人"],
+      "type_declaration": "This is an ALIEN creature from beyond Earth.",
+      "appearance_fields": {
+        "required": ["alien_type", "size"],
+        "optional": ["body_plan", "skin_type", "skin_color", "head_shape", "eye_arrangement", "limb_count", "appendages", "technology_integration", "communication_organs", "distinctive_marks", "default_expression", "special_notes"]
+      }
+    },
+    "vehicle_character": {
+      "name_zh": "载具角色",
+      "name_en": "Vehicle Character",
+      "description": "Vehicles with personality, Cars/Thomas style",
+      "examples": ["汽车角色", "火车头", "飞机", "船只", "拖拉机"],
+      "type_declaration": "This is a VEHICLE CHARACTER with personality (like Cars or Thomas).",
+      "appearance_fields": {
+        "required": ["vehicle_type", "size"],
+        "optional": ["body_style", "color_scheme", "eye_placement", "mouth_design", "expression_method", "decals_markings", "accessories", "condition", "distinctive_marks", "default_expression", "special_notes"]
+      }
+    },
+    "digital_virtual": {
+      "name_zh": "数字/虚拟角色",
+      "name_en": "Digital/Virtual Character",
+      "description": "AI entities, holograms, virtual beings",
+      "examples": ["AI助手", "虚拟偶像", "全息影像", "数字精灵", "程序化身"],
+      "type_declaration": "This is a DIGITAL/VIRTUAL character existing in electronic form.",
+      "appearance_fields": {
+        "required": ["digital_type", "size"],
+        "optional": ["form_style", "color_scheme", "pixel_resolution", "glow_effects", "interface_elements", "glitch_aesthetic", "hologram_base", "data_visualization", "distinctive_marks", "default_expression", "special_notes"]
+      }
+    },
+    "concept_personified": {
+      "name_zh": "概念拟人化",
+      "name_en": "Personified Concept",
+      "description": "Abstract concepts given physical form",
+      "examples": ["时间老人", "死神", "爱神", "命运女神", "四季"],
+      "type_declaration": "This is a PERSONIFIED CONCEPT, an abstract idea given form.",
+      "appearance_fields": {
+        "required": ["concept", "size"],
+        "optional": ["form_type", "symbolic_elements", "color_symbolism", "clothing_style", "held_symbols", "aura_effects", "age_appearance", "distinctive_marks", "default_expression", "special_notes"]
+      }
+    },
+    "miniature": {
+      "name_zh": "微型角色",
+      "name_en": "Miniature Character",
+      "description": "Tiny beings, thumb-sized characters",
+      "examples": ["拇指姑娘", "小精灵", "借物少女", "微型人", "豆丁"],
+      "type_declaration": "This is a MINIATURE character, extremely small in scale.",
+      "appearance_fields": {
+        "required": ["base_type", "size_comparison"],
+        "optional": ["body_proportions", "features", "clothing_materials", "tools_items", "transportation", "home_environment", "scale_reference", "distinctive_marks", "default_expression", "special_notes"]
+      }
+    },
+    "giant": {
+      "name_zh": "巨型角色",
+      "name_en": "Giant Character",
+      "description": "Massive beings, titans, colossi",
+      "examples": ["巨人", "泰坦", "怪兽", "山神", "巨型机器人"],
+      "type_declaration": "This is a GIANT character of massive scale.",
+      "appearance_fields": {
+        "required": ["giant_type", "size_comparison"],
+        "optional": ["body_type", "skin_surface", "coloring", "facial_features", "limb_proportions", "environmental_interaction", "footstep_effects", "scale_reference", "distinctive_marks", "default_expression", "special_notes"]
+      }
+    }
+  }
+}

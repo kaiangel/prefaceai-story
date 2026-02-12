@@ -1,0 +1,555 @@
+{
+  "version": "2.0.0",
+  "description": "Style presets for xuhua_story illustration generation",
+  "total_styles": 82,
+  "categories": {
+    "medium": {
+      "name_zh": "艺术媒介/技法",
+      "name_en": "Art Medium/Technique",
+      "description": "Traditional and digital art media styles",
+      "styles": [
+        {
+          "id": "pencil_sketch",
+          "name_zh": "铅笔素描",
+          "name_en": "Pencil Sketch",
+          "prompt_keywords": "pencil sketch, graphite drawing, hand-drawn lines, shading, hatching, traditional art"
+        },
+        {
+          "id": "colored_pencil",
+          "name_zh": "彩色铅笔",
+          "name_en": "Colored Pencil",
+          "prompt_keywords": "colored pencil art, crayon-like texture, soft blending, traditional illustration"
+        },
+        {
+          "id": "watercolor",
+          "name_zh": "水彩",
+          "name_en": "Watercolor",
+          "prompt_keywords": "watercolor painting, soft washes, wet-on-wet technique, bleeding colors, delicate brushstrokes"
+        },
+        {
+          "id": "gouache",
+          "name_zh": "水粉/不透明水彩",
+          "name_en": "Gouache",
+          "prompt_keywords": "gouache painting, opaque watercolor, matte finish, flat colors, vintage illustration style"
+        },
+        {
+          "id": "oil_painting",
+          "name_zh": "油画",
+          "name_en": "Oil Painting",
+          "prompt_keywords": "oil painting, thick brushstrokes, impasto technique, rich colors, classical art"
+        },
+        {
+          "id": "acrylic",
+          "name_zh": "丙烯画",
+          "name_en": "Acrylic",
+          "prompt_keywords": "acrylic painting, vibrant colors, versatile texture, modern art technique"
+        },
+        {
+          "id": "pastel",
+          "name_zh": "色粉画/蜡笔",
+          "name_en": "Pastel",
+          "prompt_keywords": "pastel art, soft chalky texture, blended colors, dreamy atmosphere"
+        },
+        {
+          "id": "ink_wash",
+          "name_zh": "水墨画",
+          "name_en": "Ink Wash",
+          "prompt_keywords": "ink wash painting, sumi-e style, black and white gradients, brush strokes, zen aesthetic"
+        },
+        {
+          "id": "charcoal",
+          "name_zh": "炭笔画",
+          "name_en": "Charcoal",
+          "prompt_keywords": "charcoal drawing, dramatic shadows, smudged texture, high contrast, expressive strokes"
+        },
+        {
+          "id": "digital_painting",
+          "name_zh": "数字绘画",
+          "name_en": "Digital Painting",
+          "prompt_keywords": "digital painting, clean lines, smooth gradients, modern digital art"
+        },
+        {
+          "id": "vector_art",
+          "name_zh": "矢量艺术",
+          "name_en": "Vector Art",
+          "prompt_keywords": "vector art, flat design, clean edges, geometric shapes, scalable graphics"
+        },
+        {
+          "id": "pixel_art",
+          "name_zh": "像素艺术",
+          "name_en": "Pixel Art",
+          "prompt_keywords": "pixel art, 8-bit style, retro gaming aesthetic, blocky pixels, limited palette"
+        },
+        {
+          "id": "collage",
+          "name_zh": "拼贴艺术",
+          "name_en": "Collage",
+          "prompt_keywords": "collage art, mixed media, cut paper, layered textures, assemblage"
+        },
+        {
+          "id": "linocut",
+          "name_zh": "木刻/版画",
+          "name_en": "Linocut/Woodcut",
+          "prompt_keywords": "linocut print, woodblock style, bold lines, high contrast, printmaking"
+        }
+      ]
+    },
+    "art_movement": {
+      "name_zh": "艺术流派/运动",
+      "name_en": "Art Movement",
+      "description": "Historical and contemporary art movements",
+      "styles": [
+        {
+          "id": "impressionist",
+          "name_zh": "印象派",
+          "name_en": "Impressionist",
+          "prompt_keywords": "impressionist style, Monet-inspired, soft brushwork, light and color study, plein air"
+        },
+        {
+          "id": "post_impressionist",
+          "name_zh": "后印象派",
+          "name_en": "Post-Impressionist",
+          "prompt_keywords": "post-impressionist, Van Gogh inspired, bold colors, expressive brushstrokes, emotional"
+        },
+        {
+          "id": "expressionist",
+          "name_zh": "表现主义",
+          "name_en": "Expressionist",
+          "prompt_keywords": "expressionist style, distorted forms, emotional intensity, bold colors, dramatic"
+        },
+        {
+          "id": "surrealist",
+          "name_zh": "超现实主义",
+          "name_en": "Surrealist",
+          "prompt_keywords": "surrealist art, dreamlike, impossible scenes, Dali-inspired, subconscious imagery"
+        },
+        {
+          "id": "art_nouveau",
+          "name_zh": "新艺术运动",
+          "name_en": "Art Nouveau",
+          "prompt_keywords": "art nouveau style, Mucha-inspired, flowing lines, organic forms, decorative borders"
+        },
+        {
+          "id": "art_deco",
+          "name_zh": "装饰艺术",
+          "name_en": "Art Deco",
+          "prompt_keywords": "art deco style, geometric patterns, luxurious, gold accents, 1920s glamour"
+        },
+        {
+          "id": "pop_art",
+          "name_zh": "波普艺术",
+          "name_en": "Pop Art",
+          "prompt_keywords": "pop art style, Warhol/Lichtenstein inspired, bold colors, halftone dots, commercial art"
+        },
+        {
+          "id": "minimalist",
+          "name_zh": "极简主义",
+          "name_en": "Minimalist",
+          "prompt_keywords": "minimalist art, simple shapes, limited palette, clean design, essential forms"
+        },
+        {
+          "id": "cubist",
+          "name_zh": "立体主义",
+          "name_en": "Cubist",
+          "prompt_keywords": "cubist style, Picasso-inspired, geometric fragmentation, multiple perspectives"
+        },
+        {
+          "id": "fauvism",
+          "name_zh": "野兽派",
+          "name_en": "Fauvism",
+          "prompt_keywords": "fauvist style, Matisse-inspired, wild colors, simplified forms, expressive"
+        },
+        {
+          "id": "romanticism",
+          "name_zh": "浪漫主义",
+          "name_en": "Romanticism",
+          "prompt_keywords": "romantic art style, dramatic landscapes, emotional, sublime nature, dramatic lighting"
+        },
+        {
+          "id": "baroque",
+          "name_zh": "巴洛克",
+          "name_en": "Baroque",
+          "prompt_keywords": "baroque style, dramatic chiaroscuro, rich details, ornate, theatrical lighting"
+        }
+      ]
+    },
+    "cultural": {
+      "name_zh": "文化/地域风格",
+      "name_en": "Cultural/Regional Style",
+      "description": "Art styles from different cultures and regions",
+      "styles": [
+        {
+          "id": "ukiyo_e",
+          "name_zh": "浮世绘",
+          "name_en": "Ukiyo-e",
+          "prompt_keywords": "ukiyo-e style, Japanese woodblock print, flat colors, bold outlines, Hokusai-inspired"
+        },
+        {
+          "id": "shin_hanga",
+          "name_zh": "新版画",
+          "name_en": "Shin-hanga",
+          "prompt_keywords": "shin-hanga style, modern Japanese woodblock, atmospheric, detailed, Hasui Kawase inspired"
+        },
+        {
+          "id": "dunhuang",
+          "name_zh": "敦煌风格",
+          "name_en": "Dunhuang",
+          "prompt_keywords": "Dunhuang mural style, Buddhist art, ancient Chinese, mineral pigments, flying apsaras"
+        },
+        {
+          "id": "gongbi",
+          "name_zh": "工笔画",
+          "name_en": "Gongbi",
+          "prompt_keywords": "gongbi style, Chinese fine brush painting, meticulous detail, silk painting, traditional"
+        },
+        {
+          "id": "xieyi",
+          "name_zh": "写意画",
+          "name_en": "Xieyi",
+          "prompt_keywords": "xieyi style, Chinese freehand painting, expressive brushwork, ink and wash, spontaneous"
+        },
+        {
+          "id": "persian_miniature",
+          "name_zh": "波斯细密画",
+          "name_en": "Persian Miniature",
+          "prompt_keywords": "Persian miniature style, intricate details, gold leaf, Islamic art, manuscript illustration"
+        },
+        {
+          "id": "byzantine",
+          "name_zh": "拜占庭风格",
+          "name_en": "Byzantine",
+          "prompt_keywords": "Byzantine art style, gold backgrounds, religious iconography, mosaic-like, formal poses"
+        },
+        {
+          "id": "aboriginal",
+          "name_zh": "澳洲原住民艺术",
+          "name_en": "Aboriginal",
+          "prompt_keywords": "Aboriginal dot painting, indigenous Australian art, dreamtime symbols, earth tones"
+        },
+        {
+          "id": "mexican_folk",
+          "name_zh": "墨西哥民间艺术",
+          "name_en": "Mexican Folk Art",
+          "prompt_keywords": "Mexican folk art, vibrant colors, Day of the Dead inspired, bold patterns, festive"
+        },
+        {
+          "id": "russian_folk",
+          "name_zh": "俄罗斯民间艺术",
+          "name_en": "Russian Folk Art",
+          "prompt_keywords": "Russian folk art, Khokhloma style, matryoshka inspired, floral patterns, gold and red"
+        },
+        {
+          "id": "nordic",
+          "name_zh": "北欧风格",
+          "name_en": "Nordic",
+          "prompt_keywords": "Nordic art style, Scandinavian design, nature-inspired, muted colors, hygge atmosphere"
+        },
+        {
+          "id": "african_tribal",
+          "name_zh": "非洲部落艺术",
+          "name_en": "African Tribal",
+          "prompt_keywords": "African tribal art, bold geometric patterns, earth tones, mask-inspired, ceremonial"
+        }
+      ]
+    },
+    "era_trend": {
+      "name_zh": "时代/潮流风格",
+      "name_en": "Era/Trend Style",
+      "description": "Aesthetic movements from different time periods",
+      "styles": [
+        {
+          "id": "steampunk",
+          "name_zh": "蒸汽朋克",
+          "name_en": "Steampunk",
+          "prompt_keywords": "steampunk aesthetic, Victorian machinery, brass and copper, gears and steam, industrial"
+        },
+        {
+          "id": "cyberpunk",
+          "name_zh": "赛博朋克",
+          "name_en": "Cyberpunk",
+          "prompt_keywords": "cyberpunk style, neon lights, futuristic dystopia, high tech low life, rain-soaked streets"
+        },
+        {
+          "id": "dieselpunk",
+          "name_zh": "柴油朋克",
+          "name_en": "Dieselpunk",
+          "prompt_keywords": "dieselpunk aesthetic, 1940s-50s retro-futurism, art deco machinery, noir atmosphere"
+        },
+        {
+          "id": "solarpunk",
+          "name_zh": "阳光朋克",
+          "name_en": "Solarpunk",
+          "prompt_keywords": "solarpunk style, eco-futurism, green technology, sustainable utopia, nature and tech harmony"
+        },
+        {
+          "id": "retro_futurism",
+          "name_zh": "复古未来主义",
+          "name_en": "Retro Futurism",
+          "prompt_keywords": "retro futurism, 1950s-60s space age, atomic age, optimistic future, chrome and fins"
+        },
+        {
+          "id": "vaporwave",
+          "name_zh": "蒸汽波",
+          "name_en": "Vaporwave",
+          "prompt_keywords": "vaporwave aesthetic, 80s-90s nostalgia, pink and cyan, glitch art, consumer culture"
+        },
+        {
+          "id": "synthwave",
+          "name_zh": "合成波",
+          "name_en": "Synthwave",
+          "prompt_keywords": "synthwave style, 80s neon, retro sunset, grid lines, chrome text, outrun aesthetic"
+        },
+        {
+          "id": "cottagecore",
+          "name_zh": "田园核",
+          "name_en": "Cottagecore",
+          "prompt_keywords": "cottagecore aesthetic, rural idyll, pastoral scenes, cozy domestic, wildflowers, handmade"
+        },
+        {
+          "id": "dark_academia",
+          "name_zh": "暗黑学院风",
+          "name_en": "Dark Academia",
+          "prompt_keywords": "dark academia style, gothic scholarly, old libraries, classical literature, moody autumn"
+        },
+        {
+          "id": "kawaii",
+          "name_zh": "卡哇伊",
+          "name_en": "Kawaii",
+          "prompt_keywords": "kawaii style, super cute, pastel colors, big eyes, rounded shapes, Japanese cute culture"
+        }
+      ]
+    },
+    "digital_animation": {
+      "name_zh": "数字动画风格",
+      "name_en": "Digital Animation Style",
+      "description": "Animation studio and digital art styles",
+      "styles": [
+        {
+          "id": "ghibli",
+          "name_zh": "吉卜力风格",
+          "name_en": "Studio Ghibli",
+          "prompt_keywords": "Studio Ghibli style, Miyazaki inspired, hand-drawn animation, soft colors, detailed backgrounds, whimsical atmosphere"
+        },
+        {
+          "id": "pixar",
+          "name_zh": "皮克斯风格",
+          "name_en": "Pixar",
+          "prompt_keywords": "Pixar style, 3D animation, appealing characters, expressive faces, polished rendering"
+        },
+        {
+          "id": "disney_classic",
+          "name_zh": "迪士尼经典",
+          "name_en": "Disney Classic",
+          "prompt_keywords": "Disney classic animation, hand-drawn, fluid motion, expressive characters, fairy tale aesthetic"
+        },
+        {
+          "id": "disney_modern",
+          "name_zh": "迪士尼现代",
+          "name_en": "Disney Modern",
+          "prompt_keywords": "Disney modern 3D style, Tangled/Frozen inspired, painterly 3D, expressive eyes, magical"
+        },
+        {
+          "id": "dreamworks",
+          "name_zh": "梦工厂风格",
+          "name_en": "DreamWorks",
+          "prompt_keywords": "DreamWorks animation style, exaggerated features, dynamic poses, vibrant colors"
+        },
+        {
+          "id": "shinkai",
+          "name_zh": "新海诚风格",
+          "name_en": "Makoto Shinkai",
+          "prompt_keywords": "Makoto Shinkai style, Your Name inspired, photorealistic backgrounds, lens flares, emotional skies"
+        },
+        {
+          "id": "kyoto_animation",
+          "name_zh": "京阿尼风格",
+          "name_en": "Kyoto Animation",
+          "prompt_keywords": "Kyoto Animation style, detailed eyes, soft lighting, slice of life, beautiful character design"
+        },
+        {
+          "id": "cartoon_network",
+          "name_zh": "卡通频道风格",
+          "name_en": "Cartoon Network",
+          "prompt_keywords": "Cartoon Network style, bold outlines, simplified shapes, vibrant colors, comedic"
+        },
+        {
+          "id": "adventure_time",
+          "name_zh": "探险活宝风格",
+          "name_en": "Adventure Time",
+          "prompt_keywords": "Adventure Time style, simple shapes, thick outlines, pastel backgrounds, whimsical"
+        },
+        {
+          "id": "laika",
+          "name_zh": "莱卡工作室",
+          "name_en": "Laika Studios",
+          "prompt_keywords": "Laika stop-motion style, detailed puppets, gothic whimsy, textured surfaces, handcrafted"
+        }
+      ]
+    },
+    "comic": {
+      "name_zh": "漫画/连环画风格",
+      "name_en": "Comic/Sequential Art Style",
+      "description": "Comic and graphic novel art styles",
+      "styles": [
+        {
+          "id": "manga_shounen",
+          "name_zh": "少年漫画",
+          "name_en": "Shonen Manga",
+          "prompt_keywords": "shonen manga style, dynamic action lines, spiky hair, determined expressions, dramatic"
+        },
+        {
+          "id": "manga_shoujo",
+          "name_zh": "少女漫画",
+          "name_en": "Shoujo Manga",
+          "prompt_keywords": "shoujo manga style, flowery backgrounds, sparkly eyes, romantic, delicate lines"
+        },
+        {
+          "id": "manhwa",
+          "name_zh": "韩国漫画",
+          "name_en": "Manhwa",
+          "prompt_keywords": "manhwa style, Korean webtoon, full color, detailed backgrounds, modern aesthetic"
+        },
+        {
+          "id": "manhua",
+          "name_zh": "中国漫画",
+          "name_en": "Manhua",
+          "prompt_keywords": "manhua style, Chinese comic, vibrant colors, flowing lines, dynamic compositions"
+        },
+        {
+          "id": "marvel_comics",
+          "name_zh": "漫威漫画",
+          "name_en": "Marvel Comics",
+          "prompt_keywords": "Marvel comics style, dynamic poses, bold colors, detailed anatomy, superhero art"
+        },
+        {
+          "id": "dc_comics",
+          "name_zh": "DC漫画",
+          "name_en": "DC Comics",
+          "prompt_keywords": "DC comics style, iconic poses, dramatic lighting, detailed linework, superhero aesthetic"
+        },
+        {
+          "id": "franco_belgian",
+          "name_zh": "法比漫画",
+          "name_en": "Franco-Belgian",
+          "prompt_keywords": "Franco-Belgian comic style, ligne claire, Tintin/Asterix inspired, clean lines, detailed backgrounds"
+        },
+        {
+          "id": "underground_comics",
+          "name_zh": "地下漫画",
+          "name_en": "Underground Comics",
+          "prompt_keywords": "underground comics style, R Crumb inspired, cross-hatching, counter-culture, satirical"
+        },
+        {
+          "id": "webcomic",
+          "name_zh": "网络漫画",
+          "name_en": "Webcomic",
+          "prompt_keywords": "webcomic style, digital art, clean lines, expressive characters, internet culture"
+        }
+      ]
+    },
+    "mood": {
+      "name_zh": "氛围/情绪风格",
+      "name_en": "Mood/Atmosphere Style",
+      "description": "Styles defined by emotional atmosphere",
+      "styles": [
+        {
+          "id": "dark_fantasy",
+          "name_zh": "暗黑幻想",
+          "name_en": "Dark Fantasy",
+          "prompt_keywords": "dark fantasy style, gothic atmosphere, muted colors, ominous, mysterious shadows"
+        },
+        {
+          "id": "whimsical",
+          "name_zh": "异想天开",
+          "name_en": "Whimsical",
+          "prompt_keywords": "whimsical style, playful, imaginative, surreal elements, childlike wonder"
+        },
+        {
+          "id": "cozy_healing",
+          "name_zh": "治愈系",
+          "name_en": "Cozy Healing",
+          "prompt_keywords": "cozy healing style, warm colors, soft lighting, comfortable atmosphere, iyashikei"
+        },
+        {
+          "id": "epic_dramatic",
+          "name_zh": "史诗戏剧性",
+          "name_en": "Epic Dramatic",
+          "prompt_keywords": "epic dramatic style, grand scale, dramatic lighting, heroic, cinematic composition"
+        },
+        {
+          "id": "nostalgic",
+          "name_zh": "怀旧复古",
+          "name_en": "Nostalgic",
+          "prompt_keywords": "nostalgic style, vintage feel, warm sepia tones, memory-like, aged texture"
+        },
+        {
+          "id": "dreamy",
+          "name_zh": "梦幻",
+          "name_en": "Dreamy",
+          "prompt_keywords": "dreamy style, soft focus, ethereal glow, pastel colors, floating elements"
+        },
+        {
+          "id": "mysterious",
+          "name_zh": "神秘",
+          "name_en": "Mysterious",
+          "prompt_keywords": "mysterious style, shadowy, enigmatic, hidden details, atmospheric fog"
+        },
+        {
+          "id": "cheerful",
+          "name_zh": "欢快明亮",
+          "name_en": "Cheerful",
+          "prompt_keywords": "cheerful style, bright colors, sunny atmosphere, happy, energetic"
+        }
+      ]
+    },
+    "application": {
+      "name_zh": "应用场景风格",
+      "name_en": "Application Style",
+      "description": "Styles suited for specific use cases",
+      "styles": [
+        {
+          "id": "picture_book",
+          "name_zh": "儿童绘本",
+          "name_en": "Children's Picture Book",
+          "prompt_keywords": "children's picture book illustration, soft colors, rounded shapes, friendly, educational"
+        },
+        {
+          "id": "concept_art",
+          "name_zh": "概念艺术",
+          "name_en": "Concept Art",
+          "prompt_keywords": "concept art, production design, detailed environments, professional illustration, cinematic"
+        },
+        {
+          "id": "storyboard",
+          "name_zh": "故事板",
+          "name_en": "Storyboard",
+          "prompt_keywords": "storyboard style, sequential frames, cinematic angles, rough sketches, narrative flow"
+        },
+        {
+          "id": "game_art",
+          "name_zh": "游戏美术",
+          "name_en": "Game Art",
+          "prompt_keywords": "video game art, digital painting, detailed character design, immersive environments"
+        },
+        {
+          "id": "book_cover",
+          "name_zh": "书籍封面",
+          "name_en": "Book Cover",
+          "prompt_keywords": "book cover illustration, eye-catching, symbolic imagery, title space, commercial appeal"
+        },
+        {
+          "id": "editorial",
+          "name_zh": "社论插图",
+          "name_en": "Editorial Illustration",
+          "prompt_keywords": "editorial illustration, conceptual, thought-provoking, stylized, magazine quality"
+        },
+        {
+          "id": "fashion_illustration",
+          "name_zh": "时尚插画",
+          "name_en": "Fashion Illustration",
+          "prompt_keywords": "fashion illustration, elegant poses, stylized figures, trendy, couture aesthetic"
+        }
+      ]
+    }
+  }
+}
