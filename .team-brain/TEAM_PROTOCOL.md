@@ -291,7 +291,31 @@
 2. 不能修改、删除已有消息
 3. 每条消息必须有精确时间戳（到分钟）
 4. 用明确的分隔线标记消息边界
+5. 时间戳必须使用真实的北京时间（见下方"时间戳规范"）
 ```
+
+### 🕐 时间戳规范（全团队强制执行）
+
+**所有文档中的时间戳必须使用真实的北京时间**，不允许估算或编造。
+
+**获取方法**（在每次写入时间戳前执行）:
+```bash
+TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M'
+```
+
+**适用范围**: 所有Agent在更新以下文件时必须遵循：
+- `{agent}-progress/current.md`、`completed.md`、`context-for-others.md`
+- `.team-brain/TEAM_CHAT.md`
+- `.team-brain/daily-sync/*.md`
+- `.team-brain/status/TODAY_FOCUS.md`、`PROJECT_STATUS.md`
+- `.team-brain/handoffs/PENDING.md`
+- `.team-brain/decisions/DECISIONS.md`
+- 所有其他包含时间戳的文档
+
+**禁止行为**:
+- ❌ 使用UTC或其他时区的时间
+- ❌ 根据任务顺序推测时间
+- ❌ 使用非实时的虚构时间
 
 ### 消息格式
 

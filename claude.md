@@ -6,26 +6,34 @@
 
 ---
 
-## 当前项目状态（2026-02-03）
+## 当前项目状态（2026-02-12）
 
 | Phase | 状态 | 说明 |
 |-------|------|------|
 | Phase 1 | ✅ 完成 | idea → story.json，多章节支持 |
 | Phase 2 | ✅ 完成 | 5阶段流水线 + 角色一致性突破（3人100%，6人90%） |
 | Phase 3 | ✅ 完成 | TTS + Whisper + 音画对齐（误差≤80ms） |
-| **Phase 4** | 🔴 **架构重构中** | TextOverlayService架构缺陷，需先重构再修复功能 |
-| Phase 5 | 🟢 WIP | Landing Page 基础版本完成 |
+| Phase 4 | ✅ **完成** | 条漫MVP技术验证（V5验收4.9/5）+ TextOverlayService架构重构完成 |
+| Phase 4.5 | 🔄 WIP (5%) | 视频合成（FFmpeg集成方案选型中） |
+| Phase 5 | ✅ **Landing Page完成** | Landing Page 5.0/5 完美收官（TASK-LP-FIX 8/8 + TASK-LP-POLISH 2/2） |
+| Phase 6 | 🟡 **已启动** (5%) | Git仓库已初始化（DEC-007），等待后续部署工作 |
 
 ### 你的团队（6个专业Agent）
 
 | Agent | 状态 | 当前任务 |
 |-------|------|----------|
-| **Backend** | 🔴 | **架构重构（ARCH-1/2/3）+ 核心功能修复（CORE-1/2）** |
-| Frontend | 🟢 | Landing Page 实现中 |
-| Tester | ⚪ | 等待V4验收 |
-| AI-ML | ⚪ | 等待Prompt优化任务 |
-| DevOps | ⚪ | 待命 |
-| PM | ✅ | V3全维度分析完成，等待Backend重构 |
+| Frontend | 🟢 | 空闲（Landing Page 5.0/5 完美收官） |
+| Backend | 🟢 | 空闲（架构重构+核心修复+RENAME全部完成） |
+| Tester | 🟢 | 空闲（V5验收4.9/5完成） |
+| AI-ML | 🟢 | 空闲（FIX-A1~A5全部完成） |
+| DevOps | 🟢 | 空闲（TASK-GIT-INIT完成，等待Phase 6后续指令） |
+| PM | 🟢 | 空闲（TASK-LP-POLISH 复验通过 5.0/5，等待Founder指令） |
+
+### 关键决策
+| 决策 | 内容 | 日期 |
+|------|------|------|
+| DEC-008 | Pipeline.tsx → Option A 品牌叙事路线（不暴露技术流程） | 2026-02-12 |
+| DEC-007 | Git仓库初始化（仅本地，main分支） | 2026-02-12 |
 
 ### 协调相关文件
 
@@ -213,18 +221,18 @@ Flash模型仅用于参考图生成（无多角色混淆风险），成本仅为
 - 多策略文本匹配：精确匹配 → 去标点匹配 → 前缀匹配 → 子序列匹配
 - 繁简转换处理（Whisper常输出繁体）
 
-### 4. 条漫文字渲染 🔴 架构重构中
+### 4. 条漫文字渲染 ✅ 架构重构完成
 
 条漫/漫画需要在图片中显示对话气泡、心理旁白、叙事旁白等中文文字。
 
 **问题发现（2026-01-22）**：
 Gemini Flash 模型无法正确渲染中文文字，所有对话气泡和旁白都是乱码。但基础画面质量优秀（角色一致性4/5、合成效果4/5、表情细腻度4/5）。
 
-**🚨 架构缺陷发现（2026-02-03）**：
-TextOverlayService在8个测试文件中各自重复定义，主服务目录`app/services/`中没有！这导致：
-- 修复一个故事的bug，其他故事不受益
-- 不是通用工具，是8个独立的一次性脚本
-- **当前待执行**：架构重构 → 功能修复 → 全量验收
+**架构重构完成（2026-02-03）**：
+TextOverlayService原先分散在8个测试文件中，现已统一到`app/services/text_overlay_service.py`。
+- ARCH-1/2/3 架构重构 ✅，CORE-1/2 核心修复 ✅
+- V5验收评分 4.9/5（42/42 shots全部通过）
+- 所有故事类型自动受益，删除~2075行重复代码
 
 **🎉 技术方案：无文字Prompt + 后处理叠加（V2）**
 
@@ -232,12 +240,6 @@ TextOverlayService在8个测试文件中各自重复定义，主服务目录`app
 |------|------|
 | 1. 图像生成 | 使用无文字Prompt模板，生成不含任何文字的干净图片 |
 | 2. 后处理叠加 | 使用 TextOverlayServiceV2 程序化叠加中文文字 |
-
-**⚠️ 重要：需架构重构**
-- 当前TextOverlayService分散在8个测试文件中，需统一到`app/services/text_overlay_service.py`
-- 后续如有更强模型（如 Gemini Pro 或新版本）能直接渲染中文，可切换回原生方案
-- 现有的带文字Prompt模板（`docs/COMIC_MVP_PROMPT_TEMPLATES.md`）已保留，可随时测试
-- **详见**: `.team-brain/analysis/V3_PM_INDEPENDENT_REVIEW_GENERALITY.md`
 
 **技术实现要点**：
 

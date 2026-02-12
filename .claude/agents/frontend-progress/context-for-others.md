@@ -1,12 +1,43 @@
 # Frontend 状态速览（供其他Agent参考）
 
-> 更新时间: 2026-01-29 22:00
+> 更新时间: 2026-02-12 16:05
 
 ---
 
-## 当前状态: 🟢 Landing Page 基础版本完成
+## 当前状态: ✅ TASK-LP-POLISH 全部完成，等待 PM 复验
 
 **可预览地址**: http://localhost:3000 (需要运行 `npm run dev`)
+
+---
+
+## TASK-LP-POLISH 完成情况（2/2）
+
+| 编号 | 组件 | 修复内容 | 状态 |
+|------|------|----------|------|
+| LP-POLISH-1 | Pipeline.tsx | 硬编码 rgba → CSS变量 | ✅ |
+| LP-POLISH-2 | HeroSection.tsx | setTimeout/setInterval cleanup | ✅ |
+
+**构建验证**: ✅ `npm run build` 通过
+
+---
+
+## 修改摘要
+
+### LP-POLISH-1: Pipeline.tsx 硬编码 rgba → CSS变量
+- globals.css 新增3个RGB分量变量：`--brand-primary-rgb`、`--brand-gradient-end-rgb`、`--brand-cta-rgb`
+- Pipeline.tsx 4处 inline style 的 rgba 改为引用 CSS 变量
+
+### LP-POLISH-2: HeroSection.tsx setTimeout cleanup
+- 新增 `resumeTimerRef` (useRef) 统一管理 setTimeout ID
+- 抽取 `pauseAndResume()` 替代4处散落的 setTimeout 调用
+- 每次新 setTimeout 前先 clearTimeout 旧的
+- unmount 时 useEffect cleanup 清理残留 timer
+
+---
+
+## @PM: 请复验
+
+TASK-LP-POLISH 2项修复已完成，构建通过。
 
 ---
 
@@ -19,75 +50,3 @@
 | TypeScript | 5.x |
 | Framer Motion | 最新 |
 | Lucide Icons | 最新 |
-
----
-
-## 已实现的页面/组件
-
-### Landing Page (`/`)
-
-| 模块 | 状态 | 说明 |
-|------|------|------|
-| Header | ✅ | 吸顶导航，移动端汉堡菜单 |
-| HeroSection | ✅ | 条漫轮播，双故事切换 |
-| ValueProposition | ✅ | 3个差异化卖点卡片 |
-| Pipeline | ✅ | FrameSpark 5阶段流程 |
-| Showcase | ✅ | 作品画廊，分类筛选 |
-| Stats | ✅ | 技术指标，数字动画 |
-| CTASection | ✅ | 邮箱申请表单 |
-| Footer | ✅ | 页脚链接 |
-
----
-
-## 设计系统
-
-| 项目 | 值 |
-|------|-----|
-| 主题 | Warm Dark Mode |
-| 背景色 | #121212 |
-| 品牌色 | #FF9500 暖琥珀 |
-| 字体 | Noto Sans SC / Noto Serif SC / Inter |
-
----
-
-## @Backend 需要知道
-
-- 前端暂无API对接需求，Landing Page 是纯静态展示页
-- 邮箱表单目前存到 localStorage，后续需要后端接口
-
----
-
-## @Tester 可以做
-
-- 访问 http://localhost:3000 进行视觉验收
-- 响应式测试（移动端/桌面端）
-- 动效流畅度验收
-
----
-
-## 项目目录
-
-```
-frontend/
-├── src/
-│   ├── app/
-│   │   ├── page.tsx          # 主页面
-│   │   ├── layout.tsx        # 根布局
-│   │   └── globals.css       # 全局样式
-│   └── components/
-│       ├── layout/
-│       │   ├── Header.tsx
-│       │   └── Footer.tsx
-│       └── sections/
-│           ├── HeroSection.tsx
-│           ├── ValueProposition.tsx
-│           ├── Pipeline.tsx
-│           ├── Showcase.tsx
-│           ├── Stats.tsx
-│           └── CTASection.tsx
-├── public/
-│   └── comics/
-│       ├── story-a/          # 都市亲情条漫
-│       └── story-b/          # 赛博朋克条漫
-└── tailwind.config.ts
-```

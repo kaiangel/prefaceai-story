@@ -4,6 +4,66 @@
 
 ---
 
+## 2026-02-12
+
+### TASK-LP-POLISH 2项代码质量修复 ✅
+
+**完成时间**: 2026-02-12 16:05
+**验收状态**: 待 PM 复验
+**任务来源**: TASK-LP-FIX 复验后 PM 分配的代码质量提升任务（4.5→5.0/5）
+
+**完成内容**:
+- [x] LP-POLISH-1: Pipeline.tsx 硬编码 rgba → CSS 变量（3个RGB分量变量 + 4处引用替换）
+- [x] LP-POLISH-2: HeroSection.tsx setTimeout cleanup（useRef + pauseAndResume + unmount cleanup）
+
+**修改文件**:
+| 文件 | 修改 |
+|------|------|
+| `frontend/src/app/globals.css` | 新增 --brand-primary-rgb / --brand-gradient-end-rgb / --brand-cta-rgb |
+| `frontend/src/components/sections/Pipeline.tsx` | 4处 rgba → CSS变量引用 |
+| `frontend/src/components/sections/HeroSection.tsx` | useRef timer管理 + pauseAndResume + cleanup |
+
+**验收指标**:
+- 2/2 任务完成: ✅
+- `npm run build` 通过: ✅
+- 零硬编码品牌色: ✅
+- 零未清理 timer: ✅
+
+---
+
+### TASK-LP-FIX 8个修复任务 ✅
+
+**完成时间**: 2026-02-12 14:35
+**验收状态**: 待 PM 复验
+**任务来源**: PM 验收 Landing Page 4.0/5 后分配的修复任务
+
+**完成内容**:
+- [x] LP-P0-1: Pipeline.tsx → FrameSpark™ 品牌氛围模块（整体重写）
+- [x] LP-P1-1: Showcase 添加 lightbox/modal（键盘导航、dot分页、body scroll lock）
+- [x] LP-P1-2: 移除"古风武侠"空分类
+- [x] LP-P1-3: ValueProposition 文案（"即发即用""角色如一""双输出形式"）
+- [x] LP-P2-1: Hero 条漫从右向左逐张滑入
+- [x] LP-P2-2: Hero Slogan 改为"FrameSpark™ AI条漫引擎"
+- [x] LP-P2-3: Showcase 标题改为"更多创作可能"
+- [x] LP-P2-4: globals.css 添加 prefers-reduced-motion 支持
+
+**修改文件**:
+| 文件 | 修改 |
+|------|------|
+| `frontend/src/components/sections/Pipeline.tsx` | 整体重写为品牌氛围模块 |
+| `frontend/src/components/sections/Showcase.tsx` | 整体重写，新增 lightbox |
+| `frontend/src/components/sections/ValueProposition.tsx` | 文案调整 |
+| `frontend/src/components/sections/HeroSection.tsx` | 滑入动效 + Slogan修改 |
+| `frontend/src/app/globals.css` | prefers-reduced-motion 媒体查询 |
+
+**验收指标**:
+- 8/8 任务完成: ✅
+- `npm run build` 通过: ✅
+- 无技术流程暴露: ✅
+- 品牌用语统一: ✅
+
+---
+
 ## 2026-01-29
 
 ### Landing Page 基础版本实现 ✅
