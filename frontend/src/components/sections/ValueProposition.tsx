@@ -6,21 +6,21 @@ import { Zap, Users, Film } from "lucide-react";
 const features = [
   {
     icon: Zap,
-    title: "即出即发",
-    description: "生成即可发布的条漫或短视频，无需后期处理，直接上传社交平台",
-    highlight: "无需后期处理",
+    title: "即发即用",
+    description: "标题+文案+图片+BGM，完成即可发布到抖音/小红书/视频号",
+    highlight: "完成即发布",
   },
   {
     icon: Users,
-    title: "角色一致性",
-    description: "独创混合模型架构，3人场景100%一致，6人场景90%+一致",
-    highlight: "100%一致",
+    title: "角色如一",
+    description: "至多可保持6人在不同场景中的一致性",
+    highlight: "6人一致",
   },
   {
     icon: Film,
-    title: "双重输出",
-    description: "条漫和短视频双形态输出，一次创作，多平台分发",
-    highlight: "多平台分发",
+    title: "双输出形式",
+    description: "条漫素材包或完整视频，任你选择下载",
+    highlight: "任你选择",
   },
 ];
 

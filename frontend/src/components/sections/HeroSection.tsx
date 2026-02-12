@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, Play } from "lucide-react";
 
@@ -34,8 +34,29 @@ export default function HeroSection() {
   const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentStory = stories[currentStoryIndex];
+
+  // Clear pending resume timer
+  const clearResumeTimer = useCallback(() => {
+    if (resumeTimerRef.current) {
+      clearTimeout(resumeTimerRef.current);
+      resumeTimerRef.current = null;
+    }
+  }, []);
+
+  // Pause autoplay and schedule resume after 5s
+  const pauseAndResume = useCallback(() => {
+    setIsAutoPlaying(false);
+    clearResumeTimer();
+    resumeTimerRef.current = setTimeout(() => setIsAutoPlaying(true), 5000);
+  }, [clearResumeTimer]);
+
+  // Cleanup resume timer on unmount
+  useEffect(() => {
+    return () => clearResumeTimer();
+  }, [clearResumeTimer]);
 
   // Auto advance images
   useEffect(() => {
@@ -58,25 +79,22 @@ export default function HeroSection() {
   const handleStorySwitch = useCallback((index: number) => {
     setCurrentStoryIndex(index);
     setCurrentImageIndex(0);
-    setIsAutoPlaying(false);
-    setTimeout(() => setIsAutoPlaying(true), 5000);
-  }, []);
+    pauseAndResume();
+  }, [pauseAndResume]);
 
-  const handlePrevImage = () => {
-    setIsAutoPlaying(false);
+  const handlePrevImage = useCallback(() => {
     setCurrentImageIndex((prev) =>
       prev === 0 ? currentStory.images.length - 1 : prev - 1
     );
-    setTimeout(() => setIsAutoPlaying(true), 5000);
-  };
+    pauseAndResume();
+  }, [currentStory.images.length, pauseAndResume]);
 
-  const handleNextImage = () => {
-    setIsAutoPlaying(false);
+  const handleNextImage = useCallback(() => {
     setCurrentImageIndex((prev) =>
       prev === currentStory.images.length - 1 ? 0 : prev + 1
     );
-    setTimeout(() => setIsAutoPlaying(true), 5000);
-  };
+    pauseAndResume();
+  }, [currentStory.images.length, pauseAndResume]);
 
   return (
     <section className="relative min-h-screen flex flex-col justify-center pt-16 overflow-hidden">
@@ -114,7 +132,7 @@ export default function HeroSection() {
           transition={{ delay: 0.4 }}
           className="text-xl md:text-2xl text-text-tertiary text-center mb-8 font-serif"
         >
-          每个人都有自己的故事
+          FrameSpark™ AI条漫引擎
         </motion.p>
 
         {/* CTA Buttons */}
@@ -162,39 +180,42 @@ export default function HeroSection() {
               <ChevronLeft className="w-5 h-5 text-text-secondary" />
             </button>
 
-            {/* Images Row */}
-            <div className="flex gap-3 md:gap-4 overflow-hidden px-4 md:px-12">
-              {currentStory.images.map((src, index) => (
-                <motion.div
-                  key={`${currentStory.id}-${index}`}
-                  initial={{ opacity: 0, x: 50 }}
-                  animate={{
-                    opacity: 1,
-                    x: 0,
-                    scale: index === currentImageIndex ? 1.02 : 0.95,
-                  }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  className={`relative flex-shrink-0 w-40 md:w-56 lg:w-64 aspect-[3/4] rounded-lg overflow-hidden cursor-pointer transition-all duration-story ${
-                    index === currentImageIndex
-                      ? "ring-2 ring-brand-primary shadow-glow-md"
-                      : "opacity-60"
-                  }`}
-                  onClick={() => {
-                    setCurrentImageIndex(index);
-                    setIsAutoPlaying(false);
-                    setTimeout(() => setIsAutoPlaying(true), 5000);
-                  }}
-                >
-                  <Image
-                    src={src}
-                    alt={`${currentStory.title} - 第${index + 1}页`}
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 768px) 160px, (max-width: 1024px) 224px, 256px"
-                    priority={index < 2}
-                  />
-                </motion.div>
-              ))}
+            {/* Images Row - slide in from right */}
+            <div className="flex gap-3 md:gap-4 overflow-hidden px-4 md:px-12 justify-center">
+              <AnimatePresence mode="popLayout">
+                {currentStory.images.slice(0, currentImageIndex + 1).map((src, index) => (
+                  <motion.div
+                    key={`${currentStory.id}-${index}`}
+                    layout
+                    initial={{ opacity: 0, x: 300, scale: 0.8 }}
+                    animate={{
+                      opacity: 1,
+                      x: 0,
+                      scale: index === currentImageIndex ? 1.02 : 0.95,
+                    }}
+                    exit={{ opacity: 0, x: -100, scale: 0.8 }}
+                    transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                    className={`relative flex-shrink-0 w-40 md:w-56 lg:w-64 aspect-[3/4] rounded-lg overflow-hidden cursor-pointer transition-shadow duration-story ${
+                      index === currentImageIndex
+                        ? "ring-2 ring-brand-primary shadow-glow-md"
+                        : "opacity-60"
+                    }`}
+                    onClick={() => {
+                      setCurrentImageIndex(index);
+                      pauseAndResume();
+                    }}
+                  >
+                    <Image
+                      src={src}
+                      alt={`${currentStory.title} - 第${index + 1}页`}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 160px, (max-width: 1024px) 224px, 256px"
+                      priority={index < 2}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
 
             {/* Next Button */}
