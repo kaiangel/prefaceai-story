@@ -1,14 +1,13 @@
-"use client";
-
 import { Sparkles } from "lucide-react";
+import Link from "next/link";
 
 const footerLinks = {
   product: {
     title: "产品",
     links: [
-      { label: "功能介绍", href: "#features" },
-      { label: "作品展示", href: "#showcase" },
-      { label: "定价", href: "#pricing" },
+      { label: "功能介绍", href: "/#features" },
+      { label: "作品展示", href: "/#showcase" },
+      { label: "定价", href: "/pricing" },
     ],
   },
   support: {
@@ -36,19 +35,25 @@ const footerLinks = {
   },
 };
 
-export default function Footer() {
+interface FooterProps {
+  openSubPagesInNewTab?: boolean;
+}
+
+export default function Footer({ openSubPagesInNewTab = false }: FooterProps) {
+  const isAnchorLink = (href: string) => href.startsWith("/#");
+
   return (
     <footer className="bg-bg-primary border-t border-bg-tertiary">
       <div className="container-lg py-12 lg:py-16">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 lg:gap-12">
           {/* Logo & Description */}
           <div className="col-span-2 md:col-span-4 lg:col-span-1 mb-8 lg:mb-0">
-            <a href="/" className="flex items-center gap-2 mb-4">
+            <Link href="/" className="flex items-center gap-2 mb-4">
               <Sparkles className="w-6 h-6 text-brand-primary" />
               <span className="text-xl font-bold text-text-primary">
                 序话<span className="text-brand-primary">Story</span>
               </span>
-            </a>
+            </Link>
             <p className="text-text-tertiary text-sm leading-relaxed">
               AI驱动的条漫和短视频创作平台，让每个人都能轻松创作专业级作品。
             </p>
@@ -61,16 +66,43 @@ export default function Footer() {
                 {section.title}
               </h3>
               <ul className="space-y-3">
-                {section.links.map((link) => (
-                  <li key={link.label}>
-                    <a
-                      href={link.href}
-                      className="text-text-tertiary hover:text-brand-primary transition-colors duration-fast text-sm"
-                    >
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
+                {section.links.map((link) => {
+                  const linkClass =
+                    "text-text-tertiary hover:text-brand-primary transition-colors duration-fast text-sm";
+
+                  if (isAnchorLink(link.href)) {
+                    return (
+                      <li key={link.label}>
+                        <a href={link.href} className={linkClass}>
+                          {link.label}
+                        </a>
+                      </li>
+                    );
+                  }
+
+                  if (openSubPagesInNewTab) {
+                    return (
+                      <li key={link.label}>
+                        <a
+                          href={link.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={linkClass}
+                        >
+                          {link.label}
+                        </a>
+                      </li>
+                    );
+                  }
+
+                  return (
+                    <li key={link.label}>
+                      <Link href={link.href} className={linkClass}>
+                        {link.label}
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}
@@ -82,7 +114,6 @@ export default function Footer() {
             © 2026 序话Story. All rights reserved.
           </p>
           <div className="flex items-center gap-6">
-            {/* Social Links - Placeholder */}
             <a
               href="https://twitter.com"
               target="_blank"

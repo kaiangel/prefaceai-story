@@ -21,7 +21,7 @@ export default function Home() {
         <Stats />
         <CTASection />
       </main>
-      <Footer />
+      <Footer openSubPagesInNewTab />
     </>
   );
 }

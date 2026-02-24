@@ -135,7 +135,7 @@ export default function CTASection() {
             className="text-text-tertiary text-sm mt-4"
           >
             已有邀请码？
-            <a href="/login" className="text-brand-primary hover:underline ml-1">
+            <a href="/login" target="_blank" rel="noopener noreferrer" className="text-brand-primary hover:underline ml-1">
               直接登录
             </a>
           </motion.p>
