@@ -322,7 +322,7 @@ class Phase2PipelineOrchestrator:
                         previous_shot_image=previous_shot_image,
                         previous_shot=previous_shot,
                         screenplay=screenplay,  # 传入screenplay用于获取场景氛围
-                        aspect_ratio="16:9"
+                        aspect_ratio="2:3"
                     )
 
                     if result.get("success"):

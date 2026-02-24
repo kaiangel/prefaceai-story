@@ -114,7 +114,7 @@ Requirements:
         # 使用1:1比例生成参考图
         result = await self.image_generator.generate_image(
             prompt=reference_prompt,
-            aspect_ratio="1:1",
+            aspect_ratio="2:3",  # 竖版角色参考图（抖音适配）
             use_pro_model=True  # 使用Pro模型获得更好质量
         )
 
@@ -196,7 +196,7 @@ Requirements:
         # 生成图片
         result = await self.image_generator.generate_image(
             prompt=full_prompt,
-            aspect_ratio="16:9",
+            aspect_ratio="2:3",
             reference_images=reference_images,
             use_pro_model=use_pro
         )

@@ -532,7 +532,7 @@ async def generate_images_task(
                 result = await image_generator.generate_image(
                     prompt=scene_board["image_prompt"],
                     negative_prompt=scene_board.get("negative_prompt", ""),
-                    aspect_ratio=scene_board.get("aspect_ratio", "16:9"),
+                    aspect_ratio=scene_board.get("aspect_ratio", "2:3"),
                     # reference_images=list(char_references.values()) if char_references else None,
                     style_preset=style_preset
                 )
@@ -561,7 +561,7 @@ async def generate_images_task(
                         thumbnail_path=saved["thumbnail_path"],
                         width=saved["width"],
                         height=saved["height"],
-                        aspect_ratio=scene_board.get("aspect_ratio", "16:9"),
+                        aspect_ratio=scene_board.get("aspect_ratio", "2:3"),
                         generation_model=result.get("model_used", ""),
                         generation_time_seconds=int(result.get("generation_time_seconds", 0)),
                         is_active=True,
@@ -649,7 +649,7 @@ async def regenerate_single_image_task(
             if prompt_override:
                 image_prompt = prompt_override
                 negative_prompt = ""
-                aspect_ratio = "16:9"
+                aspect_ratio = "2:3"
             else:
                 storyboard_service = StoryboardService()
                 storyboard = await storyboard_service.generate_storyboard(
@@ -660,7 +660,7 @@ async def regenerate_single_image_task(
                 scene_board = storyboard[0]
                 image_prompt = scene_board["image_prompt"]
                 negative_prompt = scene_board.get("negative_prompt", "")
-                aspect_ratio = scene_board.get("aspect_ratio", "16:9")
+                aspect_ratio = scene_board.get("aspect_ratio", "2:3")
 
             # 3. 生成图像
             image_generator = ImageGenerator()

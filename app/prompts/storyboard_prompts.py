@@ -293,7 +293,7 @@ Quality: Professional character design, high detail, sharp focus, well-lit, mast
     return prompt
 
 
-def get_aspect_ratio_for_scene(scene: dict, default: str = "16:9") -> str:
+def get_aspect_ratio_for_scene(scene: dict, default: str = "2:3") -> str:
     """
     根据场景类型推断最佳宽高比
 
@@ -311,19 +311,19 @@ def get_aspect_ratio_for_scene(scene: dict, default: str = "16:9") -> str:
     vertical_keywords = ["特写", "close-up", "portrait", "face", "头像", "半身"]
     for keyword in vertical_keywords:
         if keyword in visual_desc or keyword in location:
-            return "9:16"
+            return "2:3"  # 条漫统一比例
 
     # 宽屏场景关键词
     wide_keywords = ["全景", "panorama", "landscape", "远景", "城市", "街道", "sky"]
     for keyword in wide_keywords:
         if keyword in visual_desc or keyword in location:
-            return "21:9"
+            return "2:3"  # 条漫统一比例
 
     # 方形场景关键词
     square_keywords = ["对话", "dialogue", "两人", "face to face"]
     for keyword in square_keywords:
         if keyword in visual_desc:
-            return "1:1"
+            return "2:3"  # 条漫统一比例
 
     return default
 
@@ -1373,7 +1373,7 @@ def build_system_instruction_phase2(global_visual_direction: dict) -> str:
         system_instruction字符串
     """
     style = global_visual_direction.get("style_enforcement", "realistic_cinematic")
-    aspect_ratio = global_visual_direction.get("aspect_ratio", "16:9")
+    aspect_ratio = global_visual_direction.get("aspect_ratio", "2:3")
     color_grade = global_visual_direction.get("color_grade", "neutral")
     lighting = global_visual_direction.get("overall_lighting", "natural")
     lens_style = global_visual_direction.get("lens_style", "35mm")

@@ -65,7 +65,7 @@ class ReferenceImageManager:
         # 根据类型构建不同的prompt
         if ref_type == 'portrait':
             prompt = self._build_portrait_prompt(character, char_type, project_style)
-            aspect_ratio = "1:1"  # 肖像用正方形
+            aspect_ratio = "2:3"  # 肖像用竖版（抖音适配）
             reference_images = None  # 肖像不需要参考图
         else:
             # 全身图：如果有肖像参考，传入以确保人脸一致
@@ -73,7 +73,7 @@ class ReferenceImageManager:
                 character, char_type, project_style,
                 portrait_ref=portrait_ref
             )
-            aspect_ratio = "1:1"
+            aspect_ratio = "2:3"  # 全身用竖版（抖音适配）
             # 如果有肖像参考图，传给图像生成器
             reference_images = [portrait_ref] if portrait_ref else None
 

@@ -168,7 +168,7 @@ class StoryboardDirector:
         storyboard = {
             "global_visual_direction": global_visual_direction or {
                 "style_enforcement": f"{style_preset}_cinematic",
-                "aspect_ratio": "16:9",
+                "aspect_ratio": "2:3",
                 "color_grade": "neutral",
                 "overall_lighting": "natural",
                 "lens_style": "35mm"
@@ -416,7 +416,7 @@ Output format (JSON only, no other text):
 {{
     "global_visual_direction": {{
         "style_enforcement": "{style_preset}_cinematic",
-        "aspect_ratio": "16:9",
+        "aspect_ratio": "2:3",
         "color_grade": "based on atmosphere",
         "overall_lighting": "based on atmosphere"
     }},
@@ -546,7 +546,7 @@ Strictly follow this JSON format (MUST include {min_shots} shots):
 {{
     "global_visual_direction": {{
         "style_enforcement": "{style_preset}_cinematic",
-        "aspect_ratio": "16:9",
+        "aspect_ratio": "2:3",
         "color_grade": "based on visual_tone",
         "overall_lighting": "based on visual_tone",
         "lens_style": "35mm_shallow_depth"
@@ -767,7 +767,7 @@ Output JSON only, no other text:
         if not gvd:
             storyboard["global_visual_direction"] = {
                 "style_enforcement": "realistic_cinematic",
-                "aspect_ratio": "16:9",
+                "aspect_ratio": "2:3",
                 "color_grade": "neutral",
                 "overall_lighting": "natural",
                 "lens_style": "35mm"

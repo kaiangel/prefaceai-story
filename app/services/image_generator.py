@@ -180,11 +180,44 @@ class ImageGenerator:
         print(f"    [ImageGenerator] ⚠️ 错误分类: UNKNOWN - {error_msg}")
         return ErrorType.UNKNOWN, error_msg
 
+    def _preprocess_reference_to_aspect_ratio(self, ref_img: Image.Image, target_ratio: str) -> Image.Image:
+        """将参考图中心裁剪到目标宽高比，消除比例不匹配对生成的影响
+
+        Args:
+            ref_img: PIL Image 参考图
+            target_ratio: 目标宽高比字符串，如 "9:16"
+
+        Returns:
+            裁剪后的 PIL Image（如果不需要裁剪则返回原图）
+        """
+        w, h = ref_img.size
+        target_w_ratio, target_h_ratio = map(int, target_ratio.split(':'))
+        target = target_w_ratio / target_h_ratio
+        current = w / h
+
+        if abs(current - target) < 0.01:  # 已经匹配，不裁剪
+            return ref_img
+
+        if current > target:  # 图太宽，左右裁
+            new_w = int(h * target)
+            left = (w - new_w) // 2
+            cropped = ref_img.crop((left, 0, left + new_w, h))
+            pct = round((1 - new_w / w) * 100, 1)
+            print(f"    [ImageGenerator] 参考图预处理: {w}x{h} → {new_w}x{h} (裁剪宽度{pct}%)")
+            return cropped
+        else:  # 图太高，上下裁
+            new_h = int(w / target)
+            top = (h - new_h) // 2
+            cropped = ref_img.crop((0, top, w, top + new_h))
+            pct = round((1 - new_h / h) * 100, 1)
+            print(f"    [ImageGenerator] 参考图预处理: {w}x{h} → {w}x{new_h} (裁剪高度{pct}%)")
+            return cropped
+
     async def generate_image(
         self,
         prompt: str,
         negative_prompt: str = "",
-        aspect_ratio: str = "16:9",
+        aspect_ratio: str = "2:3",
         reference_images: Optional[List[Image.Image]] = None,
         style_preset: str = None,
         use_pro_model: bool = False,
@@ -234,11 +267,12 @@ class ImageGenerator:
         # 构建内容
         contents = [full_prompt]
         if reference_images:
-            # 添加参考图
+            # 添加参考图（预处理到目标宽高比）
             print(f"    [ImageGenerator] 传入 {len(reference_images)} 张参考图")
             for i, ref_img in enumerate(reference_images[:14]):  # 最多14张
                 if hasattr(ref_img, 'size'):
                     print(f"      参考图 {i+1}: {ref_img.size[0]}x{ref_img.size[1]}")
+                    ref_img = self._preprocess_reference_to_aspect_ratio(ref_img, aspect_ratio)
                 contents.append(ref_img)
             print(f"    [ImageGenerator] contents 共 {len(contents)} 个元素 (1个prompt + {len(contents)-1}张图)")
 
@@ -367,7 +401,7 @@ class ImageGenerator:
         self,
         shot: dict,
         reference_images: Optional[List[Image.Image]] = None,
-        aspect_ratio: str = "16:9",
+        aspect_ratio: str = "2:3",
         use_llm_translation: bool = True,
         **kwargs
     ) -> dict:
@@ -462,7 +496,7 @@ class ImageGenerator:
         previous_shot_image: Optional[Image.Image] = None,
         previous_shot: Optional[dict] = None,
         screenplay: Optional[dict] = None,
-        aspect_ratio: str = "16:9",
+        aspect_ratio: str = "2:3",
         **kwargs
     ) -> dict:
         """
@@ -588,12 +622,13 @@ class ImageGenerator:
             print(f"    [ImageGenerator Phase2] 添加上一shot图像作为连续性参考")
             contents.append(previous_shot_image)
 
-        # 添加参考图
+        # 添加参考图（预处理到目标宽高比）
         if reference_images:
             print(f"    [ImageGenerator Phase2] 传入 {len(reference_images)} 张参考图")
             for i, ref_img in enumerate(reference_images[:13]):  # 最多13张（留1张给前序shot）
                 if hasattr(ref_img, 'size'):
                     print(f"      参考图 {i+1}: {ref_img.size[0]}x{ref_img.size[1]}")
+                    ref_img = self._preprocess_reference_to_aspect_ratio(ref_img, aspect_ratio)
                 contents.append(ref_img)
 
         # 5. 调试日志
@@ -727,7 +762,7 @@ class ImageGenerator:
         previous_shot_image: Optional[Image.Image] = None,
         previous_shot: Optional[dict] = None,
         screenplay: Optional[dict] = None,
-        aspect_ratio: str = "16:9",
+        aspect_ratio: str = "2:3",
         genre: Optional[str] = None,
         **kwargs
     ) -> dict:
@@ -892,7 +927,7 @@ class ImageGenerator:
                 result = await self.generate_image(
                     prompt=item.get("prompt", ""),
                     negative_prompt=item.get("negative_prompt", ""),
-                    aspect_ratio=item.get("aspect_ratio", "16:9"),
+                    aspect_ratio=item.get("aspect_ratio", "2:3"),
                     reference_images=item.get("reference_images"),
                     style_preset=item.get("style_preset"),
                     use_pro_model=item.get("use_pro_model", False),
@@ -1067,7 +1102,7 @@ High quality, detailed, sharp focus, well-lit."""
         return await self.image_generator.generate_image(
             prompt=portrait_prompt,
             negative_prompt="blurry, low quality, distorted face, bad anatomy, multiple people, crowd, busy background",
-            aspect_ratio="3:4",  # 竖版更适合角色立绘
+            aspect_ratio="2:3",  # 竖版角色立绘（抖音适配）
             use_pro_model=True
         )
 

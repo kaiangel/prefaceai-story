@@ -32,7 +32,7 @@ class SceneImage(Base):
     # 图像属性
     width = Column(Integer, default=1024)
     height = Column(Integer, default=1024)
-    aspect_ratio = Column(String, default="16:9")
+    aspect_ratio = Column(String, default="2:3")
 
     # 生成信息
     generation_model = Column(String)  # 使用的模型

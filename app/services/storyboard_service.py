@@ -135,7 +135,7 @@ class StoryboardService:
         scenes: List[dict],
         characters: List[dict],
         style_preset: str,
-        aspect_ratio: str = "16:9"
+        aspect_ratio: str = "2:3"
     ) -> List[dict]:
         """
         生成分镜板（带拆分功能）

@@ -428,7 +428,7 @@ class SceneReferenceManager:
         result = await image_generator.generate_image(
             prompt=prompt,
             negative_prompt=negative_prompt,
-            aspect_ratio="16:9",
+            aspect_ratio="2:3",  # 场景参考图统一2:3（DEC-010）
             reference_images=reference_images
             # 不传use_pro_model，默认使用Flash
         )
