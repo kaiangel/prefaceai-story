@@ -4,6 +4,43 @@
 
 ---
 
+## 2026-02-13
+
+### TASK-REF-PREPROCESS Step 4 对比验证 ✅ 完成
+
+**完成时间**: 2026-02-13 17:05
+**验收状态**: ✅ 完成
+**测试类型**: 对比验证（A/B测试）
+
+**背景**:
+DEC-009 批准参考图预处理方案A。Backend 实现 `_preprocess_reference_to_aspect_ratio()` 代码后，AI-ML 指定 shot_34/36/22 三个边缘问题shot进行对比测试。Backend 跑完有/无预处理各3张图（共6张），交由 Tester 对比验证。
+
+**完成内容**:
+- [x] 阅读 TEAM_CHAT 最新400行及所有相关文档
+- [x] 查看 comparison_report.json 确认测试元数据
+- [x] 逐张查看6张图片（without/ 3张 + with/ 3张）
+- [x] 按PM指引的三个维度逐shot评估
+- [x] 撰写 Step 4 对比验证报告
+- [x] 发布报告到 TEAM_CHAT
+- [x] 更新 tester-progress 三个文件
+
+**评估结果**:
+
+| Shot | 边缘问题 | 角色一致性 | 整体画质 |
+|------|----------|-----------|----------|
+| shot_34（留白/单角色） | **略有改善**（白边~4%→~2-3%） | 一致 | 无差异 |
+| shot_36（留黑/双角色） | 无变化 | 一致 | 无差异 |
+| shot_22（留白/双角色） | 无变化 | 一致 | 无差异 |
+
+**总体结论**: 无变化 ~ 略有改善
+**建议**: 保留预处理代码（低成本低风险有潜在收益）
+
+**产出物**:
+- 对比验证报告: TEAM_CHAT 2026-02-13 17:05
+- 测试输入: `test_output/ref_preprocess_test/without/` + `test_output/ref_preprocess_test/with/`
+
+---
+
 ## 2026-02-03
 
 ### TASK-V5-ACCEPTANCE Kai与Cici V5验收 ✅ 通过

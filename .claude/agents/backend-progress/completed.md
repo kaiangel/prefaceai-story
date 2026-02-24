@@ -4,6 +4,129 @@
 
 ---
 
+## 2026-02-24
+
+### TASK-SCENE-REF-ASPECT: 场景参考图宽高比统一为 2:3 ✅
+
+**完成时间**: 2026-02-24 11:37
+**验收状态**: 1处修改，语法通过，grep 确认无遗漏
+
+**任务背景**:
+- DEC-010 决策：从源头统一参考图宽高比，消除比例不匹配
+- TASK-ASPECT-2x3 遗漏了 `scene_reference_manager.py`
+
+**完成内容**:
+- [x] `scene_reference_manager.py:431` — `aspect_ratio="16:9"` → `aspect_ratio="2:3"`
+- [x] Python 语法验证通过
+- [x] grep 排查 `app/services/` 无遗漏
+
+---
+
+## 2026-02-14
+
+### TASK-ASPECT-2x3: 宽高比统一改为 2:3 ✅
+
+**完成时间**: 2026-02-14 10:56
+**验收状态**: 9个文件26处修改，语法验证9/9通过
+
+**任务背景**:
+- Founder 指令: 条漫为主，抖音首发，图片统一 2:3
+- PM 排查后发布完整清单（9个文件）
+
+**完成内容**:
+- [x] 9个生产代码文件的默认宽高比统一为 `"2:3"`
+- [x] `get_aspect_ratio_for_scene()` 智能推断也统一为 `"2:3"`（Backend 决策）
+- [x] Python 语法验证 9/9 通过
+- [x] grep 排查确认无遗漏
+
+**修改文件**:
+| 文件 | 修改数 | 原值 |
+|------|--------|------|
+| `reference_image_manager.py` | 2 | `"1:1"` |
+| `image_generator.py` | 6 | `"16:9"` / `"3:4"` |
+| `storyboard_director.py` | 4 | `"16:9"` |
+| `storyboard_prompts.py` | 5 | `"16:9"` / `"9:16"` / `"21:9"` / `"1:1"` |
+| `storyboard_service.py` | 1 | `"16:9"` |
+| `consistent_image_generator.py` | 2 | `"1:1"` / `"16:9"` |
+| `pipeline_orchestrator.py` | 1 | `"16:9"` |
+| `chapters.py` | 4 | `"16:9"` |
+| `scene_image.py` | 1 | `"16:9"` |
+
+---
+
+## 2026-02-13
+
+### TASK-REF-PREPROCESS Step 3: 对比测试 ✅
+
+**完成时间**: 2026-02-13 16:24
+**验收状态**: 6/6 API调用成功，图片已保存，等待 Tester Step 4
+
+**任务背景**:
+- PM 核验 Step 1+2 通过后批准执行 Step 3
+- AI-ML 指定 shot_34/36/22 作为对比测试（覆盖留白+留黑、单角色+双角色）
+
+**完成内容**:
+- [x] 创建对比测试脚本 `tests/test_ref_preprocess_comparison.py`
+- [x] Phase 1: 禁用预处理，生成3个shot（monkey-patch noop）
+- [x] Phase 2: 启用预处理，生成相同3个shot
+- [x] 6次API调用全部成功
+
+**关键产出**:
+| 文件 | 说明 |
+|------|------|
+| `tests/test_ref_preprocess_comparison.py` | 对比测试脚本 |
+| `test_output/ref_preprocess_test/without/shot_{22,34,36}.png` | 无预处理结果 |
+| `test_output/ref_preprocess_test/with/shot_{22,34,36}.png` | 有预处理结果 |
+| `test_output/ref_preprocess_test/comparison_report.json` | 测试报告 |
+
+**预处理日志确认**:
+```
+Phase 2 中每张参考图都正确裁剪:
+Jerry fullbody: 864x1184 → 666x1184 (裁剪宽度22.9%)
+CC fullbody: 896x1152 → 648x1152 (裁剪宽度27.7%)
+Phase 1 中无裁剪日志（noop正确生效）
+```
+
+---
+
+### TASK-REF-PREPROCESS Step 2: 参考图预处理代码 ✅
+
+**完成时间**: 2026-02-13 16:07
+**验收状态**: 代码验证通过，等待 Step 3 对比测试
+
+**任务背景**:
+- DEC-009 批准方案A：在 ImageGenerator.generate_image() 中实现参考图中心裁剪
+- 参考图比例(0.73~0.78)与目标9:16(0.5625)差距17-22%，可能加剧边缘留黑/留白问题
+- AI-ML 提供了建议代码，Backend 负责实现
+
+**完成内容**:
+- [x] 新增 `_preprocess_reference_to_aspect_ratio()` 方法（中心裁剪）
+- [x] 在 `generate_image()` 中添加预处理调用
+- [x] 在 `generate_shot_image_phase2()` 中添加预处理调用
+- [x] 单元验证：裁剪数据与 AI-ML 探索结果一致
+
+**关键产出**:
+| 文件 | 说明 |
+|------|------|
+| `app/services/image_generator.py` | 新增方法 L183-214，修改两处调用 L275、L631 |
+
+**验收标准**:
+- 中心裁剪逻辑: ✅
+- 只裁不拉伸: ✅
+- 原图不受影响: ✅ (crop()返回新Image)
+- 日志输出裁剪信息: ✅
+- 容差0.01: ✅
+- 覆盖所有生成路径: ✅ (generate_image + generate_shot_image_phase2)
+
+**裁剪验证数据**:
+```
+Jerry fullbody (864x1184) → 666x1184 (裁剪宽度22.9%)
+CC fullbody (896x1152) → 648x1152 (裁剪宽度27.7%)
+已匹配的图 → 不裁剪
+```
+
+---
+
 ## 2026-02-03
 
 ### TASK-RENAME-KAI-TO-JERRY ✅

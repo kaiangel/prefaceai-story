@@ -4,6 +4,115 @@
 
 ---
 
+## 2026-02-14
+
+### TASK-LP-PAGES-FIX 4项修复 ✅
+
+**完成时间**: 2026-02-14 17:30
+**验收状态**: 待 PM 复验
+**任务来源**: PM 验收 TASK-LP-PAGES 4.0/5 后分配的修复任务
+
+**完成内容**:
+- [x] FIX-1 (P0): Footer `openSubPagesInNewTab` prop — 首页链接新开标签页，子页面用 `<Link>` 客户端路由
+- [x] FIX-2 (P1): 11个页面添加 SEO metadata — Server/Client Component 拆分
+- [x] FIX-3 (P1): Footer 内链改用 Next.js `<Link>`（与 FIX-1 合并实现）
+- [x] FIX-4 (P2): 登录页 setTimeout 清理（useRef + unmount cleanup）
+
+**修改文件**:
+| 文件 | 修改 |
+|------|------|
+| `components/layout/Footer.tsx` | 新增 `openSubPagesInNewTab` prop，移除 `"use client"`，条件渲染 `<Link>` / `<a target="_blank">` |
+| `app/page.tsx` | `<Footer openSubPagesInNewTab />` |
+| `components/sections/CTASection.tsx` | "直接登录" 链接加 `target="_blank" rel="noopener noreferrer"` |
+
+**新建文件（10个 *Content.tsx）**:
+| 文件 | 说明 |
+|------|------|
+| `app/(marketing)/about/AboutContent.tsx` | 关于我们 Client Component |
+| `app/(marketing)/terms/TermsContent.tsx` | 使用条款 Client Component |
+| `app/(marketing)/privacy/PrivacyContent.tsx` | 隐私政策 Client Component |
+| `app/(marketing)/careers/CareersContent.tsx` | 加入我们 Client Component |
+| `app/(marketing)/help/HelpContent.tsx` | 帮助中心 Client Component |
+| `app/(marketing)/tutorials/TutorialsContent.tsx` | 使用教程 Client Component |
+| `app/(marketing)/faq/FAQContent.tsx` | 常见问题 Client Component |
+| `app/(marketing)/contact/ContactContent.tsx` | 联系我们 Client Component |
+| `app/(marketing)/pricing/PricingContent.tsx` | 定价 Client Component |
+| `app/login/LoginContent.tsx` | 登录 Client Component |
+
+**验收指标**:
+- 4/4 修复完成: ✅
+- `npm run build` 通过（15路由）: ✅
+- 首页 Footer 新开标签页: ✅
+- 子页面 Footer 客户端路由: ✅
+- 浏览器标签页显示独立标题: ✅
+
+---
+
+### TASK-LP-PAGES 10个子页面 + 6个组件 ✅
+
+**完成时间**: 2026-02-14 17:00
+**验收状态**: 待 PM 验收
+**任务来源**: PM 分配的 Landing Page 子页面创建任务
+
+**完成内容**:
+
+Phase A — 基础设施:
+- [x] `(marketing)/layout.tsx` 共享layout（SubPageHeader + Footer）
+- [x] `SubPageHeader.tsx` 子页面顶部导航
+- [x] `PageHero.tsx` 子页面标题区
+- [x] `Footer.tsx` 3处链接更新
+
+Phase B — 6个内容页:
+- [x] `/about` 关于我们（品牌故事 + 产品理念 + 3个核心价值卡片）
+- [x] `/terms` 使用条款（8节 + TOC锚点导航）
+- [x] `/privacy` 隐私政策（9节 + TOC锚点导航）
+- [x] `/careers` 加入我们（团队文化 + 3个职位）
+- [x] `/help` 帮助中心（4个分类卡片）
+- [x] `/tutorials` 使用教程（3步骤卡片）
+
+Phase C — 2个交互页面:
+- [x] `/faq` 常见问题（FAQAccordion组件 + 4分类15问答）
+- [x] `/contact` 联系我们（联系信息 + 表单验证 + 提交状态）
+
+Phase D — 2个高复杂度页面:
+- [x] `/pricing` 定价（PricingToggle月/年切换 + 3个PricingCard + 定价FAQ）
+- [x] `/login` 登录（InviteCodeInput + 邀请码验证 + 震动动画 + 成功界面）
+
+**新建文件（17个）**:
+| 文件 | 说明 |
+|------|------|
+| `components/layout/SubPageHeader.tsx` | 子页面顶部导航 |
+| `components/ui/PageHero.tsx` | 子页面标题区 |
+| `components/ui/FAQAccordion.tsx` | FAQ手风琴组件 |
+| `components/ui/PricingToggle.tsx` | 月付/年付切换 |
+| `components/ui/PricingCard.tsx` | 定价卡片 |
+| `components/ui/InviteCodeInput.tsx` | 邀请码输入 |
+| `app/(marketing)/layout.tsx` | 共享layout |
+| `app/(marketing)/about/page.tsx` | 关于我们 |
+| `app/(marketing)/terms/page.tsx` | 使用条款 |
+| `app/(marketing)/privacy/page.tsx` | 隐私政策 |
+| `app/(marketing)/careers/page.tsx` | 加入我们 |
+| `app/(marketing)/help/page.tsx` | 帮助中心 |
+| `app/(marketing)/tutorials/page.tsx` | 使用教程 |
+| `app/(marketing)/faq/page.tsx` | 常见问题 |
+| `app/(marketing)/contact/page.tsx` | 联系我们 |
+| `app/(marketing)/pricing/page.tsx` | 定价 |
+| `app/login/page.tsx` | 登录 |
+
+**修改文件（1个）**:
+| 文件 | 修改 |
+|------|------|
+| `components/layout/Footer.tsx` | #pricing→/pricing, #features→/#features, #showcase→/#showcase |
+
+**验收指标**:
+- 10/10 页面创建: ✅
+- 6/6 组件创建: ✅
+- `npm run build` 通过（15路由）: ✅
+- 所有交叉链接: ✅
+- 交互功能（FAQ/表单/定价切换/登录验证）: ✅
+
+---
+
 ## 2026-02-12
 
 ### TASK-LP-POLISH 2项代码质量修复 ✅

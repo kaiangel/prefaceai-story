@@ -4,9 +4,308 @@
 
 ---
 
+## 2026-02-24
+
+### Coordinator 6项任务执行 ✅ (最新)
+
+**完成时间**: 2026-02-24 11:40
+**任务类型**: 协调 + 排查 + 方案制定 + 通知
+
+**完成内容**:
+- [x] P0: TASK-SCENE-REF-ASPECT 排查 — 确认 `scene_reference_manager.py:431` 遗漏 `16:9`，派发 @backend
+- [x] P1: TASK-GIT-COMMIT-2 提交方案 — 3批方案（Backend/Frontend/Docs），派发 @devops
+- [x] P1: CLAUDE.md 更新草案 — 4项修改提交 Coordinator 审核
+- [x] P2: 通知 5 Agent 更新 progress — 逐一通知 + PM 自查修复（时间戳矛盾+Step5缺失）
+- [x] P2: PROJECT_STATUS.md 全面更新 — 补充 11 天缺失内容
+- [x] P2: 下一阶段优先级建议 — 推荐 Phase 4.5→抖音首发→条漫B→6人一致性
+
+**待闭环**: CLAUDE.md 执行（待审核）、TASK-SCENE-REF-ASPECT 核验（待 @backend）、Agent progress 统一验证
+
+---
+
+## 2026-02-14
+
+### TASK-REF-PREPROCESS Step 5 汇总报告 ✅
+
+**完成时间**: 2026-02-14 17:34
+**任务类型**: 汇总报告
+
+**完成内容**:
+- [x] 汇总 Step 1-4 执行结果
+- [x] 对比测试分析：效果"无变化~略有改善"（shot_34 白边 ~4%→~2-3%，shot_36/22 无变化）
+- [x] 建议：保留预处理代码作为安全网
+- [x] TEAM_CHAT 发布 Step 5 汇总报告
+
+### TASK-LP-PAGES-FIX 复验通过 ✅
+
+**完成时间**: 2026-02-14 17:35（时间戳修正：原记录 17:22 有误，实际在 Frontend 17:30 完成之后）
+**任务类型**: 复验
+**触发**: Frontend 完成 4/4 修复 (17:30)
+
+**完成内容**:
+- [x] 阅读 TEAM_CHAT 最新 300 行（Frontend 完成报告 + 修复方案回顾）
+- [x] 阅读 frontend-progress/context-for-others.md
+- [x] 逐文件代码审查：Footer.tsx, CTASection.tsx, page.tsx, layout.tsx
+- [x] FIX-1 验证：`openSubPagesInNewTab` prop 三层逻辑（锚点/新标签页/Link）
+- [x] FIX-1 验证：首页传 `openSubPagesInNewTab`，marketing layout 默认 false
+- [x] FIX-1 验证：CTASection "直接登录" `target="_blank"` ✅
+- [x] FIX-2 验证：10个 page.tsx 均为 Server Component（无 `"use client"`）
+- [x] FIX-2 验证：10个 *Content.tsx 均有 `"use client"` 指令
+- [x] FIX-2 验证：metadata 逐项对照 PM 方案 10/10 一致
+- [x] FIX-3 验证：Footer 内链用 `<Link>`（与 FIX-1 合并实现）
+- [x] FIX-4 验证：`shakeTimerRef` + `apiTimerRef` + `clearTimers` + unmount cleanup
+- [x] 构建验证：`npm run build` 15/15 static pages 通过
+- [x] TEAM_CHAT 发布复验报告
+- [x] 更新 pm-progress 3个文件 + team-brain 文档
+
+**评分**: 4.8/5（从 4.0 提升至 4.8）
+
+---
+
+### TASK-LP-PAGES 验收 + TASK-LP-PAGES-FIX 修复派发 ✅
+
+**完成时间**: 2026-02-14 16:55
+**任务类型**: 验收 + 任务管理
+**触发**: Frontend 完成报告 (17:00) + Founder 反馈
+
+**完成内容**:
+- [x] 阅读 TEAM_CHAT Frontend 完成报告（4 Phase, 17新建+1修改）
+- [x] 阅读 frontend-progress/context-for-others.md
+- [x] 逐文件阅读全部 18 个文件（17新建+1修改），对照内容文档核验
+- [x] 内容还原度验证：10页面文案100%还原（价格/FAQ数量/条款章节等抽查通过）
+- [x] 交叉链接验证：15+链接全部正确
+- [x] 交互功能验证：FAQ/联系表单/定价切换/登录流程全部到位
+- [x] 价格计算验证：Pro¥441=49×12×0.75 ✅，Max¥1341=149×12×0.75 ✅
+- [x] 发现 P0 问题：子页面链接应新开标签页（Founder 确认）
+- [x] 发现 P1-1：11个页面缺 SEO metadata
+- [x] 发现 P1-2：Footer 内链用 `<a>` 未用 `<Link>`
+- [x] 发现 P2-1：登录页 setTimeout 无清理
+- [x] 向 Founder 汇报验收结果 + 分析两种方案差异
+- [x] Founder 确认方案：区分首页/子页面 + 全部修复
+- [x] TEAM_CHAT 发布 TASK-LP-PAGES-FIX 4项修复任务
+- [x] 更新 pm-progress 3个文件 + team-brain 文档
+
+**验收结果**: 4.0/5（内容5/5, 交互5/5, 联动5/5, 导航3/5, SEO 2/5, 代码4/5）
+
+---
+
+### TASK-LP-PAGES 内容文档撰写 + 任务派发 ✅
+
+**完成时间**: 2026-02-14 16:19
+**任务类型**: 内容撰写 + 任务管理
+**触发**: Founder 指令（Landing Page 子页面）
+
+**完成内容**:
+- [x] 探索 Frontend 代码库（Next.js 14 架构、组件、路由、设计系统）
+- [x] 设计技术方案（(marketing) 路由组 + 6 个新组件 + Footer 修改）
+- [x] 撰写定价体系（Free/Pro¥49/Max¥149，年付75折，4条定价FAQ）
+- [x] 撰写关于我们（品牌故事 + 产品理念 + 3个核心价值卡片）
+- [x] 撰写帮助中心（4个分类卡片）
+- [x] 撰写使用教程（3步骤流程）
+- [x] 撰写常见问题（15条FAQ，4个分类）
+- [x] 撰写联系我们（3种联系方式 + 表单验证规则）
+- [x] 撰写加入我们（团队文化 + 3个职位JD）
+- [x] 撰写使用条款（8章完整法律条款）
+- [x] 撰写隐私政策（9章完整隐私政策）
+- [x] 设计登录页交互流程（Demo邀请码 XUHUA2026 + 成功/失败/空值/震动）
+- [x] 制定 11 项验收标准
+- [x] 发布任务到 TEAM_CHAT（@frontend）
+- [x] 更新 pm-progress 3 个文件 + team-brain 文档
+
+**交付物**: `.team-brain/handoffs/TASK-LP-PAGES-CONTENT.md`
+
+---
+
+### TASK-ASPECT-2x3 PM 核验通过 ✅
+
+**完成时间**: 2026-02-14 11:01
+**任务类型**: 验收核验
+**触发**: Backend 完成报告 (10:56)
+
+**完成内容**:
+- [x] 阅读 Backend TEAM_CHAT 完成报告（26 处修改 double check 表格）
+- [x] 阅读 backend-progress/context-for-others.md
+- [x] grep 核验 `app/` 目录：27 处 `"2:3"` 全部正确
+- [x] grep 核验旧值残留：仅 4 处合理保留（docstring + 场景参考图 + valid_ratios）
+- [x] 确认 Backend 额外决策合理（智能推断统一 2:3，条漫排版一致性）
+- [x] 确认 AI-ML prompt 文本无需修改（全面排查已完成）
+- [x] 更新 pm-progress 全部 3 个文件 + team-brain 相关文档
+
+**核验结果**: ✅ 26/26 通过 + 4 处合理保留
+
+---
+
+### TASK-ASPECT-2x3 全面排查 + 执行方案发布 ✅
+
+**完成时间**: 2026-02-14 10:44
+**任务类型**: 需求分析/任务分配
+**触发**: Founder 指令（条漫为主，抖音适配 2:3）
+
+**完成内容**:
+- [x] 调查当前系统所有组件的宽高比设置
+- [x] 对比抖音 2:3 vs 系统当前 9:16/16:9 差异
+- [x] 全面排查 app/ 下所有 aspect_ratio 代码位置（9文件25处）
+- [x] 发布完整执行方案到 TEAM_CHAT（含行号、当前值、目标值）
+- [x] 分配给 @Backend 执行
+
+**更新的文档**:
+- `.team-brain/TEAM_CHAT.md` - 执行方案 + 补充完整清单
+- `.team-brain/handoffs/PENDING.md` - 新增 TASK-ASPECT-2x3
+- `.team-brain/status/TODAY_FOCUS.md` - 状态更新
+- `.claude/agents/pm-progress/*` - 三个文件
+
+---
+
+## 2026-02-13
+
+### TASK-REF-PREPROCESS Step 5 汇总报告 ✅
+
+**完成时间**: 2026-02-13 17:34
+**任务类型**: 汇总报告/决策建议
+**触发**: Tester 完成 Step 4 (17:05)
+
+**完成内容**:
+- [x] 阅读 TEAM_CHAT Tester 17:05 消息（Step 4 对比验证报告）
+- [x] 阅读 tester-progress 全部3个文件
+- [x] 综合评估5个维度（代码质量、改善效果、负面影响、成本、风险）
+- [x] 撰写 Step 5 汇总报告（任务回顾、执行过程、结果、评估、建议、后续路线图）
+- [x] 向 Founder 提出两项决策请求（闭环确认 + 后续方案）
+
+**更新的文档**:
+- `.team-brain/TEAM_CHAT.md` - Step 5 汇总报告
+- `.team-brain/handoffs/PENDING.md` - Step 4/5 状态更新
+- `.team-brain/status/TODAY_FOCUS.md` - Agent 状态更新
+- `.team-brain/daily-sync/2026-02-12.md` - PM 第十六次更新
+- `.claude/agents/pm-progress/*` - 三个文件
+
+---
+
+### TASK-REF-PREPROCESS Step 3 核验 + Step 4 指引发布 ✅
+
+**完成时间**: 2026-02-13 16:38
+**任务类型**: 核验/指引发布
+**触发**: Backend 完成 Step 3 (16:24)
+
+**核验内容**:
+- [x] 阅读 TEAM_CHAT Backend 16:24 消息（Step 3 完成）
+- [x] 阅读 backend-progress 全部3个文件
+- [x] 验证输出文件：6张PNG（without/3 + with/3）+ comparison_report.json
+- [x] 验证图片尺寸均为768x1344（9:16）
+- [x] 审查 comparison_report.json：6次API全部成功
+- [x] 发布 Step 4 详细指引（每shot观察区域+评估维度+报告模板+随机性提醒）
+
+**更新的文档**:
+- `.team-brain/TEAM_CHAT.md` - Step 3核验 + Step 4指引
+- `.team-brain/handoffs/PENDING.md` - Step 3 ✅
+- `.team-brain/status/TODAY_FOCUS.md` - Agent状态
+- `.team-brain/daily-sync/2026-02-12.md` - PM第十五次更新
+- `.claude/agents/pm-progress/*` - 三个文件
+
+---
+
+### TASK-REF-PREPROCESS Step 1+2 核验 ✅
+
+**完成时间**: 2026-02-13 16:13
+**任务类型**: 核验/审批
+**触发**: AI-ML 完成 Step 1 (16:00)、Backend 完成 Step 2 (16:07)
+
+**核验内容**:
+- [x] 阅读 TEAM_CHAT AI-ML 16:00 消息（Step 1 完成）
+- [x] 阅读 TEAM_CHAT Backend 16:07 消息（Step 2 完成）
+- [x] 阅读 ai-ml-progress 全部3个文件
+- [x] 阅读 backend-progress 全部3个文件
+- [x] 审查 `image_generator.py` 实际代码：L183-214, L275, L631
+- [x] Step 1 核验：3个shot选择合理（覆盖留白+留黑、单角色+双角色）
+- [x] Step 2 核验：验收标准5/5（中心裁剪、只裁不拉伸、原图不受影响、日志、容差）
+- [x] 发布 TEAM_CHAT 批准 Backend 执行 Step 3
+
+**更新的文档**:
+- `.team-brain/TEAM_CHAT.md` - 核验+批准Step 3消息
+- `.team-brain/handoffs/PENDING.md` - 更新Step状态
+- `.team-brain/status/TODAY_FOCUS.md` - 更新Agent状态
+- `.team-brain/daily-sync/2026-02-12.md` - PM第十四次更新
+- `.claude/agents/pm-progress/*` - 三个文件
+
+---
+
+### TASK-REF-PREPROCESS 执行方案制定 ✅
+
+**完成时间**: 2026-02-13 15:39
+**任务类型**: 执行方案制定/任务分配
+**触发**: Founder DEC-009 批准方案A，指示 PM 制定执行方案
+
+**完成内容**:
+- [x] 仔细阅读 DEC-009 决策、AI-ML 建议代码、TEAM_CHAT 相关讨论
+- [x] 制定5步执行方案（AI-ML选shot → Backend写代码 → 对比测试 → Tester验证 → PM汇总）
+- [x] 明确 Step 1 + Step 2 可并行
+- [x] 为 Backend 提供详细实现说明（位置、参考代码、验收标准）
+- [x] 为 AI-ML 提供选shot要求
+- [x] 为 Tester 提供对比验证标准
+- [x] 发布 TEAM_CHAT 执行方案
+
+**更新的文档**:
+- `.team-brain/TEAM_CHAT.md` - 执行方案发布
+- `.team-brain/handoffs/PENDING.md` - 新增 TASK-REF-PREPROCESS
+- `.team-brain/status/TODAY_FOCUS.md` - Step 27 + 更新 Agent 状态
+- `.team-brain/daily-sync/2026-02-12.md` - PM第十三次更新
+- `.claude/agents/pm-progress/*` - 三个文件
+
+---
+
 ## 2026-02-12
 
-### CLAUDE.md 更新执行 ✅ (最新)
+### 参考图预处理方案PM评估 ✅
+
+**完成时间**: 2026-02-13 15:09
+**任务类型**: 方案评估/决策建议
+**触发**: AI-ML 17:48 完成参考图预处理方案探索，请求PM评估
+
+**评估内容**:
+- [x] 阅读 TEAM_CHAT AI-ML 17:48消息
+- [x] 阅读 ai-ml-progress/context-for-others.md（详细方案+建议代码）
+- [x] 阅读 ai-ml-progress/current.md（核心数据+边界分析）
+- [x] 阅读 ai-ml-progress/completed.md（探索过程记录）
+- [x] 四维评估：技术可行性✅、成本✅、效果🟡、风险✅
+
+**评估结论**: 建议批准执行（方案A + 对比测试）
+
+**更新的文档**:
+- `.team-brain/TEAM_CHAT.md` - PM评估+Founder决策请求
+- `.team-brain/daily-sync/2026-02-12.md` - PM第十二次更新
+- `.claude/agents/pm-progress/*` - 三个文件
+
+---
+
+### TASK-GIT-COMMIT 核验 ✅
+
+**完成时间**: 2026-02-12 17:27
+**任务类型**: 产品验收/核验
+**参与者**: PM（核验）, DevOps（执行）
+
+**核验范围**:
+- [x] `git log --oneline -5` — 3 commits顺序正确
+- [x] `git status` — 5个post-commit文件（DevOps完成报告），属正常行为
+- [x] `git show --stat a6a0359` — Step 1恰好5个frontend文件，message匹配
+- [x] `git show --stat 08a0e9f` — Step 2恰好18个文档文件，message匹配
+- [x] `git ls-files | grep .env` — 仅.env.example（模板），无泄露
+
+**核验结论**: 通过 ✅
+
+**Coordinator 3项协调事项全部闭环**:
+1. ✅ TASK-GIT-COMMIT — PM方案→DevOps执行→PM核验
+2. ✅ CLAUDE.md — PM草案→Coordinator审核→PM执行
+3. ✅ PROJECT_STATUS.md — PM直接更新9处
+
+**更新的文档**:
+- `.team-brain/TEAM_CHAT.md` - 核验结果
+- `.team-brain/handoffs/PENDING.md` - 归档TASK-GIT-COMMIT
+- `.team-brain/status/TODAY_FOCUS.md` - 步骤25-26、Agent状态
+- `.team-brain/daily-sync/2026-02-12.md` - PM第十一次更新
+- `.claude/agents/pm-progress/*` - 三个文件
+
+---
+
+### CLAUDE.md 更新执行 ✅
 
 **完成时间**: 2026-02-12 17:15
 **任务类型**: 文档更新（Coordinator审核通过后执行）

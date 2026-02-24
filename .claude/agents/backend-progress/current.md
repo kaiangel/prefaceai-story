@@ -1,45 +1,117 @@
 # Backend Agent - 当前任务
 
-> **最后更新**: 2026-02-03 21:30
-> **状态**: 🟢 TASK-RENAME-KAI-TO-JERRY 完成
+> **最后更新**: 2026-02-24 11:37
+> **状态**: 🟢 空闲（全部任务完成）
 
 ---
 
 ## 正在进行
 
-暂无
+无
 
 ---
 
 ## 刚完成
 
-### 🔄 TASK-RENAME-KAI-TO-JERRY ✅ (2026-02-03 21:30)
+### 🆕 TASK-SCENE-REF-ASPECT ✅ (2026-02-24 11:37)
 
-**任务**: 将"Kai与Cici"故事中的"Kai"全部替换为"Jerry"
+**任务**: 修改 `scene_reference_manager.py:431` 的 `aspect_ratio="16:9"` → `"2:3"`
+**决策依据**: DEC-010（边缘问题根治：参考图源头统一2:3）
 
-#### 完成内容
+| 文件 | 行号 | 修改前 | 修改后 | 状态 |
+|------|------|--------|--------|------|
+| `scene_reference_manager.py` | L431 | `"16:9"` | `"2:3"` | ✅ |
 
-| 类型 | 原 | 新 | 状态 |
-|------|-----|-----|------|
-| 测试文件 | `test_comic_cc_kai.py` | `test_comic_cc_jerry.py` | ✅ |
-| 参考图目录 | `teststory_CCKai` | `teststory_CCJerry` | ✅ |
-| 参考图文件 | `Kai_*.png` | `Jerry_*.png` | ✅ |
-| 输出目录 | `comic_cc_kai_story_v3` | `comic_cc_jerry_story_v3` | ✅ |
-| 代码内容 | 172处"Kai" | "Jerry" | ✅ |
+**验证**: 语法通过 ✅ | `app/services/` 中 `"16:9"` 仅剩 docstring 和 valid_ratios ✅
 
-#### shot_12验证
+---
 
-- **台词修改**: `"你好呀，Kai"` → `"你好，Jerry"` ✅
-- **图片生成**: shot_12.png 生成成功 ✅
-- **输出目录**: `test_output/comic_cc_jerry_story_v3/`
+### TASK-ASPECT-2x3 ✅ (2026-02-14 10:56)
 
-#### 新增/修改文件
+**任务**: 宽高比统一改为 2:3（抖音适配）
 
-| 文件 | 说明 |
+#### 修改范围
+
+| 文件 | 修改数 | 原值 | 新值 |
+|------|--------|------|------|
+| `reference_image_manager.py` | 2 | `"1:1"` | `"2:3"` |
+| `image_generator.py` | 6 | `"16:9"` / `"3:4"` | `"2:3"` |
+| `storyboard_director.py` | 4 | `"16:9"` | `"2:3"` |
+| `storyboard_prompts.py` | 5 | `"16:9"` / `"9:16"` / `"21:9"` / `"1:1"` | `"2:3"` |
+| `storyboard_service.py` | 1 | `"16:9"` | `"2:3"` |
+| `consistent_image_generator.py` | 2 | `"1:1"` / `"16:9"` | `"2:3"` |
+| `pipeline_orchestrator.py` | 1 | `"16:9"` | `"2:3"` |
+| `chapters.py` | 4 | `"16:9"` | `"2:3"` |
+| `scene_image.py` | 1 | `"16:9"` | `"2:3"` |
+| **合计** | **26** | | |
+
+#### Backend 决策: `get_aspect_ratio_for_scene()` 智能推断
+
+PM 要求 Backend 自行判断是否调整智能推断逻辑。**决定: 全部改为 `"2:3"`**。
+
+理由: 现阶段以条漫为主，所有面板应统一宽高比，混合比例（9:16/21:9/1:1）会导致排版不一致。函数结构保留，未来支持多格式时可恢复。
+
+#### 验证
+
+- Python 语法: 9/9 通过 ✅
+- grep 排查: `app/` 目录无遗漏旧值（4处合理保留） ✅
+
+---
+
+### TASK-REF-PREPROCESS Step 3 ✅ (2026-02-13 16:24)
+
+**任务**: 对比测试 — 有/无预处理各生成 shot_34/36/22
+
+#### 执行结果
+
+| Shot | 边缘问题 | 角色 | 无预处理 | 有预处理 |
+|------|----------|------|----------|----------|
+| shot_34 | 顶部大白边（留白） | Jerry | ✅ | ✅ |
+| shot_36 | 上下有黑边（留黑） | Jerry+Cici | ✅ | ✅ |
+| shot_22 | 上边有分隔线（留白） | Jerry+Cici | ✅ | ✅ |
+
+**6次API调用全部成功。**
+
+#### 输出文件
+
+| 目录 | 内容 |
 |------|------|
-| `tests/test_comic_cc_jerry.py` | 新测试文件（从test_comic_cc_kai.py复制并替换） |
-| `test_output/manualtest/teststory_CCJerry/` | 参考图目录 |
-| `test_output/comic_cc_jerry_story_v3/` | 输出目录 |
+| `test_output/ref_preprocess_test/without/` | 无预处理的3张图 |
+| `test_output/ref_preprocess_test/with/` | 有预处理的3张图 |
+| `test_output/ref_preprocess_test/comparison_report.json` | 测试报告 |
+| `tests/test_ref_preprocess_comparison.py` | 测试脚本 |
+
+---
+
+### TASK-REF-PREPROCESS Step 2 ✅ (2026-02-13 16:07)
+
+**任务**: 在 `image_generator.py` 中实现参考图预处理（中心裁剪到目标宽高比）
+
+#### 修改内容
+
+| # | 修改 | 行号 | 说明 |
+|---|------|------|------|
+| 1 | 新增 `_preprocess_reference_to_aspect_ratio()` | L183-214 | 中心裁剪方法 |
+| 2 | 修改 `generate_image()` | L275 | 参考图传入API前先预处理 |
+| 3 | 修改 `generate_shot_image_phase2()` | L631 | 同上（Phase 2.0 路径） |
+
+#### 验收标准
+
+| 标准 | 结果 |
+|------|------|
+| 代码逻辑与 AI-ML 建议一致（中心裁剪） | ✅ |
+| 只裁不拉伸 | ✅ |
+| 原图不受影响（处理副本） | ✅ crop()返回新Image |
+| 日志输出裁剪信息 | ✅ |
+| 容差 0.01 | ✅ |
+
+#### 单元验证
+
+```
+Jerry fullbody (864x1184) → 666x1184 (裁剪宽度22.9%)
+CC fullbody (896x1152) → 648x1152 (裁剪宽度27.7%)
+已是9:16的图 → 不裁剪（已匹配）
+```
 
 ---
 
@@ -165,16 +237,8 @@ def add_speech_bubble_v2(service, image, text, speaker_position="right", speaker
 ## 待处理队列
 
 ### 支线任务
-- [ ] **Phase 4: 视频合成 MVP**
+- [ ] **Phase 4.5: 视频合成**（等待 Founder 决策后启动）
 - [ ] API 文档整理（解锁Frontend）
-
----
-
-## 需要其他 Agent 协助
-
-| 需要 | Agent | 原因 |
-|------|-------|------|
-| **执行V4测试验收** | @Tester | 运行测试验证ARCH-3重构效果 ⭐紧急 |
 
 ---
 

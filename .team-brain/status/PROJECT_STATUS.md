@@ -1,6 +1,6 @@
 # 序话Story 项目状态看板
 
-> 最后更新: 2026-02-12 16:30
+> 最后更新: 2026-02-24 11:35
 > 更新者: PM
 
 ---
@@ -11,7 +11,7 @@
 项目名称: 序话Story - AI条漫/短视频生成系统
 目标: 用户输入创意 → 自动生成可发布的条漫或短视频
 当前版本: v0.6.6
-当前主线: 🟢 主线稳定（V5验收4.9/5，Git仓库已初始化）
+当前主线: 🟢 主线稳定（V5验收4.9/5，LP子页面4.8/5，Git仓库已初始化）
 核心内容: 都市情感短剧 (DEC-005)
 产品形态: 条漫优先 → 短视频保留
 Pipeline品牌: FrameSpark™
@@ -28,7 +28,7 @@ Pipeline品牌: FrameSpark™
 | 3 | 音频对齐 | ✅ DONE | 100% | Backend |
 | 4 | 条漫MVP技术验证 | ✅ **完成** | 100% | PM + AI-ML + Backend + Tester |
 | 4.5 | 视频合成 | 🔄 WIP | 5% | Backend |
-| 5 | 前端开发 | ✅ **Landing Page完成** | 45% | Frontend (LP 5.0/5, TASK-LP-FIX+POLISH全部通过) |
+| 5 | 前端开发 | ✅ **Landing Page完成** | 50% | Frontend (LP主页5.0/5 + 10个子页面4.8/5) |
 | 6 | 优化部署 | 🟡 **Git初始化完成** | 5% | DevOps |
 
 ---
@@ -138,6 +138,49 @@ Pipeline品牌: FrameSpark™
 
 **预览**: http://localhost:3000
 
+### ✅ TASK-REF-PREPROCESS 参考图预处理 (DEC-009, 已闭环)
+
+**决策**: Founder 批准方案A，在 ImageGenerator.generate_image() 中实现参考图中心裁剪到目标宽高比
+
+| 步骤 | 负责 | 状态 |
+|------|------|------|
+| Step 1: 指定对比测试 shot | @AI-ML | ✅ (2026-02-14 16:00) |
+| Step 2: 实现预处理代码 | @Backend | ✅ (2026-02-14 16:07) |
+| Step 3: 跑对比测试 | @Backend | ✅ (2026-02-14 16:24) |
+| Step 4: 对比验证 | @Tester | ✅ (2026-02-14 17:05) |
+| Step 5: 汇总报告 | @PM | ✅ (2026-02-14 17:34) |
+
+**闭环结论**: 效果"无变化~略有改善"（shot_34白边~4%→~2-3%）。代码保留作为安全网。后续方案改为从源头统一宽高比（DEC-010）。
+
+### ✅ TASK-ASPECT-2x3 宽高比统一改为2:3 (2026-02-14)
+
+**内容**: 全部图像宽高比从混合比例统一为 2:3（抖音适配）
+- Backend 修改 9 文件 26 处 ✅ (2026-02-14 10:56)
+- PM 核验通过 ✅ (2026-02-14 11:01)
+- 遗留: scene_reference_manager.py 仍为 16:9 → TASK-SCENE-REF-ASPECT 修复中 (DEC-010)
+
+### ✅ TASK-LP-PAGES Landing Page 子页面 (2026-02-14)
+
+**内容**: 10个子页面实现（9个营销页 + 登录页）
+- PM 内容撰写 + 任务派发 ✅ (2026-02-14 16:19)
+- Frontend 执行 ✅ (2026-02-14 17:00) — 4/4 Phase, 17新建+1修改
+- PM 验收 4.0/5 ✅ — 内容5/5, 交互5/5, 导航3/5, SEO 2/5
+
+### ✅ TASK-LP-PAGES-FIX 4项修复 (2026-02-14)
+
+**内容**: PM 验收发现的4项问题修复
+- FIX-1(P0): Footer 首页新开标签页/子页面当前标签页 ✅
+- FIX-2(P1): 11个页面 SEO metadata ✅
+- FIX-3(P1): Footer 内链改用 `<Link>` ✅
+- FIX-4(P2): 登录页 setTimeout 清理 ✅
+- PM 复验通过 4.8/5 ✅ (2026-02-14 17:35)
+
+### 🟡 TASK-SCENE-REF-ASPECT 场景参考图宽高比修复 (DEC-010, 执行中)
+
+- PM 排查确认遗漏 ✅ (2026-02-24) — scene_reference_manager.py:431 aspect_ratio="16:9"
+- @Backend 修复任务已派发 ⏳
+- PM 核验 ⏳
+
 ### 🟡 P1 - 保留任务
 - [ ] Phase 4: 视频合成 (Backend) - **保留，后续短视频模式需要**
 
@@ -152,23 +195,26 @@ Pipeline品牌: FrameSpark™
 
 ### Backend (后端)
 ```
-状态: 🟢 正常
-当前任务: Phase 4 视频合成设计
+状态: 🟡 TASK-SCENE-REF-ASPECT 待执行
+更新时间: 2026-02-24 11:35
+当前任务: TASK-SCENE-REF-ASPECT — scene_reference_manager.py 宽高比修复
 阻塞: 无
-待解决: FFmpeg 集成方案选型
+已完成: TASK-ASPECT-2x3 (9文件26处) + TASK-REF-PREPROCESS Step2 代码实现
+待解决: FFmpeg 集成方案选型（Phase 4.5）
 ```
 
 ### Frontend (前端)
 ```
 状态: 🟢 空闲
-更新时间: 2026-02-12 16:30
+更新时间: 2026-02-24 11:35
 阻塞: 无
 
 已完成:
+  - ✅ TASK-LP-PAGES-FIX 4项修复 (PM复验通过 4.8/5)
+  - ✅ TASK-LP-PAGES 10个子页面实现 (17新建+1修改)
   - ✅ TASK-LP-POLISH 2项代码质量修复 (5.0/5 完美收官)
   - ✅ TASK-LP-FIX 8项修复 (PM复验通过 4.5/5)
   - ✅ Landing Page 基础版本 (2026-01-29)
-  - ✅ 三个全维度差异化原型 (2026-01-19)
 
 待做:
   1️⃣ TASK-RESILIENCE-001-C: 友好失败提示
@@ -176,32 +222,37 @@ Pipeline品牌: FrameSpark™
 
 ### Tester (测试)
 ```
-状态: 🟢 正常
-当前任务: 维护回归测试
+状态: 🟢 空闲
+更新时间: 2026-02-24 11:35
+当前任务: 无
+已完成: TASK-REF-PREPROCESS Step4 对比验证 ✅
 阻塞: 无
 待解决: E2E 测试框架选型
 ```
 
 ### AI_ML (AI/ML)
 ```
-状态: 🟢 正常
-当前任务: 角色一致性监控
+状态: 🟢 空闲
+更新时间: 2026-02-24 11:35
+当前任务: 无
+已完成: TASK-REF-PREPROCESS Step1 指定测试shot (shot_34/36/22) ✅
 阻塞: 无
 待解决: Pro 模型成本优化
 ```
 
 ### DevOps (运维)
 ```
-状态: 🟡 Git初始化完成 (5%)
-更新时间: 2026-02-12 11:40
-当前任务: TASK-GIT-COMMIT（等待执行）
+状态: 🟢 空闲（等待 TASK-GIT-COMMIT-2）
+更新时间: 2026-02-24 11:35
+当前任务: TASK-GIT-COMMIT-2 方案已派发，待审核后执行
 阻塞: 无
 
 已完成:
+  - ✅ TASK-GIT-COMMIT LP修改+文档提交 (a6a0359 + 08a0e9f, PM核验通过)
   - ✅ TASK-GIT-INIT Git仓库初始化 (DEC-007, commit acba309)
 
 待做:
-  1️⃣ TASK-GIT-COMMIT: 提交LP修改+文档更新
+  1️⃣ TASK-GIT-COMMIT-2 (3批提交，方案已派发)
   2️⃣ 云服务选型
 ```
 
@@ -263,14 +314,59 @@ Pipeline品牌: FrameSpark™
 |--------|---------|------|
 | Phase 3 完成 | 2025-01-05 | ✅ |
 | 概念原型流程验收 | 2026-01-19 | ✅ |
-| **设计系统确定** | 2026-01-19 | 🔄 原型已完成，等待创始人选择 |
-| Phase 4 MVP | 2026-01-25 | 🔄 |
-| Phase 5 MVP | 2026-01-31 | 🔄 待设计系统确定后启动 |
-| 内测版本 | 2026-02-15 | ⏳ |
+| **设计系统确定** | 2026-01-19 | ✅ DEC-004 |
+| Phase 4 MVP | 2026-01-25 | ✅ V5验收4.9/5 |
+| Phase 5 Landing Page | 2026-02-14 | ✅ 主页5.0/5 + 子页面4.8/5 |
+| 内测版本 | TBD | ⏳ 待视频合成+抖音首发 |
 
 ---
 
 ## 更新日志
+
+### 2026-02-24 11:35
+- **[PM] PROJECT_STATUS.md 全面更新** 📋
+  - TASK-REF-PREPROCESS: 5步全部完成 → ✅ 已闭环 (DEC-009)
+  - TASK-ASPECT-2x3: 9文件26处宽高比统一为2:3 ✅
+  - TASK-LP-PAGES: 10个子页面实现 ✅ (4.0/5)
+  - TASK-LP-PAGES-FIX: 4项修复 ✅ (PM复验4.8/5)
+  - TASK-SCENE-REF-ASPECT: PM排查确认遗漏，已派发@backend修复
+  - DEC-010: 边缘问题根治——参考图源头统一2:3
+  - 全模块状态同步更新
+
+### 2026-02-14 17:35
+- **[PM] TASK-LP-PAGES-FIX 复验通过** ✅
+  - 4/4 修复全部通过，总评 4.8/5
+  - `npm run build` 15/15 static pages ✅
+  - Landing Page 子页面闭环
+
+### 2026-02-14 17:00
+- **[Frontend] TASK-LP-PAGES + TASK-LP-PAGES-FIX 完成** ✅
+  - 10个子页面实现（17新建+1修改）+ 4项修复
+  - 4/4 Phase 全部完成
+
+### 2026-02-14 16:19
+- **[PM] TASK-LP-PAGES 内容撰写 + 任务派发** ✅
+  - 10个子页面的文案和交互规范
+  - 交付物: `.team-brain/handoffs/TASK-LP-PAGES-CONTENT.md`
+
+### 2026-02-14 11:01
+- **[PM] TASK-ASPECT-2x3 核验通过** ✅
+  - Backend 修改 9 文件 26 处
+  - 所有宽高比统一为 2:3（抖音适配）
+
+### 2026-02-14 10:56
+- **[Backend] TASK-ASPECT-2x3 执行完成** ✅
+  - 9 文件 26 处宽高比改为 2:3
+  - 角色参考图（portrait+fullbody）、场景参考图、shot生成全部统一
+
+### 2026-02-13 ~ 2026-02-14
+- **TASK-REF-PREPROCESS 5步执行** ✅
+  - Step 1 @AI-ML 指定测试shot: 34/36/22 ✅ (16:00)
+  - Step 2 @Backend 实现预处理代码 ✅ (16:07)
+  - Step 3 @Backend 跑对比测试 ✅ (16:24)
+  - Step 4 @Tester 对比验证 ✅ (17:05)
+  - Step 5 @PM 汇总报告 ✅ (17:34)
+  - 闭环结论: 效果"无变化~略有改善"，代码保留作为安全网
 
 ### 2026-02-12 16:11
 - **[PM] TASK-LP-POLISH 复验通过** ✅
