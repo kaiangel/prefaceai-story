@@ -27,6 +27,7 @@ from app.services.image_generator import ImageGenerator
 from app.services.reference_image_manager import ReferenceImageManager
 from app.services.scene_reference_manager import SceneReferenceManager
 from app.models.style_config import ProjectStyleConfig
+from app.services.text_overlay_service import TextOverlayService
 
 
 class Phase2PipelineOrchestrator:
@@ -38,7 +39,7 @@ class Phase2PipelineOrchestrator:
     orchestrator = Phase2PipelineOrchestrator(output_dir="./output")
     result = await orchestrator.run(
         idea="雨夜公交站，错过末班车的三个人",
-        style_preset="realistic",
+        style_preset="anime",
         target_duration_minutes=3
     )
     ```
@@ -61,7 +62,7 @@ class Phase2PipelineOrchestrator:
     async def run(
         self,
         idea: str,
-        style_preset: str = "realistic",
+        style_preset: str = "anime",
         target_duration_minutes: int = 3,
         language: str = "zh-CN",
         character_count: int = 3,
@@ -190,8 +191,13 @@ class Phase2PipelineOrchestrator:
 
                 images_dir = os.path.join(project_dir, "images")
                 refs_dir = os.path.join(project_dir, "refs")
+                with_text_dir = os.path.join(project_dir, "with_text_images")
                 os.makedirs(images_dir, exist_ok=True)
                 os.makedirs(refs_dir, exist_ok=True)
+                os.makedirs(with_text_dir, exist_ok=True)
+
+                # TextOverlay 服务初始化
+                text_overlay_service = TextOverlayService()
 
                 # 5a. 生成角色参考图
                 print("\n--- 5a. 生成角色参考图 ---")
@@ -267,17 +273,15 @@ class Phase2PipelineOrchestrator:
                 image_results = []
                 reference_images_log = []  # 记录每个shot的参考图使用情况
 
-                previous_shot_image = None
-                previous_shot = None
-
                 for i, shot in enumerate(shots):
                     shot_id = shot.get("shot_id", i + 1)
                     print(f"\n  生成 Shot {shot_id}/{len(shots)}...")
 
-                    # 获取角色参考图 - 从character_direction.characters_visible读取
+                    # 获取角色参考图 - SQ-2: 智能选择，每角色1张
                     char_direction = shot.get("character_direction", {})
                     chars_in_scene = char_direction.get("characters_visible", [])
-                    char_refs = ref_manager.get_references_for_scene(chars_in_scene)
+                    shot_type = shot.get("camera", {}).get("shot_size", "medium_shot")
+                    char_refs = ref_manager.get_smart_references_for_scene(chars_in_scene, shot_type)
 
                     # 获取场景参考图 - 从scene_id追溯到location_id
                     scene_refs = []
@@ -312,32 +316,41 @@ class Phase2PipelineOrchestrator:
                         "total_refs": len(all_refs)
                     })
 
-                    # 使用Phase 2.0增强生成
+                    # 使用Phase 2.0增强生成 (DEC-014: previous_shot removed)
                     result = await self.image_generator.generate_shot_image_phase2(
                         shot=shot,
                         storyboard=storyboard,
                         characters=characters,
                         style_preset=style_preset,
                         reference_images=all_refs,  # 合并后的参考图
-                        previous_shot_image=previous_shot_image,
-                        previous_shot=previous_shot,
                         screenplay=screenplay,  # 传入screenplay用于获取场景氛围
                         aspect_ratio="2:3"
                     )
 
                     if result.get("success"):
-                        # 保存图像
+                        # 保存无文字版图像
                         image_path = os.path.join(images_dir, f"shot_{shot_id:02d}.png")
                         result["pil_image"].save(image_path)
 
-                        # 更新前序shot信息（用于下一shot的连续性）
-                        previous_shot_image = result["pil_image"]
-                        previous_shot = shot  # 传递完整shot数据
+                        # TextOverlay: 生成带文字版本
+                        text_overlay_data = shot.get("text_overlay", {})
+                        with_text_path = None
+                        if text_overlay_data and text_overlay_data.get("text_type", "none") != "none":
+                            try:
+                                with_text_image = text_overlay_service.process_shot(
+                                    result["pil_image"].copy(), text_overlay_data
+                                )
+                                with_text_path = os.path.join(with_text_dir, f"shot_{shot_id:02d}.png")
+                                with_text_image.save(with_text_path)
+                                print(f"    ✅ TextOverlay: {with_text_path}")
+                            except Exception as te:
+                                print(f"    ⚠️ TextOverlay失败: {te}")
 
                         image_results.append({
                             "shot_id": shot_id,
                             "success": True,
                             "image_path": image_path,
+                            "with_text_path": with_text_path,
                             "generation_time": result.get("generation_time_seconds", 0)
                         })
                         print(f"    ✅ Shot {shot_id} 保存: {image_path}")
@@ -591,7 +604,7 @@ class Phase2PipelineOrchestrator:
 # 便捷函数
 async def run_phase2_pipeline(
     idea: str,
-    style_preset: str = "realistic",
+    style_preset: str = "anime",
     target_duration_minutes: int = 3,
     output_dir: str = "./test_output/manualtest/phase2",
     generate_images: bool = True

@@ -24,23 +24,23 @@ class ScreenplayWriter:
     输入: outline.json + characters.json
     输出: screenplay.json
 
-    模型优先级: Gemini 3 Flash (主) → Claude Haiku (备用)
+    模型优先级: Claude Sonnet 4.6 (主) → Gemini 3 Pro (备用)
     """
 
     def __init__(self):
-        # 主模型: Gemini 3 Flash
-        self.gemini_client = None
-        self.gemini_model = "gemini-3-flash-preview"
-        if os.getenv("GEMINI_API_KEY"):
-            self.gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-
-        # 备用模型: Claude Haiku
+        # 主模型: Claude Sonnet 4.6
         self.claude_client = None
-        self.claude_model = "claude-haiku-4-5-20251001"
+        self.claude_model = "claude-sonnet-4-6"
         if os.getenv("ANTHROPIC_API_KEY"):
             self.claude_client = anthropic.Anthropic(
                 api_key=os.getenv("ANTHROPIC_API_KEY")
             )
+
+        # 备用模型: Gemini 3 Pro
+        self.gemini_client = None
+        self.gemini_model = "gemini-3-pro-preview"
+        if os.getenv("GEMINI_API_KEY"):
+            self.gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
     async def write(self, outline: dict, characters: dict) -> dict:
         """
@@ -142,28 +142,28 @@ class ScreenplayWriter:
 
                 content = None
 
-                # 优先使用 Gemini 3 Flash
-                if self.gemini_client:
+                # 优先使用 Claude Sonnet 4.6
+                if self.claude_client:
                     try:
-                        response = await self.gemini_client.aio.models.generate_content(
-                            model=self.gemini_model,
-                            contents=prompt,
-                            config={"max_output_tokens": 8631}
+                        response = self.claude_client.messages.create(
+                            model=self.claude_model,
+                            max_tokens=8631,
+                            messages=[
+                                {"role": "user", "content": prompt}
+                            ]
                         )
-                        content = response.text
-                    except Exception as ge:
-                        pass  # 静默失败，尝试Claude
+                        content = response.content[0].text
+                    except Exception as ce:
+                        pass  # 静默失败，尝试Gemini
 
-                # Fallback到Claude Haiku
-                if content is None and self.claude_client:
-                    response = self.claude_client.messages.create(
-                        model=self.claude_model,
-                        max_tokens=8631,
-                        messages=[
-                            {"role": "user", "content": prompt}
-                        ]
+                # Fallback到Gemini 3 Pro
+                if content is None and self.gemini_client:
+                    response = await self.gemini_client.aio.models.generate_content(
+                        model=self.gemini_model,
+                        contents=prompt,
+                        config={"max_output_tokens": 8631}
                     )
-                    content = response.content[0].text
+                    content = response.text
 
                 if content is None:
                     raise ValueError("无可用的LLM服务")
@@ -380,9 +380,37 @@ ALLOWED props for each character (from characters.json):
 
 ⚠️ 重要：location_id 必须完全匹配上述列表中的值（如 "{first_location_id}"），不要自己编造新的ID。
 
+═══════════════════════════════════════════════════════════
+## 对话要求（CRITICAL）
+═══════════════════════════════════════════════════════════
+
+每个 scene 必须包含至少 2 组对话交互（dialogue_beats）。
+即使是独处场景，角色也应有自言自语、回忆对话、或电话/短信对话。
+对话是推动故事最有效的方式——角色应该 SPEAK，而不只是被旁白描述。
+
+对话写作原则：
+- 对话必须简洁有力，每句≤20字，像真实漫画气泡中的文字
+- 体现角色性格差异（粗犷vs温柔、直白vs含蓄）
+- 包含情绪标注，便于后续分镜确定气泡类型
+- 独处场景可以是：自言自语、内心对话、回忆中的对话、电话/短信
+
+### 对话明确化规则（CRITICAL — NO VAGUE REFERENCES）
+
+关键剧情词必须在对话中**显式表达**，禁止使用模糊代称：
+❌ 模糊: "那个行业"、"那件事"、"你知道的"、"那个考试"、"那边的情况"
+✅ 明确: "公务员考试"、"父亲的葬礼"、"转学手续"、"店铺三年租约"
+
+前30%对话必须完成核心冲突定义：
+- 第1-2组 dialogue_beats 必须让观众明确理解：谁要什么？谁反对什么？矛盾焦点是什么？
+- 使用具体的事件、术语、地名、人名，不要留给观众猜测
+- 例: 故事关于"女儿不愿考公"→ 前2组对话必须出现"公务员"、"报名表"、"体制内"等具体词
+
+═══════════════════════════════════════════════════════════
+
 ## 输出要求
 这个scene必须包含：
 - 至少 {target_beats} 个 action_beats
+- 至少 2 组 dialogue_beats（对话交互）
 - 约 {target_narration_words} 字的 narration（有文学性的旁白）
 
 直接输出JSON，不要```json```包裹，不要任何解释文字：
@@ -404,6 +432,10 @@ ALLOWED props for each character (from characters.json):
         {{"beat_id": "{scene_id}a", "action": "动作描述", "duration_hint": 5, "emotional_note": "情绪"}},
         {{"beat_id": "{scene_id}b", "action": "动作描述", "duration_hint": 5, "emotional_note": "情绪"}},
         {{"beat_id": "{scene_id}c", "action": "动作描述", "duration_hint": 5, "emotional_note": "情绪"}}
+    ],
+    "dialogue_beats": [
+        {{"beat_id": "{scene_id}a_dialogue", "speaker": "char_001", "line": "对话内容（≤20字）", "emotion": "情绪标注"}},
+        {{"beat_id": "{scene_id}a_dialogue_2", "speaker": "char_002", "line": "回应内容（≤20字）", "emotion": "情绪标注"}}
     ],
     "narration": "【字数硬性要求：必须≥{target_narration_words}字】这是TTS朗读的旁白，要有文学性。详细描写：人物神态动作、内心活动、环境氛围、情绪变化、感官细节。充分展开，不要惜字如金。写够{target_narration_words}字...",
     "narration_tone": "情绪基调",

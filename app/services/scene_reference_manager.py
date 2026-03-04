@@ -12,10 +12,52 @@ P2.0核心原则：
 import asyncio
 import re
 from typing import Dict, Any, List, Optional
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 from app.models.style_config import ProjectStyleConfig
 from app.services.style_enforcer import StyleEnforcer
+
+
+def _label_scene_image(image: Image.Image, label: str) -> Image.Image:
+    """
+    SQ-1: 在场景参考图左上角叠加场景标签（半透明黑底+白字）
+    返回标注后的副本，不修改原图
+    """
+    labeled = image.copy().convert("RGBA")
+    overlay = Image.new("RGBA", labeled.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    font_size = max(20, image.width // 20)
+    font = None
+    for font_path in [
+        "/System/Library/Fonts/PingFang.ttc",
+        "/System/Library/Fonts/STHeiti Light.ttc",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
+    ]:
+        try:
+            font = ImageFont.truetype(font_path, font_size)
+            break
+        except (OSError, IOError):
+            continue
+    if font is None:
+        font = ImageFont.load_default()
+
+    bbox = draw.textbbox((0, 0), label, font=font)
+    text_w, text_h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    padding = 8
+
+    draw.rectangle(
+        [4, 4, text_w + padding * 2 + 4, text_h + padding * 2 + 4],
+        fill=(0, 0, 0, 180)
+    )
+    draw.text((padding + 4, padding + 4), label, fill=(255, 255, 255), font=font)
+
+    labeled = Image.alpha_composite(labeled, overlay)
+    return labeled.convert("RGB")
 
 
 class SceneReferenceManager:
@@ -29,6 +71,7 @@ class SceneReferenceManager:
     def __init__(self):
         self.scene_references: Dict[str, Dict[str, Image.Image]] = {}
         self.anchor_descriptions: Dict[str, str] = {}
+        self.location_names: Dict[str, str] = {}  # SQ-1: {location_id: location_name}
 
     # ========== 场景分析方法 ==========
 
@@ -223,10 +266,15 @@ class SceneReferenceManager:
         return None
 
     def get_references_for_location(self, location_id: str) -> List[Image.Image]:
-        """获取指定场景的所有参考图"""
-        if location_id in self.scene_references:
-            return list(self.scene_references[location_id].values())
-        return []
+        """获取指定场景的所有参考图（SQ-1: 带场景标签）"""
+        if location_id not in self.scene_references:
+            return []
+
+        refs = []
+        for view_type, image in self.scene_references[location_id].items():
+            label = f"Scene: {location_id} {view_type.capitalize()}"
+            refs.append(_label_scene_image(image, label))
+        return refs
 
     def has_reference(self, location_id: str) -> bool:
         """检查是否存在某场景的参考图"""
@@ -441,6 +489,11 @@ class SceneReferenceManager:
             # 保存到 scene_references（使用原始location_id作为key，以便后续查找）
             storage_key = location_id if location_id else anchor_key
             self.set_reference(storage_key, view_type, pil_image)
+
+            # SQ-1: 存储 location_name 用于标注
+            loc_name = anchor_info.get('location_name', '') or representative_scene.get('location', '')
+            if storage_key and loc_name:
+                self.location_names[storage_key] = loc_name
 
             # 构建描述
             description = self._build_anchor_description(location_info, view_type)

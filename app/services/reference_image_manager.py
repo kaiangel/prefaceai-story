@@ -15,11 +15,49 @@
 
 import asyncio
 from typing import Dict, Any, List, Optional
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 from app.services.character_prompt_builder import CharacterPromptBuilder
 from app.services.style_enforcer import StyleEnforcer
 from app.models.style_config import ProjectStyleConfig
+
+
+def _label_reference_image(image: Image.Image, label: str) -> Image.Image:
+    """
+    SQ-1: 在参考图左上角叠加身份标签（半透明黑底+白字）
+    返回标注后的副本，不修改原图
+    """
+    labeled = image.copy().convert("RGBA")
+    overlay = Image.new("RGBA", labeled.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    font_size = max(20, image.width // 20)
+    font = None
+    for font_path in [
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
+    ]:
+        try:
+            font = ImageFont.truetype(font_path, font_size)
+            break
+        except (OSError, IOError):
+            continue
+    if font is None:
+        font = ImageFont.load_default()
+
+    bbox = draw.textbbox((0, 0), label, font=font)
+    text_w, text_h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    padding = 8
+
+    draw.rectangle(
+        [4, 4, text_w + padding * 2 + 4, text_h + padding * 2 + 4],
+        fill=(0, 0, 0, 180)
+    )
+    draw.text((padding + 4, padding + 4), label, fill=(255, 255, 255), font=font)
+
+    labeled = Image.alpha_composite(labeled, overlay)
+    return labeled.convert("RGB")
 
 
 class ReferenceImageManager:
@@ -35,6 +73,7 @@ class ReferenceImageManager:
         # 新格式：{char_id: {'portrait': Image, 'fullbody': Image}}
         self.character_references: Dict[str, Dict[str, Image.Image]] = {}
         self.environment_references: Dict[str, Image.Image] = {}  # {scene_type: PIL.Image}
+        self.character_names: Dict[str, str] = {}  # SQ-1: {char_id: name_en}
         self.character_builder = CharacterPromptBuilder()
 
     async def generate_character_reference(
@@ -95,6 +134,9 @@ class ReferenceImageManager:
             if char_id not in self.character_references:
                 self.character_references[char_id] = {}
             self.character_references[char_id][ref_type] = result['pil_image']
+            # SQ-1: 存储角色英文名用于标注
+            name_en = character.get('name_en', '') or character.get('name', 'Unknown')
+            self.character_names[char_id] = name_en
             result['char_id'] = char_id
             result['char_name'] = character.get('name', 'Unknown')
             result['ref_type'] = ref_type
@@ -486,6 +528,49 @@ Single {type_label} only, no other elements, no text."""
                     refs.append(char_refs['portrait'])
                 if 'fullbody' in char_refs:
                     refs.append(char_refs['fullbody'])
+        return refs
+
+    def get_smart_references_for_scene(
+        self, character_ids: List[str], shot_type: str = "medium_shot"
+    ) -> List[Image.Image]:
+        """
+        SQ-2: 智能参考图选择 — 每角色 1 张，根据 shot_type 决定用 portrait 或 fullbody
+
+        规则：
+        - close_up / extreme_close_up / medium_close_up → portrait
+        - 其余 (wide, medium, etc.) → fullbody
+
+        Args:
+            character_ids: 角色ID列表
+            shot_type: 当前 shot 的景别
+
+        Returns:
+            参考图列表（每个角色 1 张）
+        """
+        portrait_types = {"close_up", "extreme_close_up", "medium_close_up"}
+        use_portrait = shot_type in portrait_types
+
+        refs = []
+        for char_id in character_ids:
+            if char_id in self.character_references:
+                char_refs = self.character_references[char_id]
+                name_en = self.character_names.get(char_id, char_id)
+
+                if use_portrait and 'portrait' in char_refs:
+                    ref_type = 'portrait'
+                    img = char_refs['portrait']
+                elif 'fullbody' in char_refs:
+                    ref_type = 'fullbody'
+                    img = char_refs['fullbody']
+                elif 'portrait' in char_refs:
+                    ref_type = 'portrait'
+                    img = char_refs['portrait']
+                else:
+                    continue
+
+                # SQ-1: 叠加身份标签
+                label = f"Character: {name_en}"
+                refs.append(_label_reference_image(img, label))
         return refs
 
     def get_portrait_refs(self, character_ids: List[str]) -> List[Image.Image]:

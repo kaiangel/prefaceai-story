@@ -411,6 +411,81 @@ Character data:
 ❌ BAD: "looking exhausted"
 ✅ GOOD: "his shoulders sag under an invisible weight, dark circles hollow out his eyes, his tie hangs loose"
 
+### 6. STRICT CHARACTER COUNT — NO EXTRA PEOPLE (CRITICAL)
+Each image_prompt MUST depict EXACTLY the characters listed in characters_in_scene — NO ONE ELSE.
+- State the exact count: "EXACTLY 2 characters in this scene"
+- FORBIDDEN: bystanders, extras, crowd, background figures, passersby, waiters, strangers, onlookers, silhouettes of other people
+- FORBIDDEN language: "blurred forms of other men/people", "other diners in the background", "busy restaurant with patrons"
+- Empty chairs, empty tables, empty seats MUST remain empty — do NOT fill them with unnamed figures
+- If the scene is a public place (restaurant, park, street), describe ONLY the named characters + environment/furniture/props — NEVER add ambient human figures
+❌ BAD: "the two friends sit at a table, blurred forms of other diners visible in the background"
+✅ GOOD: "EXACTLY 2 characters in this scene. The two friends sit at a table, empty chairs and warm pendant lights fill the rest of the restaurant"
+
+### 7. OBJECT PHYSICAL PLAUSIBILITY ON SHARED SURFACES (CRITICAL)
+When multiple objects sit on the same surface (table, desk, counter, shelf, floor), each object MUST have a distinct spatial anchor. Objects MUST NOT overlap or occupy the same position.
+- Use explicit placement words: "at the near edge", "at the far left corner", "beside the plate", "to the right of the cup"
+- FORBIDDEN vague spatial words when multiple objects share a surface: "among", "around it", "surrounded by", "in the midst of"
+- Each object needs its own non-overlapping zone on the surface
+❌ BAD: "a smartphone glows at the table's centre, around it a plate of braised pork and wine cups"
+✅ GOOD: "a smartphone rests at the near edge of the table in front of char_001, a plate of braised pork sits at the centre, two wine cups stand at the far side"
+❌ BAD: "books and laptop and coffee mug scattered on the desk"
+✅ GOOD: "an open laptop at the desk's centre, a coffee mug at the right edge, three stacked books at the far left corner"
+
+### 8. MULTI-CHARACTER LIMB INTERACTION LIMITS (CRITICAL)
+At most 2 characters' hands/arms may actively interact with the SAME object in one shot. If 3+ characters need to touch the same object, use ONE of these alternatives:
+- Split into sequential shots (each showing 1-2 characters interacting)
+- Use a reaction shot (close-up of the object, then cut to characters' faces reacting)
+- Show only 1-2 characters' hands in sharp focus, others' hands hidden or out of frame
+- FORBIDDEN: 3+ pairs of hands converging on the same point/object in one image
+❌ BAD: "three pairs of chopsticks enter frame from three directions, their tips converging on the same cluster of dumplings"
+✅ GOOD: "char_001 picks up a dumpling with chopsticks, char_002's hand rests on the table holding a rice bowl, char_003 is visible in the background raising a cup"
+❌ BAD: "all four hands reach for the same document on the table"
+✅ GOOD: "close-up of char_001's hand sliding the document across the table toward char_002, whose fingers hover at the paper's edge"
+
+## NARRATIVE VISUAL PROPS (MANDATORY)
+
+Every image_prompt MUST include at least one plot-relevant prop or environmental detail that conveys story information visually:
+❌ BAD: "two characters arguing in a living room"
+✅ GOOD: "two characters arguing in a living room, a civil service exam registration form crumpled on the table, an open laptop showing job listings"
+❌ BAD: "character sitting alone in bedroom"
+✅ GOOD: "character sitting alone in bedroom, a half-packed suitcase open on the floor, plane tickets pinned on the bulletin board"
+
+Props should tell the story even if the viewer cannot read the text overlay. The viewer should understand WHAT the conflict is about from the visual elements alone.
+
+## SPATIAL DEPTH RULES (MANDATORY)
+
+For medium_shot, medium_close_up, close_up: AT LEAST 30% of the frame must show visible background/environment.
+❌ BAD: "extreme close-up of face filling entire frame with no background"
+✅ GOOD: "close-up of her face, tears glistening, the blurred warm glow of the café behind her, shelves of books visible over her shoulder"
+
+Use foreground objects (blurred cup, door frame, rain streaks) to create depth layers.
+Aim for at least 2 depth layers per shot; 3 layers for emotional beats.
+
+## SHOT TRANSITION RULES (MANDATORY — between consecutive shots in the same scene)
+
+### 30-Degree Rule
+Adjacent shots in the same scene MUST change camera angle by at least 30 degrees. Cutting between two nearly identical angles creates a jarring jump cut.
+
+### Shot Size Variation
+No more than 2 consecutive shots may use the same shot_size. After 2 shots of the same size, the 3rd MUST change.
+
+### Camera Angle Variation
+Do NOT default every shot to eye_level. Choose angle based on narrative intent:
+- low_angle: empowerment, dominance, threat
+- high_angle: vulnerability, isolation, overview
+- eye_level: neutral, conversation, equality
+- dutch_angle: disorientation, tension (use sparingly)
+
+### Composition Variation
+Alternate subject_position across shots: left_third → center → right_third. Avoid 3+ consecutive shots with the same subject_position.
+
+### Lens & Focal Length
+Match focal_length to shot_size for natural perspective:
+- wide_shot / establishing: 24mm-35mm (environmental context)
+- medium_shot / medium_wide: 35mm-50mm (balanced)
+- close_up / medium_close_up: 85mm (portrait compression, background separation)
+- extreme_close_up: 100mm-135mm (detail isolation)
+
 Output format (JSON only, no other text):
 ```json
 {{
@@ -425,8 +500,8 @@ Output format (JSON only, no other text):
             "shot_id": {shot_id_start},
             "scene_id": {scene_id},
             "action_beat_id": "beat_id",
-            "camera": {{"shot_size": "wide/medium/close_up", "angle": "eye_level/low/high", "movement": "static/pan/dolly"}},
-            "composition": {{"subject_position": "position description"}},
+            "camera": {{"shot_size": "wide/medium/close_up", "angle": "eye_level/low/high", "movement": "static/pan/dolly", "focal_length": "24mm/35mm/50mm/85mm"}},
+            "composition": {{"subject_position": "left_third/center/right_third", "foreground": "foreground element for depth (blurred object, rain, frame edge...)", "background": "background element (city lights, room interior, landscape...)", "depth_layers": "2_layers/3_layers"}},
             "lighting": {{"key_light": "light source", "mood": "atmosphere"}},
             "character_direction": {{"characters_visible": ["char_id"]}},
             "image_prompt": "Full English prompt, 80-100 words, including scene + character appearance + SPECIFIC POSTURE/GESTURE from narration + facial expression + lighting + mood",
@@ -633,6 +708,15 @@ Strictly follow this JSON format (MUST include {min_shots} shots):
 ### 5. Emotions MUST be shown through specific body language
 ❌ BAD: "looking exhausted"
 ✅ GOOD: "his shoulders sag under an invisible weight, dark circles hollow out his eyes, his tie hangs loose and crooked"
+
+### 6. STRICT CHARACTER COUNT — NO EXTRA PEOPLE
+Each image_prompt MUST depict EXACTLY the characters in characters_in_scene — NO ONE ELSE. No bystanders, extras, crowd, or background figures. Empty chairs/seats stay empty.
+
+### 7. OBJECT PHYSICAL PLAUSIBILITY
+Multiple objects on the same surface (table/desk/floor) MUST have distinct spatial anchors with non-overlapping placement. Use "at the near edge", "at the far left corner" — NOT "among", "around it", "surrounded by".
+
+### 8. MULTI-CHARACTER LIMB INTERACTION LIMITS
+At most 2 characters' hands may actively interact with the SAME object in one shot. If 3+ characters need to touch one object, split into sequential shots or use a reaction shot instead.
 
 ═══════════════════════════════════════════════════════════════════════════════
 REMEMBER: You MUST generate {min_shots} complete shots! One shot per beat!

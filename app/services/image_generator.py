@@ -21,6 +21,125 @@ from app.prompts.storyboard_prompts import (
 from app.services.style_enforcer import StyleEnforcer
 
 
+def _strip_speaker_for_native(text: str) -> str:
+    """剥离说话者前缀，提取纯文字内容（用于原生文字渲染 prompt 构建）"""
+    import re
+    pattern = r'^[\w\u4e00-\u9fff]+(?:内心|（[^）]*）)?[：:]\s*[「"『]?(.+?)[」"』]?$'
+    match = re.match(pattern, text.strip())
+    if match:
+        return match.group(1)
+    return text
+
+
+def build_native_text_prompt(text_overlay: dict) -> str:
+    """
+    根据 text_overlay 数据构建 TEXT OVERLAY REQUIREMENT 指令块，
+    用于 NB2 原生渲染中文文字（不依赖 TextOverlay 后处理）。
+
+    参考实现: tests/test_nb2_text_test.py B组 build_text_overlay_prompt()
+
+    Args:
+        text_overlay: shot 的 text_overlay 数据字典，包含 text_type, chinese_text, speaker_position 等
+
+    Returns:
+        TEXT OVERLAY REQUIREMENT 指令块字符串，空字符串表示无需文字渲染
+    """
+    text_type = text_overlay.get("text_type", "none")
+    chinese_text = text_overlay.get("chinese_text", "")
+    position = text_overlay.get("speaker_position", "bottom")
+
+    if text_type == "none" or not chinese_text:
+        return ""
+
+    blocks = []
+
+    if text_type == "thought":
+        text = chinese_text if isinstance(chinese_text, str) else chinese_text[0]
+        clean = _strip_speaker_for_native(text)
+        blocks.append(
+            f"TEXT OVERLAY REQUIREMENT:\n"
+            f"A semi-transparent black bar (at the {position}) spanning the full width of the image, "
+            f"height approximately 18% of frame.\n"
+            f"Display Chinese text '{clean}' in white font, centered alignment.\n"
+            f"Inner monologue style: represents character's private thoughts."
+        )
+
+    elif text_type == "narration":
+        text = chinese_text if isinstance(chinese_text, str) else chinese_text[0]
+        clean = _strip_speaker_for_native(text)
+        blocks.append(
+            f"TEXT OVERLAY REQUIREMENT:\n"
+            f"A semi-transparent black bar (at the {position}) spanning the full width of the image, "
+            f"height approximately 18% of frame.\n"
+            f"Display Chinese text '{clean}' in white font, centered alignment.\n"
+            f"Narrative caption style: objective narration."
+        )
+
+    elif text_type == "dialogue":
+        texts = chinese_text if isinstance(chinese_text, list) else [chinese_text]
+        for i, txt in enumerate(texts):
+            if isinstance(txt, dict):
+                txt = txt.get('text', '')
+            clean = _strip_speaker_for_native(txt)
+            pos_desc = "upper left" if i == 0 else "upper right"
+            blocks.append(
+                f"TEXT OVERLAY REQUIREMENT (Bubble {i+1}):\n"
+                f"A white rounded rectangular speech bubble positioned {pos_desc} in the frame.\n"
+                f"Inside the bubble, display Chinese text '{clean}' in black font, centered alignment.\n"
+                f"Speech bubble style: clean white fill, thin black outline, rounded corners, "
+                f"triangular tail pointing to speaker."
+            )
+
+    elif text_type in ["dialogue_with_thought", "narration_with_thought",
+                        "narration_with_dialogue", "dialogue_with_narration"]:
+        texts = chinese_text if isinstance(chinese_text, list) else [chinese_text]
+        bubble_idx = 0
+        for i, item in enumerate(texts):
+            # 结构化元数据格式: {"type": "dialogue|thought|narration", "text": "..."}
+            if isinstance(item, dict) and "type" in item:
+                sub_type = item["type"]
+                txt = item.get("text", "")
+            else:
+                # 回退: 从文本内容推断子类型（兼容旧格式 LLM 输出）
+                txt = item
+                if "内心：" in txt or "内心:" in txt:
+                    sub_type = "thought"
+                elif txt.startswith("旁白：") or txt.startswith("「"):
+                    sub_type = "narration"
+                elif "：「" in txt or ":「" in txt or "：\"" in txt:
+                    sub_type = "dialogue"
+                else:
+                    sub_type = "narration"
+
+            clean = _strip_speaker_for_native(txt)
+
+            if sub_type == "thought":
+                blocks.append(
+                    f"TEXT OVERLAY REQUIREMENT ({i+1} - Inner monologue):\n"
+                    f"A semi-transparent black bar (at the bottom) spanning the full width, "
+                    f"height approximately 15% of frame.\n"
+                    f"Display Chinese text '{clean}' in white font, centered."
+                )
+            elif sub_type == "narration":
+                blocks.append(
+                    f"TEXT OVERLAY REQUIREMENT ({i+1} - Narration):\n"
+                    f"A semi-transparent black bar (at the bottom) spanning the full width, "
+                    f"height approximately 15% of frame.\n"
+                    f"Display Chinese text '{clean}' in white font, centered."
+                )
+            elif sub_type == "dialogue":
+                pos_desc = "upper left" if bubble_idx == 0 else "upper right"
+                blocks.append(
+                    f"TEXT OVERLAY REQUIREMENT ({i+1} - Dialogue bubble):\n"
+                    f"A white rounded rectangular speech bubble positioned {pos_desc}.\n"
+                    f"Inside the bubble, display Chinese text '{clean}' in black font, centered.\n"
+                    f"Speech bubble style: clean white fill, black outline, rounded corners, tail pointing to speaker."
+                )
+                bubble_idx += 1
+
+    return "\n\n".join(blocks)
+
+
 class ErrorType(Enum):
     """图像生成错误类型分类
 
@@ -55,7 +174,7 @@ class ImageGenerator:
 
     # 模型配置
     FAST_MODEL = "gemini-2.5-flash-image"  # 快速模型（主用）
-    PRO_MODEL = "gemini-3-pro-image-preview"  # 高级模型，支持参考图（备用）
+    PRO_MODEL = "gemini-3.1-flash-image-preview"  # Nano Banana 2（主力生图模型，原 Pro）
 
     # 重试配置
     MAX_RETRIES = 3
@@ -491,12 +610,11 @@ class ImageGenerator:
         shot: dict,
         storyboard: dict,
         characters: dict,
-        style_preset: str = "realistic",
+        style_preset: str = "anime",
         reference_images: Optional[List[Image.Image]] = None,
-        previous_shot_image: Optional[Image.Image] = None,
-        previous_shot: Optional[dict] = None,
         screenplay: Optional[dict] = None,
         aspect_ratio: str = "2:3",
+        use_native_text: bool = True,
         **kwargs
     ) -> dict:
         """
@@ -504,9 +622,8 @@ class ImageGenerator:
 
         核心增强：
         1. system_instruction - 全局风格锚定
-        2. continuity_context - 与上一shot的连续性
-        3. character_reference_mapping - 角色-参考图映射
-        4. narrative_context - 剧情上下文（情绪/剧情连续性）
+        2. character_reference_mapping - 角色-参考图映射
+        3. narrative_context - 剧情上下文（情绪/剧情连续性）
 
         Args:
             shot: Phase 2.0 shot数据，包含camera/composition/lighting
@@ -514,8 +631,6 @@ class ImageGenerator:
             characters: 完整角色数据 {"characters": [...]}
             style_preset: 风格预设
             reference_images: 参考图像列表 (角色参考图 + 场景参考图)
-            previous_shot_image: 上一张shot的图像（用于连续性）
-            previous_shot: 上一张shot的完整数据
             screenplay: 剧本数据（用于获取场景氛围）
             aspect_ratio: 宽高比
 
@@ -536,21 +651,18 @@ class ImageGenerator:
         )
 
         # 计算参考图数量以正确构建IMAGE编号映射
-        has_previous_shot_image = previous_shot_image is not None
         char_direction = shot.get("character_direction", {})
         characters_in_shot = char_direction.get("characters_visible", [])
-        # 每个角色2张参考图(portrait + fullbody)
-        char_refs_count = len(characters_in_shot) * 2
+        # SQ-2: 每个角色1张参考图（智能选择 portrait 或 fullbody）
+        char_refs_count = len(characters_in_shot) * 1
         # 场景参考图 = 总参考图 - 角色参考图
         total_refs = len(reference_images) if reference_images else 0
         scene_ref_count = max(0, total_refs - char_refs_count)
 
         prompt_package = prompt_builder.build_full_prompt(
             shot=shot,
-            previous_shot=previous_shot,
             screenplay=screenplay,
             include_system_instruction=True,
-            has_previous_shot_image=has_previous_shot_image,
             scene_ref_count=scene_ref_count
         )
 
@@ -596,6 +708,23 @@ class ImageGenerator:
         # 包括 MUST INCLUDE (photorealistic等) 和 DO NOT USE (cartoon, anime等)
         full_prompt = StyleEnforcer.enforce_prompt(full_prompt, style_preset)
 
+        # color_mode 处理：覆盖 preset 的颜色设定（用于回忆/闪回等特殊效果）
+        color_mode = shot.get("color_mode", "full_color")
+        if color_mode == "grayscale":
+            full_prompt += "\n\n[COLOR OVERRIDE] This shot MUST be in GRAYSCALE, black and white. Override any color requirements from the style preset."
+        elif color_mode == "sepia":
+            full_prompt += "\n\n[COLOR OVERRIDE] This shot MUST be in SEPIA TONE, warm brownish monochrome. Override any color requirements from the style preset."
+
+        # NB2 原生文字渲染：将 TEXT OVERLAY REQUIREMENT 附加到 prompt 末尾
+        # 当 use_native_text=True 时，NB2 直接在图像中渲染中文文字（旁白/对话/心理描述）
+        # 当 use_native_text=False 时，不附加文字指令，由 TextOverlay 后处理叠加（备用方案）
+        if use_native_text:
+            text_overlay = shot.get("text_overlay", {})
+            native_text_block = build_native_text_prompt(text_overlay)
+            if native_text_block:
+                full_prompt += "\n\n" + native_text_block
+                print(f"    [ImageGenerator Phase2] 原生文字渲染: text_type={text_overlay.get('text_type', 'none')}")
+
         # DEBUG: 保存shot的完整prompt用于验证
         shot_id = shot.get("shot_id", 0)
         if shot_id in [1, 2]:  # 保存Shot 1和Shot 2用于对比验证
@@ -607,25 +736,20 @@ class ImageGenerator:
                 with open(f"{debug_dir}/{filename}", "w", encoding="utf-8") as f:
                     f.write(f"=== Phase 2.0 Shot {shot_id} Prompt (角色一致性增强版) ===\n\n")
                     f.write(f"生成时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-                    f.write(f"has_previous_shot_image: {previous_shot_image is not None}\n\n")
+                    f.write(f"has_previous_shot_image: False (DEC-014: removed)\n\n")
                     f.write(f"=== 完整Prompt ===\n\n")
                     f.write(full_prompt)
                 print(f"    [DEBUG] Shot {shot_id} prompt已保存至 {debug_dir}/{filename}")
             except Exception as e:
                 print(f"    [DEBUG] 保存prompt失败: {e}")
 
-        # 4. 构建contents
+        # 4. 构建contents (DEC-014: previous_shot_image removed)
         contents = [full_prompt]
-
-        # 添加上一shot的图像（用于连续性参考）
-        if previous_shot_image:
-            print(f"    [ImageGenerator Phase2] 添加上一shot图像作为连续性参考")
-            contents.append(previous_shot_image)
 
         # 添加参考图（预处理到目标宽高比）
         if reference_images:
             print(f"    [ImageGenerator Phase2] 传入 {len(reference_images)} 张参考图")
-            for i, ref_img in enumerate(reference_images[:13]):  # 最多13张（留1张给前序shot）
+            for i, ref_img in enumerate(reference_images[:14]):  # 最多14张
                 if hasattr(ref_img, 'size'):
                     print(f"      参考图 {i+1}: {ref_img.size[0]}x{ref_img.size[1]}")
                     ref_img = self._preprocess_reference_to_aspect_ratio(ref_img, aspect_ratio)
@@ -636,7 +760,7 @@ class ImageGenerator:
         print(f"      model: {self.PRO_MODEL}")
         print(f"      style_preset: {style_preset}")
         print(f"      has_system_instruction: {bool(system_instruction)}")
-        print(f"      has_continuity: {bool(previous_shot_image)}")
+        print(f"      has_continuity: False (DEC-014: removed)")
         print(f"      reference_images: {len(reference_images) if reference_images else 0}")
         print(f"      shot camera: {shot.get('camera', {}).get('shot_size', 'N/A')}")
         print(f"      prompt前300字符: {full_prompt[:300]}...")
@@ -757,13 +881,12 @@ class ImageGenerator:
         shot: dict,
         storyboard: dict,
         characters: dict,
-        style_preset: str = "realistic",
+        style_preset: str = "anime",
         reference_images: Optional[List[Image.Image]] = None,
-        previous_shot_image: Optional[Image.Image] = None,
-        previous_shot: Optional[dict] = None,
         screenplay: Optional[dict] = None,
         aspect_ratio: str = "2:3",
         genre: Optional[str] = None,
+        use_native_text: bool = True,
         **kwargs
     ) -> dict:
         """
@@ -786,8 +909,6 @@ class ImageGenerator:
             characters: 完整角色数据
             style_preset: 风格预设
             reference_images: 参考图像列表
-            previous_shot_image: 上一张shot的图像
-            previous_shot: 上一张shot的完整数据
             screenplay: 剧本数据
             aspect_ratio: 宽高比
             genre: 题材类型（wuxia/mystery/cyberpunk/war），用于题材特定替换规则
@@ -805,10 +926,9 @@ class ImageGenerator:
             characters=characters,
             style_preset=style_preset,
             reference_images=reference_images,
-            previous_shot_image=previous_shot_image,
-            previous_shot=previous_shot,
             screenplay=screenplay,
             aspect_ratio=aspect_ratio,
+            use_native_text=use_native_text,
             **kwargs
         )
 
@@ -877,10 +997,9 @@ class ImageGenerator:
                 characters=characters,
                 style_preset=style_preset,
                 reference_images=reference_images,
-                previous_shot_image=previous_shot_image,
-                previous_shot=previous_shot,
                 screenplay=screenplay,
                 aspect_ratio=aspect_ratio,
+                use_native_text=use_native_text,
                 **kwargs
             )
 

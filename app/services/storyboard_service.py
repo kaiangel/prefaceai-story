@@ -1389,3 +1389,100 @@ FLEXIBLE ATTRIBUTES (may vary based on scene context):
             parts.append(mood)
 
         return " - ".join(parts)
+
+
+def validate_shot_transitions(shots: list) -> List[str]:
+    """
+    SQ-6: 检查相邻 shot 之间的镜头语言变化是否足够
+
+    检查项：
+    1. 3+ 连续相同 shot_type（景别死板）
+    2. 3+ 连续相同 camera_angle（角度死板）
+    3. 30度法则违规（同场景内景别+角度都没变 = 跳切）
+    4. 景别跳跃 >2 级（如 wide 直接跳 extreme_close_up）
+    5. 同场景内连续相同 subject_position
+
+    Args:
+        shots: shot 列表（Phase 2.0 格式）
+
+    Returns:
+        警告信息列表
+    """
+    warnings = []
+
+    size_order = [
+        'extreme_wide_shot', 'wide_shot', 'medium_wide_shot',
+        'medium_shot', 'medium_close_up', 'close_up', 'extreme_close_up'
+    ]
+
+    def _get_shot_type(shot):
+        return shot.get('camera', {}).get('shot_size') or shot.get('shot_type', 'medium_shot')
+
+    def _get_camera_angle(shot):
+        return shot.get('camera', {}).get('angle') or shot.get('camera_angle', 'eye_level')
+
+    def _get_scene_id(shot):
+        return shot.get('scene_id') or shot.get('original_scene_id')
+
+    for i in range(1, len(shots)):
+        prev = shots[i - 1]
+        curr = shots[i]
+        curr_id = curr.get('shot_id', i + 1)
+
+        prev_type = _get_shot_type(prev)
+        curr_type = _get_shot_type(curr)
+        prev_angle = _get_camera_angle(prev)
+        curr_angle = _get_camera_angle(curr)
+        prev_scene = _get_scene_id(prev)
+        curr_scene = _get_scene_id(curr)
+
+        # 1. 3+ 连续相同景别
+        if prev_type == curr_type and i >= 2:
+            if _get_shot_type(shots[i - 2]) == curr_type:
+                warnings.append(
+                    f"Shot {curr_id}: 3+ consecutive {curr_type} — "
+                    f"vary shot size for rhythm"
+                )
+
+        # 2. 3+ 连续相同角度
+        if prev_angle == curr_angle and i >= 2:
+            if _get_camera_angle(shots[i - 2]) == curr_angle:
+                warnings.append(
+                    f"Shot {curr_id}: 3+ consecutive {curr_angle} — "
+                    f"vary angle for visual interest"
+                )
+
+        # 3. 30度法则：同场景内景别和角度都没变
+        same_type = prev_type == curr_type
+        same_angle = prev_angle == curr_angle
+        same_scene = prev_scene == curr_scene
+
+        if same_type and same_angle and same_scene:
+            warnings.append(
+                f"Shot {curr_id}: LIKELY 30-DEGREE RULE VIOLATION — "
+                f"same shot_type ({curr_type}) AND same camera_angle "
+                f"({curr_angle}) as previous shot in same scene. "
+                f"This will produce a jump cut. Change at least one."
+            )
+
+        # 4. 景别跳跃 >2 级
+        prev_idx = size_order.index(prev_type) if prev_type in size_order else 3
+        curr_idx = size_order.index(curr_type) if curr_type in size_order else 3
+
+        if abs(prev_idx - curr_idx) > 2:
+            warnings.append(
+                f"Shot {curr_id}: Large jump from {prev_type} to "
+                f"{curr_type} — consider intermediate shot size "
+                f"(unless this is an intentional dramatic cut)"
+            )
+
+        # 5. 同场景内连续相同构图主体位置
+        prev_pos = prev.get('composition', {}).get('subject_position')
+        curr_pos = curr.get('composition', {}).get('subject_position')
+        if prev_pos and curr_pos and prev_pos == curr_pos and same_scene:
+            warnings.append(
+                f"Shot {curr_id}: Same subject_position ({curr_pos}) as "
+                f"previous shot — vary composition for visual flow"
+            )
+
+    return warnings
