@@ -4,12 +4,217 @@
 
 ---
 
+## 2026-03-04
+
+### TASK-CREATE-UPGRADE P2 P3/P4 修复 ✅
+
+**完成时间**: 2026-03-04
+**验收状态**: 修复完成
+
+**PM 复验 P2 通过 (4.8/5) 后的反馈修复（3 文件）**:
+
+| 级别 | 文件 | 修复内容 |
+|------|------|----------|
+| P3 | StoryCard.tsx | +aria-label 菜单按钮 +ESC 键关闭菜单 |
+| P4 | StoryDetailContent.tsx | character map key index → char.name |
+| P4 | UserMenu.tsx | 设置链接 /dashboard → /settings |
+
+`npm run build` 18 路由通过，0 错误。
+
+---
+
+## 2026-03-03
+
+### TASK-CREATE-UPGRADE P2 账户体系 + Dashboard ✅
+
+**完成时间**: 2026-03-03
+**验收状态**: PM 复验 4.8/5 通过
+**任务来源**: P1 复验 4.7/5 PASS 后启动 P2
+
+**完成内容（14 文件 = 10 新建 + 4 修改）**:
+
+#### 类型扩展（1 修改）
+- [x] `types/create.ts` — +RegisterForm 接口 +StoryDetail 接口（继承 StoryCard）
+
+#### Auth Context 增强（1 修改）
+- [x] `contexts/AuthContext.tsx` — +register 函数 +stories 状态 +deleteStory，登录后加载 mock 故事
+
+#### Mock 数据增强（1 修改）
+- [x] `lib/mock-data.ts` — 故事列表 3→5 个，+coverImageUrl（引用真实 mock-shots），+getMockStoryDetail()
+
+#### 注册页面（2 新建）
+- [x] `app/register/page.tsx` — Server 组件（metadata）
+- [x] `app/register/RegisterContent.tsx` — 用户名+邮箱+密码表单，验证逻辑，成功跳转 Dashboard
+
+#### Dashboard 页面（2 新建）
+- [x] `app/dashboard/page.tsx` — Server 组件（metadata）
+- [x] `app/dashboard/DashboardContent.tsx` — 欢迎语+统计卡片+故事网格，未登录重定向
+
+#### Story Detail 页面（2 新建）
+- [x] `app/dashboard/[storyId]/page.tsx` — Server 组件（动态路由 metadata）
+- [x] `app/dashboard/[storyId]/StoryDetailContent.tsx` — Shot 轮播+缩略图+旁白+角色+风格
+
+#### Dashboard 组件（4 新建）
+- [x] `components/dashboard/StoryCard.tsx` — 封面图+标题+风格+状态+操作菜单（续写/删除）
+- [x] `components/dashboard/StoryGrid.tsx` — 搜索+筛选（状态/排序）+响应式 grid
+- [x] `components/dashboard/EmptyState.tsx` — 新用户无故事引导
+- [x] `components/dashboard/UserMenu.tsx` — 头像+下拉（工作台/设置/退出）
+
+#### CreateHeader 集成（1 修改）
+- [x] `components/layout/CreateHeader.tsx` — 登录态 UserMenu + 工作台链接；未登录态登录链接
+
+**验收指标**:
+- 10/10 新建文件: ✅
+- 4/4 修改文件: ✅
+- `npm run build` 通过（18路由，+3新路由）: ✅
+- 注册→Dashboard 流程: ✅
+- 登录→Dashboard（5个mock故事）: ✅
+- 故事搜索/筛选/排序: ✅
+- 故事详情 Shot 轮播: ✅
+- CreateHeader 用户菜单: ✅
+- Login 页面增加注册链接: ✅
+
+---
+
+## 2026-03-02
+
+### TASK-CREATE-UPGRADE P1 Stage B-E 页面骨架 ✅
+
+**完成时间**: 2026-03-02
+**验收状态**: 待 PM 复验
+**任务来源**: P0 复验 4.8/5 PASS 后启动 P1
+
+**完成内容**:
+
+#### P4 修复（PM 复验指出 + 自检发现）
+- [x] `components/ui/CharacterUploader.tsx` — 添加 `URL.revokeObjectURL()` 防止内存泄漏
+- [x] `components/ui/SceneUploader.tsx` — 同上
+- [x] `components/create/StageE.tsx` — setTimeout 添加 useRef + useEffect cleanup（自检发现，与 StageA 同类问题）
+
+#### 文档修正（PM 复验指出）
+- [x] `frontend-progress/completed.md` — 日期修正
+- [x] `frontend-progress/current.md` — 文件数量修正 5→7
+- [x] `TEAM_CHAT.md` — 时间戳修正
+
+#### P1 类型 + 状态管理扩展（2 修改）
+- [x] `types/create.ts` — +CreateStage +GenerationLogEntry +BGMTrack +MOOD_OPTIONS +BGM_TRACKS，CreateAction 23→34
+- [x] `contexts/CreateContext.tsx` — +currentStage +generationLog +bgm，reducer 23→34 case
+
+新增 11 个 action: SET_STAGE, UPDATE_OUTLINE_TITLE, UPDATE_OUTLINE_SUMMARY, UPDATE_OUTLINE_CHARACTER, ADD_PLOT_POINT, DELETE_PLOT_POINT, SET_MOOD, UPDATE_SHOT_TEXT, REGENERATE_SHOT, DELETE_SHOT, SET_BGM
+
+#### P1 Stage 页面组件（4 新建 + 1 修改）
+- [x] `components/create/StageB.tsx` — 确认页（大纲编辑 + 角色卡片 + **情节拖拽排序** + 结局 + 情绪）
+- [x] `components/create/StageC.tsx` — 生成页（进度条 + 步骤日志 + mock 推进 + 自动跳转）
+- [x] `components/create/StageD.tsx` — 预览页（Shot 轮播 **真实图片** + 缩略图 + 旁白编辑 + 重新生成/删除 + BGM）
+- [x] `components/create/StageE.tsx` — 交付页（漫画打包 + 视频下载 + mock 下载动画 + 新建故事）
+- [x] `app/create/CreateContent.tsx` — 重构为 Stage 路由器（StageA 提取 + currentStage switch + mock 大纲注入）
+
+#### Founder 实测修复（5 项）
+- [x] StageC 进度条卡 0% — 去掉 startedRef，修复 React Strict Mode 双挂载导致 interval 被取消
+- [x] StageD 图片区域右侧留白 — 图片容器改为 max-w-sm 居中 + aspect-[2/3]
+- [x] Shot 预览接入真实图片 — 27 张 test_output 图拷到 `public/mock-shots/`，mock 数据改为引用真实路径
+- [x] Shot 13 缺失 — 源数据跳过 shot_13，mock 数据从连续编号改为实际文件列表 `MOCK_SHOT_FILES`
+- [x] StageB 情节拖拽排序 — GripVertical 图标从装饰改为功能性，用 framer-motion `Reorder` + `useDragControls` 实现
+
+**验收指标**:
+- P4 修复 3/3: ✅
+- 文档修正 3/3: ✅
+- 类型扩展（34 action types）: ✅
+- Stage B-E 组件 4/4 新建: ✅
+- CreateContent 路由整合: ✅
+- 完整用户流程可走通（mock + 真实图片）: ✅
+- Founder 实测修复 5/5: ✅
+- `npm run build` 通过（16路由）: ✅
+
+---
+
+### TASK-CREATE-UPGRADE P0 Create 页面升级 ✅
+
+**完成时间**: 2026-03-02
+**验收状态**: ✅ PM 复验通过 4.8/5 (2026-03-02)
+**任务来源**: PM 派发 DEC-013 Create 页面升级
+
+**完成内容**:
+- [x] `types/create.ts` — 全流程类型定义（4 types + 8 interfaces + 16 presets + 4 lengths + 23 actions）
+- [x] `lib/mock-data.ts` — Mock 数据（outline/shots/progress/style analysis/character extract）
+- [x] `contexts/AuthContext.tsx` — Auth 状态管理（Provider + useAuth hook）
+- [x] `contexts/CreateContext.tsx` — Create 状态管理（Provider + useCreate hook + reducer）
+- [x] `components/ui/AspectRatioSelector.tsx` — 画面比例（2:3竖屏 / 16:9横屏）
+- [x] `components/ui/CharacterUploader.tsx` — 角色参考图上传（最多5个 + AI mock）
+- [x] `components/ui/SceneUploader.tsx` — 场景参考图上传（最多8个 + 拖拽）
+- [x] `components/ui/DocumentUploader.tsx` — 故事文档上传（txt/md/PDF）
+- [x] `components/ui/CustomStyleUploader.tsx` — 自定义风格上传（AI 关键词 mock）
+- [x] `components/ui/StyleSelector.tsx` — 重写：15 预设（默认显示8个+"更多"展开）+ 自定义 + 互斥
+- [x] `components/ui/LengthSelector.tsx` — 重写：3→4 选项 + 续写模式
+- [x] `components/ui/StoryIdeaInput.tsx` — 集成 DocumentUploader
+- [x] `app/create/CreateContent.tsx` — 全面重构（Context + 全组件集成）
+- [x] `app/create/page.tsx` — 包裹 CreateProvider
+- [x] `app/layout.tsx` — 包裹 AuthProvider
+
+**验收指标**:
+- 9/9 新建文件: ✅
+- 7/7 修改文件: ✅（含 components/index.ts barrel export）
+- `npm run build` 通过（16路由）: ✅
+- 15 种风格预设（默认8个 + "更多"展开7个）+ 自定义风格互斥: ✅
+- 4 种篇幅（含长篇续写模式）: ✅
+- 角色/场景/文档上传: ✅
+- Context 状态管理（23 action types）: ✅
+
+**Founder 微调（已完成）**:
+- [x] 风格默认只显示 8 个，点"更多"展开剩余 7 个
+- [x] "灌篮高手" → "井上雄彦"、"Pixar 3D" → "皮克斯3D"
+- `npm run build` ✅ 通过
+
+---
+
+## 2026-02-26
+
+### TASK-UI-STAGE-A Stage A 输入界面 ✅
+
+**完成时间**: 2026-02-26 16:00
+**验收状态**: ✅ PM 复验通过 4.5/5 (2026-02-26 16:43)
+**任务来源**: PM 派发 DEC-011 产品层 Phase 2 任务
+
+**完成内容**:
+- [x] CreateHeader — 创作页轻量导航栏
+- [x] StoryIdeaInput — 故事创意文本框（自动增高、字数统计、必填校验）
+- [x] LengthSelector — 篇幅三选一卡片（快闪/短篇/中篇，spring 动画）
+- [x] StyleSelector — 8 种风格卡片网格（CSS 渐变预览 + checkmark）
+- [x] CreateContent — 页面主体组装（状态管理 + mock 提交）
+- [x] page.tsx — Server Component（SEO metadata）
+
+**新建文件（6个）**:
+| 文件 | 说明 |
+|------|------|
+| `app/create/page.tsx` | Server Component |
+| `app/create/CreateContent.tsx` | Client Component |
+| `components/layout/CreateHeader.tsx` | 创作页导航 |
+| `components/ui/StoryIdeaInput.tsx` | 故事创意输入 |
+| `components/ui/LengthSelector.tsx` | 篇幅选择器 |
+| `components/ui/StyleSelector.tsx` | 风格选择器 |
+
+**验收指标**:
+- 6/6 文件创建: ✅
+- `npm run build` 通过（16路由）: ✅
+- 文本框交互（自动增高/字数/校验）: ✅
+- 篇幅切换动画: ✅
+- 风格选择 + checkmark: ✅
+- 移动端响应式: ✅
+- 浏览器标签页 "开始创作 - 序话Story": ✅
+
+**PM P1 修复（17:27）**:
+- [x] FIX-1: handleSubmit 增加 500 字校验，超过阻止提交
+- [x] FIX-2: setTimeout mock 用 useRef + useEffect cleanup，防卸载后 state update
+- `npm run build` 再次通过 ✅
+
+---
+
 ## 2026-02-14
 
 ### TASK-LP-PAGES-FIX 4项修复 ✅
 
 **完成时间**: 2026-02-14 17:30
-**验收状态**: 待 PM 复验
+**验收状态**: ✅ PM 复验通过 4.8/5 (2026-02-14 17:35)
 **任务来源**: PM 验收 TASK-LP-PAGES 4.0/5 后分配的修复任务
 
 **完成内容**:
@@ -51,7 +256,7 @@
 ### TASK-LP-PAGES 10个子页面 + 6个组件 ✅
 
 **完成时间**: 2026-02-14 17:00
-**验收状态**: 待 PM 验收
+**验收状态**: ✅ PM 验收 4.0/5 → 修复后 4.8/5
 **任务来源**: PM 分配的 Landing Page 子页面创建任务
 
 **完成内容**:

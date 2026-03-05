@@ -1,6 +1,6 @@
 # 序话Story 项目状态看板
 
-> 最后更新: 2026-02-24 11:35
+> 最后更新: 2026-03-04
 > 更新者: PM
 
 ---
@@ -11,7 +11,7 @@
 项目名称: 序话Story - AI条漫/短视频生成系统
 目标: 用户输入创意 → 自动生成可发布的条漫或短视频
 当前版本: v0.6.6
-当前主线: 🟢 主线稳定（V5验收4.9/5，LP子页面4.8/5，Git仓库已初始化）
+当前主线: 🟢 主线稳定（回归验证 4.36/5 ✅ + PM 4.36/5 ✅ → **4daad77 ✅** → @DevOps 剩余批次提交 + push 进行中）
 核心内容: 都市情感短剧 (DEC-005)
 产品形态: 条漫优先 → 短视频保留
 Pipeline品牌: FrameSpark™
@@ -28,8 +28,8 @@ Pipeline品牌: FrameSpark™
 | 3 | 音频对齐 | ✅ DONE | 100% | Backend |
 | 4 | 条漫MVP技术验证 | ✅ **完成** | 100% | PM + AI-ML + Backend + Tester |
 | 4.5 | 视频合成 | 🔄 WIP | 5% | Backend |
-| 5 | 前端开发 | ✅ **Landing Page完成** | 50% | Frontend (LP主页5.0/5 + 10个子页面4.8/5) |
-| 6 | 优化部署 | 🟡 **Git初始化完成** | 5% | DevOps |
+| 5 | 前端开发 | ✅ **LP+Stage A+Create P0+P1+P2 全部完成, PM 复验全部通过** | 95% | Frontend (LP 5.0/5 + 子页面 4.8/5 + Stage A 4.8/5 + P0 4.8/5 + P1 4.7/5 + P2 4.8/5) |
+| 6 | 优化部署 | 🟡 **GitHub远程仓库就绪** | 8% | DevOps (prefaceai-story推送完成) |
 
 ---
 
@@ -157,7 +157,7 @@ Pipeline品牌: FrameSpark™
 **内容**: 全部图像宽高比从混合比例统一为 2:3（抖音适配）
 - Backend 修改 9 文件 26 处 ✅ (2026-02-14 10:56)
 - PM 核验通过 ✅ (2026-02-14 11:01)
-- 遗留: scene_reference_manager.py 仍为 16:9 → TASK-SCENE-REF-ASPECT 修复中 (DEC-010)
+- 遗留已修复: scene_reference_manager.py 16:9 → 2:3 ✅ (TASK-SCENE-REF-ASPECT, DEC-010)
 
 ### ✅ TASK-LP-PAGES Landing Page 子页面 (2026-02-14)
 
@@ -175,11 +175,79 @@ Pipeline品牌: FrameSpark™
 - FIX-4(P2): 登录页 setTimeout 清理 ✅
 - PM 复验通过 4.8/5 ✅ (2026-02-14 17:35)
 
-### 🟡 TASK-SCENE-REF-ASPECT 场景参考图宽高比修复 (DEC-010, 执行中)
+### ✅ TASK-SCENE-REF-ASPECT 场景参考图宽高比修复 (DEC-010, 已完成)
 
-- PM 排查确认遗漏 ✅ (2026-02-24) — scene_reference_manager.py:431 aspect_ratio="16:9"
-- @Backend 修复任务已派发 ⏳
-- PM 核验 ⏳
+- PM 排查确认遗漏 ✅ (2026-02-24 11:21) — scene_reference_manager.py:431 aspect_ratio="16:9"
+- @Backend 修复完成 ✅ (2026-02-24 11:37)
+- PM 核验通过 ✅ (commit 926f284 已入库)
+
+### ⭐ DEC-011 条漫产品形态定义 (2026-02-24, Founder 决策)
+
+**交付形式**: 打包下载（参考图+shot图+BGM）+ 视频下载（合成视频）
+
+**条漫模式** — 用户选"故事篇幅"：
+| 选项 | Shot 数 | 定位 |
+|------|---------|------|
+| 快闪 | ~10 张 | 一个片段 |
+| 短篇 | ~18 张 | 完整小故事（默认） |
+| 中篇 | ~36 张 | 起承转合完整叙事 |
+
+**短视频模式** — 用户选"视频时长"（每4秒=1 shot）：
+| 选项 | 时长 | Shot 数 |
+|------|------|---------|
+| 短 | 15 秒 | ~4 张 |
+| 中 | 1 分钟 | ~15 张 |
+| 长 | 3 分钟 | ~46 张 |
+
+**专业参数**（duration_minutes/min_scenes 等）留作未来高级设置，初期不暴露。
+**架构策略**: Phase 2.0 五阶段流水线保留为备用架构。
+
+**用户旅程**: A(输入) → B(确认) → C(生成) → D(预览) → E(交付)，详见 `CLAUDE.md`
+
+**实施计划**:
+- ✅ **Phase 1**: TASK-E2E-VALIDATE — Backend 29/29 ✅ → Tester 4.9/5 ✅ → **PM 复核 4.3/5** ✅
+- ✅ **DEC-012**: Founder 4项决策（模型全面升级+灌篮高手风格+text_type优化+角色框架）
+- ✅ **Phase 2 并行**: 六项任务全部完成 (2026-02-26)
+  - @Backend: TASK-MODEL-UPGRADE ✅ (7文件→Sonnet 4.6, Stage 1-4通过)
+  - @AI-ML: TASK-STYLE-SLAMDUNK ✅ + TASK-TEXT-TYPE-OPT ✅ + TASK-IDENTITY-DESIGN ✅
+  - @Frontend: TASK-UI-STAGE-A ✅ (PM复验 4.5/5)
+  - @DevOps: GitHub远程仓库 ✅ (prefaceai-story)
+- ✅ **Phase 2.5 修复**: 全部完成 + PM 核验通过 (2026-02-26 17:48)
+  - @Backend: TASK-STYLE-DEFAULT-FIX ✅ (4文件8处 realistic→anime, PM核验通过)
+  - @Backend: TASK-MODEL-UPGRADE-RETEST ✅ (slam_dunk 20/20 + Sonnet 4.6, PM核验通过)
+- ✅ **E2E-TEST-2**: Tester 4.3/5 + PM 独立复核通过 (2026-02-27 15:41)
+  - @Tester: 7/7 维度通过（含 1 项有条件通过），20 shots + slam_dunk + Sonnet 4.6
+  - @PM: 独立复核确认合理，额外发现队友球衣颜色不一致（Stage 2 系统性问题）
+  - Founder 6 项决策确认 → Phase 3 六项任务派发
+- ✅ **Phase 3 全部完成 + PM 核验 7/7 PASS** (2026-02-27 16:32)
+  - @Backend: TASK-NB2-SWITCH ✅ (P0, 5/5 shots, avg 25.9s, 2.8x提速)
+  - @AI-ML: TASK-SLAMDUNK-COLOR ✅ (P0, mandatory+2, forbidden+3, color_mode通用)
+  - @AI-ML + @Backend: TASK-DIALOGUE-SYSTEM ✅ (P0, L1 dialogue_beats + L2+3 dialogue≥60%)
+  - @Backend: TASK-TEAM-UNIFORM ✅ (P1, Stage 2 规则5新增)
+  - @Backend: TASK-SPEAKER-PREFIX ✅ (P2, 智能前缀，向后兼容)
+  - @Tester: TASK-NB2-TEXT-TEST ✅ (P1, Tester 16:55 + PM 复核 17:24)
+- ✅ **Founder 方案 B 决策** (2026-02-27 17:24)
+  - 全面切换 NB2 原生文字渲染（旁白/对话/心理描述）
+  - TextOverlay 代码完整保留作为备用方案
+  - 新增开关 `use_native_text=True`（默认原生，可切回 TextOverlay）
+- ✅ **TASK-NB2-NATIVE-TEXT PM 核验通过** (2026-02-28 10:25)
+  - @Backend 17:50 完成，PM 10:25 核验代码+输出全部 PASS
+  - `image_generator.py`: `build_native_text_prompt()` + `use_native_text` 开关
+  - 验证: 5/5 shots, 5 种 text_type 全覆盖, avg 45.0s/张
+  - TextOverlay 代码完整保留作为备用
+- ✅ **TASK-AB-STYLE-DESC PM 核验通过** (2026-02-28 11:15)
+  - B 组（场域式）4.5 vs A 组（命令式）4.17，B 组 2 胜 1 平
+  - PM 补充：维度升级 — 光影叙事力、电影感构图、背景空间感均 B 优
+  - **待跨风格验证后 Founder 统一决策**
+- ⚠️ **TASK-NATIVE-TEXT-ROBUSTNESS PARTIAL PASS** (2026-02-28 11:15)
+  - 架构正确，但 image_generator.py 关键字回退与 text_overlay_service.py 不一致
+  - → TASK-ROBUSTNESS-FIX (P1) @Backend 修复中
+- ✅ **Phase 4 全部完成**
+  - @Backend: TASK-ROBUSTNESS-FIX ✅ (P1, 关键字回退修复)
+  - @AI-ML: TASK-STYLE-DESC-REWRITE ✅ (15/15 风格 + slam_dunk 修复确认) — Step 3 闭环
+  - @Tester: TASK-CROSS-STYLE-TEST ✅ + TASK-DIALOGUE-DENSE-TEST ✅
+  - @Frontend: TASK-CREATE-UPGRADE P2 ✅ (PM 复验 4.8/5)
+- ✅ **Step 7 PASS + Bugfix 4/4 PASS + 回归验证 4.36/5 + PM 独立复核 4.36/5** → **Bug #5 (P2) 修复 → TASK-GIT-COMMIT-3**
 
 ### 🟡 P1 - 保留任务
 - [ ] Phase 4: 视频合成 (Backend) - **保留，后续短视频模式需要**
@@ -195,64 +263,65 @@ Pipeline品牌: FrameSpark™
 
 ### Backend (后端)
 ```
-状态: 🟡 TASK-SCENE-REF-ASPECT 待执行
-更新时间: 2026-02-24 11:35
-当前任务: TASK-SCENE-REF-ASPECT — scene_reference_manager.py 宽高比修复
+状态: ✅ Bug #5 修复完成 + PM Review PASS
+更新时间: 2026-03-04
+当前任务: 无 — 等 TASK-GIT-COMMIT-3
 阻塞: 无
-已完成: TASK-ASPECT-2x3 (9文件26处) + TASK-REF-PREPROCESS Step2 代码实现
+已完成: TASK-NATIVE-TEXT-ROBUSTNESS ⚠️ (PM核验 PARTIAL PASS, 关键字回退不一致) + TASK-NB2-NATIVE-TEXT ✅ + TASK-NB2-SWITCH ✅ + TASK-DIALOGUE-SYSTEM L1 ✅ + TASK-TEAM-UNIFORM ✅ + TASK-SPEAKER-PREFIX ✅ + TASK-MODEL-UPGRADE ✅ + TASK-STYLE-DEFAULT-FIX ✅ + TASK-MODEL-UPGRADE-RETEST ✅ + TASK-E2E-VALIDATE ✅ + TASK-SCENE-REF-ASPECT ✅
 待解决: FFmpeg 集成方案选型（Phase 4.5）
 ```
 
 ### Frontend (前端)
 ```
-状态: 🟢 空闲
-更新时间: 2026-02-24 11:35
+状态: ✅ P0+P1+P2 全部完成 + PM 复验全部通过
+更新时间: 2026-03-03
 阻塞: 无
 
 已完成:
+  - ✅ TASK-CREATE-UPGRADE P2 完成 (PM复验 4.8/5, 14文件, 03-03) — 注册+工作台+故事详情+UserMenu
+  - ✅ TASK-CREATE-UPGRADE P1 完成 (PM复验 4.7/5, 7文件, 03-02) + P4修复(revokeObjectURL) + 文档修正
+  - ✅ TASK-CREATE-UPGRADE P0 完成 (PM复验 4.8/5, 16文件, 03-02) + Founder微调完成
+  - ✅ TASK-UI-STAGE-A Stage A 输入界面 (PM复验 4.8/5, 含P1修复, 2026-02-26)
   - ✅ TASK-LP-PAGES-FIX 4项修复 (PM复验通过 4.8/5)
   - ✅ TASK-LP-PAGES 10个子页面实现 (17新建+1修改)
-  - ✅ TASK-LP-POLISH 2项代码质量修复 (5.0/5 完美收官)
-  - ✅ TASK-LP-FIX 8项修复 (PM复验通过 4.5/5)
-  - ✅ Landing Page 基础版本 (2026-01-29)
+  - ✅ TASK-LP-POLISH + TASK-LP-FIX + Landing Page (5.0/5)
 
 待做:
-  1️⃣ TASK-RESILIENCE-001-C: 友好失败提示
+  - P3×1 + P4×3 可选修复（不阻塞）
 ```
 
 ### Tester (测试)
 ```
-状态: 🟢 空闲
-更新时间: 2026-02-24 11:35
-当前任务: 无
-已完成: TASK-REF-PREPROCESS Step4 对比验证 ✅
+状态: ✅ 回归验证完成 (4.36/5) + PM 独立复核一致
+更新时间: 2026-03-04
+当前任务: 无 — 等 @AI-ML + @Backend 完成 + TASK-GIT-COMMIT-3
+已完成: 回归验证 4.36/5 (4/4 Bug PASS + Bug #5 发现) ✅ + Step 7 A/B ✅ + Step 4 (ink+realistic) ✅ + DIALOGUE-DENSE-TEST ✅ + CROSS-STYLE-TEST ✅ + AB-STYLE-DESC ✅ + E2E-TEST-2 ✅ + NB2-TEXT-TEST ✅ + E2E-VALIDATE ✅
 阻塞: 无
-待解决: E2E 测试框架选型
 ```
 
 ### AI_ML (AI/ML)
 ```
-状态: 🟢 空闲
-更新时间: 2026-02-24 11:35
-当前任务: 无
-已完成: TASK-REF-PREPROCESS Step1 指定测试shot (shot_34/36/22) ✅
+状态: ✅ Shot 15/18 Prompt 优化完成 + PM Review PASS
+更新时间: 2026-03-04
+当前任务: 无 — 等 TASK-GIT-COMMIT-3
+已完成: TASK-STYLE-DESC-REWRITE ✅ (15/15 + Step 4 PM核验通过) + illustration 场域式前置 ✅ + TASK-SLAMDUNK-COLOR ✅ + TASK-DIALOGUE-SYSTEM L2+3 ✅ + TASK-STYLE-SLAMDUNK ✅ + TASK-TEXT-TYPE-OPT ✅ + TASK-IDENTITY-DESIGN ✅
 阻塞: 无
-待解决: Pro 模型成本优化
 ```
 
 ### DevOps (运维)
 ```
-状态: 🟢 空闲（等待 TASK-GIT-COMMIT-2）
-更新时间: 2026-02-24 11:35
-当前任务: TASK-GIT-COMMIT-2 方案已派发，待审核后执行
+状态: 🔧 批次提交 + push 进行中
+更新时间: 2026-03-05
+当前任务: 4daad77 已提交 → Batch A/B/C (~120 文件) + git push
 阻塞: 无
 
 已完成:
-  - ✅ TASK-GIT-COMMIT LP修改+文档提交 (a6a0359 + 08a0e9f, PM核验通过)
-  - ✅ TASK-GIT-INIT Git仓库初始化 (DEC-007, commit acba309)
+  - ✅ GitHub远程仓库 prefaceai-story (private) 推送完成 (2026-02-26 11:02)
+  - ✅ TASK-GIT-COMMIT-2 三批提交 (67文件, PM核验通过)
+  - ✅ TASK-GIT-COMMIT + TASK-GIT-INIT
 
 待做:
-  1️⃣ TASK-GIT-COMMIT-2 (3批提交，方案已派发)
+  1️⃣ TASK-GIT-COMMIT-3（🔧 进行中, PM 已派发 03-04 21:00）
   2️⃣ 云服务选型
 ```
 
@@ -322,6 +391,238 @@ Pipeline品牌: FrameSpark™
 ---
 
 ## 更新日志
+
+### 2026-03-03
+- **[Founder] 场域式批准为默认策略** ⭐ → Step 4 派发 (ink + realistic 验证)
+- **[PM] Founder 决策记录 + Step 4 正式派发 @Tester** 📋
+  - ink + realistic 各 5 shots, 4 维度验收, 都市情感题材
+  - AI-ML/Backend 可提前准备 Step 5
+- **[PM] Step 3 闭环 — slam_dunk 修复确认 + Founder 决策请求** 📋
+  - AI-ML 修复 slam_dunk 句序 (17:05) → PM 逐句核验确认 (17:11): 6 句顺序 ✅, 内容不变 ✅
+  - Step 3 最终结果: **15/15 全部通过** → Founder 决策场域式是否落地
+  - 文档全面同步（TEAM_CHAT + PENDING + TODAY_FOCUS + PROJECT_STATUS + daily-sync + pm-progress×3）
+- **[AI-ML] slam_dunk 句序修复完成** ✅
+  - 传统→光影→色彩→质感→角色→构图，内容不变仅调换顺序
+  - 文档更新：ai-ml-progress×3 + TEAM_CHAT + daily-sync
+- **[PM] Step 3 Review + P2 复验完成** 📋
+  - Step 3: style_enforcer.py 13/15 PASS, slam_dunk 6 句顺序需修 → AI-ML 修复中
+  - P2: 14 文件复验 4.8/5 通过, DEC-013 合规 5/5, 零新依赖
+  - 文档全面同步（TEAM_CHAT + PENDING + TODAY_FOCUS + pm-progress×3 + daily-sync + PROJECT_STATUS）
+- **[Founder] DIALOGUE-DENSE-TEST 全 29 shots 审查 + 5 项决策** ⭐
+  - 发现 4 项 shot 质量问题：角色一致性(Shot04/29) + 生图违和感(Shot05-07) + Shots太含蓄 + Pro模型规则过时
+  - 补充：连续 shots 背景重复度高，需全维度运镜差异化
+  - 5 项决策确认：参考图标注+智能选择 / 违和感4项全做 / Stage 3+4对话明确化+视觉道具 / NB2默认Pro仅Premium储备 / 连续镜头运镜差异化
+- **[PM] DIALOGUE-DENSE-TEST 独立分析完成 + TASK-SHOT-QUALITY-UPGRADE 派发** 📋
+  - 查看全部 29 shots + 6 角色参考图 + 3 场景参考图 + storyboard JSON + 代码结构
+  - 精读 shot_transition_improvement_guide.md (718行)，提出多 Stage 根因分析
+  - PM 额外发现：Shot 15 双格分镜(P3) + Shot 16 金表火花(P4) + 29/29 零text bleeding(正面)
+  - 7 项改进方案 (SQ-1~SQ-7) 整合为 TASK-SHOT-QUALITY-UPGRADE，插入 Step 5
+  - 全文档同步更新
+- **[Tester] TASK-DIALOGUE-DENSE-TEST 完成** ✅
+  - dialogue 79.3% PASS (≥60%), 29/29 shots, 37.2s/shot, 角色一致性 ~95%, 零 text bleeding
+  - 假设 A 成立：暗恋题材低对话是题材结构性，非 SELF-CHECK 机制失效
+- **[Founder] DEC-014: 采纳 Plan A — 完全移除 previous_shot_image 传递** ⭐
+  - PM 独立分析发现构图感染+链式放大+跨场景 Bug 三重问题
+  - 场景参考图 + 文字 prompt 已充分覆盖环境连续性
+  - 新增 SQ-8，TASK-SHOT-QUALITY-UPGRADE 7→8 项
+- **[AI-ML] TASK-STYLE-DESC-REWRITE Step 2 完成** ✅
+  - 15/15 风格场域式改写，1 文件修改 (style_enforcer.py)，Python 加载 + enforce_prompt 验证通过
+- **[Frontend] TASK-CREATE-UPGRADE P2 完成** ✅
+  - 14 文件 (10新建+4修改)，npm run build 18 路由通过，待 PM 复验
+  - 注册 + 工作台 + 故事详情 + StoryCard + StoryGrid + UserMenu
+- **[Backend] Step 5c 预研完成** ✅
+  - SQ-1/2/6 全部理解到位，准备就绪
+- **[PM] DEC-014 记录 + 多 Agent 进度同步 + 全文档更新 (10 文件)** 📋
+  - DEC-014 决策记录 + SQ-8 新增 + SQ-1/SQ-2 scope 更新
+  - AI-ML Step 2 完成确认 → Step 3 PM review 启动
+  - Backend SQ-8 详细实现指引（3 文件修改内容 + IMAGE 编号变化）
+  - SQ-5 澄清：DEC-014 后仅限 Stage 4 层面，不涉及 Stage 5
+
+### 2026-03-02
+- **[PM] 执行顺序修正: 并行→串行 (Founder 决策)** 📋
+  - TASK-DIALOGUE-DENSE-TEST → TASK-STYLE-DESC-REWRITE 改为串行
+  - AI-ML 取消"禁止改代码"约束，可直接改 style_enforcer.py + 必要 prompt 文件
+  - 省掉中间文档步骤，PM 只 review 一次代码
+- **[PM] TASK-CREATE-UPGRADE P1 独立复验 PASS (4.7/5) + 两项任务正式派发** 📋
+  - DEC-013 Stage B-E 全合规，Stage Router 架构通过，代码 7 文件审查 4.4/5
+  - P4 修复 2/2 PASS (revokeObjectURL)，构建 16/16，文档修正 3/3
+  - 发现: StageB GripVertical 无拖拽(P3) + StageE setTimeout 无清理(P4)
+  - 范围调整: 22→7 文件（单页 Stage Router 简化方案合理）
+  - TASK-DIALOGUE-DENSE-TEST (P0) → @Tester 正式派发
+  - TASK-STYLE-DESC-REWRITE (P1) → @AI-ML 正式派发（串行，等 Tester 完成后）
+  - 全文档同步更新
+- **[Frontend] TASK-CREATE-UPGRADE P1 完成** ✅
+  - 7 文件 (4新建+3修改): StageB/C/D/E + types/CreateContext/CreateContent
+  - P4 修复: CharacterUploader/SceneUploader revokeObjectURL 2/2 + 文档修正 3/3
+  - `npm run build` 16 路由通过, /create 9.29kB
+- **[PM] TASK-CREATE-UPGRADE P0 独立复验 PASS (4.8/5)** 📋
+  - DEC-013 8/8 决策全部合规，架构/代码/Founder微调/构建全通过
+  - P4: CharacterUploader/SceneUploader 未 revokeObjectURL（已反馈 Frontend）
+  - 文档不一致: 日期错误+文件数不一致（已反馈 Frontend）
+  - Frontend 可启动 P1（22文件，Stage B-E）
+  - 全文档同步更新
+- **[Frontend] TASK-CREATE-UPGRADE P0 完成 + Founder 微调完成** ✅
+  - 16 文件 (9新建+7修改), `npm run build` 16路由通过
+  - Founder 微调: 风格默认8个+"更多"展开 + 重命名(井上雄彦/皮克斯3D)
+- **[PM] TASK-CROSS-STYLE-TEST 独立核验 PASS — 场域式跨风格泛化验证通过** 📋
+  - PM 独立评分与 Tester 完全一致（0 gap）: B组 4.38 vs A组 3.88，B组 3 胜 1 平
+  - PM 补充 4 维度: 叙事构图力(B优)、场景连续性(平)、NB2文字质量(A微优)、情感表达力(B优)
+  - DIALOGUE-SYSTEM: 28.1% EXPECTED FAIL — 暗恋题材结构性原因，非系统 bug，建议 genre-adaptive
+  - 速度: B 快 26%，与 slam_dunk 相反，需更多数据
+  - 建议 Founder 批准场域式为默认策略 + 讨论阈值调整
+  - 全文档同步更新 9 个文件
+
+### 2026-02-28 18:07
+- **[PM] DEC-013 决策闭环 — Create 页面升级 7 项功能决策 + TASK-CREATE-UPGRADE 计划** 📋
+  - Founder 7 项 Create 页面反馈 → PM 独立分析（技术可行性 + 4 项关联点）→ 5 个澄清问题 → Founder 全部确认
+  - DEC-013 记录：角色上传/场景上传/文档上传/宽高比/长篇/风格升级/渲染策略/其他确认
+  - TASK-CREATE-UPGRADE 计划：P0(18文件) + P1(22文件) + P2(14文件)，React Context + useReducer，零新依赖
+  - 全文档同步更新 9 个文件
+
+### 2026-02-28 14:52
+- **[PM] 第三轮核验 — ROBUSTNESS-FIX ✅ + illustration 场域式 ✅ + Tester 启动通知** 📋
+  - TASK-ROBUSTNESS-FIX PM 代码核验 ✅ PASS: 3/3 修复点逐行对齐完全一致
+  - illustration 场域式 B 组 PM 核验 ✅ PASS: 6 句完整、零重复、都市情感适配
+  - TASK-CROSS-STYLE-TEST 前置全部满足 → 通知 @Tester 启动
+  - 全文档同步更新
+
+### 2026-02-28 11:15
+- **[PM] Phase 4 第二轮核验 — AB-STYLE-DESC ✅ + ROBUSTNESS ⚠️ + Founder 3项决策 + 新任务派发** 📋
+  - TASK-AB-STYLE-DESC PM 核验 ✅ PASS: B组(场域式) 4.5 vs A组(命令式) 4.17，B组 2胜1平
+  - PM 补充维度：光影叙事力、电影感构图、背景空间感均 B 优；速度 51% 可接受
+  - TASK-NATIVE-TEXT-ROBUSTNESS PM 核验 ⚠️ PARTIAL PASS: 架构正确，但 image_generator.py 关键字回退与 text_overlay_service.py 不一致
+  - Founder 3 项决策：(1) Backend 先修复不一致 (2) 跨风格用 illustration (3) 场域式等验证后决策
+  - 派发 TASK-ROBUSTNESS-FIX (P1) @Backend + TASK-CROSS-STYLE-TEST (P2) @Tester（等前置）
+  - 通知 @AI-ML 提供 illustration 场域式 style_description 改写
+  - 全文档同步更新
+
+### 2026-02-28 10:25
+- **[PM] TASK-NB2-NATIVE-TEXT PM 核验 ✅ + TASK-AB-STYLE-DESC 前置审核 ✅ + 新任务派发** 📋
+  - TASK-NB2-NATIVE-TEXT: 代码审阅 + 5 张验证图逐一查看 + JSON 数据 + Python 语法 → 全部 PASS
+  - TASK-AB-STYLE-DESC 前置: AI-ML 场域式改写质量好，单一变量隔离 → 通知 Tester 可启动
+  - 发现技术债: build_native_text_prompt() 混合类型分类依赖中文关键字 → 派发 TASK-NATIVE-TEXT-ROBUSTNESS (P2) @Backend
+  - 全文档同步更新
+
+### 2026-02-27 17:24
+- **[PM] NB2-TEXT-TEST 独立复核 + Founder 方案 B 决策 + Phase 4 任务派发** 📋
+  - PM 独立复核 NB2-TEXT-TEST：10 张图逐一对比，评分 A=3.8/5 B=4.1/5（反转 Tester 结论）
+  - 关键澄清：A/B 两组均用 NB2 模型，成本/速度相同
+  - Founder 决策：方案 B 全面切换 NB2 原生文字渲染 + TextOverlay 保留备用
+  - 派发 TASK-NB2-NATIVE-TEXT (P0) @Backend + TASK-AB-STYLE-DESC (P2) @Tester
+  - 全文档同步更新
+
+### 2026-02-27 16:55
+- **[Tester] TASK-NB2-TEXT-TEST 完成** ✅ — A=4.2/5 B=3.8/5
+- **[Coordinator] Prompt 工程高级原则文档完成** ✅ (17:10) + A/B 测试建议
+
+### 2026-02-27 16:32
+- **[PM] Phase 3 全部任务核验 7/7 PASS + 全文档同步** 📋
+  - 核验 Backend 4 项 + AI-ML 2 项代码任务：全部与 PM 派发规格一致
+  - Python 语法验证 6/6 文件通过
+  - NB2 验证输出确认：5/5 shots, 848x1264, avg 25.9s（Pro 提速 2.8x）
+  - Founder 反馈处理：shot_04 角色偏差记录，建议 Tester 增加角色一致性维度
+  - 通知 @Tester：TASK-NB2-TEXT-TEST 前置条件已满足
+  - 全文档同步更新 (pm-progress×3 + PENDING + TODAY_FOCUS + PROJECT_STATUS + TEAM_CHAT + daily-sync + DECISIONS)
+
+### 2026-02-27 16:05~16:09
+- **[AI-ML] Phase 3 两项 P0 任务完成** ✅ — SLAMDUNK-COLOR + DIALOGUE-SYSTEM L2+3
+- **[Backend] Phase 3 四项任务完成** ✅ — NB2-SWITCH + DIALOGUE L1 + TEAM-UNIFORM + SPEAKER-PREFIX
+
+### 2026-02-27 15:41
+- **[PM] E2E-TEST-2 独立复核 + Founder 6项决策 + Phase 3 六项任务派发** 📋
+  - TASK-E2E-TEST-2 PM 独立复核：确认 Tester 4.3/5 合理
+  - 额外发现：队友球衣颜色不一致（Stage 2 系统性问题）
+  - NB2 API 兼容性搜索研究确认：100% 兼容（同 SDK、同参数、同参考图支持）
+  - Founder 6 项决策确认：NB2切换 + 灰度修复 + 对话系统重构 + 团队着装 + NB2文字测试 + 智能前缀
+  - 派发 Phase 3 六项任务：NB2-SWITCH(P0) + SLAMDUNK-COLOR(P0) + DIALOGUE-SYSTEM(P0) + TEAM-UNIFORM(P1) + NB2-TEXT-TEST(P1) + SPEAKER-PREFIX(P2)
+  - 全文档同步更新 (pm-progress×3 + PENDING + TODAY_FOCUS + PROJECT_STATUS + TEAM_CHAT + daily-sync)
+
+### 2026-02-27 14:33
+- **[Tester] TASK-E2E-TEST-2 完成** ✅
+  - 7/7 维度通过（含 1 项有条件通过），总评 4.3/5
+  - slam_dunk / Sonnet 4.6 / Gemini 3 Pro Image / 20 shots / 2角色 / 1446.5秒
+  - 遗留：灰度/彩色不统一 (P1) + thought 45%/dialogue 10% 失衡 (P2)
+
+### 2026-02-26 19:00
+- **[Coordinator] Nano Banana 2 全维度研究报告** 📊
+  - 研究报告：docs/NANO_BANANA_2_RESEARCH.md（291 行）
+  - 结论：NB2 速度 3-5x，成本 -50%，角色一致性 ~95% 与 Pro 持平
+  - CLAUDE.md 已更新：数据流+核心服务表标注 NB2 评估中
+
+### 2026-02-26 17:48
+- **[PM] Backend 三项核验 + E2E 启动 + text_type 分析** 📋
+  - 核验 TASK-STYLE-DEFAULT-FIX ✅（4文件8处 realistic→anime，零残留）
+  - 核验 TASK-MODEL-UPGRADE-RETEST ✅（slam_dunk 20/20，Sonnet 4.6 通过）
+  - 确认 Frontend P1 修复 ✅（评分 4.5→4.8/5）
+  - text_type 分布 PM 分析：dialogue 10%（目标40-50%）→ 判断为题材导致（内心独白篮球故事），暂不优化
+  - 通知 @Tester 启动 TASK-E2E-TEST-2（完整 Stage 1→5 + TextOverlay，slam_dunk 风格，7项验收维度）
+  - 全文档同步更新 (pm-progress×3 + PENDING + TODAY_FOCUS + PROJECT_STATUS + TEAM_CHAT + daily-sync)
+
+### 2026-02-26 17:33
+- **[Backend] TASK-STYLE-DEFAULT-FIX + TASK-MODEL-UPGRADE-RETEST 完成** ✅
+  - 4文件8处默认值 realistic→anime
+  - slam_dunk + Sonnet 4.6 Stage 1-4 验证，20/20 关键词命中
+- **[Frontend] Stage A P1 修复完成** ✅
+  - handleSubmit 500字校验 + setTimeout useRef+useEffect cleanup
+
+### 2026-02-26 16:43
+- **[PM] Phase 2 综合复核 + Founder 反馈执行 + 新任务派发** 📋
+  - 验收 4 项 Agent 任务：Backend TASK-MODEL-UPGRADE ✅ / AI-ML 3任务 ✅ / Frontend TASK-UI-STAGE-A ✅ / DevOps GitHub ✅
+  - Frontend Stage A 复验 **4.5/5**（DEC-011 全覆盖，2项P1建议）
+  - 发现 style_preset 默认值问题：8文件默认 realistic → 需改 anime
+  - 发现 text_type 分布偏差：dialogue 5.3%(目标40-50%), thought 47.4%(目标20-25%)
+  - 派发 TASK-STYLE-DEFAULT-FIX + TASK-MODEL-UPGRADE-RETEST 给 @Backend
+  - PM 反思记录：任务派发必须包含完整测试参数
+  - 全文档同步更新 (pm-progress×3 + PENDING + TODAY_FOCUS + PROJECT_STATUS + TEAM_CHAT + daily-sync)
+
+### 2026-02-26 11:02~16:18
+- **[DevOps] GitHub远程仓库创建** ✅ — prefaceai-story (private, kaiangel)
+- **[AI-ML] 三项任务完成** ✅ — slam_dunk预设 + TEXT OVERLAY RULES + 角色框架文档
+- **[Frontend] TASK-UI-STAGE-A 完成** ✅ — /create 页面 6 新文件
+- **[Backend] TASK-MODEL-UPGRADE 完成** ✅ — 7文件→Sonnet 4.6, Stage 1-4通过
+
+### 2026-02-25 18:09
+- **[PM] DEC-012 记录 + Sonnet 4.6 成本估算 + Phase 2 六项任务正式派发** 📋
+  - Founder 4项决策：模型全面升级(Sonnet 4.6) + 灌篮高手风格 + text_type优化 + 角色一致性框架
+  - 成本估算：文本生成 ~$0.35-0.43/故事（总成本 <5% 增量）
+  - 派发：TASK-MODEL-UPGRADE(@Backend) + TASK-STYLE-SLAMDUNK + TASK-TEXT-TYPE-OPT + TASK-IDENTITY-DESIGN(@AI-ML) + TASK-E2E-TEST-2(@Tester) + TASK-UI-STAGE-A(@Frontend)
+
+### 2026-02-25 18:00
+- **[PM] TASK-E2E-VALIDATE 独立复核 + Founder 反馈回应** 🔍
+  - 逐一查看全部 29 张 shot，发现角色眼镜一致性仅 68%（6/19 shot 缺眼镜），Tester 验收维度 2 不准
+  - PM 总评 4.3/5（Tester 给 4.9/5 偏高）
+  - 回应 Founder 4 项反馈：角色一致性/narration占比/条漫风格/LLM模型
+  - 梳理全部 LLM 模型清单，推荐 Stage 1+3 换 Claude Sonnet 4.6（方案 B）
+  - Phase 1 流水线技术上跑通 ✅，遗留问题纳入 Phase 2
+
+### 2026-02-24 17:39~18:30
+- **[Backend] TASK-E2E-VALIDATE Step 1a+1b 完成** ✅
+  - 29/29 shots 100% 成功，TextOverlay 28/29 正确渲染
+  - 总耗时 ~30 分钟，Pro 模型生图
+- **[Tester] TASK-E2E-VALIDATE Step 2 验收** ✅
+  - 7/7 维度全部通过，总评 4.9/5
+  - 补充分析：narration 86% 过高 + text_type 优化建议
+
+### 2026-02-24 15:45
+- **[PM] TextOverlay 集成补充** 📋
+  - 发现 TextOverlayService 未集成到正式流水线（仅存在于测试脚本）
+  - 数据缺口分析：Stage 4 缺 text_type/dialogue_lines/thought_lines/speaker_position
+  - TASK-E2E-VALIDATE 更新为 Step 1a + Step 1b（TextOverlay）+ Step 2（7维度验收）
+  - 全部相关文档同步更新
+
+### 2026-02-24 15:35
+- **[PM] TASK-E2E-VALIDATE 派发** 📋
+  - Phase 1 混合方案（Founder 批准）：Backend 跑通 → Tester 独立验收
+  - 用户旅程框架（A-E 五阶段）纳入 DEC-011 段落
+  - PENDING/TODAY_FOCUS/PROJECT_STATUS 同步更新
+
+### 2026-02-24 15:10
+- **[PM] DEC-011 纳入 + 6处过期信息修复** 📋
+  - DEC-011 条漫产品形态定义（Founder 决策）纳入 PROJECT_STATUS
+  - TASK-SCENE-REF-ASPECT: 🟡→✅ 已完成 (Backend 11:37, commit 926f284)
+  - Backend 模块状态: 🟡→🟢 空闲
+  - DevOps 模块状态: 更新为3批提交已完成
+  - TASK-ASPECT-2x3 遗留项: 标记已修复
 
 ### 2026-02-24 11:35
 - **[PM] PROJECT_STATUS.md 全面更新** 📋

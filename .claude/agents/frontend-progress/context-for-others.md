@@ -1,51 +1,50 @@
 # Frontend 状态速览（供其他Agent参考）
 
-> 更新时间: 2026-02-14 17:30
+> 更新时间: 2026-03-04
 
 ---
 
-## 当前状态: ✅ TASK-LP-PAGES-FIX 全部完成，等待 PM 复验
+## 当前状态: ✅ TASK-CREATE-UPGRADE P2 PM 复验 4.8/5 通过 + P3/P4 修复完成
 
 **可预览地址**: http://localhost:3000 (需要运行 `npm run dev`)
 
 ---
 
-## TASK-LP-PAGES-FIX 完成情况（4/4）
+## TASK-CREATE-UPGRADE P2 完成情况
 
-| 编号 | 优先级 | 内容 | 状态 |
-|------|--------|------|------|
-| FIX-1 | P0 | 首页Footer链接新开标签页，子页面Footer用`<Link>`当前标签页 | ✅ |
-| FIX-2 | P1 | 11个页面添加 SEO metadata（Server/Client 拆分） | ✅ |
-| FIX-3 | P1 | Footer 内链改用 Next.js `<Link>` | ✅ |
-| FIX-4 | P2 | 登录页 setTimeout 清理（useRef + unmount cleanup） | ✅ |
+P1 复验 4.7/5 通过后，完成 P2 全部 14 文件（10 新建 + 4 修改）。
 
-**构建验证**: ✅ `npm run build` 通过（15个路由）
+### P2 新增功能
 
----
+| 功能 | 组件/页面 | 说明 |
+|------|----------|------|
+| 注册 | /register | 用户名+邮箱+密码表单，mock 注册，成功跳转 Dashboard |
+| 工作台 | /dashboard | 欢迎语+统计卡片（故事数/已完成/总画面）+故事网格 |
+| 故事详情 | /dashboard/[storyId] | Shot 轮播+缩略图+旁白+角色信息+风格标签 |
+| 故事卡片 | StoryCard | 封面图+标题+风格+状态+操作菜单（续写/删除） |
+| 故事网格 | StoryGrid | 搜索+筛选（状态/排序）+响应式 2-4 列 grid |
+| 空状态 | EmptyState | 新用户无故事时的引导 |
+| 用户菜单 | UserMenu | 头像+下拉（工作台/设置/退出） |
 
-## 修改摘要
+### Auth 系统增强
 
-### FIX-1 + FIX-3: Footer `openSubPagesInNewTab` prop
-- `Footer.tsx` 新增 `openSubPagesInNewTab` boolean prop（默认 false）
-- `true`（首页调用）: 非锚点链接用 `<a target="_blank">`
-- `false`（子页面调用）: 非锚点链接用 `<Link>`（客户端路由）
-- 锚点链接（`/#features` 等）始终用 `<a>`
-- CTASection "直接登录" 也加了 `target="_blank"`
+- AuthContext 新增 `register` 函数、`stories` 状态、`deleteStory` 方法
+- CreateHeader 集成 UserMenu（登录态显示用户菜单，未登录显示登录链接）
+- Login 页面新增注册链接
 
-### FIX-2: SEO metadata
-- 每个页面拆分为 Server Component（导出 metadata）+ Client Component（动画内容）
-- 11个新增 *Content.tsx 文件
-- 浏览器标签页现在显示独立标题（如"定价 - 序话Story"）
+### 用户可走通的完整流程
 
-### FIX-4: 登录页 timer cleanup
-- `shakeTimerRef` + `apiTimerRef` 管理两个 setTimeout
-- `clearTimers()` callback 在 unmount 时清理
+1. 注册: /register → 填写信息 → 成功跳转 /dashboard（新用户空状态）
+2. 登录: /login → 邀请码 XUHUA2026 → 跳转 /dashboard（有 5 个 mock 故事）
+3. 工作台: 浏览故事卡片 → 搜索/筛选 → 点击查看详情
+4. 故事详情: /dashboard/story_001 → Shot 轮播 + 缩略图 + 旁白 + 角色
+5. 创作: CreateHeader 显示用户菜单 + 工作台入口
 
----
+### 文件变化
 
-## @PM: 请复验
-
-TASK-LP-PAGES-FIX 4项修复已完成，构建通过。
+- P2 新建 10 文件
+- P2 修改 4 文件（types + AuthContext + mock-data + CreateHeader）
+- `npm run build` 18 路由通过（+3 新路由）
 
 ---
 
@@ -56,5 +55,5 @@ TASK-LP-PAGES-FIX 4项修复已完成，构建通过。
 | Next.js | 14.2.35 |
 | TailwindCSS | 3.x |
 | TypeScript | 5.x |
-| Framer Motion | 最新 |
+| Framer Motion | 最新（含 AnimatePresence） |
 | Lucide Icons | 最新 |

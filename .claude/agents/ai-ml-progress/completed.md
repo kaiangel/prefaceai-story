@@ -4,6 +4,350 @@
 
 ---
 
+## 2026-03-04
+
+### Shot 15/18 Prompt 工程优化 + SQ-4/SQ-5/Bug#3 恢复 ✅
+
+**完成时间**: 2026-03-04
+**关联任务**: TASK-SHOT-QUALITY-BUGFIX (Founder 指派, PM 19:30 派发)
+**修改文件**: `app/services/storyboard_director.py`
+
+**事件**: PM 回滚代码时误删 AI-ML 所有改动，本次一并重新应用 + 新增 2 条规则
+**新增规则**:
+- Rule #7 OBJECT PHYSICAL PLAUSIBILITY: 共享表面物体需独立空间锚点，禁止重叠
+- Rule #8 MULTI-CHARACTER LIMB INTERACTION LIMITS: 同一物体最多2角色手部交互
+**重新应用**: Rule #6 (Bug #3) + SQ-4 (NARRATIVE VISUAL PROPS + SPATIAL DEPTH) + SQ-5 (SHOT TRANSITION + 数据增强)
+**两处规则区**: 主规则区 (详细版) + 强化规则区 (精简版)
+**验证**: ✅ Python 语法检查通过 (935 lines)
+
+---
+
+### TASK-SHOT-QUALITY-BUGFIX Bug #3 — 神秘路人修复 ✅
+
+**完成时间**: 2026-03-04
+**关联任务**: TASK-SHOT-QUALITY-BUGFIX (P2, Bug #3)
+**修改文件**: `app/services/storyboard_director.py`
+
+**问题**: Step 7 B 组 6/24 (25%) shots 出现不在角色列表中的路人（餐厅服务员、模糊背景人影等）
+**根因**: NB2 模型默认填充大空间 + prompt 暗示性措辞 + 缺少人数负面约束
+**修复**: IMAGE PROMPT QUALITY REQUIREMENTS Rule #6 — STRICT CHARACTER COUNT — NO EXTRA PEOPLE
+- 要求 "EXACTLY N characters in this scene"
+- 禁止 bystanders/extras/crowd/background figures
+- 禁止暗示性措辞 "blurred forms of other people"
+- 空座位保持空状态
+**验证**: ✅ Python 语法检查通过
+
+---
+
+### TASK-SHOT-QUALITY-UPGRADE Step 5b — SQ-3 + SQ-4 + SQ-5 ✅
+
+**完成时间**: 2026-03-04
+**关联任务**: TASK-SHOT-QUALITY-UPGRADE (P0, Step 5b)
+**修改文件**:
+- `app/services/screenplay_writer.py` — SQ-3
+- `app/services/storyboard_director.py` — SQ-4 + SQ-5
+
+**任务类型**: Prompt 工程（Stage 3+4 prompt 改进 × 3 项）
+
+**SQ-3: Stage 3 对话明确化规则**
+- 在 `_build_single_scene_prompt()` 对话要求区块添加：
+  - 关键剧情词显式表达（禁止"那个行业"→必须"公务员考试"）
+  - 前30%对话完成核心冲突定义
+- 插入方法: 在现有"对话写作原则"4条规则后、输出要求前
+
+**SQ-4: Stage 4 叙事性视觉道具 + 空间纵深**
+- 在 `_build_scene_prompt()` 添加：
+  - NARRATIVE VISUAL PROPS: 每 image_prompt 至少1个剧情道具
+  - SPATIAL DEPTH RULES: medium/close-up 保留≥30%背景，≥2层景深
+- 插入方法: IMAGE PROMPT QUALITY 后、TEXT OVERLAY RULES 前
+
+**SQ-5: Stage 4 运镜差异化 + 构图数据增强**
+- Prompt 新增 SHOT TRANSITION RULES:
+  - 30度法则 + 景别变化 + 角度变化 + 构图变化 + 焦距规则
+- 数据结构增强:
+  - composition 新增: foreground, background, depth_layers
+  - camera 新增: focal_length
+- 仅 Stage 4（DEC-014 后 Stage 5 由 Backend SQ-8 处理）
+
+**验证**: ✅ Python 语法检查通过（两文件 0 error）
+
+**经验记录**:
+- SQ-4 的 NARRATIVE VISUAL PROPS 是视觉叙事的关键 — 让观众不看文字也能理解冲突
+- SQ-5 的30度法则是影视专业最基础的剪辑规则，之前 Stage 4 prompt 完全没有
+- composition 增加 foreground/background/depth_layers 后，LLM 被迫思考每个 shot 的空间层次
+- focal_length 与 shot_size 绑定（wide=24-35mm, close=85mm）确保了光学真实性
+
+---
+
+## 2026-03-03
+
+### TASK-STYLE-DESC-REWRITE — slam_dunk 句序修复 ✅
+
+**完成时间**: 2026-03-03 17:05
+**关联任务**: TASK-STYLE-DESC-REWRITE (P1, Step 3 PM review 反馈)
+**修改文件**: `app/services/style_enforcer.py`
+
+**任务类型**: Prompt 工程（句序修复）
+
+**问题**: PM review 发现 slam_dunk 场域式描述的 6 句顺序错乱
+- 错误: 传统→体态→笔触→光影→色彩→构图
+- 正确: 传统→光影→色彩→质感→角色→构图
+
+**修复**: 保持 6 句内容不变，重新排列顺序为标准 6 句结构
+
+**验证**: ✅ 句序正确 + enforce_prompt() 通过 + 词数不变 (107)
+
+**经验记录**:
+- 已验证的 A/B 测试版本虽然内容经过验证，但句序标准化仍然需要确认
+- 6句结构的顺序本身也是"场域式"规范的一部分，不仅是内容
+
+---
+
+### TASK-STYLE-DESC-REWRITE — 15个风格 style_description 场域式改写 ✅
+
+**完成时间**: 2026-03-03 15:56
+**关联任务**: TASK-STYLE-DESC-REWRITE (P1, Step 2)
+**修改文件**: `app/services/style_enforcer.py`
+
+**任务类型**: Prompt 工程（场域式改写 × 15 风格）
+
+**完成内容**:
+- [x] 2个已验证描述（slam_dunk, illustration）直接应用 A/B 测试胜出版本
+- [x] 13个新写场域式描述，全部遵循6句结构
+- [x] 每个描述 150-250 词范围（已验证版本除外）
+- [x] 全英文，与 mandatory/forbidden 零重复
+- [x] Python 加载验证 15/15 通过
+- [x] enforce_prompt() 验证 15/15 通过
+- [x] 更新 ai-ml-progress 三个文件
+
+**6句结构**: ①传统锚定 ②光影哲学 ③色彩心理 ④质感密度 ⑤角色表演 ⑥构图原则
+
+**经验记录**:
+- 场域式描述的核心是让模型"进入角色"而不是"执行命令"
+- 每个风格的传统锚定必须独特且具体（不能泛泛说"fine art"）
+- 光影/色彩/质感三者构成视觉底座，角色表演和构图构成叙事顶层
+- 已验证的 slam_dunk/illustration 虽然词数偏少（107/116），但因通过 A/B 测试不应修改
+
+---
+
+## 2026-02-28
+
+### TASK-CROSS-STYLE-TEST 前置 — illustration 场域式 style_description 提供 ✅
+
+**完成时间**: 2026-02-28 11:30
+**关联任务**: TASK-CROSS-STYLE-TEST (P2) 前置准备
+**产出**: TEAM_CHAT 中发布 B 组场域式改写版本
+
+**任务类型**: Prompt 工程（场域式改写）
+
+**依据**: 原则 7（约束+场域双层架构），复用 slam_dunk 场域式 6 句结构
+
+**完成内容**:
+- [x] 分析当前命令式 style_description（1 句，与 mandatory 高度重叠）
+- [x] 编写场域式改写版本（6 句各司其职）
+- [x] 确认与 mandatory/forbidden 约束层不重复
+- [x] 确认适合都市情感题材但不锁死题材
+- [x] 发布到 TEAM_CHAT 通知 PM + Tester
+
+**场域式改写要点**:
+| 句 | 功能 |
+|----|------|
+| 1 | 传统锚定（digital illustration as storytelling art） |
+| 2 | 光影哲学（光引导视线、情绪暗示） |
+| 3 | 色彩心理（色温=情感：暖琥珀=亲密、冷蓝=孤独） |
+| 4 | 质感密度（真实但不写实：织物纹理、雨湿路面、手机微光） |
+| 5 | 角色表演（姿态、微表情、人物间距） |
+| 6 | 构图原则（清晰+深度、情感定位） |
+
+---
+
+## 2026-02-27
+
+### TASK-AB-STYLE-DESC 前置 — slam_dunk 场域式 style_description 提供 ✅
+
+**完成时间**: 2026-02-27 17:44
+**关联任务**: TASK-AB-STYLE-DESC (P2) 前置准备
+**产出**: TEAM_CHAT 中发布 B 组场域式改写版本
+
+**任务类型**: Prompt 工程（场域式改写）
+
+**依据**: 原则 7（约束+场域双层架构）
+
+**完成内容**:
+- [x] 分析当前命令式 style_description 的结构和冗余
+- [x] 根据原则 7 编写场域式改写版本（6 句各司其职）
+- [x] 确认与 mandatory/forbidden 约束层不重复
+- [x] 发布到 TEAM_CHAT 通知 PM
+
+**场域式改写要点**:
+| 句 | 功能 |
+|----|------|
+| 1 | 传统锚定（Inoue + cinema-manga） |
+| 2 | 人体质感（真实比例、运动员体魄、表情深度） |
+| 3 | 墨法特征（粗线力量、细线阴影、网点渐变） |
+| 4 | 光影叙事（体育馆荧光灯、黄金时段暖色调） |
+| 5 | 色彩定调（饱和全彩，接地真实感） |
+| 6 | 构图哲学（电影感角度，情感冲击力） |
+
+---
+
+### TASK-SLAMDUNK-COLOR — slam_dunk 彩色修复+color_mode增强 ✅ (P0)
+
+**完成时间**: 2026-02-27 16:05
+**关联任务**: E2E-TEST-2 发现灰度/彩色不统一
+**文件**: `app/services/style_enforcer.py` + `app/services/storyboard_director.py` + `app/services/image_generator.py`
+
+**任务类型**: 风格修复 + 增强功能
+
+**Part A — slam_dunk preset 修复**:
+- [x] `mandatory_keywords` 新增 `"full color manga"`, `"colored manga illustration"`（10→12个）
+- [x] `forbidden_keywords` 新增 `"black and white"`, `"grayscale"`, `"monochrome"`（12→15个）
+- [x] `style_description` 删除 `"dramatic black-and-white contrast"` → `"dramatic contrast with rich color palette"` + `"MUST be in FULL COLOR."`
+
+**Part B — per-shot color_mode 增强**:
+- [x] `storyboard_director.py` Stage 4 prompt 新增 COLOR MODE 规则说明
+- [x] shot JSON 模板新增 `"color_mode"` 可选字段（full_color/grayscale/sepia）
+- [x] `image_generator.py` 新增 color_mode 处理：在 StyleEnforcer.enforce_prompt() 之后追加 COLOR OVERRIDE 指令
+- [x] Python 语法验证 3/3 通过
+
+**关键产出**:
+| 文件 | 说明 |
+|------|------|
+| `app/services/style_enforcer.py` | slam_dunk preset 全彩修复 |
+| `app/services/storyboard_director.py` | Stage 4 color_mode 规则 + JSON 模板 |
+| `app/services/image_generator.py` | color_mode → prompt COLOR OVERRIDE |
+
+---
+
+### TASK-DIALOGUE-SYSTEM Layer 2+3 — 对话系统 Stage 4 规则重构 ✅ (P0)
+
+**完成时间**: 2026-02-27 16:05
+**关联任务**: E2E-TEST-2 发现 dialogue 10%/thought 45% 失衡
+**文件**: `app/services/storyboard_director.py` TEXT OVERLAY RULES 区域
+
+**任务类型**: Prompt 优化（规则重构）
+
+**Layer 2 — CRITICAL DISTRIBUTION RULES 完全重写**:
+- [x] dialogue（含混合类型）≥60% 硬下限（原 40-50%）
+- [x] thought 15-25%（原 20-25%）
+- [x] narration ≤10%（原 ≤30%）
+- [x] none 禁止（原 5-10%）
+- [x] 新增 "Why dialogue dominance matters" 原理说明
+- [x] 新增 SELF-CHECK 自检规则
+
+**Layer 3 — Guidelines 重写**:
+- [x] 删除 "not every shot needs text"、"Action/establishing shots → none"
+- [x] 新增 "Every shot MUST have text. NO exceptions."
+- [x] 新增 "When 2+ characters are together → MUST be dialogue"
+- [x] Python 语法验证通过
+
+**效果对比**:
+| 指标 | Phase 2 规则 | Phase 3 规则 | E2E-TEST-2 实测 |
+|------|-------------|-------------|----------------|
+| dialogue(含混合) | 40-50% | **≥60%** | 25% |
+| thought | 20-25% | 15-25% | 45% |
+| narration | ≤30% | **≤10%** | 5% |
+| none | 5-10% | **0%** | 20% |
+
+**关键产出**:
+| 文件 | 说明 |
+|------|------|
+| `app/services/storyboard_director.py` | TEXT OVERLAY RULES 完全重构 |
+
+---
+
+## 2026-02-26
+
+### TASK-STYLE-SLAMDUNK — 灌篮高手风格预设 ✅ (P0)
+
+**完成时间**: 2026-02-26 15:56
+**关联决策**: DEC-012 决策 3
+**文件**: `app/services/style_enforcer.py`
+
+**任务类型**: 风格预设新增
+
+**完成内容**:
+- [x] 新增 `slam_dunk` 风格预设（StyleEnforcement 配置完整）
+- [x] 10 个 mandatory_keywords：slam dunk manga style, Takehiko Inoue inspired, realistic manga proportions, dynamic linework, detailed anatomy, dramatic lighting and shadow, Japanese manga aesthetic, expressive character art, screentone effects, bold ink strokes
+- [x] 12 个 forbidden_keywords：chibi, cute, super deformed, pastel colors, photorealistic photograph, 3D render, CGI, Western comic style, simple cartoon, flat colors, pixel art, watercolor, oil painting
+- [x] 详细 style_description 强调"成熟写实漫画，非可爱向"
+- [x] 额外新增 `korean_webtoon` 预设（为后续测试备用）
+- [x] Python 语法验证通过，`get_supported_styles()` 确认 15 种风格
+
+**关键产出**:
+| 文件 | 说明 |
+|------|------|
+| `app/services/style_enforcer.py` | 新增 slam_dunk + korean_webtoon 预设 |
+
+---
+
+### TASK-TEXT-TYPE-OPT — text_type 分布优化 ✅ (P1)
+
+**完成时间**: 2026-02-26 15:56
+**关联决策**: DEC-012 决策 2
+**文件**: `app/services/storyboard_director.py` TEXT OVERLAY RULES 区域
+
+**任务类型**: Prompt 优化
+
+**任务背景**:
+Phase 1 E2E 测试发现 narration 占 86%（25/29 shots），dialogue 仅 1 shot。需要优化 Stage 4 prompt 引导 LLM 生成更合理的 text_type 分布。
+
+**完成内容**:
+- [x] 新增 CRITICAL DISTRIBUTION RULES 硬约束：narration ≤30%, dialogue 40-50%, thought 20-25%, none 5-10%
+- [x] 新增 "Why this matters" 原理说明：narration 是最不吸引人的 text_type
+- [x] 增强 Guidelines 场景引导：明确何时用 dialogue/thought/none，何时才用 narration
+- [x] 参考 Tester 18:30 的 7 个 shot 改写建议
+- [x] Python 语法验证通过
+
+**效果对比**:
+| 指标 | 优化前 | 优化后（预期） |
+|------|--------|---------------|
+| narration 占比 | 86% | ≤30% |
+| dialogue 占比 | 3.4% | 40-50% |
+| thought 占比 | 10.3% | 20-25% |
+| none 占比 | 0% | 5-10% |
+
+**关键产出**:
+| 文件 | 说明 |
+|------|------|
+| `app/services/storyboard_director.py` | TEXT OVERLAY RULES 区域优化 |
+
+---
+
+### TASK-IDENTITY-DESIGN — 角色一致性框架文档 ✅ (P2)
+
+**完成时间**: 2026-02-26 15:56
+**关联决策**: DEC-012 决策 1
+**文件**: `docs/CHARACTER_IDENTITY_FRAMEWORK.md`
+
+**任务类型**: 设计文档
+
+**任务背景**:
+Founder 提出 Identity Anchors + Narrative Variables 概念框架，用于系统化角色视觉一致性管理。
+
+**完成内容**:
+- [x] Identity Anchors 定义（6 类锚点：面部骨骼、身体比例、肤色、发型发色、标志性配饰、基础服装）
+- [x] 标志性配饰的特殊地位和应对策略（image_prompt 强调、参考图确认、Stage 2 标注）
+- [x] Narrative Variables 6 层体系（情绪/物理/装备/环境/可见度/时间）
+- [x] 各层优先级排序
+- [x] Stage 2 角色设计数据结构建议（identity_anchors + narrative_defaults）
+- [x] image_prompt 完整应用示例（陈默在雨中）
+- [x] 已知限制 + 后续迭代方向
+
+**关键产出**:
+| 文件 | 说明 |
+|------|------|
+| `docs/CHARACTER_IDENTITY_FRAMEWORK.md` | v1.0 角色一致性框架文档 |
+
+**后续方向**:
+| 方向 | 优先级 | 说明 |
+|------|--------|------|
+| prompt 中强调标志性配饰 | P1 | `_build_character_description()` 中加 MUST BE VISIBLE |
+| Stage 2 输出增加 identity_anchors 字段 | P2 | 显式标记锁定特征 |
+| 单张 shot 重新生成功能 | P1 | 配饰丢失时可单独重跑 |
+
+---
+
 ## 2026-02-24
 
 ### TASK-REF-PREPROCESS — 全部闭环 (DEC-009 + DEC-010) ✅

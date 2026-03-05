@@ -1,164 +1,65 @@
 # Backend Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 Backend 的工作状态和可用资源
-> **最后更新**: 2026-02-24 11:37
+> **最后更新**: 2026-03-04 18:07
 
 ---
 
 ## 当前状态速览
 
 ```
-状态: 🟢 空闲（全部任务完成）
-当前任务: 无
+状态: ✅ TASK-SHOT-QUALITY-BUGFIX Backend 全部修复完成 (Bug#1, #2, #4, #5)
+当前任务: 无（等待 PM review + TASK-GIT-COMMIT-3）
 阻塞: 无
-可请求: Phase 4.5 视频合成、API文档
 ```
 
 ---
 
-## 🆕 TASK-SCENE-REF-ASPECT 完成 (2026-02-24 11:37)
+## ✅ TASK-SHOT-QUALITY-BUGFIX Backend 部分 (2026-03-04 18:07)
 
-### 给 @PM 的信息 ⭐
+### 给 @PM 的信息
 
-**场景参考图宽高比已统一为 2:3。** `scene_reference_manager.py:431` 从 `"16:9"` 改为 `"2:3"`。
+**4 项 Bug 修复全部完成，3 个文件修改，全部语法/import 检查通过。请 review。**
 
-这是 TASK-ASPECT-2x3 的最后一处遗漏（DEC-010 决策），修复后 `app/services/` 目录中不再有任何 `"16:9"` 硬编码默认值。
+| # | Bug | 级别 | 文件 | 修复方式 |
+|---|-----|------|------|----------|
+| 1 | 场景标签中文→□ | **P1** | `scene_reference_manager.py` | 标签改用英文 `location_id` + CJK 字体兜底 |
+| 2 | Prompt 指令泄漏 | **P2** | `image_generator.py` | 移除 "70-80% opacity"/"1-2px"/"~15px" 技术英文 |
+| 4 | Validator 字段名 | **P3** | `storyboard_service.py` | `camera.camera_angle` → `camera.angle` |
+| 5 | dialogue handler dict crash | **P2** | `image_generator.py` | L81-82 添加 `isinstance(txt, dict)` 类型检查 |
 
-**验证**: 语法通过 ✅ | grep 排查确认无遗漏 ✅
+### 给 @AI-ML 的信息
+
+- **Bug #3 (神秘路人)** 是 @AI-ML 的任务，Backend 侧无需改动
+- Backend 的 Bug #2 修复已精简 `build_native_text_prompt()` 中所有带数值的技术英文，降低 NB2 文字泄漏风险
+
+### 给 @Tester 的信息
+
+- Backend 4 项 Bugfix 完成 (Bug #1/#2/#4/#5)，等 PM review 后进入 TASK-GIT-COMMIT-3
+- Bug #4 修复后 Validator 的假阳性警告应大幅减少
 
 ### 给 @DevOps 的信息
 
-TASK-SCENE-REF-ASPECT 已完成，`scene_reference_manager.py` 的修改可以包含在 TASK-GIT-COMMIT-2 Batch 1 中一并提交。
-
-### 宽高比统一全景（2:3）
-
-| 参考图类型 | 文件 | 状态 |
-|-----------|------|------|
-| 角色肖像 | `reference_image_manager.py` | ✅ 2:3 |
-| 角色全身 | `reference_image_manager.py` | ✅ 2:3 |
-| 场景参考图 | `scene_reference_manager.py` | ✅ 2:3（本次修复） |
-| Shot生成 | `image_generator.py` 等 | ✅ 2:3 |
-
-**所有参考图和生成图均统一为 2:3，从源头消除比例不匹配。**
-
----
-
-## ✅ 之前完成: V5修复任务 (2026-02-03 19:00)
-
-### 全部V5修复完成
-
-**任务来源**: PM独立综合复核
-
-| 任务ID | 描述 | 优先级 | 状态 |
-|--------|------|--------|------|
-| **FIX-B1** | 混合类型气泡位置索引修复 | **P0** | ✅ |
-| FIX-B2 | 移除「」符号添加逻辑 | P1 | ✅ |
-| FIX-B3 | 启用detect_overlay_collision | P1 | ✅ |
-| FIX-B4 | bubble_alpha配置化/降低 | P2 | ✅ |
-
-### 关键修复说明
-
-**FIX-B1 (P0)**: 混合类型(dialogue_with_narration等)中多条对话不再重叠，使用索引计算位置
-
-**FIX-B2 (P1)**: 气泡内容不再有多余的「」符号
-
-**FIX-B3 (P1)**: 气泡碰撞检测已启用，自动避让已有气泡
-
-**FIX-B4 (P2)**: 气泡透明度可配置，默认值从191降到180
-
----
-
-## ✅ 之前完成: 架构重构(ARCH-1/2/3) + 核心功能修复(CORE-1/2)
-
-**迁移的测试文件**:
-
-| 文件 | 删除代码行数 | 迁移方式 |
-|------|-------------|---------|
-| `test_comic_story_c_cyberpunk.py` | ~350行 | 直接导入 |
-| `test_comic_full_story_v2.py` | ~430行 | 直接导入 |
-| `test_comic_full_story.py` | ~345行 | 直接导入 |
-| `test_text_overlay.py` | ~200行 | 适配器模式 |
-| `test_text_overlay_v2.py` | ~250行 | 适配器模式 |
-| `test_new_story_overlay_v2.py` | ~150行 | 适配器模式 |
-| `test_comic_story_b_wuxia_ink.py` | ~350行 | 直接导入 |
-
-**总计**: 删除 ~2075 行重复代码
-
-**导入方式**:
-```python
-from app.services.text_overlay_service import (
-    TextOverlayService,
-    strip_speaker_prefix,
-    get_bubble_position_for_index,
-    detect_overlay_collision,
-)
-```
-
----
-
-## 给 @Tester 的信息 ⭐
-
-### V4验收指南
-
-**验收目标**: 确认ARCH-3重构后所有测试文件仍能正常运行
-
-**运行测试**:
-```bash
-# 任选一个测试文件验证
-python tests/test_comic_cc_kai.py
-python tests/test_comic_full_story.py
-python tests/test_comic_full_story_v2.py
-python tests/test_text_overlay.py
-python tests/test_text_overlay_v2.py
-python tests/test_new_story_overlay_v2.py
-python tests/test_comic_story_b_wuxia_ink.py
-python tests/test_comic_story_c_cyberpunk.py
-```
-
-**验收重点**:
-1. 所有测试文件能正常导入主服务
-2. 文字叠加功能正常工作（旁白、气泡、情感强调）
-3. 之前修复的P0/P1问题仍然有效
-
----
-
-## 给 @PM 的信息
-
-**ARCH-3 架构重构完成！**
-
-| 重构步骤 | 状态 |
-|---------|------|
-| ARCH-1: 创建主服务 `app/services/text_overlay_service.py` | ✅ 完成 |
-| ARCH-2: 更新 `__init__.py` 导出 | ✅ 完成 |
-| ARCH-3: 迁移7个测试文件 | ✅ 完成 |
-
-**重构收益**:
-- 删除 ~2075 行重复代码
-- 修复主服务的bug，所有故事类型（wuxia, cyberpunk, ghibli等）都受益
-- 代码维护性大幅提升
-
----
-
-## 给 @AI-ML 的信息
-
-Backend的架构重构已完成。现在TextOverlayService是统一的主服务，未来的Prompt优化和功能增强只需修改一处。
+- TASK-GIT-COMMIT-3 需等全部 Bugfix (Backend + AI-ML) 完成后执行
+- Backend 修改文件: scene_reference_manager.py, image_generator.py, storyboard_service.py (共 3 文件 4 项修复)
 
 ---
 
 ## 已完成可用的服务
 
-### TextOverlayService (统一版)
+### Phase 2.0 五阶段服务
 
-**位置**: `app/services/text_overlay_service.py`
+| 阶段 | 服务 | 主力模型 | 备用模型 |
+|------|------|---------|---------|
+| Stage 1 | StoryOutlineGenerator | **Claude Sonnet 4.6** | Gemini 3 Pro |
+| Stage 2 | CharacterDesigner | **Claude Sonnet 4.6** | Gemini 3 Pro |
+| Stage 3 | ScreenplayWriter | **Claude Sonnet 4.6** | Gemini 3 Pro |
+| Stage 4 | StoryboardDirector | **Claude Sonnet 4.6** | Gemini 3 Pro |
+| Stage 5 | ImageGenerator | **Nano Banana 2** (gemini-3.1-flash-image-preview) | *(Pro 作 fallback)* |
 
-| 功能 | 方法 | 说明 |
-|------|------|------|
-| 自适应旁白 | `add_monologue()` | 根据亮度调整透明度，支持垂直堆叠 |
-| 白底叙事 | `add_narrative()` | 白色背景+黑字的叙事旁白 |
-| 智能气泡 | `add_speech_bubble()` | 自动剥离speaker前缀，半透明底 |
-| 前缀剥离 | `strip_speaker_prefix()` | 移除"Kai：""Cici内心："等前缀 |
-| 气泡位置 | `get_bubble_position_for_index()` | 支持3+气泡交替左右布局 |
-| 碰撞检测 | `detect_overlay_collision()` | 检测叠加区域冲突 |
-| 完整处理 | `process_shot()` | 一站式处理所有文字叠加 |
+### 文字渲染双通道
 
-**支持的风格**: 都市情感、古风武侠、赛博朋克、吉卜力、水墨等全部风格
+| 通道 | 方式 | 开关 | 状态 |
+|------|------|------|------|
+| **原生渲染（默认）** | NB2 在 prompt 中渲染中文 | `use_native_text=True` | ✅ 激活 |
+| **后处理渲染（备用）** | TextOverlayService 叠加 | `use_native_text=False` | ✅ 保留 |

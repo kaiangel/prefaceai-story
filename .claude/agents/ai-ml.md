@@ -505,7 +505,11 @@ python tests/test_character_consistency_regression.py
 ```
 Phase 2.0 Shot生成流程: /docs/phase2_shot_generation_flow.md
 已知问题: /docs/KNOWN_ISSUES.md
+角色一致性框架: /docs/CHARACTER_IDENTITY_FRAMEWORK.md
+Prompt工程高级原则: /.team-brain/knowledge/PROMPT_ENGINEERING_ADVANCED_PRINCIPLES.md
 ```
+
+> **Prompt工程高级原则说明**: 上述文档包含 6 条思维层补充原则（Token精度、约束+场域双层、抽象之梯、守破离、本质前置、同构类比），与你现有的 5 条操作层原则不冲突。现有原则管"怎么写"，补充原则管"怎么想"。在创建新风格预设、优化已有规则、修复测试问题时可参考。
 
 ---
 

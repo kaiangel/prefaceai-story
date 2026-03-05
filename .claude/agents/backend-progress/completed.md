@@ -4,7 +4,354 @@
 
 ---
 
+## 2026-03-04
+
+### TASK-SHOT-QUALITY-BUGFIX Backend 部分 ✅ (16:09 + 18:07)
+
+**来源**: PM Step 7 独立复核发现 4 个 Bug + 回归验证发现 Bug #5，Backend 负责 #1/#2/#4/#5
+**优先级**: P1-P3
+
+**4 项修复，3 个文件：**
+
+| # | Bug | 级别 | 文件 | 修复方式 |
+|---|-----|------|------|----------|
+| 1 | 场景标签中文→□ 泄漏 | **P1** | `scene_reference_manager.py` | 标签改用英文 `location_id`；CJK 字体 (PingFang/STHeiti/NotoSansCJK) 加入字体 fallback 列表 |
+| 2 | Prompt "70-80% opacity" 文字泄漏 | **P2** | `image_generator.py` | `build_native_text_prompt()` 移除 4 处 opacity 行 + 1 处 px 描述 |
+| 4 | Validator `camera_angle` 字段名错误 | **P3** | `storyboard_service.py` | `_get_camera_angle()` 从 `camera.camera_angle` 改为 `camera.angle` |
+| 5 | dialogue handler dict crash | **P2** | `image_generator.py` | L81-82 添加 `isinstance(txt, dict)` 类型检查，与 compound handlers 一致 |
+
+全部语法/import 检查通过 ✅
+
+---
+
+### Step 5c: TASK-SHOT-QUALITY-UPGRADE Backend 部分 ✅ (10:50)
+
+**来源**: PM 正式启动 Step 5c → SQ-8 + SQ-2 + SQ-1 + SQ-6
+**优先级**: P0
+
+**4 项改进，6 个文件修改：**
+
+| SQ | 改进项 | 涉及文件 |
+|----|--------|----------|
+| SQ-8 | 移除 previous_shot_image (DEC-014) | pipeline_orchestrator.py, image_generator.py, storyboard_prompts.py |
+| SQ-2 | 智能参考图选择（每角色1张） | reference_image_manager.py, pipeline_orchestrator.py, image_generator.py, storyboard_prompts.py |
+| SQ-1 | PIL文字标注参考图 | reference_image_manager.py, scene_reference_manager.py, storyboard_prompts.py |
+| SQ-6 | Shot Transition Validator | storyboard_service.py |
+
+**关键变更**:
+- SQ-8: previous_shot_image + previous_shot 从全链路移除 (pipeline → image_gen → prompts)
+- SQ-2: 新增 `get_smart_references_for_scene(char_ids, shot_type)`，close_up→portrait/其余→fullbody
+- SQ-1: `_label_reference_image()` + `_label_scene_image()` PIL叠加，标签声明式prompt
+- SQ-6: `validate_shot_transitions()` 5项规则检查
+
+全部语法检查通过 ✅
+
+---
+
+## 2026-02-28
+
+### TASK-ROBUSTNESS-FIX (P1) ✅ — 关键字回退逻辑修复 (11:31)
+
+**来源**: PM 核验 TASK-NATIVE-TEXT-ROBUSTNESS 发现不一致 → PM 派发 (2026-02-28 11:15)
+**优先级**: P1
+
+**修复文件**: `app/services/image_generator.py` `build_native_text_prompt()` 混合类型回退分支
+
+对齐 `text_overlay_service.py` `_classify_sub_type()`:
+
+| # | 修复点 | 修复前 | 修复后 |
+|---|--------|--------|--------|
+| 1 | thought 关键字 | `"内心" in txt`（过于宽泛，可能误触） | `"内心：" in txt or "内心:" in txt`（含冒号，精准匹配） |
+| 2 | narration 检测 | `"旁白" in txt`（过于宽泛） | `txt.startswith("旁白：")`（仅匹配前缀） |
+| 3 | dialogue 检测 | 缺少 `"：\""` 中文冒号+双引号 | 补充 `or "：\"" in txt` |
+
+语法 ✅
+
+---
+
+### TASK-NATIVE-TEXT-ROBUSTNESS (P2) ✅ — 混合类型文本分类逻辑优化 (10:37)
+
+**来源**: PM 派发 (2026-02-28 10:25)
+**优先级**: P2
+
+**问题**: `build_native_text_prompt()` 和 `process_shot()` 中混合类型（dialogue_with_thought 等）判断每条文本的子类型依赖中文关键字（"内心"/"旁白"/"：「"），Stage 4 输出格式变化会导致分类失败。
+
+**优化**: 让 Stage 4 输出结构化子类型元数据，Stage 5 和 TextOverlay 优先使用元数据分类。
+
+**修改文件**（3 个）：
+
+1. **`storyboard_director.py`** — Stage 4 prompt 更新:
+   - TEXT OVERLAY RULES 中混合类型 `chinese_text` 格式从字符串数组改为对象数组
+   - 新格式: `[{"type": "dialogue", "text": "苏晨：「你好」"}, {"type": "thought", "text": "苏晨内心：「...」"}]`
+   - JSON 输出模板 `chinese_text` 说明同步更新
+
+2. **`image_generator.py`** — `build_native_text_prompt()` 混合类型处理:
+   - 优先检查 `isinstance(item, dict) and "type" in item` → 使用 `item["type"]`
+   - 回退: LLM 输出纯字符串时，从文本内容推断子类型（保持鲁棒性）
+
+3. **`text_overlay_service.py`** — `process_shot()` 混合类型处理:
+   - 新增 `_classify_sub_type()` 内部函数，统一分类逻辑
+   - 支持结构化元数据 + 旧格式回退
+   - `total_dialogues` 计算改用分类结果（`sub_type == "dialogue"`）
+
+语法 3/3 通过 ✅
+
+---
+
+## 2026-02-27
+
+### TASK-NB2-NATIVE-TEXT (P0) ✅ — NB2 原生文字渲染切换 (17:50)
+
+**来源**: Phase 4 PM 派发 (Founder 决策方案 B)
+**优先级**: P0
+
+**任务**: 修改 Shot 生成流程，让 NB2 原生渲染中文文字，不再依赖 TextOverlay 后处理
+
+`app/services/image_generator.py`:
+
+1. **新增模块级函数**:
+   - `build_native_text_prompt(text_overlay)` — 根据 text_overlay 数据构建 TEXT OVERLAY REQUIREMENT 指令块
+   - `_strip_speaker_for_native(text)` — 剥离说话者前缀（用于 prompt 构建）
+   - 支持 7 种 text_type: thought, narration, dialogue, dialogue_with_thought, narration_with_thought, narration_with_dialogue, dialogue_with_narration
+
+2. **`generate_shot_image_phase2()` 新增参数 `use_native_text: bool = True`**:
+   - `True`（默认）: StyleEnforcer + color_mode 之后，将 TEXT OVERLAY REQUIREMENT 附加到 prompt 末尾
+   - `False`: 不附加，由 TextOverlay 后处理叠加
+
+3. **`generate_shot_image_phase2_safe()` 同步新增 `use_native_text` 参数**:
+   - 透传给首次生成 + 改写重试的两处 `generate_shot_image_phase2()` 调用
+
+**参考实现**: `tests/test_nb2_text_test.py` B组 `build_text_overlay_prompt()` (:87-170)
+
+**验证结果** (5 shots, slam_dunk, `use_native_text=True`):
+
+| Shot | text_type | 时间 | 尺寸 |
+|------|-----------|------|------|
+| 01 | thought | 51.1s | 848x1264 |
+| 06 | narration | 39.4s | 848x1264 |
+| 09 | dialogue | 41.9s | 848x1264 |
+| 13 | narration_with_thought | 48.0s | 848x1264 |
+| 17 | dialogue_with_thought | 44.3s | 848x1264 |
+
+- 成功率: **5/5 (100%)** ✅
+- 平均: **45.0s/张**
+- TextOverlay 代码完整保留（未删除任何功能）✅
+
+语法 ✅ | 输出: `test_output/manualtest/nb2_native_text_verify/`
+测试脚本: `tests/test_nb2_native_text.py`
+
+---
+
+### Phase 3 Backend 四项任务 ✅ (16:09)
+
+**TASK-NB2-SWITCH (P0)**: Shot 生图主力模型 Gemini 3 Pro → Nano Banana 2 (gemini-3.1-flash-image-preview)
+- `image_generator.py:58` PRO_MODEL 改 1 行 + 注释更新
+- 验证: 5/5 shots 成功, 848x1264, 平均 25.9s/张（Pro ~72s, 提速 ~2.8x）
+- 输出: `test_output/manualtest/nb2_switch_verify/`
+
+**TASK-DIALOGUE-SYSTEM Layer 1 (P0)**: Stage 3 ScreenplayWriter 对话系统
+- `screenplay_writer.py` `_build_single_scene_prompt()` 新增对话强制约束块
+- JSON 输出模板新增 `dialogue_beats` 字段（speaker + line + emotion）
+- 每 scene 至少 2 组对话交互
+
+**TASK-TEAM-UNIFORM (P1)**: Stage 2 CharacterDesigner 团队着装一致性
+- `character_designer.py` 新增规则 5（球队/学校/军队/公司统一着装）
+- 原规则 5 "服装状态" 改编号为 6
+
+**TASK-SPEAKER-PREFIX (P2)**: TextOverlay 智能 Speaker 前缀处理
+- `text_overlay_service.py` 新增 3 个函数: `extract_speaker_name`, `smart_strip_speaker_prefix`, `_find_char_id_by_name`
+- `process_shot()` 新增 `characters_in_scene` + `characters_data` 可选参数
+- 画面可见角色→剥离前缀，画外音→保留前缀，完全向后兼容
+
+语法 4/4 通过 ✅
+
+---
+
+## 2026-02-26
+
+### TASK-STYLE-DEFAULT-FIX + TASK-MODEL-UPGRADE-RETEST ✅
+
+**完成时间**: 2026-02-26 17:33
+**来源**: Founder 反馈 → PM 派发 (2026-02-26 16:43)
+**优先级**: P0
+
+#### TASK-STYLE-DEFAULT-FIX: 默认风格修复
+
+4 个文件 8 处 `style_preset` 默认值 `"realistic"` → `"anime"`:
+
+| 文件 | 处数 | 行号 |
+|------|------|------|
+| pipeline_orchestrator.py | 3 | :42, :65, :615 |
+| storyboard_director.py | 2 | :98, :892 |
+| image_generator.py | 2 | :494, :760 |
+| shot_prompt_generator.py | 1 | :389 |
+
+语法 4/4 通过 ✅
+
+#### TASK-MODEL-UPGRADE-RETEST: slam_dunk 风格重跑验证
+
+**测试脚本**: `tests/test_model_upgrade.py` (style_preset="slam_dunk")
+
+| Stage | provider | 结果 |
+|-------|----------|------|
+| 1 | claude ✅ | "最后一投", 2角色, 6情节, 4场景 |
+| 2 | claude ✅ | 陈晨+林峰, physical+clothing 完整 |
+| 3 | claude ✅ | 6 scenes, 20 beats, 1302字 |
+| 4 | claude ✅ | 20 shots, text_overlay 完整 |
+
+**slam_dunk 风格验证**: 20/20 (100%) image_prompt 包含 slam dunk 相关关键词 ✅
+
+**text_type 分布对比**:
+| text_type | realistic | slam_dunk | DEC-012 目标 |
+|-----------|-----------|-----------|-------------|
+| narration | 2 (10.5%) | 1 (5%) | ≤30% ✅ |
+| thought | 9 (47.4%) | 9 (45%) | 20-25% |
+| dialogue | 1 (5.3%) | 2 (10%) | 40-50% |
+| dialogue_with_thought | 1 (5.3%) | 3 (15%) | - |
+| none | 5 (26.3%) | 4 (20%) | 5-10% |
+| narration_with_thought | 1 (5.3%) | 1 (5%) | - |
+
+总耗时 553.9秒 | 输出: `test_output/manualtest/model_upgrade_retest_slamdunk/`
+
+---
+
+### TASK-MODEL-UPGRADE: 模型全面升级 ✅
+
+**完成时间**: 2026-02-26 16:18
+**来源**: DEC-012 决策 4 → PM 派发 (2026-02-25 18:09)
+**优先级**: P0
+
+**任务**: 7 个文本生成服务文件从 Gemini Flash/Haiku → Claude Sonnet 4.6 (主) + Gemini 3 Pro (备)
+
+#### Step 1: 模型配置切换 (7文件) ✅
+
+| # | 文件 | 原主力 | 新主力 | 新备用 |
+|---|------|--------|--------|--------|
+| 1 | story_outline_generator.py | Gemini Flash | Sonnet 4.6 | Gemini 3 Pro |
+| 2 | character_designer.py | Gemini Flash | Sonnet 4.6 | Gemini 3 Pro |
+| 3 | screenplay_writer.py | Gemini Flash | Sonnet 4.6 | Gemini 3 Pro |
+| 4 | storyboard_director.py | Gemini Flash | Sonnet 4.6 | Gemini 3 Pro |
+| 5 | alignment_service.py | Gemini Flash | Sonnet 4.6 | Gemini 3 Pro |
+| 6 | prompt_rewriter.py | Haiku 4.5 | Sonnet 4.6 | Gemini 3 Pro (新增) |
+| 7 | character_position_detection.py | Haiku 4.5 | Sonnet 4.6 | *(示例代码)* |
+
+**具体修改内容**:
+- Files 1-5: 交换 __init__ 中 Claude/Gemini 客户端初始化顺序 + 方法内优先级
+- File 5 (alignment_service): 额外修改 `_visual_alignment()` 支持 Claude 多模态图片输入（之前 Claude fallback 不传图）
+- File 6 (prompt_rewriter): 重命名 `HAIKU_MODEL` → `SONNET_MODEL`，新增 Gemini 3 Pro 客户端和 fallback
+- File 7 (character_position_detection): `EXAMPLE_USAGE` 字符串内模型 ID 更新
+
+**模型 ID 对照**:
+| 用途 | 旧 ID | 新 ID |
+|------|-------|-------|
+| 文本主力 | `gemini-3-flash-preview` / `claude-haiku-4-5-20251001` | `claude-sonnet-4-6` |
+| 文本备用 | `claude-haiku-4-5-20251001` / 无 | `gemini-3-pro-preview` |
+
+#### Step 2: 验证 Gemini 3 Pro 文本模型 ID ✅
+
+`client.models.list()` 确认 `gemini-3-pro-preview` 存在于 API 模型列表。
+
+#### Step 3: Stage 1-4 基础测试 ✅
+
+**测试脚本**: `tests/test_model_upgrade.py`
+
+| Stage | 服务 | provider | 结果 |
+|-------|------|----------|------|
+| 1 | StoryOutlineGenerator | claude ✅ | "最后三秒", 2角色, 6情节点, 3场景 |
+| 2 | CharacterDesigner | claude ✅ | 2角色 (林晟+教练老陈), physical+clothing 完整 |
+| 3 | ScreenplayWriter | claude ✅ | 6 scenes, 19 beats, 1247字旁白 |
+| 4 | StoryboardDirector | claude ✅ | 19 shots, text_overlay 全覆盖 |
+
+**text_overlay 分布对比**:
+| text_type | Sonnet 4.6 (本次) | Gemini Flash (上次 E2E) | 变化 |
+|-----------|-------------------|------------------------|------|
+| narration | 2 (10.5%) | 25 (86%) | 大幅下降 |
+| thought | 9 (47.4%) | 1 (3.4%) | 大幅增加 |
+| none | 5 (26.3%) | 1 (3.4%) | 增加 |
+| dialogue | 1 (5.3%) | 1 (3.4%) | 持平 |
+| dialogue_with_thought | 1 (5.3%) | 0 | 新增 |
+| narration_with_thought | 1 (5.3%) | 1 (3.4%) | 持平 |
+
+**总耗时**: 597秒 (~10分钟，仅 Stage 1-4，不含图像生成)
+**语法检查**: 7/7 通过 ✅
+**输出目录**: `test_output/manualtest/model_upgrade/`
+
+#### 未改动的文件
+- `image_generator.py` — 生图模型不变（Gemini Pro Image + Flash Image）
+- `story_generator.py` — Phase 1 遗留文件，不在 DEC-012 任务范围
+
+---
+
 ## 2026-02-24
+
+### TASK-E2E-VALIDATE Step 1a+1b: 端到端流水线验证 ✅
+
+**完成时间**: 2026-02-24 17:38
+**验收状态**: ✅ 代码完成 + 实际运行通过（29/29 shots, 28/29 TextOverlay）
+
+**任务背景**:
+- TASK-E2E-VALIDATE（Phase 1 端到端流水线验证 + TextOverlay 集成）
+- PM 指定混合方案：先跑通基础流水线(1a)，再集成 TextOverlay(1b)
+
+**完成内容**:
+
+#### Step 1b-1: Stage 4 Prompt 修改 ✅
+- [x] `storyboard_director.py:_build_scene_prompt()` 新增 TEXT OVERLAY RULES 指令段
+- [x] 教 LLM 输出 `text_overlay` 字段（text_type + chinese_text + speaker_position）
+- [x] 支持 8 种 text_type，chinese_text 可为字符串或数组
+
+#### Step 1b-2: Pipeline TextOverlay 集成 ✅
+- [x] `pipeline_orchestrator.py` 导入 `TextOverlayService`
+- [x] 创建 `with_text_images/` 输出目录
+- [x] 图片保存后调用 `text_overlay_service.process_shot()` 生成带文字版
+- [x] 错误隔离：TextOverlay 失败不影响基础流水线
+
+#### Step 1a: E2E 测试脚本 ✅
+- [x] 新建 `tests/test_e2e_validate.py`
+- [x] 调用 `Phase2PipelineOrchestrator` 全参数运行
+
+#### 实际运行结果 ✅ (2026-02-24 17:08→17:38)
+- [x] 29/29 shots 全部生成成功
+- [x] 28/29 TextOverlay 成功（1张 text_type=none 正确跳过）
+- [x] 4种 text_overlay 类型（narration/thought/dialogue/narration_with_thought）均正确渲染
+- [x] Speaker 前缀剥离正确
+- [x] 宽高比 832x1248 = 2:3 ✅
+- [x] 总耗时 1775秒 (~29.6分钟)
+
+**运行统计**:
+| 指标 | 结果 |
+|------|------|
+| 故事 | 雨夜的庇护 / 2角色 / 6场 / 29 shots |
+| 原图 | 29/29 ✅ |
+| 带文字版 | 28/29 ✅ (shot_13 text_type=none) |
+| 角色参考图 | 4/4 (portrait+fullbody x 2) |
+| 场景参考图 | 2/2 |
+| Shot模型 | gemini-3-pro-image-preview (Pro) |
+| 参考图模型 | gemini-2.5-flash-image (Flash) |
+
+**text_overlay 类型分布**:
+| text_type | 数量 | 渲染验证 |
+|-----------|------|----------|
+| narration | 25 | ✅ 底部半透明黑底白字 |
+| thought | 1 | ✅ "林晓内心：「...」" → 正确剥离前缀 |
+| dialogue | 1 | ✅ "林晓：「谢谢。」" → 对话气泡 |
+| narration_with_thought | 1 | ✅ 混合分层：旁白(下)+内心独白(中) |
+| none | 1 | ✅ 正确跳过 |
+
+**关键产出**:
+| 文件 | 说明 |
+|------|------|
+| `app/services/storyboard_director.py` | 新增 text_overlay prompt 规则 + 输出字段 |
+| `app/services/pipeline_orchestrator.py` | TextOverlay 集成（import + dir + process） |
+| `tests/test_e2e_validate.py` | E2E 验证测试脚本 |
+| `test_output/manualtest/e2e_validate/20260224_170840/` | 完整运行输出 |
+
+**技术设计决策**:
+- `text_overlay` 字段格式直接兼容 `process_shot()` 期望的 dict 结构，无需额外转换
+- chinese_text 使用前缀标记法（"旁白：「...」" / "角色名：「...」" / "角色名内心：「...」"），与现有测试数据格式一致
+- TextOverlay 处理在 try/except 中，失败不阻塞主流水线
+
+---
 
 ### TASK-SCENE-REF-ASPECT: 场景参考图宽高比统一为 2:3 ✅
 
