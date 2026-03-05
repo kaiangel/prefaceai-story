@@ -139,6 +139,15 @@ export default function LoginContent() {
         {/* Bottom links */}
         <div className="mt-8 text-center space-y-3">
           <p className="text-text-tertiary text-sm">
+            没有账户？{" "}
+            <Link
+              href="/register"
+              className="text-brand-primary hover:underline"
+            >
+              注册
+            </Link>
+          </p>
+          <p className="text-text-tertiary text-sm">
             没有邀请码？{" "}
             <Link
               href="/#cta"
