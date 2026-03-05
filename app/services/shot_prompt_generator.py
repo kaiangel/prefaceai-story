@@ -386,7 +386,7 @@ No text overlay, no watermark, no UI elements
         shot_info: Dict[str, Any],
         scene_ref_description: str,
         characters: List[Dict[str, Any]],
-        style_preset: str = "realistic"
+        style_preset: str = "anime"
     ) -> str:
         """
         测试用：为单个shot生成prompt

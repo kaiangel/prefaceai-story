@@ -53,6 +53,31 @@ EMPHASIS_COLOR = "#FF4444"
 # 工具函数
 # =============================================================================
 
+def extract_speaker_name(text: str) -> Optional[str]:
+    """
+    从文字中提取说话者名称
+
+    支持格式:
+    - "陈晨：「内容」" → "陈晨"
+    - "陈晨内心：「内容」" → "陈晨"
+    - "教练（画外音）：「内容」" → "教练"
+    - "旁白：「内容」" → "旁白"
+
+    Args:
+        text: 原始文字
+
+    Returns:
+        说话者名称，或 None（无前缀时）
+    """
+    if not text:
+        return None
+    pattern = r'^([\w\u4e00-\u9fff]+?)(?:内心|（[^）]*）)?[：:]\s*[「"『]?'
+    match = re.match(pattern, text.strip())
+    if match:
+        return match.group(1)
+    return None
+
+
 def strip_speaker_prefix(text: str) -> str:
     """
     通用Speaker前缀剥离
@@ -73,15 +98,89 @@ def strip_speaker_prefix(text: str) -> str:
     if not text:
         return text
 
-    # 匹配：角色名（可选"内心"）+ 冒号 + 可选引号 + 内容 + 可选引号
-    pattern = r'^[\w\u4e00-\u9fff]+(?:内心)?[：:]\s*[「"『]?(.+?)[」"』]?$'
+    # 匹配：角色名（可选"内心"/"（画外音）"等）+ 冒号 + 可选引号 + 内容 + 可选引号
+    pattern = r'^[\w\u4e00-\u9fff]+(?:内心|（[^）]*）)?[：:]\s*[「"『]?(.+?)[」"』]?$'
     match = re.match(pattern, text.strip())
     if match:
         content = match.group(1)
         # FIX-B2: 直接返回内容，不添加引号
-        # 之前的逻辑会给没有引号的内容添加「」，但这是不需要的
         return content
     return text
+
+
+def smart_strip_speaker_prefix(
+    text: str,
+    characters_in_scene: Optional[List[str]] = None,
+    characters_data: Optional[List[dict]] = None
+) -> str:
+    """
+    智能Speaker前缀处理
+
+    - 画面中可见角色 → 剥离前缀（读者能看到谁在说话）
+    - 画外音角色 → 保留前缀（读者需要知道谁在说话）
+    - 无角色数据时 → 回退到全部剥离（向后兼容）
+
+    Args:
+        text: 原始文字
+        characters_in_scene: 当前 shot 的 characters_in_scene 列表（char_id）
+        characters_data: 角色数据列表（含 id, name, name_en）
+
+    Returns:
+        处理后的文字
+    """
+    if not text:
+        return text
+
+    # 无角色数据时，回退到原始逻辑
+    if not characters_in_scene or not characters_data:
+        return strip_speaker_prefix(text)
+
+    speaker_name = extract_speaker_name(text)
+    if not speaker_name:
+        return text  # 无前缀，原样返回
+
+    # 特殊处理：「旁白」始终剥离
+    if speaker_name == "旁白":
+        return strip_speaker_prefix(text)
+
+    # 查找 speaker 对应的 char_id
+    char_id = _find_char_id_by_name(speaker_name, characters_data)
+
+    if char_id and char_id in characters_in_scene:
+        # 画面中可见 → 剥离前缀
+        return strip_speaker_prefix(text)
+    else:
+        # 画外音或未知角色 → 保留前缀
+        return text
+
+
+def _find_char_id_by_name(name: str, characters_data: List[dict]) -> Optional[str]:
+    """
+    通过角色名查找 char_id
+
+    支持匹配：name（中文名）、name_en（英文名）、部分匹配
+
+    Args:
+        name: 说话者名称
+        characters_data: 角色数据列表
+
+    Returns:
+        char_id 或 None
+    """
+    for char in characters_data:
+        char_name = char.get("name", "")
+        char_name_en = char.get("name_en", "")
+        char_id = char.get("id", "")
+
+        # 精确匹配
+        if name == char_name or name == char_name_en:
+            return char_id
+
+        # 部分匹配（如 "陈" 匹配 "陈晨"）
+        if len(name) >= 1 and (name in char_name or char_name in name):
+            return char_id
+
+    return None
 
 
 def get_bubble_position_for_index(index: int, total: int) -> Tuple[int, int]:
@@ -258,7 +357,8 @@ class TextOverlayService:
         text: str,
         position: str = "bottom",
         height_ratio: float = 0.18,
-        y_offset: int = 0
+        y_offset: int = 0,
+        pre_stripped: bool = False
     ) -> Tuple[Image.Image, int]:
         """
         添加旁白/心理独白（黑底白字）
@@ -269,12 +369,13 @@ class TextOverlayService:
             position: 位置 ("top", "bottom", "center")
             height_ratio: 条带高度比例
             y_offset: 垂直偏移（用于多旁白堆叠）
+            pre_stripped: 是否已经过智能前缀处理（跳过内部剥离）
 
         Returns:
             (处理后的图片, 条带高度) 元组
         """
-        # CORE-1: 所有文字类型都剥离speaker前缀
-        clean_text = strip_speaker_prefix(text)
+        # CORE-1: 所有文字类型都剥离speaker前缀（除非已预处理）
+        clean_text = text if pre_stripped else strip_speaker_prefix(text)
 
         img = image.copy()
         width, height = img.size
@@ -321,7 +422,8 @@ class TextOverlayService:
         text: str,
         bubble_x_percent: int = 50,
         bubble_y_percent: int = 5,
-        bubble_alpha: Optional[int] = None  # FIX-B4: 使用None表示使用默认值
+        bubble_alpha: Optional[int] = None,  # FIX-B4: 使用None表示使用默认值
+        pre_stripped: bool = False
     ) -> Image.Image:
         """
         添加对话气泡（半透明）
@@ -336,6 +438,7 @@ class TextOverlayService:
             bubble_x_percent: 气泡x位置百分比 (0-100)
             bubble_y_percent: 气泡y位置百分比 (0-100)
             bubble_alpha: 气泡透明度 (0-255)，默认使用self.default_bubble_alpha
+            pre_stripped: 是否已经过智能前缀处理（跳过内部剥离）
 
         Returns:
             处理后的图片
@@ -344,8 +447,8 @@ class TextOverlayService:
         if bubble_alpha is None:
             bubble_alpha = self.default_bubble_alpha
 
-        # CORE-1: 剥离speaker前缀
-        clean_text = strip_speaker_prefix(text)
+        # CORE-1: 剥离speaker前缀（除非已预处理）
+        clean_text = text if pre_stripped else strip_speaker_prefix(text)
 
         img = image.copy()
         if img.mode != 'RGBA':
@@ -437,7 +540,9 @@ class TextOverlayService:
         self,
         image: Image.Image,
         shot: Dict,
-        bubble_positions: Optional[Dict] = None
+        bubble_positions: Optional[Dict] = None,
+        characters_in_scene: Optional[List[str]] = None,
+        characters_data: Optional[List[dict]] = None
     ) -> Image.Image:
         """
         处理单个shot的文字叠加
@@ -456,6 +561,8 @@ class TextOverlayService:
             image: 原始图片
             shot: Shot配置字典，需包含text_type和chinese_text字段
             bubble_positions: AI检测的气泡位置（可选）
+            characters_in_scene: 当前 shot 画面中的角色 ID 列表（用于智能前缀处理）
+            characters_data: 角色数据列表（含 id, name 等，用于智能前缀处理）
 
         Returns:
             处理后的图片
@@ -470,6 +577,15 @@ class TextOverlayService:
         if text_type == "none" or not chinese_text:
             return result
 
+        # 智能前缀处理：预处理所有文字
+        has_smart_context = characters_in_scene is not None and characters_data is not None
+
+        def _smart_strip(txt: str) -> str:
+            """用智能逻辑处理单条文字"""
+            if has_smart_context:
+                return smart_strip_speaker_prefix(txt, characters_in_scene, characters_data)
+            return strip_speaker_prefix(txt)
+
         # 跟踪各位置已占用的高度，用于垂直堆叠
         position_offsets = {"top": 0, "bottom": 0, "center": 0}
 
@@ -477,14 +593,16 @@ class TextOverlayService:
         if text_type == "narration":
             position = shot.get("speaker_position", "bottom")
             if position in ["top", "bottom", "center"]:
-                result, _ = self.add_monologue(result, chinese_text, position=position)
+                processed = _smart_strip(chinese_text)
+                result, _ = self.add_monologue(result, processed, position=position, pre_stripped=True)
 
         elif text_type == "thought":
             position = shot.get("speaker_position", "bottom")
             if "," in position:
                 position = position.split(",")[0]
             text = chinese_text if isinstance(chinese_text, str) else chinese_text[0]
-            result, _ = self.add_monologue(result, text, position=position)
+            processed = _smart_strip(text)
+            result, _ = self.add_monologue(result, processed, position=position, pre_stripped=True)
 
         elif text_type == "dialogue":
             if isinstance(chinese_text, list):
@@ -497,42 +615,52 @@ class TextOverlayService:
                         x_pct = pos.get("bubble_x_percent", x_pct)
                         y_pct = pos.get("bubble_y_percent", y_pct)
 
-                    result = self.add_speech_bubble(result, txt, bubble_x_percent=x_pct, bubble_y_percent=y_pct)
+                    processed = _smart_strip(txt)
+                    result = self.add_speech_bubble(result, processed, bubble_x_percent=x_pct, bubble_y_percent=y_pct, pre_stripped=True)
             else:
                 x_pct, y_pct = 50, 5
                 if bubble_positions:
                     first_pos = list(bubble_positions.values())[0] if isinstance(bubble_positions, dict) else bubble_positions[0]
                     x_pct = first_pos.get("bubble_x_percent", 50)
                     y_pct = first_pos.get("bubble_y_percent", 5)
-                result = self.add_speech_bubble(result, chinese_text, bubble_x_percent=x_pct, bubble_y_percent=y_pct)
+                processed = _smart_strip(chinese_text)
+                result = self.add_speech_bubble(result, processed, bubble_x_percent=x_pct, bubble_y_percent=y_pct, pre_stripped=True)
 
         elif text_type in ["dialogue_with_thought", "dialogue_with_narration", "narration_with_thought", "narration_with_dialogue"]:
             # 混合类型：统一处理，跟踪偏移实现垂直堆叠
             texts = chinese_text if isinstance(chinese_text, list) else [chinese_text]
 
+            # 分类每条文本的子类型
+            def _classify_sub_type(item):
+                """从结构化元数据或文本内容推断子类型"""
+                if isinstance(item, dict) and "type" in item:
+                    return item["type"], item.get("text", "")
+                txt = item
+                if "内心：" in txt or "内心:" in txt:
+                    return "thought", txt
+                elif txt.startswith("旁白：") or txt.startswith("「"):
+                    return "narration", txt
+                elif "：「" in txt or ":「" in txt or "：\"" in txt:
+                    return "dialogue", txt
+                return "narration", txt
+
+            classified = [_classify_sub_type(item) for item in texts]
+
             # FIX-B1: 添加对话气泡索引跟踪，避免重叠
-            # 先统计总对话数量
-            total_dialogues = sum(1 for t in texts if "：「" in t or ":「" in t or "：\"" in t)
+            total_dialogues = sum(1 for sub_type, _ in classified if sub_type == "dialogue")
             dialogue_index = 0
 
-            for txt in texts:
-                # 使用strip_speaker_prefix统一处理，而不是硬编码字符串匹配
-                if txt.startswith("旁白：") or txt.startswith("「"):
+            for sub_type, txt in classified:
+                processed = _smart_strip(txt)
+                if sub_type in ("narration", "thought"):
                     result, bar_height = self.add_monologue(
-                        result, txt, position="bottom",
-                        y_offset=position_offsets["bottom"]
+                        result, processed, position="bottom",
+                        y_offset=position_offsets["bottom"], pre_stripped=True
                     )
                     position_offsets["bottom"] += bar_height + 5
-                elif "内心：" in txt or "内心:" in txt:
-                    result, bar_height = self.add_monologue(
-                        result, txt, position="bottom",
-                        y_offset=position_offsets["bottom"]
-                    )
-                    position_offsets["bottom"] += bar_height + 5
-                elif "：「" in txt or ":「" in txt or "：\"" in txt:
-                    # FIX-B1: 对话气泡使用索引计算位置，避免重叠
+                elif sub_type == "dialogue":
                     x_pct, y_pct = get_bubble_position_for_index(dialogue_index, total_dialogues)
-                    result = self.add_speech_bubble(result, txt, bubble_x_percent=x_pct, bubble_y_percent=y_pct)
+                    result = self.add_speech_bubble(result, processed, bubble_x_percent=x_pct, bubble_y_percent=y_pct, pre_stripped=True)
                     dialogue_index += 1
 
         return result

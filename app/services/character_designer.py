@@ -22,23 +22,23 @@ class CharacterDesigner:
     输入: outline.json
     输出: characters.json
 
-    模型优先级: Gemini 3 Flash (主) → Claude Haiku (备用)
+    模型优先级: Claude Sonnet 4.6 (主) → Gemini 3 Pro (备用)
     """
 
     def __init__(self):
-        # 主模型: Gemini 3 Flash
-        self.gemini_client = None
-        self.gemini_model = "gemini-3-flash-preview"
-        if os.getenv("GEMINI_API_KEY"):
-            self.gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-
-        # 备用模型: Claude Haiku
+        # 主模型: Claude Sonnet 4.6
         self.claude_client = None
-        self.claude_model = "claude-haiku-4-5-20251001"
+        self.claude_model = "claude-sonnet-4-6"
         if os.getenv("ANTHROPIC_API_KEY"):
             self.claude_client = anthropic.Anthropic(
                 api_key=os.getenv("ANTHROPIC_API_KEY")
             )
+
+        # 备用模型: Gemini 3 Pro
+        self.gemini_client = None
+        self.gemini_model = "gemini-3-pro-preview"
+        if os.getenv("GEMINI_API_KEY"):
+            self.gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
     async def design(self, outline: dict) -> dict:
         """
@@ -66,21 +66,8 @@ class CharacterDesigner:
         content = None
         provider = None
 
-        # 优先使用 Gemini 3 Flash
-        if self.gemini_client:
-            try:
-                response = await self.gemini_client.aio.models.generate_content(
-                    model=self.gemini_model,
-                    contents=prompt,
-                    config={"max_output_tokens": 8631}
-                )
-                content = response.text
-                provider = "gemini"
-            except Exception as e:
-                print(f"  [Gemini失败: {e}，尝试Claude备用]")
-
-        # Fallback到Claude Haiku
-        if content is None and self.claude_client:
+        # 优先使用 Claude Sonnet 4.6
+        if self.claude_client:
             try:
                 response = self.claude_client.messages.create(
                     model=self.claude_model,
@@ -92,7 +79,20 @@ class CharacterDesigner:
                 content = response.content[0].text
                 provider = "claude"
             except Exception as e:
-                print(f"[CharacterDesigner] ❌ Claude也失败: {e}")
+                print(f"  [Claude失败: {e}，尝试Gemini备用]")
+
+        # Fallback到Gemini 3 Pro
+        if content is None and self.gemini_client:
+            try:
+                response = await self.gemini_client.aio.models.generate_content(
+                    model=self.gemini_model,
+                    contents=prompt,
+                    config={"max_output_tokens": 8631}
+                )
+                content = response.text
+                provider = "gemini"
+            except Exception as e:
+                print(f"[CharacterDesigner] ❌ Gemini也失败: {e}")
                 raise
 
         if content is None:
@@ -209,11 +209,18 @@ class CharacterDesigner:
 4. **种族一致性**：同一故事中的角色应保持种族一致（除非剧情需要）
    - 中国故事的角色应有亚洲面孔特征
 
-5. **服装状态**：clothing.condition应反映角色当前的状态
+5. **团队/组织着装一致性**：属于同一团队/组织的角色，制服/统一着装必须在颜色和款式上保持一致
+   - 同一球队的球员：球衣颜色、款式相同，仅通过号码和体型区分
+   - 同一学校学生：校服相同
+   - 同一军队士兵：军装相同
+   - 同一公司员工：工装/制服相同
+   - 通过球衣号码、臂章、发型、体型、面部特征来区分角色——不要用不同颜色的制服
+
+6. **服装状态**：clothing.condition应反映角色当前的状态
    - 如雨夜故事中角色应该是"rain-soaked"
    - 如加班后角色应该是"disheveled, tired appearance"
 
-6. **ID规范**：角色id从char_001开始递增
+7. **ID规范**：角色id从char_001开始递增
 
 现在开始设计角色：
 """

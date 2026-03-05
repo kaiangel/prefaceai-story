@@ -42,29 +42,41 @@ class PromptRewriter:
                 new_prompt = rewriter.rewrite_simple(prompt)
     """
 
-    # Haiku 模型配置
-    HAIKU_MODEL = "claude-haiku-4-5-20251001"
+    # 主模型: Claude Sonnet 4.6
+    SONNET_MODEL = "claude-sonnet-4-6"
     MAX_TOKENS = 2000
 
     def __init__(self):
         """初始化 PromptRewriter"""
         self.client = None
+        self.gemini_client = None
         self._init_client()
 
     def _init_client(self):
-        """初始化 Anthropic 客户端"""
+        """初始化 LLM 客户端（主: Claude Sonnet 4.6, 备: Gemini 3 Pro）"""
+        # 主模型: Claude Sonnet 4.6
         try:
             import anthropic
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if api_key:
                 self.client = anthropic.AsyncAnthropic(api_key=api_key)
-                print("[PromptRewriter] ✅ Anthropic 客户端初始化成功")
+                print("[PromptRewriter] ✅ Anthropic 客户端初始化成功 (Sonnet 4.6)")
             else:
-                print("[PromptRewriter] ⚠️ ANTHROPIC_API_KEY 未设置，智能改写功能不可用")
+                print("[PromptRewriter] ⚠️ ANTHROPIC_API_KEY 未设置")
         except ImportError:
-            print("[PromptRewriter] ⚠️ anthropic 包未安装，智能改写功能不可用")
+            print("[PromptRewriter] ⚠️ anthropic 包未安装")
         except Exception as e:
             print(f"[PromptRewriter] ⚠️ Anthropic 客户端初始化失败: {e}")
+
+        # 备用模型: Gemini 3 Pro
+        try:
+            from google import genai
+            gemini_key = os.getenv("GEMINI_API_KEY")
+            if gemini_key:
+                self.gemini_client = genai.Client(api_key=gemini_key)
+                print("[PromptRewriter] ✅ Gemini 备用客户端初始化成功")
+        except Exception:
+            pass
 
     def needs_rewrite(self, prompt: str) -> bool:
         """
@@ -108,26 +120,46 @@ class PromptRewriter:
         Returns:
             改写后的 prompt，失败返回 None
         """
-        if not self.client:
-            print("[PromptRewriter] ❌ Anthropic 客户端未初始化，无法使用智能改写")
+        if not self.client and not self.gemini_client:
+            print("[PromptRewriter] ❌ 无可用 LLM 客户端，无法使用智能改写")
             return None
 
         try:
-            print(f"[PromptRewriter] 🔄 开始智能改写 (Haiku)...")
+            print(f"[PromptRewriter] 🔄 开始智能改写 (Sonnet 4.6)...")
             print(f"[PromptRewriter] 原始 prompt 长度: {len(prompt)} 字符")
 
             # 构建改写 prompt
             rewrite_prompt = build_rewrite_prompt(prompt, debug_mode=debug)
 
-            # 调用 Haiku
-            response = await self.client.messages.create(
-                model=self.HAIKU_MODEL,
-                max_tokens=self.MAX_TOKENS,
-                messages=[{"role": "user", "content": rewrite_prompt}]
-            )
+            rewritten = None
 
-            # 提取结果
-            rewritten = response.content[0].text.strip()
+            # 优先使用 Claude Sonnet 4.6
+            if self.client:
+                try:
+                    response = await self.client.messages.create(
+                        model=self.SONNET_MODEL,
+                        max_tokens=self.MAX_TOKENS,
+                        messages=[{"role": "user", "content": rewrite_prompt}]
+                    )
+                    rewritten = response.content[0].text.strip()
+                except Exception as ce:
+                    print(f"[PromptRewriter] Claude失败: {ce}，尝试Gemini备用")
+
+            # Fallback到Gemini 3 Pro
+            if rewritten is None and self.gemini_client:
+                try:
+                    response = await self.gemini_client.aio.models.generate_content(
+                        model="gemini-3-pro-preview",
+                        contents=rewrite_prompt,
+                        config={"max_output_tokens": self.MAX_TOKENS}
+                    )
+                    rewritten = response.text.strip()
+                except Exception as ge:
+                    print(f"[PromptRewriter] Gemini也失败: {ge}")
+                    return None
+
+            if rewritten is None:
+                return None
 
             # 验证结果
             if not rewritten or len(rewritten) < 50:

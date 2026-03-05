@@ -31,21 +31,21 @@ class AlignmentService:
 
     对齐误差目标：≤ 80ms
 
-    模型优先级: Gemini 3 Flash (主) → Claude Haiku 4.5 (备用)
+    模型优先级: Claude Sonnet 4.6 (主) → Gemini 3 Pro (备用)
     """
 
     def __init__(self):
-        # 主模型: Gemini 3 Flash
-        self.gemini_client = None
-        self.gemini_model = "gemini-3-flash-preview"
-        if settings.GEMINI_API_KEY:
-            self.gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
-
-        # 备用模型: Claude Haiku 4.5
+        # 主模型: Claude Sonnet 4.6
         self.claude_client = None
-        self.claude_model = "claude-haiku-4-5-20251001"
+        self.claude_model = "claude-sonnet-4-6"
         if settings.ANTHROPIC_API_KEY:
             self.claude_client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+
+        # 备用模型: Gemini 3 Pro
+        self.gemini_client = None
+        self.gemini_model = "gemini-3-pro-preview"
+        if settings.GEMINI_API_KEY:
+            self.gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
         if not self.gemini_client and not self.claude_client:
             print("Warning: No LLM API key set, alignment service will fail")
@@ -152,34 +152,49 @@ class AlignmentService:
 
         response_text = None
 
-        # 优先使用 Gemini 3 Flash
-        if self.gemini_client:
+        # 优先使用 Claude Sonnet 4.6（支持多模态图片输入）
+        if self.claude_client:
+            try:
+                # 构建Claude多模态内容
+                claude_content = []
+                for i, img_data in enumerate(encoded_images):
+                    claude_content.append({
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/jpeg",
+                            "data": img_data["base64"]
+                        }
+                    })
+                    claude_content.append({
+                        "type": "text",
+                        "text": f"[图片{i+1}: scene_id={img_data['scene_id']}]"
+                    })
+                claude_content.append({"type": "text", "text": prompt})
+
+                response = self.claude_client.messages.create(
+                    model=self.claude_model,
+                    max_tokens=8631,
+                    messages=[{"role": "user", "content": claude_content}]
+                )
+                response_text = response.content[0].text
+            except Exception as e:
+                print(f"  [AlignmentService] Claude视觉对齐失败: {e}，尝试Gemini")
+
+        # Fallback到Gemini 3 Pro
+        if response_text is None and self.gemini_client:
             try:
                 response = await self.gemini_client.aio.models.generate_content(
                     model=self.gemini_model,
                     contents=contents,
                     config=types.GenerateContentConfig(
-                        temperature=0.2,  # 低温度确保一致性
+                        temperature=0.2,
                         max_output_tokens=8631
                     )
                 )
                 response_text = response.text
             except Exception as e:
-                print(f"  [AlignmentService] Gemini视觉对齐失败: {e}，尝试Claude")
-
-        # Fallback到Claude Haiku（注意：Claude不支持图片，使用文本描述）
-        if response_text is None and self.claude_client:
-            try:
-                # 提取文本内容（跳过图片）
-                text_only_prompt = f"{prompt}\n\n注意：无法直接查看图片，请根据场景描述进行匹配。"
-                response = self.claude_client.messages.create(
-                    model=self.claude_model,
-                    max_tokens=8631,
-                    messages=[{"role": "user", "content": text_only_prompt}]
-                )
-                response_text = response.content[0].text
-            except Exception as e:
-                print(f"  [AlignmentService] Claude视觉对齐也失败: {e}")
+                print(f"  [AlignmentService] Gemini视觉对齐也失败: {e}")
 
         if response_text is None:
             return {"matches": []}
@@ -210,8 +225,20 @@ class AlignmentService:
 
         response_text = None
 
-        # 优先使用 Gemini 3 Flash
-        if self.gemini_client:
+        # 优先使用 Claude Sonnet 4.6
+        if self.claude_client:
+            try:
+                response = self.claude_client.messages.create(
+                    model=self.claude_model,
+                    max_tokens=8631,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                response_text = response.content[0].text
+            except Exception as e:
+                print(f"  [AlignmentService] Claude文本对齐失败: {e}，尝试Gemini")
+
+        # Fallback到Gemini 3 Pro
+        if response_text is None and self.gemini_client:
             try:
                 response = await self.gemini_client.aio.models.generate_content(
                     model=self.gemini_model,
@@ -223,19 +250,7 @@ class AlignmentService:
                 )
                 response_text = response.text
             except Exception as e:
-                print(f"  [AlignmentService] Gemini文本对齐失败: {e}，尝试Claude")
-
-        # Fallback到Claude Haiku
-        if response_text is None and self.claude_client:
-            try:
-                response = self.claude_client.messages.create(
-                    model=self.claude_model,
-                    max_tokens=8631,
-                    messages=[{"role": "user", "content": prompt}]
-                )
-                response_text = response.content[0].text
-            except Exception as e:
-                print(f"  [AlignmentService] Claude文本对齐也失败: {e}")
+                print(f"  [AlignmentService] Gemini文本对齐也失败: {e}")
 
         if response_text is None:
             return {"matches": []}

@@ -1397,18 +1397,15 @@ DO NOT deviate from these parameters regardless of individual shot descriptions.
 
 def build_continuity_context_phase2(
     current_shot: dict,
-    previous_shot: Optional[dict] = None,
     continuity_notes: Optional[List[dict]] = None,
-    has_previous_shot_image: bool = False
 ) -> str:
     """
     Phase 2.0: 构建与上一个shot的连续性上下文
+    DEC-014: previous_shot_image 已移除，场景参考图+文字prompt提供环境连续性
 
     Args:
         current_shot: 当前shot数据
-        previous_shot: 上一个shot数据（可选）
         continuity_notes: 连续性说明列表
-        has_previous_shot_image: 是否有前序shot图像传入
 
     Returns:
         连续性上下文字符串
@@ -1416,34 +1413,6 @@ def build_continuity_context_phase2(
     context_parts = []
 
     current_id = current_shot.get("shot_id", 0)
-
-    # 如果有前序shot图像，添加使用指令（最重要！）
-    if has_previous_shot_image:
-        context_parts.append("""
-═══════════════════════════════════════════════════════════
-VISUAL CONTINUITY REFERENCE (CRITICAL)
-═══════════════════════════════════════════════════════════
-
-A previous shot image is provided (Image 1) showing the same location.
-
-MUST MAINTAIN (environment continuity):
-- Location identity and architectural details
-- Lighting direction and color temperature
-- Weather conditions (rain intensity, wet surfaces, fog density)
-- Time-of-day atmosphere and ambient lighting
-
-MUST VARY (cinematic storytelling - follow THIS shot's instructions):
-- Camera angle and shot size (as specified in THIS shot's camera settings)
-- Character positioning and poses (based on THIS shot's action description)
-- Composition and framing (create visual variety, don't copy previous layout)
-- Focal point (based on THIS shot's narrative emphasis)
-
-⚠️ IMPORTANT: The previous shot is for ENVIRONMENT reference only.
-Do NOT replicate its framing, composition, or character positions.
-Each shot should feel like a natural camera cut in the same scene,
-not a static copy with elements pasted in.
-═══════════════════════════════════════════════════════════
-""".strip())
 
     # 查找相关的连续性说明
     if continuity_notes:
@@ -1458,20 +1427,6 @@ not a static copy with elements pasted in.
             if note:
                 context_parts.append(f"Note: {note}")
 
-    # 如果有上一个shot，提取关键信息
-    if previous_shot:
-        prev_char_dir = previous_shot.get("character_direction", {})
-
-        # 角色屏幕方向
-        for char_id in prev_char_dir.get("characters_visible", []):
-            char_info = prev_char_dir.get(char_id, {})
-            eye_line = char_info.get("eye_line", "")
-            if eye_line:
-                context_parts.append(f"Previous shot: {char_id} was {eye_line}")
-
-        # 180度法则提醒
-        context_parts.append("MAINTAIN 180-degree rule: Keep consistent screen direction")
-
     if context_parts:
         return "\n".join(context_parts)
     else:
@@ -1481,40 +1436,31 @@ not a static copy with elements pasted in.
 def build_character_reference_mapping_phase2(
     characters_in_shot: List[str],
     characters_data: List[dict],
-    has_previous_shot: bool = False,
     scene_ref_count: int = 0
 ) -> str:
     """
-    Phase 2.0: 构建参考图映射说明（增强版）
-
-    正确对应 contents 数组的图像顺序：
-    - Image 1: Previous shot (如有)
-    - Images N-N+1: Character portrait + fullbody (每角色2张)
-    - Images M-M+X: Scene references
+    Phase 2.0: 构建参考图映射说明
+    SQ-1: 标签声明式 — 模型直接从图上标签读取身份，不依赖 IMAGE N 精确对应
+    SQ-2: 每角色 1 张参考图（智能选择 portrait 或 fullbody）
 
     Args:
         characters_in_shot: shot中出现的角色ID列表
         characters_data: 角色完整数据列表
-        has_previous_shot: 是否有前序shot图像
         scene_ref_count: 场景参考图数量
 
     Returns:
         映射说明字符串
     """
-    lines = ["REFERENCE IMAGES IN ORDER:"]
-    img_idx = 1
+    lines = ["""CHARACTER & SCENE REFERENCES:
+Each reference image is labeled directly on the image.
+- Images labeled "Character: XXX" → use to maintain that character's appearance
+- Images labeled "Scene: XXX" → use to maintain environment consistency"""]
 
-    # 1. 前序shot图像（如有）
-    if has_previous_shot:
-        lines.append(f"- Image {img_idx}: Previous shot (ENVIRONMENT reference only, do NOT copy composition)")
-        img_idx += 1
-
-    # 2. 角色参考图（每角色 portrait + fullbody 共2张）
+    # 角色身份描述（让模型知道每个角色长什么样）
     if characters_in_shot:
-        lines.append("\nCHARACTER REFERENCES (use for identity consistency):")
+        lines.append("\nCHARACTERS IN THIS SHOT:")
 
         for char_id in characters_in_shot:
-            # 查找角色数据
             char_data = next(
                 (c for c in characters_data if c.get("id") == char_id),
                 None
@@ -1523,29 +1469,12 @@ def build_character_reference_mapping_phase2(
             if char_data:
                 name_zh = char_data.get("name", "")
                 name_en = char_data.get("name_en", "") or name_zh
-
-                # 使用增强的身份描述
                 identity = build_identity_line_phase2(char_data)
 
-                # 每个角色2张图：portrait + fullbody
                 if name_zh and name_zh != name_en:
-                    line = f"- Images {img_idx}-{img_idx+1}: {name_en} ({name_zh}) - portrait + fullbody - {identity}"
+                    lines.append(f"- {name_en} ({name_zh}): {identity}")
                 else:
-                    line = f"- Images {img_idx}-{img_idx+1}: {name_en} - portrait + fullbody - {identity}"
-
-                lines.append(line)
-            else:
-                lines.append(f"- Images {img_idx}-{img_idx+1}: {char_id} - portrait + fullbody")
-
-            img_idx += 2
-
-    # 3. 场景参考图（如有）
-    if scene_ref_count > 0:
-        lines.append("\nSCENE REFERENCES (use for environment consistency):")
-        if scene_ref_count == 1:
-            lines.append(f"- Image {img_idx}: Scene reference (interior or exterior)")
-        else:
-            lines.append(f"- Images {img_idx}-{img_idx+scene_ref_count-1}: Scene references (interior + exterior)")
+                    lines.append(f"- {name_en}: {identity}")
 
     return "\n".join(lines)
 
@@ -1576,21 +1505,18 @@ class Phase2PromptBuilder:
     def build_full_prompt(
         self,
         shot: dict,
-        previous_shot: Optional[dict] = None,
         screenplay: Optional[dict] = None,
         include_system_instruction: bool = True,
-        has_previous_shot_image: bool = False,
         scene_ref_count: int = 0
     ) -> dict:
         """
         构建完整的prompt包（增强版 - 包含角色一致性关键指令和剧情上下文）
+        DEC-014: previous_shot 和 has_previous_shot_image 已移除
 
         Args:
             shot: 当前shot数据
-            previous_shot: 上一个shot数据
             screenplay: 剧本数据（用于获取场景氛围）
             include_system_instruction: 是否包含系统指令
-            has_previous_shot_image: 是否有前序shot图像传入
             scene_ref_count: 场景参考图数量
 
         Returns:
@@ -1625,11 +1551,10 @@ class Phase2PromptBuilder:
             result["critical_header"] = ""
 
         # 4. 角色映射（传入新参数以正确对应contents数组顺序）
-        if characters_in_shot or has_previous_shot_image or scene_ref_count > 0:
+        if characters_in_shot or scene_ref_count > 0:
             result["character_mapping"] = build_character_reference_mapping_phase2(
                 characters_in_shot,
                 self.characters,
-                has_previous_shot=has_previous_shot_image,
                 scene_ref_count=scene_ref_count
             )
         else:
@@ -1642,18 +1567,16 @@ class Phase2PromptBuilder:
         else:
             result["image_prompt"] = build_phase2_image_prompt(shot, self.style_preset)
 
-        # 6. 连续性上下文（传入新参数以添加前序shot使用指令）
+        # 6. 连续性上下文 (DEC-014: previous_shot removed)
         result["continuity_context"] = build_continuity_context_phase2(
             shot,
-            previous_shot,
             self.continuity_notes,
-            has_previous_shot_image=has_previous_shot_image
         )
 
-        # 7. 剧情上下文（新增）
+        # 7. 剧情上下文
         result["narrative_context"] = build_narrative_context_phase2(
             shot,
-            previous_shot,
+            None,
             screenplay
         )
 

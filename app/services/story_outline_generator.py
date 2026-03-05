@@ -25,23 +25,23 @@ class StoryOutlineGenerator:
     输入: idea, style_preset, target_duration_minutes
     输出: outline.json
 
-    模型优先级: Gemini 3 Flash (主) → Claude Haiku (备用)
+    模型优先级: Claude Sonnet 4.6 (主) → Gemini 3 Pro (备用)
     """
 
     def __init__(self):
-        # 主模型: Gemini 3 Flash
-        self.gemini_client = None
-        self.gemini_model = "gemini-3-flash-preview"
-        if os.getenv("GEMINI_API_KEY"):
-            self.gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-
-        # 备用模型: Claude Haiku
+        # 主模型: Claude Sonnet 4.6
         self.claude_client = None
-        self.claude_model = "claude-haiku-4-5-20251001"
+        self.claude_model = "claude-sonnet-4-6"
         if os.getenv("ANTHROPIC_API_KEY"):
             self.claude_client = anthropic.Anthropic(
                 api_key=os.getenv("ANTHROPIC_API_KEY")
             )
+
+        # 备用模型: Gemini 3 Pro
+        self.gemini_client = None
+        self.gemini_model = "gemini-3-pro-preview"
+        if os.getenv("GEMINI_API_KEY"):
+            self.gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
     async def generate(
         self,
@@ -86,24 +86,10 @@ class StoryOutlineGenerator:
         content = None
         provider = None
 
-        # 优先使用 Gemini 3 Flash
-        if self.gemini_client:
+        # 优先使用 Claude Sonnet 4.6
+        if self.claude_client:
             try:
-                print(f"  [尝试 Gemini 3 Flash]")
-                response = await self.gemini_client.aio.models.generate_content(
-                    model=self.gemini_model,
-                    contents=prompt,
-                    config={"max_output_tokens": 8631}
-                )
-                content = response.text
-                provider = "gemini"
-            except Exception as e:
-                print(f"  [Gemini失败: {e}，尝试Claude备用]")
-
-        # Fallback到Claude Haiku
-        if content is None and self.claude_client:
-            try:
-                print(f"  [尝试 Claude Haiku]")
+                print(f"  [尝试 Claude Sonnet 4.6]")
                 response = self.claude_client.messages.create(
                     model=self.claude_model,
                     max_tokens=8631,
@@ -114,7 +100,21 @@ class StoryOutlineGenerator:
                 content = response.content[0].text
                 provider = "claude"
             except Exception as e:
-                print(f"[StoryOutlineGenerator] ❌ Claude也失败: {e}")
+                print(f"  [Claude失败: {e}，尝试Gemini备用]")
+
+        # Fallback到Gemini 3 Pro
+        if content is None and self.gemini_client:
+            try:
+                print(f"  [尝试 Gemini 3 Pro]")
+                response = await self.gemini_client.aio.models.generate_content(
+                    model=self.gemini_model,
+                    contents=prompt,
+                    config={"max_output_tokens": 8631}
+                )
+                content = response.text
+                provider = "gemini"
+            except Exception as e:
+                print(f"[StoryOutlineGenerator] ❌ Gemini也失败: {e}")
                 raise
 
         if content is None:

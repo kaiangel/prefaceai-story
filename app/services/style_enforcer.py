@@ -51,7 +51,7 @@ class StyleEnforcer:
                 "cel-shaded", "vector", "flat colors", "manga", "comic",
                 "artistic interpretation", "digital art"
             ],
-            style_description="This image MUST look like a real photograph taken with a professional camera. Natural lighting, realistic textures, no stylization.",
+            style_description="You are photographing in the tradition of master cinematographers and documentary photographers — every frame a real moment captured with an unblinking lens. Light falls as it does in life: warm afternoon sun streaming through curtains, cool fluorescent wash in office corridors, the golden edge of dawn tracing a jawline into shadow. Colors remain true and grounded — warm skin tones set against cool urban concrete, the muted organic palette of real weather and real rooms, never oversaturated or artificially vivid. Every surface holds photographic truth: pores and fine lines on living skin, the crease of worn leather, condensation on cold glass, dust motes drifting through a shaft of afternoon light. Characters exist as real people caught in unposed moments — the weight of a tired hand on a table, the unconscious angle of a turned shoulder, eyes that carry genuine thought. Each composition uses the photographer's disciplined eye: depth of field isolating subjects from background, leading lines drawing attention to the emotional center, the decisive moment where gesture and setting align.",
             quality_keywords=["8K", "high resolution", "sharp focus", "professional lighting", "DSLR quality"]
         ),
 
@@ -67,7 +67,7 @@ class StyleEnforcer:
                 "photorealistic", "photograph", "real photo", "lifelike",
                 "realistic skin", "natural lighting"
             ],
-            style_description="This image MUST be in cartoon animation style with vibrant colors, clean outlines, and expressive character designs.",
+            style_description="You are animating in the tradition of classic cartoon storytelling — where every frame pops with personality and every expression lands without subtlety. Light serves clarity above all: bold flat shadows define form, bright fills keep the mood buoyant, and dramatic backlighting appears only when the comedy or drama demands a spotlight moment. Colors sing at full volume — primaries punch with energy, pastels soften tender scenes, and every palette choice reads instantly from across the room. Surfaces stay clean and graphic: smooth skin, crisp fabric shapes, environments built from confident color blocks rather than fussy texture. Characters perform with their whole bodies — rubbery limbs stretching into gesture, eyebrows arching into orbit, mouths pulling wide enough to swallow the joke. Each composition stages action for instant readability: clear silhouettes against contrasting backgrounds, generous negative space around key expressions, and dynamic angles that make still frames feel like they are mid-motion.",
             quality_keywords=["high quality animation", "professional cartoon", "polished artwork"]
         ),
 
@@ -82,7 +82,7 @@ class StyleEnforcer:
                 "photorealistic", "photograph", "real photo", "2D", "flat",
                 "anime", "manga", "hand-drawn", "sketch"
             ],
-            style_description="This image MUST be in Pixar 3D animation style with smooth 3D surfaces, expressive characters, and cinematic lighting.",
+            style_description="You are sculpting in the tradition of Pixar's master animators — artists who proved that digital characters can carry the full weight of human emotion. Light behaves cinematically: volumetric rays filter through dusty attics, subsurface scattering warms cheeks with life, rim lights separate characters from lush environments in moments of revelation. Colors are emotionally engineered — warm ambers wrap moments of connection, cool desaturated tones signal loss, and every palette shift follows the heart of the story. Surfaces achieve that signature tangibility: smooth plastic-like skin with just enough imperfection, fabric that drapes with real physics, environments rich with small props that whisper backstory. Characters perform through the subtlest channels — the slight widening of eyes, the barely suppressed quiver of a lip, the weight shift that betrays hesitation before a brave step. Each composition borrows from live-action cinematography: rack focus to shift emotional attention, low angles that make small characters feel brave, wide establishing shots that make vast worlds feel intimate.",
             quality_keywords=["high quality 3D render", "professional animation", "studio quality"]
         ),
 
@@ -98,7 +98,7 @@ class StyleEnforcer:
                 "photorealistic", "photograph", "3D render", "Pixar",
                 "Western cartoon", "realistic skin"
             ],
-            style_description="This image MUST be in Japanese anime style with characteristic cel shading, expressive eyes, and anime aesthetics.",
+            style_description="You are animating in the tradition of Japan's finest studios — where hand-drawn precision meets cinematic ambition and every frame could be a poster. Light is theatrical and unapologetic: harsh cel-shaded shadows cut across faces in moments of resolve, golden sunset backlighting halos a character's silhouette, lens flares burst through tree canopies as emotions peak. Colors shift with narrative temperature — saturated and vivid in moments of passion and confrontation, washed pale in bittersweet memories, deep midnight blues for quiet introspection. Linework is the skeleton of everything: clean and confident outer strokes define form, while detail concentrates where emotion lives — in the luminous depth of large expressive eyes, in the liquid flow of hair catching wind. Characters perform through anime's unique visual grammar — eyes that carry entire soliloquies, hair that responds to emotional energy, the held pause before an explosive reaction. Each composition embraces dynamic camera language: dramatic low angles for determination, tight close-ups where eyes fill the frame, sweeping wide shots where characters stand small against vast skies and city lights.",
             quality_keywords=["high quality anime", "professional anime art", "detailed anime"]
         ),
 
@@ -113,7 +113,7 @@ class StyleEnforcer:
                 "photorealistic", "3D render", "digital 3D", "harsh lighting",
                 "dark gritty", "modern CGI"
             ],
-            style_description="This image MUST be in Studio Ghibli style with hand-drawn aesthetics, soft watercolor-like colors, and detailed natural backgrounds.",
+            style_description="You are painting in the tradition of Studio Ghibli and Hayao Miyazaki — where hand-drawn warmth transforms every scene into a place you wish you could visit. Light arrives softly and naturally: dappled sunlight filtering through forest canopies, the gentle amber of lantern-lit evenings, clouds that glow with the quiet gold of late afternoon. Colors are drawn from the living earth — sage greens of wild meadows, warm ochres of wooden interiors, the infinite graduating blues of Miyazaki's signature skies. Every background is painted with loving attention to organic detail: wind-rippled grass, weathered stone walls with moss creeping through cracks, laundry swaying on a clothesline in a breeze you can almost feel. Characters express themselves with disarming simplicity — round gentle faces where a single tear or a small determined frown carries more weight than any dramatic gesture. Each composition breathes with space and patience: wide shots where characters exist as small figures within vast living landscapes, intimate framings that find magic in the mundane — a meal being prepared, rain drumming on a window, the moment of stillness before adventure begins.",
             quality_keywords=["Ghibli quality", "masterful animation", "hand-painted look"]
         ),
 
@@ -129,7 +129,7 @@ class StyleEnforcer:
                 "photorealistic", "photograph", "3D render",
                 "low quality", "sketch", "unfinished"
             ],
-            style_description="This image MUST be in polished digital illustration style with vibrant colors, clean lines, and rich details.",
+            style_description="You are creating in the tradition of the finest digital illustrators — artists who treat every frame as a painting that tells a story. Light pours through windows and catches in hair, pooling in warm gradients that guide the eye to what matters most. Colors breathe with intention: warm ambers for intimacy, cool blues for solitude, saturated accents that anchor emotion. Every surface carries just enough texture to feel alive — the weave of fabric, the sheen of rain-wet pavement, the soft glow of a phone screen in twilight. Characters inhabit their world through posture, micro-expression, and the charged space between them. Each composition balances clarity with depth, placing the viewer exactly where the feeling lives.",
             quality_keywords=["artstation trending", "professional illustration", "high detail"]
         ),
 
@@ -145,7 +145,7 @@ class StyleEnforcer:
                 "photorealistic", "sharp edges", "3D render", "digital",
                 "hard lines", "neon colors"
             ],
-            style_description="This image MUST be in watercolor painting style with soft edges, dreamy atmosphere, and flowing colors.",
+            style_description="You are painting in the tradition of watercolor masters — artists who know that the most beautiful mark is the one shared between pigment and water's own will. Light exists not by adding brightness but by protecting the white of the paper — untouched space glows with a luminosity no pigment can match, creating halos around figures and windows that seem to radiate warmth. Colors bloom and mingle on wet surfaces: warm siennas bleed into cool ceruleans at the horizon, rose washes drift into violet shadows, each edge soft and alive with the memory of water's movement. Texture is the medium itself — the tooth of cold-pressed paper catching pigment in its valleys, pools of color drying darker at their edges, granulation where heavy pigments settle into gentle constellations. Characters emerge from washes rather than sharp lines — a turned head suggested by a shadow's edge, emotion carried in the warmth or coolness of flesh tones, figures that breathe because their boundaries are never fully closed. Each composition embraces the watercolorist's wisdom: leave more unsaid than said, let white space carry as much story as painted areas, and trust the viewer to complete what the water began.",
             quality_keywords=["beautiful watercolor", "artistic quality", "delicate washes"]
         ),
 
@@ -161,7 +161,7 @@ class StyleEnforcer:
                 "photorealistic", "scary", "dark", "violent",
                 "mature content", "horror", "realistic violence"
             ],
-            style_description="This image MUST be in children's book illustration style with friendly characters, soft colors, and whimsical charm.",
+            style_description="You are illustrating in the tradition of beloved picture book artists — creators who know that a child's first encounter with art should feel like a warm hug made visible. Light wraps everything in safety: soft and even, with no frightening shadows, just gentle warmth that makes indoor scenes feel cozy and outdoor scenes feel like endless summer afternoons. Colors speak the language of comfort — honeyed yellows, powder blues, rosy pinks, leaf greens — all slightly softened as if seen through the haze of a happy memory. Textures feel handmade and touchable: the chalky grain of crayon, the soft press of colored pencil, backgrounds that feel like painted paper you could reach into and crinkle. Characters are drawn to be instantly loved — round faces with oversized curious eyes, small hands that gesture with wonder, proportions that make even grown-ups look approachable and kind. Each composition keeps the story crystal clear: one main action per frame, uncluttered backgrounds that never compete with characters, and generous space that lets young eyes find the story without getting lost.",
             quality_keywords=["professional children's illustration", "picture book quality", "appealing to children"]
         ),
 
@@ -177,8 +177,49 @@ class StyleEnforcer:
                 "photorealistic", "3D render", "Western comic style",
                 "full color realistic"
             ],
-            style_description="This image MUST be in Japanese manga style with characteristic screentone effects, expressive linework, and dynamic composition.",
+            style_description="You are drawing in the tradition of manga masters — storytellers who compress entire emotional arcs into single frames and make still images feel like they are in motion. Light is rendered through the language of ink: crisp shadows define drama, screentone gradients build atmospheric depth from delicate to oppressive, and strategic white space creates moments of blinding revelation or serene calm. Contrast is the primary emotional instrument — deep blacks anchor moments of intensity, while open linework lightens scenes of tenderness or comedy. Every line earns its place: bold confident strokes for action and silhouette, fine detailed hatching for texture and mood, speed lines that make the eye race across the frame. Characters express through manga's full emotional spectrum — from subtle downcast eyes in a quiet panel to explosive reaction faces that shatter the frame's boundaries, each expression calibrated to the story's current heartbeat. Each composition thinks in sequential rhythm: establishing shots that set the stage wide, rapid close-ups that punch emotional beats, dramatic dutch angles for crisis moments, and the deliberate held silence of a full-frame face that lets a single expression speak volumes.",
             quality_keywords=["professional manga", "detailed linework", "high quality manga art"]
+        ),
+
+        # ============ 灌篮高手/井上雄彦风格 ============
+        "slam_dunk": StyleEnforcement(
+            style_name="slam_dunk",
+            style_display_name="Slam Dunk Manga (Takehiko Inoue)",
+            mandatory_keywords=[
+                "slam dunk manga style", "Takehiko Inoue inspired",
+                "realistic manga proportions", "dynamic linework",
+                "detailed anatomy", "dramatic lighting and shadow",
+                "Japanese manga aesthetic", "expressive character art",
+                "screentone effects", "bold ink strokes",
+                "full color manga", "colored manga illustration"
+            ],
+            forbidden_keywords=[
+                "chibi", "cute", "super deformed", "pastel colors",
+                "photorealistic photograph", "3D render", "CGI",
+                "Western comic style", "simple cartoon", "flat colors",
+                "pixel art", "watercolor", "oil painting",
+                "black and white", "grayscale", "monochrome"
+            ],
+            style_description="You are drawing in the tradition of Takehiko Inoue, where basketball manga becomes cinema. Light is the silent storyteller: gymnasium fluorescents carving sharp shadows, golden hour warming courts in amber. Rich, saturated color grounds every panel in vivid reality. Bold ink strokes for power, fine hatching for shadow, screentone gradients building atmosphere like a film score. Every body carries real athletic weight — muscles defined under fabric, postures shaped by exhaustion and resolve, faces holding the full depth of human emotion. Each composition finds the cinematic angle that makes the viewer feel the impact — a dunk's slam, a free throw's silence, the weight of unspoken rivalry.",
+            quality_keywords=["professional manga art", "detailed linework", "cinematic manga composition", "masterful ink work", "dynamic action poses"]
+        ),
+
+        # ============ 韩漫风格 ============
+        "korean_webtoon": StyleEnforcement(
+            style_name="korean_webtoon",
+            style_display_name="Korean Webtoon Style",
+            mandatory_keywords=[
+                "Korean webtoon style", "manhwa aesthetic", "clean digital linework",
+                "soft color palette", "romantic manga", "detailed facial expressions",
+                "modern urban setting", "webtoon format"
+            ],
+            forbidden_keywords=[
+                "photorealistic photograph", "3D render", "pixel art",
+                "chibi", "Western comic", "rough sketch",
+                "dark gritty", "horror"
+            ],
+            style_description="You are drawing in the tradition of Korean webtoon artists — digital storytellers who elevated the manhwa form into an art of beautiful faces and electric emotional tension. Light glows with a soft digital warmth: gentle gradients wrap around cheekbones, backlit hair shimmers with an almost ethereal halo, and indoor scenes carry the intimate warmth of carefully placed ambient light. Colors are refined and intentional — soft blush tones for romantic scenes, cool lavenders for melancholy, with selective vivid accents on eyes and lips that draw focus like a spotlight on a stage. Every surface is polished and precise: clean digital linework that never wavers, smooth color fills with subtle gradient shading, character designs so carefully rendered that each eyelash and strand of hair feels individually placed. Characters live through their faces — large expressive eyes that shimmer with unshed tears or narrow with determination, the charged centimeters of space between two people who have not yet touched, micro-expressions that carry entire unspoken conversations. Each composition gravitates toward emotional intimacy: close framings that make the viewer feel like a confidant, dramatic angles that heighten confrontation, and the strategic use of negative space that makes characters feel beautifully alone in their feelings.",
+            quality_keywords=["professional webtoon", "polished digital art", "beautiful character design", "clean coloring"]
         ),
 
         # ============ 油画风格 ============
@@ -193,7 +234,7 @@ class StyleEnforcer:
                 "photorealistic", "digital", "flat colors", "vector",
                 "anime", "cartoon"
             ],
-            style_description="This image MUST be in oil painting style with visible brushstrokes, rich textures, and classical art aesthetics.",
+            style_description="You are painting in the tradition of the Old Masters — artists who understood that oil on canvas holds light like no other medium, layering luminosity into every shadow and warmth into every face. Light is sculpted with a painter's patience: golden glow emerging from darkness to caress a cheek, cool daylight pouring through a single window, chiaroscuro carving three-dimensional presence from flat canvas. Colors are mixed with the richness that only oil allows — warm umbers layered beneath cool surface tones, flesh that glows because translucent glazes build up its life, shadows that are never black but alive with deep violets and burnt siennas. Every surface declares its material truth through the brush: thick impasto catching real light on a sunlit sleeve, soft blended passages where skin turns from light into shadow, the visible weave of canvas asserting itself beneath thin washes. Characters carry the psychological weight of portraiture — eyes that follow the viewer with thought behind them, hands positioned with meaning, postures that reveal inner state as clearly as any expression. Each composition follows classical architecture: the golden section guiding the eye, atmospheric perspective building depth, and the careful orchestration of light and dark masses that makes a painting feel like a world with its own gravity.",
             quality_keywords=["museum quality", "masterful painting", "fine art"]
         ),
 
@@ -209,7 +250,7 @@ class StyleEnforcer:
                 "pastoral", "rural", "ancient", "medieval",
                 "bright daylight", "nature scene"
             ],
-            style_description="This image MUST be in cyberpunk aesthetic with neon lights, dark futuristic atmosphere, and high-tech urban environment.",
+            style_description="You are building worlds in the tradition of cyberpunk visionaries — Syd Mead's chrome futures, Ridley Scott's rain-soaked neon nightscapes, and Ghost in the Shell's meditative urban decay. Light is artificial and omnipresent: neon signs bleed pink and cyan through perpetual rain, holographic advertisements cast shifting color onto wet faces, and the only natural light is the sickly glow of a sky choked by smog and industry. Colors exist in electric opposition — hot neon magentas and teals burn against deep shadow, chrome surfaces scatter fractured reflections, and the rare warm light of an analog lamp becomes a beacon of humanity in a digital wasteland. Every surface tells a story of layered time: rain-slicked asphalt reflecting a thousand neon signs, corroded metal alongside sleek corporate glass, cables and pipes snaking through architecture like exposed veins. Characters carry the weight of living between worlds — augmented eyes reflecting data streams, leather and synthetic fabric layered for function over fashion, postures that balance street-level weariness with coiled readiness. Each composition builds depth through urban density: towering vertical cityscapes that dwarf their inhabitants, Dutch angles that keep the viewer off-balance, and rain — always rain — turning every surface into a mirror of fractured light.",
             quality_keywords=["atmospheric", "cinematic cyberpunk", "detailed futuristic"]
         ),
 
@@ -225,7 +266,7 @@ class StyleEnforcer:
                 "colorful", "neon", "photorealistic", "3D render",
                 "Western art", "digital effects"
             ],
-            style_description="This image MUST be in traditional Chinese ink wash painting style with elegant brush strokes, minimalist composition, and ink gradients.",
+            style_description="You are painting in the tradition of Chinese ink wash masters — scholars who believed that a single brush stroke, guided by decades of discipline, could capture the essence of a mountain or the spirit of a person. Light does not fall from any source — it exists in the paper itself, the untouched white silk or rice paper radiating a luminosity that ink approaches but never conquers, creating depth through the dialogue between presence and absence. Color is the ink's own vocabulary: dense black for bold certainty, diluted gray washes drifting like morning mist across valleys, and the rare touch of mineral pigment — a vermillion seal, an ochre autumn leaf — that burns with intensity precisely because the rest is restrained. Texture lives in the brush's memory: a single stroke can begin thick and wet with confident authority, thin to a trembling hair-fine line, and end in a dry brush scratch that makes paper grain visible like wind across water. Figures are suggested rather than defined — a scholar's posture captured in three confident strokes, emotion conveyed through the angle of a bowed head or the energy of a turned sleeve, humanity distilled to its essential gestures. Each composition embraces emptiness as its most powerful element: vast unpainted space that becomes sky, water, silence, and meaning — asymmetric balance where a single figure at the edge of nothing carries more weight than a crowded scene ever could.",
             quality_keywords=["elegant", "masterful brushwork", "traditional aesthetics"]
         ),
 
@@ -241,7 +282,7 @@ class StyleEnforcer:
                 "photorealistic", "smooth gradients", "high resolution photo",
                 "3D render", "anti-aliased"
             ],
-            style_description="This image MUST be in pixel art style with visible pixels, limited color palette, and retro game aesthetics.",
+            style_description="You are crafting in the tradition of pixel art masters — artists who turned severe technical constraints into an aesthetic that feels more deliberate and honest than any high-resolution render. Light is constructed pixel by pixel: dithering patterns simulate gradients with mathematical precision, limited palettes force every shadow to be a conscious color choice, and highlights land on exactly the right pixel to make forms read clearly at any scale. Colors are curated with the discipline of a limited palette — each hue earned its place, warm tones cluster for life and energy, cool tones for calm and mystery, and the careful juxtaposition of two or three colors creates the illusion of dozens. Every surface honors the grid: crisp aliased edges define clean silhouettes, clusters of pixels suggest texture — brick, wood, fabric, metal — through pattern rather than detail, and each tile of environment is placed with the intentionality of mosaic. Characters are designed for instant recognition — distinctive silhouettes readable at thumbnail size, emotions conveyed through the tilt of a few-pixel head and the position of dot eyes, each pose a carefully chosen frame that implies motion. Each composition respects the pixel grid's geometry: clean horizontal staging, thoughtful use of the limited canvas, and the retro warmth of an era when every single pixel was placed by a human hand with purpose.",
             quality_keywords=["clean pixels", "well-designed pixel art", "professional retro"]
         ),
     }

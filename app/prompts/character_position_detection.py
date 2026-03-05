@@ -369,7 +369,7 @@ async def detect_bubble_positions(
     debug_mode: bool = False
 ) -> dict:
     """
-    用 Claude 4.5 Haiku 检测角色并推荐泡泡位置
+    用 Claude Sonnet 4.6 检测角色并推荐泡泡位置
 
     Args:
         shot_image_path: shot图像文件路径
@@ -421,9 +421,9 @@ async def detect_bubble_positions(
     # 添加 Prompt 文本
     content.append({"type": "text", "text": prompt_text})
 
-    # 调用 Haiku
+    # 调用 Claude Sonnet 4.6
     response = await client.messages.create(
-        model="claude-haiku-4-5-20251001",
+        model="claude-sonnet-4-6",
         max_tokens=500,
         messages=[{"role": "user", "content": content}]
     )
