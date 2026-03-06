@@ -71,7 +71,7 @@ export default function DashboardContent() {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 }}
-            className="grid grid-cols-3 gap-4 mb-8"
+            className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-8"
           >
             <div className="bg-bg-secondary rounded-xl border border-white/5 p-4">
               <div className="flex items-center gap-2 mb-2">

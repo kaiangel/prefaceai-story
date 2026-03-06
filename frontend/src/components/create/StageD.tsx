@@ -104,16 +104,16 @@ export default function StageD() {
               <button
                 onClick={handlePrev}
                 disabled={currentIndex === 0}
-                className="w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white disabled:opacity-30 pointer-events-auto transition-opacity"
+                className="w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-black/50 flex items-center justify-center text-white disabled:opacity-30 pointer-events-auto transition-opacity"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-5 h-5 sm:w-4 sm:h-4" />
               </button>
               <button
                 onClick={handleNext}
                 disabled={currentIndex === shots.length - 1}
-                className="w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white disabled:opacity-30 pointer-events-auto transition-opacity"
+                className="w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-black/50 flex items-center justify-center text-white disabled:opacity-30 pointer-events-auto transition-opacity"
               >
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-5 h-5 sm:w-4 sm:h-4" />
               </button>
             </div>
           </div>
@@ -165,7 +165,7 @@ export default function StageD() {
             </div>
 
             {/* Shot Meta */}
-            <div className="flex items-center gap-3 text-[10px] text-text-muted">
+            <div className="flex items-center gap-3 text-[11px] sm:text-[10px] text-text-muted">
               <span>镜头: {currentShot.shotType}</span>
               <span>角度: {currentShot.cameraAngle}</span>
               <span>场景: {currentShot.sceneId}</span>

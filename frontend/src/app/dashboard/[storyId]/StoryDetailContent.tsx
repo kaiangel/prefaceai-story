@@ -107,7 +107,7 @@ export default function StoryDetailContent() {
                 {selectedShot > 0 && (
                   <button
                     onClick={() => setSelectedShot((p) => p - 1)}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-bg-primary/80 backdrop-blur-sm text-text-secondary hover:text-text-primary transition-colors"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 p-2.5 sm:p-2 rounded-full bg-bg-primary/80 backdrop-blur-sm text-text-secondary hover:text-text-primary transition-colors"
                   >
                     <ChevronLeft className="w-5 h-5" />
                   </button>
@@ -115,7 +115,7 @@ export default function StoryDetailContent() {
                 {selectedShot < story.shots.length - 1 && (
                   <button
                     onClick={() => setSelectedShot((p) => p + 1)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-bg-primary/80 backdrop-blur-sm text-text-secondary hover:text-text-primary transition-colors"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 sm:p-2 rounded-full bg-bg-primary/80 backdrop-blur-sm text-text-secondary hover:text-text-primary transition-colors"
                   >
                     <ChevronRight className="w-5 h-5" />
                   </button>
@@ -133,7 +133,7 @@ export default function StoryDetailContent() {
                   <button
                     key={shot.shotId}
                     onClick={() => setSelectedShot(i)}
-                    className={`flex-shrink-0 w-14 h-20 rounded-md overflow-hidden border-2 transition-all ${
+                    className={`flex-shrink-0 w-12 h-16 sm:w-14 sm:h-20 rounded-md overflow-hidden border-2 transition-all ${
                       selectedShot === i
                         ? "border-brand-primary"
                         : "border-transparent opacity-60 hover:opacity-100"
@@ -170,7 +170,7 @@ export default function StoryDetailContent() {
             >
               {/* Title & Summary */}
               <div>
-                <h1 className="text-xl font-bold mb-2">{story.title}</h1>
+                <h1 className="text-lg sm:text-xl font-bold mb-2">{story.title}</h1>
                 <p className="text-sm text-text-tertiary leading-relaxed">{story.summary}</p>
               </div>
 

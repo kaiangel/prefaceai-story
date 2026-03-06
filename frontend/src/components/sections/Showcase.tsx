@@ -249,7 +249,7 @@ export default function Showcase() {
             {/* Close button */}
             <button
               onClick={closeLightbox}
-              className="absolute top-4 right-4 z-50 w-10 h-10 flex items-center justify-center bg-bg-tertiary/80 hover:bg-bg-elevated rounded-full transition-colors duration-fast"
+              className="absolute top-4 right-4 z-50 w-11 h-11 sm:w-10 sm:h-10 flex items-center justify-center bg-bg-tertiary/80 hover:bg-bg-elevated rounded-full transition-colors duration-fast"
               aria-label="关闭"
             >
               <X className="w-5 h-5 text-text-secondary" />
@@ -271,7 +271,7 @@ export default function Showcase() {
                 e.stopPropagation();
                 goToPrev();
               }}
-              className="absolute left-4 z-50 w-12 h-12 flex items-center justify-center bg-bg-tertiary/60 hover:bg-bg-elevated rounded-full transition-colors duration-fast"
+              className="absolute left-2 sm:left-4 z-50 w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-bg-tertiary/60 hover:bg-bg-elevated rounded-full transition-colors duration-fast"
               aria-label="上一张"
             >
               <ChevronLeft className="w-6 h-6 text-text-secondary" />
@@ -284,7 +284,7 @@ export default function Showcase() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.2 }}
-              className="relative w-full max-w-lg mx-16 aspect-[3/4]"
+              className="relative w-full max-w-lg mx-4 sm:mx-16 aspect-[3/4]"
               onClick={(e) => e.stopPropagation()}
             >
               <Image
@@ -303,7 +303,7 @@ export default function Showcase() {
                 e.stopPropagation();
                 goToNext();
               }}
-              className="absolute right-4 z-50 w-12 h-12 flex items-center justify-center bg-bg-tertiary/60 hover:bg-bg-elevated rounded-full transition-colors duration-fast"
+              className="absolute right-2 sm:right-4 z-50 w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-bg-tertiary/60 hover:bg-bg-elevated rounded-full transition-colors duration-fast"
               aria-label="下一张"
             >
               <ChevronRight className="w-6 h-6 text-text-secondary" />
@@ -320,7 +320,7 @@ export default function Showcase() {
                       prev ? { ...prev, imageIndex: index } : null
                     );
                   }}
-                  className={`w-2.5 h-2.5 rounded-full transition-all duration-fast ${
+                  className={`w-3 h-3 sm:w-2.5 sm:h-2.5 rounded-full transition-all duration-fast ${
                     index === lightbox.imageIndex
                       ? "bg-brand-primary scale-110"
                       : "bg-text-muted hover:bg-text-tertiary"

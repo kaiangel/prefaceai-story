@@ -97,7 +97,7 @@ export default function HeroSection() {
   }, [currentStory.images.length, pauseAndResume]);
 
   return (
-    <section className="relative min-h-screen flex flex-col justify-center pt-16 overflow-hidden">
+    <section className="relative min-h-[100dvh] flex flex-col justify-center pt-16 overflow-hidden">
       {/* Background gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-b from-bg-primary via-bg-primary/95 to-bg-secondary" />
 
