@@ -1378,21 +1378,13 @@ def build_system_instruction_phase2(global_visual_direction: dict) -> str:
     lighting = global_visual_direction.get("overall_lighting", "natural")
     lens_style = global_visual_direction.get("lens_style", "35mm")
 
-    return f"""GLOBAL VISUAL DIRECTION FOR THIS STORY:
-
-Style Enforcement: {style}
-Aspect Ratio: {aspect_ratio}
-Color Grade: {color_grade}
-Overall Lighting Approach: {lighting}
-Lens Style: {lens_style}
-
-CRITICAL REQUIREMENTS:
-1. MAINTAIN these visual parameters CONSISTENTLY across ALL shots
-2. Every image must feel like it's from the SAME film/story
-3. Color palette, lighting mood, and visual style must be cohesive
-4. Character appearances must remain IDENTICAL across shots
-
-DO NOT deviate from these parameters regardless of individual shot descriptions."""
+    # TASK-PROMPT-BUBBLE: trimmed redundant lines
+    # - Removed "Style Enforcement" (redundant with StyleEnforcer mandatory prefix)
+    # - Removed "Aspect Ratio" (set via API parameter, not prompt)
+    # - Condensed CRITICAL REQUIREMENTS into single concise line
+    return f"""GLOBAL VISUAL DIRECTION:
+Color Grade: {color_grade} | Lighting: {lighting} | Lens: {lens_style}
+CONSISTENCY: Maintain identical character appearances, color palette, and lighting mood across all shots."""
 
 
 def build_continuity_context_phase2(

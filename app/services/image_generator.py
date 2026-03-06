@@ -31,6 +31,15 @@ def _strip_speaker_for_native(text: str) -> str:
     return text
 
 
+def _extract_speaker_name(text: str) -> str:
+    """从带说话者前缀的文本中提取说话者名（中文），用于气泡指向指令"""
+    import re
+    match = re.match(r'^([\w\u4e00-\u9fff]+?)(?:内心)?[：:]', text.strip())
+    if match:
+        return match.group(1)
+    return ""
+
+
 def build_native_text_prompt(text_overlay: dict) -> str:
     """
     根据 text_overlay 数据构建 TEXT OVERLAY REQUIREMENT 指令块，
@@ -76,19 +85,9 @@ def build_native_text_prompt(text_overlay: dict) -> str:
         )
 
     elif text_type == "dialogue":
-        texts = chinese_text if isinstance(chinese_text, list) else [chinese_text]
-        for i, txt in enumerate(texts):
-            if isinstance(txt, dict):
-                txt = txt.get('text', '')
-            clean = _strip_speaker_for_native(txt)
-            pos_desc = "upper left" if i == 0 else "upper right"
-            blocks.append(
-                f"TEXT OVERLAY REQUIREMENT (Bubble {i+1}):\n"
-                f"A white rounded rectangular speech bubble positioned {pos_desc} in the frame.\n"
-                f"Inside the bubble, display Chinese text '{clean}' in black font, centered alignment.\n"
-                f"Speech bubble style: clean white fill, thin black outline, rounded corners, "
-                f"triangular tail pointing to speaker."
-            )
+        # TASK-PROMPT-BUBBLE: dialogue now embedded in [SCENE DESCRIPTION]
+        # via build_dialogue_scene_embed(), no longer appended as TEXT OVERLAY
+        return ""
 
     elif text_type in ["dialogue_with_thought", "narration_with_thought",
                         "narration_with_dialogue", "dialogue_with_narration"]:
@@ -128,16 +127,158 @@ def build_native_text_prompt(text_overlay: dict) -> str:
                     f"Display Chinese text '{clean}' in white font, centered."
                 )
             elif sub_type == "dialogue":
-                pos_desc = "upper left" if bubble_idx == 0 else "upper right"
-                blocks.append(
-                    f"TEXT OVERLAY REQUIREMENT ({i+1} - Dialogue bubble):\n"
-                    f"A white rounded rectangular speech bubble positioned {pos_desc}.\n"
-                    f"Inside the bubble, display Chinese text '{clean}' in black font, centered.\n"
-                    f"Speech bubble style: clean white fill, black outline, rounded corners, tail pointing to speaker."
-                )
-                bubble_idx += 1
+                # TASK-PROMPT-BUBBLE: dialogue sub-items in compound types
+                # are now handled by build_dialogue_scene_embed() and embedded
+                # in [SCENE DESCRIPTION]. Skip TEXT OVERLAY for dialogue.
+                pass
 
     return "\n\n".join(blocks)
+
+
+def _resolve_speaker_label(
+    chinese_name: str,
+    characters: list = None,
+    speaker_format: str = "chinese"
+) -> str:
+    """
+    TASK-PROMPT-BUBBLE-FOLLOWUP: 根据 speaker_format 将中文说话者名转换为指定格式。
+
+    Args:
+        chinese_name: 从台词提取的中文名（如 "顾建国"）
+        characters: 角色数据列表（含 id/name/name_en）
+        speaker_format: "chinese"(默认) | "english" | "char_id"
+
+    Returns:
+        转换后的说话者标签
+    """
+    if not chinese_name:
+        return ""
+
+    if speaker_format == "chinese" or not characters:
+        return chinese_name
+
+    # 查找角色数据
+    char_data = next(
+        (c for c in characters
+         if c.get("name") == chinese_name or chinese_name in c.get("name", "")),
+        None
+    )
+
+    if not char_data:
+        # 找不到匹配角色，回退到中文名
+        return chinese_name
+
+    if speaker_format == "english":
+        return char_data.get("name_en", "") or chinese_name
+    elif speaker_format == "char_id":
+        return char_data.get("id", "") or chinese_name
+
+    return chinese_name
+
+
+# TASK-PROMPT-BUBBLE-FOLLOWUP-R2: 语言约束映射
+# 当前仅实现简体中文，未来可扩展繁体中文/英语/西班牙语/法文等
+_TEXT_LANGUAGE_CONFIG = {
+    "zh-CN": {
+        "text_descriptor": "Simplified Chinese",
+        "constraint": "All text in speech bubbles MUST be in Simplified Chinese characters only. Do NOT use Traditional Chinese characters.",
+    },
+    "zh-TW": {
+        "text_descriptor": "Traditional Chinese",
+        "constraint": "All text in speech bubbles MUST be in Traditional Chinese characters.",
+    },
+    "en": {
+        "text_descriptor": "English",
+        "constraint": "All text in speech bubbles MUST be in English.",
+    },
+}
+
+
+def build_dialogue_scene_embed(
+    text_overlay: dict,
+    characters: list = None,
+    speaker_format: str = "chinese",
+    text_language: str = "zh-CN"
+) -> str:
+    """
+    TASK-PROMPT-BUBBLE: 将对话气泡指令嵌入 [SCENE DESCRIPTION]，
+    而非作为 prompt 末尾的 TEXT OVERLAY REQUIREMENT。
+
+    Founder 实测证明：NB2 用 ~30 字简单 prompt 就能完美渲染对话气泡。
+    当前 ~9000 字 prompt 中对话指令被淹没（注意力权重 < 1%）。
+    将对话融入场景描述，让模型将气泡视为场景构图的一部分。
+
+    Args:
+        text_overlay: shot 的 text_overlay 数据字典
+        characters: 角色数据列表（用于 speaker_format 转换）
+        speaker_format: "chinese"(默认) | "english" | "char_id"
+        text_language: 气泡文字语言 "zh-CN"(默认简体中文) | "zh-TW" | "en" 等
+
+    Returns:
+        嵌入场景描述的对话气泡文本，空字符串表示无对话
+    """
+    text_type = text_overlay.get("text_type", "none")
+    chinese_text = text_overlay.get("chinese_text", "")
+
+    if not chinese_text:
+        return ""
+
+    # 获取语言配置
+    lang_config = _TEXT_LANGUAGE_CONFIG.get(text_language, _TEXT_LANGUAGE_CONFIG["zh-CN"])
+    text_desc = lang_config["text_descriptor"]
+    lang_constraint = lang_config["constraint"]
+
+    dialogue_lines = []
+
+    def _build_bubble_line(speaker: str, clean_text: str) -> str:
+        if speaker:
+            return (
+                f"Near {speaker}, a white speech bubble with rounded corners "
+                f"displays {text_desc} text '{clean_text}' in black font."
+            )
+        return (
+            f"A white speech bubble with rounded corners "
+            f"displays {text_desc} text '{clean_text}' in black font."
+        )
+
+    if text_type == "dialogue":
+        texts = chinese_text if isinstance(chinese_text, list) else [chinese_text]
+        for txt in texts:
+            if isinstance(txt, dict):
+                txt = txt.get('text', '')
+            clean = _strip_speaker_for_native(txt)
+            speaker_zh = _extract_speaker_name(txt)
+            speaker = _resolve_speaker_label(speaker_zh, characters, speaker_format)
+            dialogue_lines.append(_build_bubble_line(speaker, clean))
+
+    elif text_type in ["dialogue_with_thought", "narration_with_thought",
+                        "narration_with_dialogue", "dialogue_with_narration"]:
+        texts = chinese_text if isinstance(chinese_text, list) else [chinese_text]
+        for item in texts:
+            if isinstance(item, dict) and "type" in item:
+                sub_type = item["type"]
+                txt = item.get("text", "")
+            else:
+                txt = item
+                if "内心：" in txt or "内心:" in txt:
+                    sub_type = "thought"
+                elif txt.startswith("旁白：") or txt.startswith("「"):
+                    sub_type = "narration"
+                elif "：「" in txt or ":「" in txt or "：\"" in txt:
+                    sub_type = "dialogue"
+                else:
+                    sub_type = "narration"
+
+            if sub_type == "dialogue":
+                clean = _strip_speaker_for_native(txt)
+                speaker_zh = _extract_speaker_name(txt)
+                speaker = _resolve_speaker_label(speaker_zh, characters, speaker_format)
+                dialogue_lines.append(_build_bubble_line(speaker, clean))
+
+    if dialogue_lines:
+        # 追加语言约束指令（确保模型输出正确字体/字形）
+        return " ".join(dialogue_lines) + f" {lang_constraint}"
+    return ""
 
 
 class ErrorType(Enum):
@@ -698,15 +839,33 @@ class ImageGenerator:
         if continuity_context:
             full_prompt_parts.append(f"[CONTINUITY]\n{continuity_context}")
 
-        # 主prompt（场景描述）
-        full_prompt_parts.append(f"[SCENE DESCRIPTION]\n{main_prompt}")
+        # TASK-PROMPT-BUBBLE: 对话气泡嵌入场景描述（而非 prompt 末尾）
+        # Founder 实测: NB2 用简单 prompt (~30 字) 即可渲染完美气泡，
+        # 嵌入场景描述让模型将气泡视为构图元素，获得更高注意力权重
+        dialogue_embed = ""
+        if use_native_text:
+            text_overlay = shot.get("text_overlay", {})
+            dialogue_embed = build_dialogue_scene_embed(
+                text_overlay,
+                characters=characters.get("characters", []),
+                speaker_format='english',
+                text_language='zh-CN'
+            )
+
+        # 主prompt（场景描述）+ 嵌入的对话气泡
+        if dialogue_embed:
+            full_prompt_parts.append(f"[SCENE DESCRIPTION]\n{main_prompt}\n{dialogue_embed}")
+            print(f"    [ImageGenerator Phase2] 对话气泡已嵌入场景描述 ({len(dialogue_embed)} chars)")
+        else:
+            full_prompt_parts.append(f"[SCENE DESCRIPTION]\n{main_prompt}")
 
         full_prompt = "\n\n".join(full_prompt_parts)
 
         # 🚨 关键：使用 StyleEnforcer 强制风格，防止风格漂移
         # StyleEnforcer 会在 prompt 最前面添加 MANDATORY STYLE 指令
         # 包括 MUST INCLUDE (photorealistic等) 和 DO NOT USE (cartoon, anime等)
-        full_prompt = StyleEnforcer.enforce_prompt(full_prompt, style_preset)
+        # TASK-PROMPT-BUBBLE: 禁用 quality_suffix（与 mandatory keywords 重叠冗余）
+        full_prompt = StyleEnforcer.enforce_prompt(full_prompt, style_preset, add_quality_suffix=False)
 
         # color_mode 处理：覆盖 preset 的颜色设定（用于回忆/闪回等特殊效果）
         color_mode = shot.get("color_mode", "full_color")
@@ -716,14 +875,15 @@ class ImageGenerator:
             full_prompt += "\n\n[COLOR OVERRIDE] This shot MUST be in SEPIA TONE, warm brownish monochrome. Override any color requirements from the style preset."
 
         # NB2 原生文字渲染：将 TEXT OVERLAY REQUIREMENT 附加到 prompt 末尾
-        # 当 use_native_text=True 时，NB2 直接在图像中渲染中文文字（旁白/对话/心理描述）
-        # 当 use_native_text=False 时，不附加文字指令，由 TextOverlay 后处理叠加（备用方案）
+        # TASK-PROMPT-BUBBLE: dialogue 已嵌入场景描述（上方），此处只处理 thought/narration
+        # 当 use_native_text=True 时，NB2 直接在图像中渲染中文文字（旁白/心理描述）
+        # 当 use_native_text=False 时，不附加文字指令，由 TextOverlay 后处理叠加
         if use_native_text:
             text_overlay = shot.get("text_overlay", {})
             native_text_block = build_native_text_prompt(text_overlay)
             if native_text_block:
                 full_prompt += "\n\n" + native_text_block
-                print(f"    [ImageGenerator Phase2] 原生文字渲染: text_type={text_overlay.get('text_type', 'none')}")
+                print(f"    [ImageGenerator Phase2] 原生文字渲染 (thought/narration): text_type={text_overlay.get('text_type', 'none')}")
 
         # DEBUG: 保存shot的完整prompt用于验证
         shot_id = shot.get("shot_id", 0)
