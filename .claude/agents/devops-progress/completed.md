@@ -4,6 +4,183 @@
 
 ---
 
+### TASK-DEPLOY-EXEC 启动 — 全面状态检查 + 阻塞项识别 ✅
+
+**完成时间**: 2026-03-06
+**验收状态**: 检查完成，3 项阻塞待确认
+
+**任务类型**: 部署执行 / 状态检查
+
+**完成内容**:
+- [x] 读取 TEAM_CHAT 最新 1000 行（19084 行中的 18084-19084）
+- [x] 读取部署方案 DOCKER_COMPOSE_DEPLOYMENT_PLAN.md（561 行）
+- [x] 读取 VPS 环境文档 VPS_DEPLOYMENT_ENVIRONMENT.md
+- [x] 检查 SSL 证书文件: `docker/ssl/*.pem` + `.key` 存在 ✅
+- [x] 检查 `frontend/next.config.mjs`: 空配置，缺 `output: 'standalone'` — D1 阻塞
+- [x] 检查 `app/main.py`: `/health` 可用 ✅，CORS `["*"]` 需后续限制
+- [x] 检查 `requirements.txt`: 无 celery/redis（D4 可延后）
+- [x] 检查 `.env.example`: 17 变量模板 ✅
+- [x] 检查 git status: 45 文件未提交（代码+文档+测试）
+- [x] 输出运维状态报告
+- [x] 更新进度文档: current.md + context-for-others.md + completed.md + daily-sync + TEAM_CHAT
+
+**阻塞项**:
+| # | 内容 | 解决方式 |
+|---|------|----------|
+| 1 | D1: next.config.mjs 缺 output: 'standalone' | 待确认谁修改 |
+| 2 | 45 文件未提交/未推送 | 待确认 commit+push 节奏 |
+| 3 | .env.production API Key | 待 Founder 提供 |
+
+---
+
+### TASK-DEPLOY-PREP Step 3: PM 审查反馈落实 ✅
+
+**完成时间**: 2026-03-05
+**验收状态**: 待 PM 二次审核
+**依据**: PM [2026-03-05] TEAM_CHAT 审查 PASS + 6 项修改建议（R1-R6）+ Cloudflare SSL 配置
+
+**任务类型**: 基础设施 / 部署方案更新
+
+**完成内容**:
+- [x] R1: worker 添加 `profiles: ["celery"]`（初始部署不启动）
+- [x] R2: 依赖清单新增 D6 — CORS `allow_origins=["*"]` → 限制为 `prefaceai.mov`
+- [x] R6: 移除 `version: "3.8"`（Compose V2 不需要，避免 deprecation warning）
+- [x] Nginx HTTP → HTTPS 全面升级（Cloudflare Origin Certificate）
+  - HTTP 80 仅做 301 重定向
+  - HTTPS 443 + Origin Certificate（`/etc/ssl/prefaceai-mov/`）
+  - `ssl_session_cache shared:SSL_MOV:10m` 避免与旧站冲突
+  - HSTS `max-age=63072000` 与旧站一致
+- [x] 部署步骤新增 Step 3: SSL 证书部署
+- [x] 架构图更新（HTTP → HTTPS）
+- [x] 风险表 SSL 条目更新为已解决
+- [x] 设计决策说明更新
+
+**PM 审查反馈覆盖情况**:
+| # | PM 修改建议 | 落实状态 |
+|---|------------|---------|
+| R1 | worker profiles: ["celery"] | ✅ 已添加 |
+| R2 | CORS D6 标注 | ✅ 已添加到依赖清单 |
+| R3 | Cloudflare Full (Strict) 已确认 | ✅ N/A — PM 已在 Cloudflare 设置 |
+| R4 | 考虑 pg_isready healthcheck | ℹ️ 当前用 SQLite，暂不适用 |
+| R5 | gzip_types 补充 font 类型 | ℹ️ 可在实际部署时微调 |
+| R6 | 移除 version: "3.8" | ✅ 已移除 |
+
+---
+
+### TASK-DEPLOY-PREP Step 2: Docker Compose 部署方案 ✅
+
+**完成时间**: 2026-03-05
+**验收状态**: 待 PM 审核 + Founder 批准
+**依据**: PM [2026-03-05 11:19] TEAM_CHAT Docker Compose 方案批准派发（含 6 项注意事项）
+
+**任务类型**: 基础设施 / 部署规划
+
+**完成内容**:
+- [x] 架构设计: 4 容器（api + worker + frontend + redis）+ Nginx 反代
+- [x] docker-compose.yml 草案（含健康检查、named volumes、内部网络）
+- [x] Dockerfile.api 草案（Python 3.11-slim + Pillow + FFmpeg + 中文字体 + Celery）
+- [x] Dockerfile.frontend 草案（Node 20 多阶段构建 + standalone 模式）
+- [x] Nginx 配置草案（prefaceai.mov + Cloudflare 真实 IP 还原 + API/前端分流）
+- [x] 环境变量管理方案（.env.production 运行时挂载，不入 image）
+- [x] 部署步骤清单（4 步 + 验证清单 8 项）
+- [x] 依赖清单（5 项代码改动 + 9 项 VPS 操作）
+- [x] 风险评估（6 项 + 应对策略）
+
+**输出文档**: `.team-brain/knowledge/DOCKER_COMPOSE_DEPLOYMENT_PLAN.md`
+
+**PM 6 项注意事项覆盖情况**:
+| # | PM 注意事项 | 方案覆盖 |
+|---|------------|---------|
+| 1 | 后端 API 层已有基础 + 前后端联调未完成 | ✅ 依赖 D5 标注 |
+| 2 | 环境变量安全管理 | ✅ .env.production 方案 |
+| 3 | Celery + Redis | ✅ 容器 + 依赖 D2-D4 标注 |
+| 4 | Python 版本策略 | ✅ Docker 内 3.11-slim |
+| 5 | Nginx 共存 | ✅ 独立站点配置 |
+| 6 | 输出格式 | ✅ 架构图 + 配置草案 + 步骤 + 依赖 |
+
+**关键设计决策**:
+- 端口仅绑定 `127.0.0.1`，外部流量必须经 Nginx
+- Redis 不暴露到宿主机，仅 Docker 内部网络
+- Celery worker 可延后（D2-D4），不阻塞初始部署
+- 最小可部署集：仅需 Frontend 改 `next.config.mjs`（D1）
+
+---
+
+### TASK-DEPLOY-PREP Step 1: VPS 环境全维度检查 ✅
+
+**完成时间**: 2026-03-05
+**验收状态**: Founder 已确认
+**依据**: Coordinator 部署指令（技术栈 + SSH 信息 + 域名确认）
+
+**任务类型**: 基础设施 / 部署准备
+
+**完成内容**:
+- [x] SSH 连接验证: trader 密钥登录 ✅ + root 密钥登录 ✅
+- [x] 硬件检查: 8C / 16GB / 200GB（97% 磁盘空闲）
+- [x] OS 检查: Ubuntu 20.04.6 LTS, Python 3.8.10（需升级到 3.10+）
+- [x] 已安装软件: Nginx 1.18 + Supervisor 4.1 + Git 2.25
+- [x] 缺失软件: Docker、Node.js、Redis、FFmpeg
+- [x] 端口占用: :80/:443 Nginx, :5000 旧 Flask, :58913 SSH
+- [x] 现有服务确认: prefaceai.net（Prompt 优化工具，保留）+ Momentum Trading（保留）
+- [x] Founder 确认 4 项: 旧站保留 / Trading 保留 / root 密钥可用 / prefaceai.mov 主域名
+- [x] 环境文档创建: `.team-brain/knowledge/VPS_DEPLOYMENT_ENVIRONMENT.md`
+
+**VPS 摘要**:
+```
+IP: 107.148.1.199:58913
+硬件: 8C Intel Xeon / 16GB RAM / 200GB SSD
+OS: Ubuntu 20.04.6 LTS
+已有: Nginx + Supervisor + Git + Python 3.8
+缺失: Docker + Node.js + Redis + FFmpeg
+域名: prefaceai.mov → Cloudflare 代理 → VPS
+```
+
+**验证结果**:
+| 验证项 | 结果 |
+|--------|------|
+| trader SSH 密钥登录 | ✅ |
+| root SSH 密钥登录 | ✅ |
+| 硬件资源充足 | ✅ 8C/16GB/200GB |
+| 现有服务不受影响 | ✅ 端口 :5000 + /opt/momentum-trading 不动 |
+| Cloudflare DNS 指向 VPS | ✅ prefaceai.mov → 107.148.1.199 |
+
+---
+
+### TASK-GIT-COMMIT-3: SQ/Bugfix + 剩余积压变更提交 + Push ✅
+
+**完成时间**: 2026-03-05
+**验收状态**: 待PM核验
+**依据**: PM [2026-03-04 21:00] TEAM_CHAT 派发（SQ/Bugfix 7文件）+ PM [2026-03-05] TEAM_CHAT 补充派发（Batch A/B/C + push）
+
+**任务类型**: 版本控制
+
+**完成内容**:
+- [x] SQ/Bugfix: 7 文件（SQ-1~8 + Bug#1~5 + Rule#7/#8）— commit `4daad77`
+- [x] Batch A: Backend 代码 9 文件（模型升级 + 风格系统 + NB2原生文字）— commit `135acf4`
+- [x] Batch B: Frontend 代码 60 文件（Create P0/P1/P2 + Dashboard + Register + 28 mock PNGs）— commit `3a9ec56`
+- [x] Batch C: 文档 + 测试 55 文件（agent progress + team-brain + 12测试脚本 + knowledge base）— commit `4af7ea1`
+- [x] 统一 push: `e05bbd2..4af7ea1` → `origin/main` ✅
+
+**Commit 信息**:
+```
+4af7ea1 docs: agent progress + team-brain + tests + knowledge base (55 files, +19306/-816)
+3a9ec56 feat(frontend): Create upgrade P0+P1+P2 + Dashboard + Register (60 files, +3863/-1)
+135acf4 feat: model upgrade + style system + NB2 native text (9 files, +401/-255)
+4daad77 feat: shot quality upgrade (SQ-1~8) + bugfix (#1~5) + prompt rules (#7/#8) (7 files, +566/-83)
+总计: 131 files changed, 24136 insertions(+), 1155 deletions(-)
+```
+
+**验证结果**:
+| 验证项 | 结果 |
+|--------|------|
+| git status 工作区干净 | ✅ 0 个未提交文件 |
+| git log 4 新commits | ✅ 全部完整 |
+| git push origin main | ✅ 远程同步成功 |
+| 无敏感文件 | ✅ 全部 Batch 安全 |
+| storyboard_prompts.py 确认 | ✅ PM 列出但实际无变更，正确跳过 |
+
+---
+
 ### GitHub 远程仓库建立 ✅
 
 **完成时间**: 2026-02-26 11:02

@@ -1,24 +1,42 @@
 # PM Agent - 当前任务
 
-> **最后更新**: 2026-03-05
-> **状态**: ✅ @DevOps TASK-GIT-COMMIT-3 补充批次提交 + push 已派发
+> **最后更新**: 2026-03-06 16:15
+> **状态**: Founder 批准部署 + DevOps 派发 + Tester E2E 执行中
 
 ---
 
 ## 刚完成
 
-- 核查 git status: ~120 个未提交文件（从 TASK-GIT-COMMIT-2 积累）
-- 分类为 3 批: Backend 代码 / Frontend 代码 / 文档+测试
-- 派发 @DevOps 批次提交 + 统一 push（Founder 已确认）
+### Founder 批准 DEPLOY-PREP 部署方案 + TASK-DEPLOY-EXEC 派发 @DevOps
+
+- Founder 批准 Docker Compose 部署方案
+- 正式派发 @DevOps 执行 VPS 实际部署（Step 1-4）
+- 前置依赖 D1: Frontend 需改 `next.config.mjs` 添加 `output: 'standalone'`
+- API Key 需 Founder 提供真实值
+
+### PM 备忘记录 — Tester E2E 后待推进
+
+- Phase 4.5 视频合成（FFmpeg，当前 5%）→ @Backend
+- 前后端联调 D5（Mock → 真实 API）→ @Frontend + @Backend
 
 ---
 
-## 待办
+## 当前并行
 
-| 事项 | 状态 |
-|------|------|
-| 等 @DevOps 完成 3 批提交 + push | ⏳ |
-| PM 核验 commits + push | DevOps 完成后 |
+| 事项 | Agent | 状态 |
+|------|-------|------|
+| TASK-DEPLOY-EXEC VPS 实际部署 | @DevOps | ⏳ 刚派发 |
+| TASK-E2E-REGRESSION 综合回归测试 | @Tester | ⏳ 执行中 |
+| PM 等待两项结果 → 独立复核 | @PM | ⏳ 等待中 |
+
+---
+
+## Tester E2E 完成后待推进
+
+| # | 事项 | Agent |
+|---|------|-------|
+| 1 | Phase 4.5 视频合成 (FFmpeg) | @Backend |
+| 2 | 前后端联调 D5 | @Frontend + @Backend |
 
 ---
 
@@ -26,8 +44,8 @@
 
 | 时间 | 更新内容 |
 |------|----------|
-| 2026-03-05 | ✅ 剩余 ~120 文件分类 → @DevOps 批次提交+push 派发 + 全文档同步 |
-| 2026-03-04 21:00 | ✅ Founder 确认 → @DevOps TASK-GIT-COMMIT-3 派发 |
-| 2026-03-04 20:30 | ✅ PM Review: @AI-ML PASS + @Backend PASS |
-| 2026-03-04 19:30 | ✅ Shot 15/18 根因分析 → @AI-ML + @Backend 任务派发 |
-| 2026-03-04 18:00 | ✅ 回归验证独立复核: PM 4.36/5 vs Tester 4.36/5 |
+| 2026-03-06 16:15 | ✅ Founder 批准部署 + @DevOps TASK-DEPLOY-EXEC 派发 + 备忘记录 + 全文档同步 |
+| 2026-03-06 16:00 | ✅ DEPLOY-PREP Step 3 PASS + RESPONSIVE-OPT 4.5/5 + Tester E2E 派发 + 全文档同步 |
+| 2026-03-06 15:26 | ✅ Backend Code Review 12 维度 PASS + speaker_format 闭环 + 全文档同步 |
+| 2026-03-06 14:45 | ✅ R2 审查 + Founder 决策 speaker_format=english + @Backend 派发 + 全文档同步 |
+| 2026-03-06 11:33 | ✅ FOLLOWUP PM 审查 + Founder 决策 + FOLLOWUP-R2 派发 @AI-ML + 全文档同步 |

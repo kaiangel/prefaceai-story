@@ -1,6 +1,6 @@
 # PM Agent - 给其他Agent的信息
 
-> **最后更新**: 2026-03-05
+> **最后更新**: 2026-03-06 16:15
 > **目的**: 让其他Agent快速了解当前状态和任务
 
 ---
@@ -8,32 +8,54 @@
 ## 当前状态
 
 ```
-✅ TASK-GIT-COMMIT-3 (4daad77) 已提交
-🔧 @DevOps: 剩余 ~120 文件分 3 批提交 + 统一 push 进行中
+✅ Founder 批准 DEPLOY-PREP 部署方案
+⏳ @DevOps TASK-DEPLOY-EXEC VPS 实际部署（刚派发）
+⏳ @Tester TASK-E2E-REGRESSION 综合回归测试（执行中）
 ```
 
 ---
 
-## @devops 注意（立即执行）
+## @devops 注意
 
-### 🔧 TASK-GIT-COMMIT-3 补充 — 批次提交 + push
+### TASK-DEPLOY-EXEC — VPS 实际部署 (Founder 已批准)
 
-**任务详情见 TEAM_CHAT 2026-03-05**
-
-- Batch A: Backend 代码 (9 文件)
-- Batch B: Frontend 代码 (~33 + ~25 PNGs)
-- Batch C: 文档 + 测试 (~80 文件)
-- 最后: `git push origin main`（4daad77 + A/B/C 全部一次推送）
-
-完成后通知 PM。
+- **方案文档**: `.team-brain/knowledge/DOCKER_COMPOSE_DEPLOYMENT_PLAN.md`
+- **执行步骤**: Step 1 VPS 准备 → Step 2 项目部署 → Step 3 SSL+Nginx → Step 4 验证
+- **前置依赖 D1**: Frontend 需改 `next.config.mjs` 添加 `output: 'standalone'`，如遇此问题通知 PM
+- **API Key**: `.env.production` 需 Founder 提供真实值
+- **验证清单**: 3 个容器 Up（初始，不含 worker）
+- **每步完成后在 TEAM_CHAT 报告进度**
+- 详细派发见 TEAM_CHAT 2026-03-06 16:15
 
 ---
 
-## @ai-ml @backend @tester @frontend 注意
+## @tester 注意
 
-### ✅ 当前无任务
+### TASK-E2E-REGRESSION — 综合回归测试 (已派发)
 
-等 TASK-GIT-COMMIT-3 全部完成 + push。
+- 2 个故事 × 10 shots，不同题材+风格
+- 7 维度验收，详见 TEAM_CHAT 2026-03-06 16:00
+- 完成后通知 PM
+
+---
+
+## @frontend 注意
+
+- RESPONSIVE-OPT PM 复验通过 (4.5/5)，当前无新任务
+- **注意**: DevOps 部署可能需要你修改 `next.config.mjs` 添加 `output: 'standalone'`（D1 依赖），如收到通知请优先处理
+
+---
+
+## @backend 注意
+
+- 当前无新任务
+- Tester E2E 完成后将安排 Phase 4.5 视频合成 + 前后端联调
+
+---
+
+## @ai-ml 注意
+
+- 当前无新任务
 
 ---
 

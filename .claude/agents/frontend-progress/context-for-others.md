@@ -1,50 +1,51 @@
 # Frontend 状态速览（供其他Agent参考）
 
-> 更新时间: 2026-03-04
+> 更新时间: 2026-03-06
 
 ---
 
-## 当前状态: ✅ TASK-CREATE-UPGRADE P2 PM 复验 4.8/5 通过 + P3/P4 修复完成
+## 当前状态: TASK-RESPONSIVE-OPT 响应式优化完成，待 PM 复验
 
 **可预览地址**: http://localhost:3000 (需要运行 `npm run dev`)
 
 ---
 
-## TASK-CREATE-UPGRADE P2 完成情况
+## TASK-RESPONSIVE-OPT 响应式 / 移动端适配
 
-P1 复验 4.7/5 通过后，完成 P2 全部 14 文件（10 新建 + 4 修改）。
+在保持现有 UI 和交互体验不变的前提下，优化移动端适配。修改 7 个文件，`npm run build` 18 路由通过。
 
-### P2 新增功能
+### 修改概要
 
-| 功能 | 组件/页面 | 说明 |
-|------|----------|------|
-| 注册 | /register | 用户名+邮箱+密码表单，mock 注册，成功跳转 Dashboard |
-| 工作台 | /dashboard | 欢迎语+统计卡片（故事数/已完成/总画面）+故事网格 |
-| 故事详情 | /dashboard/[storyId] | Shot 轮播+缩略图+旁白+角色信息+风格标签 |
-| 故事卡片 | StoryCard | 封面图+标题+风格+状态+操作菜单（续写/删除） |
-| 故事网格 | StoryGrid | 搜索+筛选（状态/排序）+响应式 2-4 列 grid |
-| 空状态 | EmptyState | 新用户无故事时的引导 |
-| 用户菜单 | UserMenu | 头像+下拉（工作台/设置/退出） |
+| 文件 | 变更 |
+|------|------|
+| `DashboardContent.tsx` | 统计卡片 grid-cols-3 -> grid-cols-1 sm:grid-cols-3 |
+| `Showcase.tsx` | Lightbox: 关闭按钮加大触控区域，图片 margin 减小，导航箭头缩小间距，圆点指示器加大 |
+| `HeroSection.tsx` | min-h-screen -> min-h-[100dvh]，修复移动浏览器地址栏高度问题 |
+| `StoryDetailContent.tsx` | 导航箭头触控区域加大，缩略图移动端缩小，标题响应式字号 |
+| `StageB.tsx` | 情节点删除按钮在触屏设备始终可见，"点击编辑"提示仅桌面显示 |
+| `StageD.tsx` | 导航箭头加大，Shot meta 文字移动端稍大 |
+| `Header.tsx` | 移动菜单打开时锁定 body 滚动 |
 
-### Auth 系统增强
+### 关键适配原则
 
-- AuthContext 新增 `register` 函数、`stories` 状态、`deleteStory` 方法
-- CreateHeader 集成 UserMenu（登录态显示用户菜单，未登录显示登录链接）
-- Login 页面新增注册链接
+- 触控目标最小 44px（Apple HIG 推荐）
+- `hover:` 状态加 `sm:` 前缀（触屏无 hover）
+- `100dvh` 替代 `100vh`（修复移动浏览器地址栏问题）
+- body scroll lock 防止移动端覆盖层下方穿透滚动
 
-### 用户可走通的完整流程
+---
 
-1. 注册: /register → 填写信息 → 成功跳转 /dashboard（新用户空状态）
-2. 登录: /login → 邀请码 XUHUA2026 → 跳转 /dashboard（有 5 个 mock 故事）
-3. 工作台: 浏览故事卡片 → 搜索/筛选 → 点击查看详情
-4. 故事详情: /dashboard/story_001 → Shot 轮播 + 缩略图 + 旁白 + 角色
-5. 创作: CreateHeader 显示用户菜单 + 工作台入口
+## 待做（记录）
 
-### 文件变化
+### 视频预览器组件（等后端 Phase 4.5 视频合成就绪后再做）
 
-- P2 新建 10 文件
-- P2 修改 4 文件（types + AuthContext + mock-data + CreateHeader）
-- `npm run build` 18 路由通过（+3 新路由）
+用户故事完成后的"检查站"——对应用户旅程 Stage D（预览）：
+- 播放器区域：播放/暂停合成视频
+- 镜头缩略图条：点击跳转到对应镜头
+- 单镜头操作：重新生成、编辑旁白文案
+- BGM 切换
+
+当前 Phase 4.5（视频合成）进度 5%，暂无真实视频可播放。Founder 确认先记录，后续做。
 
 ---
 

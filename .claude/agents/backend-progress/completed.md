@@ -4,6 +4,93 @@
 
 ---
 
+## 2026-03-06
+
+### TASK-BUBBLE-SPEAKER-FORMAT-DEPLOY ✅ (14:56)
+
+**来源**: PM 派发 (Founder 决策 speaker_format='english', R2 A/B/C 对比后确认)
+**优先级**: P0
+
+**任务**: 修改 `image_generator.py` 生产代码，为 `build_dialogue_scene_embed()` 传入 `characters`, `speaker_format`, `text_language` 三个参数
+
+**修改文件**: `app/services/image_generator.py` (第 845-853 行)
+
+```python
+# BEFORE:
+dialogue_embed = build_dialogue_scene_embed(text_overlay)
+
+# AFTER:
+dialogue_embed = build_dialogue_scene_embed(
+    text_overlay,
+    characters=characters.get("characters", []),
+    speaker_format='english',
+    text_language='zh-CN'
+)
+```
+
+**关键决策**:
+- 类型处理: `characters.get("characters", [])` 从 dict wrapper 提取 list，匹配函数签名 `characters: list`
+- `speaker_format='english'`: Founder 决策，B 组 (english) 语言一致性 + 多语言扩展性最优
+- `text_language='zh-CN'`: 强制简体中文，完全修复 R1 繁体渲染问题
+- 死代码: 检查后未发现需清理的死代码路径
+
+**验证**: Python 语法/import 检查通过 ✅
+
+---
+
+## 2026-03-05
+
+### TASK-BUBBLE-SIMPLIFY 测试完成 ✅ (16:14)
+
+**来源**: PM 派发 TASK-BUBBLE-SIMPLIFY (对话气泡简化方案验证)
+**优先级**: P1
+
+- **脚本**: `tests/test_bubble_simplify.py`
+- **输出**: `test_output/manualtest/bubble_simplify/` (group_A/B/C.png + prompt.txt)
+- **耗时**: A=33.1s, B=41.3s, C=99.3s
+
+**关键结论**: 3 组均未渲染对话气泡。移除 TEXT OVERLAY REQUIREMENT 后 NB2 将对话行理解为场景情绪上下文，不触发气泡渲染。对话嵌入有助于场景情绪表现，角色一致性 3 组均良好。
+
+等待 PM/Founder 评审决定下一步方案。
+
+---
+
+### TASK-SHOT10-REGEN + Bug #6 修复 ✅ (15:17)
+
+**来源**: PM 派发 TASK-SHOT10-REGEN (补生成因 Bug #5 crash 缺失的 shot_10)
+**优先级**: P1
+
+#### TASK-SHOT10-REGEN: 补生成 shot_10
+
+- **脚本**: `tests/test_shot10_regen.py`
+- **输出**: `test_output/manualtest/bugfix_regression/20260304_162910/shots/shot_10.png` (848x1264, NB2)
+- **验证**: Bug #5 dict 格式 chinese_text 正确处理 ✅, 角色一致性 ✅, 18/18 shots 全部到位 ✅
+
+**验证过程**:
+1. 首次生成角色一致性差 → 创建诊断脚本 `tests/test_shot10_diagnosis.py` 对 shot_10 vs shot_11 做 6 维度全量对比
+2. 诊断结论: prompt/参考图/API 参数完全一致，确认为 NB2 模型随机性 + wide_shot+high_angle 增加难度
+3. 重跑后角色一致性 OK，但发现 Bug #6
+
+#### Bug #6 (P2): 多人对话气泡缺少说话者指向
+
+**文件**: `image_generator.py`
+
+| 修改点 | 修改前 | 修改后 |
+|--------|--------|--------|
+| 新增 `_extract_speaker_name()` | (不存在) | 从 "林晨宇：「...」" 提取说话者名 |
+| dialogue handler 气泡位置 | `"upper left" if i == 0 else "upper right"` (硬编码) | `f"near {speaker}"` (跟随说话者) |
+| dialogue handler 尾部指向 | `"triangular tail pointing to speaker"` (无名) | `f"triangular tail pointing toward {speaker}"` |
+| compound handler 气泡位置 | 同上硬编码 | 同上跟随说话者 |
+| compound handler 尾部指向 | 同上无名 | 同上具名 |
+
+**根因**: `_strip_speaker_for_native()` 剥离说话者前缀后丢弃，prompt 中气泡位置硬编码且无说话者身份信息。多人对话时模型无法确定哪个气泡属于谁。
+
+**影响范围**: 18 shots 中 5 个含多人对话 (Shot 2/4/5/10/11)，其中 2/4/5 碰巧正确（单人+内心独白），10/11 错误（3 人同时对话）。
+
+**验证**: shot_10 重跑后林晨宇台词气泡正确出现在林晨宇旁 ✅
+
+---
+
 ## 2026-03-04
 
 ### TASK-SHOT-QUALITY-BUGFIX Backend 部分 ✅ (16:09 + 18:07)

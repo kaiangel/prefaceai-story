@@ -18024,3 +18024,1131 @@ docs: agent progress + team-brain + tests + knowledge base
 完成后通知 PM。
 
 ---
+
+### 2026-03-05 10:36 @pm → @backend
+
+**TASK-SHOT10-REGEN — 补生成 shot_10（Founder 已确认）**
+
+回归验证测试中 shot_10 因 Bug #5（dialogue handler dict crash）缺失。Bug #5 已修复（`image_generator.py` L81-82 isinstance dict check），现在需要补生成这一张。
+
+**任务详情**:
+
+| 项目 | 内容 |
+|------|------|
+| **Storyboard 数据** | `test_output/manualtest/bugfix_regression/20260304_162910/4_storyboard.json` L374-422 (shot_id: 10) |
+| **角色参考图** | `test_output/manualtest/bugfix_regression/20260304_162910/character_refs/` |
+| **场景参考图** | `test_output/manualtest/bugfix_regression/20260304_162910/scene_refs/` |
+| **标注参考图** | `test_output/manualtest/bugfix_regression/20260304_162910/labeled_refs/` |
+| **预期输出** | `test_output/manualtest/bugfix_regression/20260304_162910/shots/shot_10.png` |
+
+**Shot 10 关键信息**:
+- scene_id: 4, shot_type: wide_shot, camera_angle: high_angle
+- 3 个角色: char_001, char_002, char_003
+- text_type: "dialogue"，chinese_text 为 dict 列表格式（即 Bug #5 的触发数据）
+- 此 shot 是高潮帧（家庭争吵），验证 Bug #5 修复是否正确处理 dict 格式
+
+**执行方式**:
+- 使用现有后端代码，仅重新生成 shot_10 这一张图
+- 确保 Bug #5 修复后 dict 格式的 chinese_text 被正确处理
+- 生成成功后截图/确认输出文件存在
+
+完成后通知 PM。
+
+---
+
+### 2026-03-05 @devops → @pm
+
+**TASK-GIT-COMMIT-3 全部完成 + push ✅**
+
+4 批提交 + 统一 push 已完成，工作区干净。
+
+| Batch | Commit | 文件数 | 变更量 |
+|-------|--------|--------|--------|
+| SQ/Bugfix | `4daad77` | 7 | +566/-83 |
+| Batch A (Backend) | `135acf4` | 9 | +401/-255 |
+| Batch B (Frontend) | `3a9ec56` | 60 | +3863/-1 |
+| Batch C (Docs+Tests) | `4af7ea1` | 55 | +19306/-816 |
+| **总计** | **4 commits** | **131** | **+24136/-1155** |
+
+- `git push origin main`: `e05bbd2..4af7ea1` → ✅ 远程同步成功
+- `git status`: ✅ 工作区干净（0 未提交文件）
+- 安全检查: ✅ 4 个 Batch 均无敏感文件泄露
+- 备注: PM 列出的 `storyboard_prompts.py` 实际无变更（HEAD 对比 diff 为空），已正确跳过
+
+请 PM 核验。DevOps 进入空闲等待。
+
+---
+
+### 2026-03-05 @devops → @all
+
+**VPS 环境全维度检查完成 — 部署前准备**
+
+SSH 进入目标 VPS（107.148.1.199:58913）完成全维度环境评估。
+
+**关键发现**:
+- 硬件充足: 8C/16GB/200GB（97% 磁盘空闲）
+- OS: Ubuntu 20.04.6 LTS，Python 3.8（⚠️ 需 3.10+）
+- 已有: Nginx + Supervisor + Git
+- 缺失: Docker、Node.js、Redis、FFmpeg
+- 现有服务（保留不动）: prefaceai.net Prompt 优化工具 + Momentum Trading 量化系统
+- root 密钥登录已验证 ✅
+
+**域名方案**: `prefaceai.mov` → Cloudflare 代理 → VPS，Nginx 新增站点配置与旧站并存
+
+**端口规划**: :8000 FastAPI / :3000 Next.js / :6379 Redis（旧站 :5000 不动）
+
+**详细文档**: `.team-brain/knowledge/VPS_DEPLOYMENT_ENVIRONMENT.md`
+
+下一步: 出 Docker Compose 部署方案。
+
+---
+
+### 2026-03-05 11:19 @pm → @all
+
+**PM 核验 — DevOps VPS 环境检查 ✅ PASS + Docker Compose 方案批准**
+
+#### VPS 检查核验结果
+
+| 维度 | 结果 |
+|------|------|
+| SSH 连接 (trader + root) | ✅ |
+| 硬件 (8C/16GB/200GB) | ✅ |
+| OS + 软件缺失识别 | ✅ |
+| 端口占用 + 现有服务保留 | ✅ |
+| 域名 + DNS (prefaceai.mov → Cloudflare → VPS) | ✅ |
+| Founder 4 项确认 | ✅ |
+| 文档 (VPS_DEPLOYMENT_ENVIRONMENT.md) | ✅ |
+| DevOps 进度文件 + 协议遵守 | ✅ |
+
+#### @devops — Docker Compose 部署方案（Founder 已批准，继续执行）
+
+请出 Docker Compose 部署方案。以下是 PM 汇总的注意事项，方案中请逐一覆盖：
+
+**1. 后端 API 层已有基础**
+- `app/main.py` FastAPI 入口已存在
+- 5 个 API 路由模块: `auth / projects / images / audio / chapters`
+- 但**前后端联调尚未完成**（前端当前用 Mock 数据），方案中标注此依赖
+
+**2. 环境变量安全管理**
+- 6 个 API Key（ANTHROPIC / GEMINI / OPENAI / VOLCENGINE×3）
+- 方案需明确 `.env` 文件管理方式（不入 Docker image，运行时挂载或 Docker secrets）
+
+**3. Celery + Redis**
+- 图像生成/TTS 等耗时任务需异步处理
+- 当前后端可能还没有 Celery worker 定义，方案中标注此依赖
+- Redis 用途：Celery broker + 可选缓存
+
+**4. Python 版本策略**
+- Docker 容器内使用 Python 3.10+（不动系统 Python 3.8）
+- VPS 文档已提到此策略 ✅
+
+**5. Nginx 共存**
+- 新增 `prefaceai.mov` 站点配置
+- 与现有 `prefaceai.net` (旧站) 并存
+- 旧站 :5000 不动
+
+**6. 方案输出格式建议**
+- 文档路径: `.team-brain/knowledge/DOCKER_COMPOSE_DEPLOYMENT_PLAN.md`
+- 包含: 架构图 + docker-compose.yml 草案 + Dockerfile(s) + Nginx 配置 + 部署步骤 + 依赖清单
+
+完成后通知 PM。
+
+---
+
+### 2026-03-05 15:17 — @backend → @pm @tester @devops
+
+**TASK-SHOT10-REGEN ✅ + Bug #6 (P2) 发现并修复 ✅**
+
+#### 1. TASK-SHOT10-REGEN 完成
+
+Shot_10 补生成完成，18/18 shots 全部到位。
+
+- 输出: `test_output/manualtest/bugfix_regression/20260304_162910/shots/shot_10.png` (848x1264, NB2)
+- Bug #5 验证: dict 格式 chinese_text 正确处理 ✅
+- 角色一致性: 3 人均匹配参考图 ✅
+
+#### 2. 过程中的发现
+
+**首次生成角色一致性差** → 创建全维度诊断脚本 `tests/test_shot10_diagnosis.py`，对 shot_10 vs shot_11 做 6 维度对比（prompt 结构/参考图/API 参数/代码路径/style_preset/prompt diff）。结论: **确认为 NB2 模型随机性**，代码和 prompt 完全一致。wide_shot + high_angle 组合增加了模型保持角色一致性的难度。重跑后正常。
+
+#### 3. Bug #6 (P2): 多人对话气泡缺少说话者指向 — 已修复
+
+| 项 | 详情 |
+|---|------|
+| 文件 | `image_generator.py` |
+| 根因 | `build_native_text_prompt()` dialogue handler 的 `_strip_speaker_for_native()` 剥离说话者名后丢弃；气泡位置硬编码 `upper left/right`；`"tail pointing to speaker"` 无说话者身份 |
+| 影响 | 18 shots 中 5 个含多人对话 (Shot 2/4/5/10/11)，其中 10/11 气泡指向明确错误 |
+| 修复 | 新增 `_extract_speaker_name()`；气泡位置改为 `near {speaker}`；尾部指向改为 `toward {speaker}` |
+| 验证 | shot_10 重跑后林晨宇台词气泡正确出现在林晨宇旁 ✅ |
+
+#### 4. 修改文件清单
+
+| 文件 | 变更 |
+|------|------|
+| `app/services/image_generator.py` | 新增 `_extract_speaker_name()`；dialogue handler + compound handler 气泡位置/指向修复 |
+| `tests/test_shot10_regen.py` | 新建 — shot_10 补生成脚本 |
+| `tests/test_shot10_diagnosis.py` | 新建 — shot_10 vs shot_11 全维度诊断脚本 |
+
+@PM 请 review Bug #6 修复。@DevOps 下次 commit 需包含上述文件。
+
+---
+
+### 2026-03-05 @devops → @pm
+
+**TASK-DEPLOY-PREP Step 2 完成 — Docker Compose 部署方案已输出**
+
+方案文档: `.team-brain/knowledge/DOCKER_COMPOSE_DEPLOYMENT_PLAN.md`
+
+**方案概要**:
+- 4 容器架构: api (FastAPI :8000) + worker (Celery) + frontend (Next.js :3000) + redis (:6379)
+- Nginx 反代: `prefaceai.mov` → `/api/` 转 :8000，`/` 转 :3000，与旧站 `prefaceai.net` 并存
+- Docker 内 Python 3.11-slim（解决系统 3.8 问题）+ Node 20 多阶段构建
+- 环境变量: `.env.production` 运行时挂载，不入 image/Git
+- Cloudflare 代理模式: 源站只监听 :80，HTTPS 由 Cloudflare 处理
+
+**PM 6 项注意事项全覆盖** ✅
+
+**关键依赖**:
+- D1（阻塞部署）: Frontend 需改 `next.config.mjs` 添加 `output: 'standalone'`
+- D2-D4（可延后）: Celery 代码当前完全不存在（0 引用），初始部署走同步模式
+- D5（可延后）: 前后端联调
+
+请 PM 审核方案。
+
+---
+
+### 2026-03-05 15:55 @pm → @all
+
+**PM 审查 — TASK-SHOT10-REGEN + Bug #6 + 对话气泡方案迭代**
+
+#### 1. TASK-SHOT10-REGEN 审查
+
+**Bug #5 验证**: ✅ PASS — dict 格式 `chinese_text` 正确处理，Shot 10 生成成功（848x1264, NB2）。
+
+**角色一致性**: ✅ 3/3 PASS
+| 角色 | image_prompt 位置 | 图中实际 | 匹配 |
+|------|------------------|----------|------|
+| char_002 林建国 | at the left | 左侧酒红衬衫 | ✅ |
+| char_003 林德福 | at the far side | 中后方深色中山装 | ✅ |
+| char_001 林晨宇 | at the right | 右侧灰色衬衫 | ✅ |
+
+#### 2. Bug #6 修复审查 — ❌ 气泡定位不够可靠
+
+**问题 A（Founder 指出, 严重）**: "都给我住口——！"（林德福/爷爷的台词）放在右下方，视觉上紧邻林晨宇。读者会认为是林晨宇在说话。实际说话人林德福在图的上方中间位置，气泡应在爷爷附近。
+
+**问题 B（Founder 指出）**: 林建国台词"你懂什么叫想要！你懂什么叫代价！"被 NB2 重复渲染两次（上左+下左）。代码只请求 3 个气泡，NB2 额外渲染了第 4 个（NB2 多气泡渲染不稳定）。
+
+**根因分析**:
+
+Bug #6 修复使用 `near {中文说话者名}` 替代硬编码位置（`image_generator.py:94-96`）。但 NB2 无法可靠地将中文名映射到图中角色的视觉位置：
+
+1. **语言不匹配**: image_prompt 用英文描述角色位置（`char_003 in faded dark navy Mao-jacket at the far side`），文字叠加指令用中文名（`near 林德福`），NB2 需要跨语言交叉引用
+2. **char_ID 断裂**: character_mapping 包含 `Lin Defu (林德福): [描述]`，但和 image_prompt 中的 `char_003` 关联需要 NB2 自行推断
+3. **"near" 指令过于模糊**: NB2 不知道 "near 林德福" 对应图中哪个空间区域
+
+**Bug #6 修复方向正确**（用说话者身份替代硬编码），但实现方案对 NB2 不够可靠。
+
+#### 3. Founder + PM 讨论 → 简化方案（重要）
+
+经过讨论，Founder 提出一个根本性简化思路：
+
+**❌ 当前方案（过度工程化）**:
+- image_prompt 描述画面（英文）
+- 单独的 TEXT OVERLAY REQUIREMENT 块指定气泡位置（`near {中文名}`）+ 样式（白底、黑框、尾巴指向...）
+
+**✅ Founder 简化方案**:
+- 把对话内容直接嵌入 image_prompt 的场景描述中
+- 例如：`char_003 shouts: '都给我住口——！'` 或 `Lin Defu's dialogue: '都给我住口——！'`
+- 让 NB2 自行理解"谁说的话"并自然放置气泡
+- **不需要单独的气泡指令**
+
+**核心逻辑**: 如果对话和角色在 image_prompt 的**同一句话**里，NB2 天然知道这句话是谁说的、气泡该放在谁旁边。
+
+**适用范围**: 仅针对 dialogue 类型。现有的 thought（内心独白）和 narration（旁白）方式效果好，不动。
+
+#### 4. 派发 @Backend — TASK-BUBBLE-SIMPLIFY（快速验证测试）
+
+**任务**: 用 Shot 10 同样的场景数据，对比 3 种对话嵌入方式，验证哪种 NB2 的气泡定位最准。
+
+**测试变量**:
+
+| 组 | 方式 | 示例 |
+|----|------|------|
+| A | char_ID + 中文台词 | `char_003's dialogue: '都给我住口——！'` |
+| B | 英文名 + 中文台词 | `Lin Defu shouts: '都给我住口——！'` |
+| C | 角色描述 + 中文台词 | `The old man in navy Mao-jacket shouts: '都给我住口——！'` |
+
+**测试数据**: 复用 Shot 10 的 storyboard + character_refs + scene_refs（`test_output/manualtest/bugfix_regression/20260304_162910/`）
+
+**评判标准**:
+1. 3 个气泡是否各自**靠近正确的说话角色**（最重要）
+2. 是否出现重复渲染
+3. 气泡样式是否可接受（无显式气泡指令时 NB2 的自动样式）
+
+**实施方式**:
+- 创建测试脚本 `tests/test_bubble_simplify.py`
+- 每组生成 1 张（共 3 张），对比效果
+- 对话嵌入到 image_prompt 末尾（在现有场景描述之后），替代 TEXT OVERLAY REQUIREMENT 块
+- **仅修改 dialogue 类型**的处理方式，thought/narration 保持现有逻辑
+
+**注意**: 这是验证测试，不是正式代码修改。根据测试结果再决定正式修改方案。
+
+完成后通知 PM，附上 3 张图片对比。
+
+---
+
+### 2026-03-05 16:14 — @backend
+
+#### ✅ TASK-BUBBLE-SIMPLIFY 测试完成
+
+@pm @founder 3 组对话嵌入方案验证完毕，报告如下：
+
+**关键发现：3 组均未渲染对话气泡**
+
+| 评判标准 | 组 A (char_ID) | 组 B (英文名) | 组 C (角色描述) |
+|----------|---------------|--------------|----------------|
+| 1. 气泡靠近正确角色 | N/A - 无气泡 | N/A - 无气泡 | N/A - 无气泡 |
+| 2. 重复渲染 | ✅ 无 | ✅ 无 | ✅ 无 |
+| 3. 气泡样式 | N/A - 无气泡 | N/A - 无气泡 | N/A - 无气泡 |
+
+**对话嵌入内容**:
+- 组 A: `char_001's dialogue: '你们有没有问过我，我想要什么？！'`
+- 组 B: `Lin Chenyu shouts: '你们有没有问过我，我想要什么？！'`
+- 组 C: `The young man in light grey shirt shouts: '你们有没有问过我，我想要什么？！'`
+
+**根因**: 移除 `TEXT OVERLAY REQUIREMENT` 指令块后，NB2 将对话行理解为场景情绪上下文，不渲染气泡/文字。
+
+**额外发现**:
+- 对话嵌入帮助 NB2 更好理解场景情绪（3 人争吵紧张氛围表现到位）
+- 3 组角色一致性均良好，角色定位正确
+
+**输出**: `test_output/manualtest/bubble_simplify/group_A.png`, `group_B.png`, `group_C.png`
+**测试脚本**: `tests/test_bubble_simplify.py`
+
+**Backend 建议（供参考）**:
+1. 保留对话嵌入（帮助情绪理解）+ 精简的气泡渲染指令组合
+2. 或对话嵌入用于情绪 + TextOverlayServiceV2 后处理渲染所有气泡（最可靠）
+
+请 PM/Founder 评审决定下一步。
+
+---
+
+### 2026-03-05 16:45 — @pm
+
+#### ✅ PM 审查 — TASK-DEPLOY-PREP Step 2: Docker Compose 部署方案
+
+**审查结论: PASS（附 6 项修改建议 + 3 项确认事项）**
+
+方案整体架构合理、文档清晰、依赖分析透彻。DevOps 覆盖了 PM 6 项注意事项。
+
+**逐维度审查结果**:
+
+| 维度 | 结果 | 说明 |
+|------|------|------|
+| 架构设计 | ✅ PASS | 4 容器 + Nginx 反代合理；端口无冲突；Redis 仅内部网络 |
+| Docker Compose | ⚠️ 1 项修改 | worker 容器加 `profiles: ["celery"]`，初始部署不启动（代码无 Celery） |
+| Dockerfile.api | ✅ PASS | python:3.11-slim + fonts-noto-cjk + FFmpeg 正确 |
+| Dockerfile.frontend | ✅ PASS | 多阶段构建，D1 阻塞已标注 |
+| Nginx 配置 | ✅ PASS | 路径剥离正确，300s timeout，50m upload，CF 真实 IP 还原 |
+| 环境变量 | ✅ PASS | .env.production 不入 Git，运行时挂载 |
+| 依赖分析 | ✅ PASS | D1 阻塞确认（next.config.mjs 为空），D2-D4 可延后 |
+| 风险评估 | ✅ PASS | 6 项风险全部覆盖 |
+| PM 6 项注意事项 | ✅ 6/6 覆盖 | 端口/旧站/安全/CF/Python版本/Swap |
+
+**修改建议清单**:
+
+| # | 类型 | 内容 | 阻塞？ |
+|---|------|------|--------|
+| R1 | 修改 | worker 加 `profiles: ["celery"]` | 否（但不改会报错） |
+| R2 | 新增 | D6: CORS `allow_origins=["*"]` → 限制域名 | 否 |
+| R3 | 确认 | Cloudflare SSL 模式 | ✅ **已解决** — Full (Strict) |
+| R4 | 确认 | VOLCENGINE_SECRET_KEY | 否 |
+| R5 | 确认 | .env.example 完整性 | 否 |
+| R6 | 建议 | docker-compose.yml 移除 `version: "3.8"` | 否 |
+
+---
+
+#### ✅ Cloudflare SSL 配置完成 — prefaceai.mov
+
+**Founder 操作 + PM 指导，全部完成**:
+
+1. **SSL 模式**: Full → **Full (Strict)** ✅
+2. **Origin Certificate**: 已创建（`*.prefaceai.mov` + `prefaceai.mov`，到期 2041-03-01）
+   - 证书 + 私钥保存: `docker/ssl/prefaceai-mov-origin.pem` + `.key`
+   - `.gitignore` 已更新: `docker/ssl/` + `.env.*`
+3. **边缘证书设置**: 12/12 项与 prefaceai.net 完全一致 ✅
+   - 始终使用 HTTPS: ON
+   - TLS 1.3: ON
+   - 自动 HTTPS 重写: ON
+   - 随机加密: ON
+
+**对部署方案的影响**:
+- Nginx 需改为监听 443 + SSL（Origin Certificate），80 仅做重定向
+- DevOps 部署时需将 `docker/ssl/` 下两个文件复制到 VPS `/etc/ssl/prefaceai-mov/`
+
+@devops 注意：部署方案 Nginx 配置需更新为 HTTPS（Origin Certificate 已就绪）。
+
+---
+
+### 2026-03-05 18:30 — @pm
+
+#### PM 深度分析 — TASK-BUBBLE-SIMPLIFY 全维度解剖
+
+**完整文档**: `.team-brain/analysis/BUBBLE_SIMPLIFY_DEEP_ANALYSIS.md`
+
+**核心发现**:
+
+1. **3 组零气泡的根因**：对话行是叙事标注而非视觉渲染指令 + 被质量标签夹层抑制 + 完全缺少视觉元素描述。与说话者标识方式（char_ID/英文名/描述）无关。
+
+2. **正面发现**：对话嵌入显著增强 NB2 的情绪理解和角色表情质量。且已验证对话嵌入不触发 NB2 自行渲染气泡 → 不会与 TextOverlay 后处理冲突。
+
+3. **NB2 文字渲染能力边界**：单文本固定位置元素（思想/旁白条）可靠；多文本动态定位元素（对话气泡）不可靠（定位错误 + 重复渲染）。
+
+4. **通用性压力测试**（Founder 追问）：混合方案（NB2 native + TextOverlay 分工）在 16+ 风格、多题材、模型迭代维度下脆弱。NB2 native 仅在 2 种风格验证过。
+
+**PM 推荐**: 路径 C — 统一 TextOverlay + 对话嵌入
+
+```
+NB2: 干净画面 + 对话嵌入（情绪增强，use_native_text=False）
+TextOverlayV2: 全类型文字后处理（对话气泡 + 思想条 + 旁白条）
+```
+
+**推荐理由**: 一条代码路径 / 风格无关 / 模型无关 / Stage D 全类型可编辑 / 已验证 42/42, 4.9/5
+
+待 Founder 决策。
+
+---
+
+### 2026-03-05 19:00 — @pm
+
+#### Founder 新证据推翻 PM 初始结论 + TASK-PROMPT-BUBBLE 派发
+
+**Founder 用 Gemini 网页版 NB2 实测**:
+1. 漫画风格 ~30 字 prompt → 3 人对话气泡完美渲染（中文清晰、定位准确、无重复）
+2. 写实风格 + 指定中文文本（方向 2 格式："character has a speech bubble saying '...'") → 同样成功
+
+**PM 初始结论被推翻**: 问题不是 NB2 模型能力边界，而是我们 ~9000 字 prompt 导致对话指令被淹没（注意力权重 < 1%）。
+
+**Founder 确定方向**: 方向 2+3 融合
+- 方向 2: 对话气泡融入场景描述
+- 方向 3: 精简 prompt 冗余（保留必要核心）
+- Stage D: NB2 native 优先
+- 验证: 2 × 10-shot 不同风格故事
+
+**完整分析更新**: `.team-brain/analysis/BUBBLE_SIMPLIFY_DEEP_ANALYSIS.md`（新增第八、九章）
+
+---
+
+### 2026-03-05 19:00 — @pm → @ai-ml
+
+#### 派发 TASK-PROMPT-BUBBLE — Prompt 架构优化（NB2 原生对话气泡）
+
+@ai-ml 请执行以下任务:
+
+**背景**: Founder 实测证明 NB2 完全具备对话气泡渲染能力。当前 prompt (~9000 字) 中对话指令被淹没导致失败。需要优化 prompt 架构，在保持角色一致性和风格一致性的前提下，让 NB2 可靠渲染对话气泡。
+
+**方向**（Founder 确定，方向 2+3 融合）:
+
+1. **对话气泡融入场景描述**（方向 2）:
+   - 将对话从 prompt 末尾的附加块，改为嵌入 `[SCENE DESCRIPTION]` 中
+   - 格式参考: "character has a speech bubble saying '中文台词'"
+   - Founder 已用此格式在 Gemini 网页版验证成功（写实风格 + 指定中文）
+
+2. **精简 prompt 冗余**（方向 3）:
+   - PM 已识别的冗余点（详见分析文档第九章）:
+     - 风格信息三重叠（System Instruction + StyleEnforcer + image_prompt 末尾）→ 去掉重复
+     - Quality Suffix 与 StyleEnforcer mandatory 重叠 → 合并
+     - System Instruction 可精简 → 保留 Aspect Ratio/Color Grade/Lighting/Lens，去掉与 StyleEnforcer 重叠的风格行
+   - **关键原则**: 只精简冗余，该有的核心不能删（StyleEnforcer 前缀、Critical Header、角色身份描述等）
+
+3. **移除原有 TEXT OVERLAY REQUIREMENT 对话分支**:
+   - `build_native_text_prompt()` 中 dialogue 类型不再生成独立的 TEXT OVERLAY REQUIREMENT 块
+   - 对话渲染通过方向 2（嵌入场景描述）实现
+   - thought/narration 的 TEXT OVERLAY REQUIREMENT 暂保留（如果测试中发现也能通过场景嵌入解决，可一并优化）
+
+**验证要求**:
+- **2 个 10-shot 完整故事**，不同内容 + 不同风格
+- 建议: 一个用现有已测试过的故事数据（如家庭晚餐争吵/illustration），一个用不同题材+风格
+- 验证维度:
+  1. 对话气泡渲染成功率（气泡是否出现 + 中文是否准确）
+  2. 气泡定位准确性（是否靠近正确说话者）
+  3. 角色一致性保持（不能因 prompt 改动导致角色变脸）
+  4. 风格一致性保持
+  5. 场景描述准确性（构图、光线、氛围）
+
+**关键参考文档**:
+- `.team-brain/analysis/BUBBLE_SIMPLIFY_DEEP_ANALYSIS.md` — 完整分析（重点看第八、九章）
+- `test_output/manualtest/bubble_simplify/group_*_prompt.txt` — 当前 prompt 结构参考
+- `app/services/image_generator.py:670-750` — prompt 组装逻辑
+- `app/prompts/storyboard_prompts.py` — prompt 各模块构建
+- `app/services/style_enforcer.py` — 风格强制前缀
+
+**输出要求**:
+- 修改后的代码（image_generator.py + 可能的 storyboard_prompts.py / style_enforcer.py）
+- 2 × 10-shot 测试结果（图片 + prompt + 成功率统计）
+- 对比报告: 优化前后 prompt 字符数 + 各维度质量对比
+
+---
+
+### 2026-03-05 19:15 — @pm → @devops
+
+#### 正式派发 TASK-DEPLOY-PREP Step 3 — 更新部署方案（与 TASK-PROMPT-BUBBLE 并行）
+
+@devops 请执行以下更新，基于 PM 审查通过的 Step 2 方案 + 6 项修改建议:
+
+**需要更新的内容**:
+
+**1. Nginx 配置改为 HTTPS（最重要）**:
+- Cloudflare SSL 已设为 **Full (Strict)**，源站必须支持 HTTPS
+- Origin Certificate 已创建并保存在项目中:
+  - 证书: `docker/ssl/prefaceai-mov-origin.pem`
+  - 私钥: `docker/ssl/prefaceai-mov-origin.key`
+  - 覆盖域名: `*.prefaceai.mov` + `prefaceai.mov`，到期 2041-03-01
+- Nginx 配置需改为:
+  - 监听 443 + ssl，引用 Origin Certificate
+  - 80 端口仅做 301 重定向到 HTTPS
+- 部署时需将 `docker/ssl/` 下两个文件复制到 VPS `/etc/ssl/prefaceai-mov/`
+- **参考**: 同机已有 prefaceai.net 的 SSL 配置（证书在 `/home/www/sumai/cert/`）
+
+**2. R1: worker 加 `profiles: ["celery"]`**:
+```yaml
+worker:
+  profiles: ["celery"]  # 初始部署不启动，D2-D4 完成后启用
+```
+代码中 Celery 完全不存在（0 引用），不加 profiles 初始 `docker compose up` 会报错。
+
+**3. R2: CORS 限制域名（D6，非阻塞）**:
+- 当前 `app/main.py` 中 `allow_origins=["*"]`
+- 建议在部署方案中标注: 上线前需限制为 `["https://prefaceai.mov", "https://www.prefaceai.mov"]`
+- 此项不阻塞部署，可后续处理
+
+**4. R6: docker-compose.yml 移除 `version: "3.8"`（非阻塞）**:
+- Compose V2 不再需要 version 字段，保留会触发 deprecation warning
+
+**输出要求**:
+- 更新 `.team-brain/knowledge/DOCKER_COMPOSE_DEPLOYMENT_PLAN.md`（方案文档）
+- 更新 Nginx 配置块（从 HTTP 改为 HTTPS + 重定向）
+- 更新 docker-compose.yml（worker profiles + 移除 version）
+- 更新部署步骤（新增 SSL 证书复制步骤）
+- 完成后通知 PM 审查
+
+**参考文档**:
+- `.team-brain/knowledge/DOCKER_COMPOSE_DEPLOYMENT_PLAN.md` — 当前 Step 2 方案
+- `.team-brain/knowledge/VPS_DEPLOYMENT_ENVIRONMENT.md` — VPS 环境信息
+- PM 审查报告: TEAM_CHAT 2026-03-05 16:45
+
+---
+
+**[2026-03-05 DevOps]** @PM TASK-DEPLOY-PREP Step 3 完成 ✅
+
+PM 审查反馈已全部落实，`DOCKER_COMPOSE_DEPLOYMENT_PLAN.md` 已更新：
+
+**落实项**:
+| # | PM 修改建议 | 落实状态 |
+|---|------------|---------|
+| R1 | worker `profiles: ["celery"]` | ✅ 已添加 |
+| R2 | CORS D6 标注 | ✅ 新增 D6 到依赖清单 |
+| R6 | 移除 `version: "3.8"` | ✅ 已移除 |
+| Nginx HTTPS | Origin Certificate + 301 重定向 | ✅ 全面升级 |
+
+**Nginx HTTPS 配置要点**:
+- HTTP 80 → 301 重定向到 HTTPS
+- HTTPS 443 + Origin Certificate (`/etc/ssl/prefaceai-mov/`)
+- `ssl_session_cache shared:SSL_MOV:10m`（避免与旧站 `SSL:10m` 冲突）
+- HSTS `max-age=63072000`（与旧站一致）
+
+**同步更新的文档**:
+- `DOCKER_COMPOSE_DEPLOYMENT_PLAN.md`（架构图/端口表/docker-compose.yml/Nginx 配置/部署步骤/依赖清单/风险表）
+- `devops-progress/current.md` + `context-for-others.md` + `completed.md`
+- `daily-sync/2026-03-05.md`
+
+请 PM 二次审核。
+
+---
+
+**[2026-03-05 AI-ML]** @PM @Founder TASK-PROMPT-BUBBLE 代码完成 + 2×10-shot 验证通过 ✅
+
+**修改文件**: `app/services/image_generator.py` + `app/prompts/storyboard_prompts.py`
+
+**方向 2 — 对话气泡嵌入场景描述**:
+- 新增 `build_dialogue_scene_embed()` 函数
+- 对话从 prompt 末尾 TEXT OVERLAY REQUIREMENT（<1% 注意力）→ 嵌入 [SCENE DESCRIPTION] 核心区（高注意力）
+- 格式: "Near {speaker}, a white speech bubble with rounded corners displays Chinese text '{台词}' in black font."
+- 支持纯 dialogue + 复合类型中的 dialogue 子项
+- thought/narration 的 TEXT OVERLAY REQUIREMENT 保持不变
+
+**方向 3 — 精简 prompt 冗余** (~400-600 chars 节省):
+- System Instruction: ~400 → ~150 chars（移除与 StyleEnforcer 重叠的 Style Enforcement + Aspect Ratio 行）
+- Quality Suffix: ~80 → 0 chars（`add_quality_suffix=False`，与 mandatory keywords 重叠）
+- `build_native_text_prompt()` dialogue 分支返回 ""（由场景嵌入处理）
+
+**验证结果**:
+| 测试集 | 风格 | 成功率 | 对话嵌入 |
+|--------|------|--------|---------|
+| dialogue_dense_illustration | illustration | 10/10 | 10/10 |
+| slamdunk_dialogue | slam_dunk | 10/10 | 4/4 |
+
+**报告**: `test_output/manualtest/prompt_bubble/comparison_report.md`
+**测试脚本**: `tests/test_prompt_bubble.py`
+
+**待人工检查**: 气泡渲染质量、定位准确性、角色一致性、风格一致性
+
+**文档同步**: ai-ml-progress/current.md + context-for-others.md + completed.md + daily-sync/2026-03-05.md
+
+---
+
+**[2026-03-05 22:46 PM]** @全员 TASK-PROMPT-BUBBLE PM 独立审查报告 — **PASS** ✅
+
+**审查范围**:
+- 20 张生成图片逐一查看（dialogue_dense_illustration 10 + slamdunk_dialogue 10）
+- 代码深度审查: `image_generator.py` (1320 行, 🔴 critical) + `storyboard_prompts.py` + `test_prompt_bubble.py`
+- 侧效分析: 6 项风险点评估
+
+**核心结论**:
+1. **方向 2（对话嵌入场景描述）**: `build_dialogue_scene_embed()` 实现正确，对话成功从 prompt 末尾 (<1% 注意力) 移入 [SCENE DESCRIPTION] 核心区
+2. **方向 3（prompt 精简）**: System Instruction ~400→~150 chars，Quality Suffix 禁用，dialogue TEXT OVERLAY 移除
+3. **验证结果确认**: 20/20 生成成功，14/14 对话嵌入成功
+4. **侧效风险**: 6 项均评估为低至低-中风险，无高风险
+
+**PM 独立发现**:
+- 场景环境不一致（部分 shot 背景差异）— **pre-existing 问题**，非本次变更引入
+- 角色细节漂移（眼镜/发型/球衣号码）— pre-existing
+- Shot 11 气泡位置略偏 — 轻微，不影响可读性
+- **测试脚本未保存 prompt 文本文件** — `prompts/` 目录为空，AI-ML 交付缺口
+- **prompt 精简仅有估算值** (~400-600 chars)，缺少精确的 before/after 数据
+
+**Founder 讨论要点**:
+- Near {中文名} 跨语言映射: 放在高注意力区域效果好很多，但理论上英文名/char_ID 更一致
+- 之前 TASK-BUBBLE-SIMPLIFY 3 组对比（char_ID/English/描述）因零气泡无法评估命名格式
+- Prompt 精简应有精确数据，不能只有估算
+
+---
+
+**[2026-03-05 22:46 PM]** @AI-ML TASK-PROMPT-BUBBLE-FOLLOWUP — 两项后续任务派发
+
+**任务 1: 精确 prompt 尺寸测量** (P1)
+
+请提供 TASK-PROMPT-BUBBLE 优化前后的精确 prompt 尺寸对比:
+- 选择 1 个有对话的 shot（如 dialogue_dense_illustration 的某个 shot）
+- 分别使用优化前逻辑和优化后逻辑生成完整 prompt
+- 记录:
+  - System Instruction: before 字符数 → after 字符数
+  - Quality Suffix: before 字符数 → after 字符数 (应为 0)
+  - TEXT OVERLAY REQUIREMENT (dialogue): before 字符数 → after 字符数 (应为 0)
+  - 对话嵌入 (build_dialogue_scene_embed): 新增字符数
+  - **总 prompt**: before 总字符数 → after 总字符数，净减少百分比
+- 输出: 表格形式，附 before/after prompt 完整文本各保存一份到 `test_output/manualtest/prompt_bubble/prompts/`
+
+**任务 2: Near {speaker} 命名格式 A/B/C 对比** (P1)
+
+当前 `build_dialogue_scene_embed()` 使用中文名 (`Near {speaker}`)。请测试三种命名格式对气泡渲染的影响:
+- **A 组（当前）**: `Near 苏晨, a white speech bubble...` — 中文名
+- **B 组**: `Near Su Chen, a white speech bubble...` — 英文名 (从 `name_en` 字段获取)
+- **C 组**: `Near char_001, a white speech bubble...` — char_ID
+
+测试要求:
+- 修改 `build_dialogue_scene_embed()` 支持传入命名格式参数（`speaker_format: Literal['chinese', 'english', 'char_id']`）
+- 使用 **同一组 shot 数据**（dialogue_dense_illustration 的 10 shots）
+- 每组生成 10 shots
+- 对比维度: 气泡出现率、气泡位置准确性、台词内容正确性
+- 输出: 对比报告 + 3 组各 10 张图片保存到 `test_output/manualtest/prompt_bubble/speaker_format_test/`
+
+**参考**: TASK-BUBBLE-SIMPLIFY 之前测试 3 种格式（char_ID/English/描述），但因零气泡（prompt 位置问题）无法评估。现在位置问题已解决（对话在高注意力区），可以有效对比命名格式的影响。
+
+---
+
+**[2026-03-06 11:00 AI-ML]** @PM @Founder TASK-PROMPT-BUBBLE-FOLLOWUP 两项任务完成 ✅
+
+**任务 1: 精确 prompt 尺寸测量**:
+| 模块 | 优化前 | 优化后 | 差异 |
+|------|--------|--------|------|
+| System Instruction | 635 | 339 | -296 |
+| Quality Suffix | 59 | 0 | -59 |
+| TEXT OVERLAY (dialogue) | 210 | 0 | -210 |
+| Dialogue Scene Embed | 0 | 113 | +113 |
+| **总 prompt (Shot 1)** | **5707** | **5252** | **-455 (-8.0%)** |
+| **总 prompt (Shot 5)** | **5258** | **4803** | **-455 (-8.7%)** |
+
+Prompt 全文: `test_output/manualtest/prompt_bubble/prompts/` (4 个 before/after 文本)
+
+**任务 2: Near {speaker} 命名格式 A/B/C 对比**:
+- 代码: 新增 `_resolve_speaker_label()` + `build_dialogue_scene_embed()` 新增 `characters`/`speaker_format` 参数
+- A 组 (中文名): 10/10 成功, 10/10 对话嵌入, 441s
+- B 组 (英文名): 10/10 成功, 10/10 对话嵌入, 253s
+- C 组 (char_ID): 10/10 成功, 10/10 对话嵌入, 277s
+- **⚠️ B/C 组无参考图** (测试脚本 ref_manager 实例化问题), Founder 人工对比时需注意
+
+**报告**: `test_output/manualtest/prompt_bubble/speaker_format_test/comparison_report.md`
+**图片**: `test_output/manualtest/prompt_bubble/speaker_format_test/{A_chinese,B_english,C_char_id}/images/`
+
+**待 Founder 人工检查**: 三组各 10 张图，对比气泡出现率、气泡定位、台词正确性
+
+**文档同步**: ai-ml-progress/current + context-for-others + completed + TEAM_CHAT + daily-sync/2026-03-06
+
+---
+
+**[2026-03-06 11:33 PM]** @AI-ML @Founder TASK-PROMPT-BUBBLE-FOLLOWUP PM 审查完成 + Founder 决策 + 新任务派发
+
+### PM 审查报告
+
+**任务 1: 精确 prompt 尺寸测量 — PASS ✅**
+- 方法论 ✅ / 数据准确性 ✅ / 覆盖度 ✅ / 产出完整 ✅
+- 手工验证 BEFORE/AFTER prompt 全文，模块增减数字吻合（误差 3 chars，来自格式化换行）
+- 结论：优化后 prompt 减少 ~8%，数据可信
+
+**任务 2: Near {speaker} 命名格式 A/B/C 对比 — 有条件 PASS + 3 个问题**
+
+| 组 | 生成 | 气泡 | 台词正确 | 参考图 | 关键问题 |
+|---|---|---|---|---|---|
+| A (中文名) | 10/10 | 10/10 | 9/10 | ✅ 有 | shot_13 繁体字 |
+| B (英文名) | 10/10 | 10/10 | 8/10 | ❌ 无 | shot_13 全繁体, shot_14 少1气泡 |
+| C (char_id) | 10/10 | 10/10 | 8/10 | ❌ 无 | **shot_01 幽灵气泡+乱码**, shot_10 多"的"字, shot_14 少1气泡 |
+
+**问题 1 (严重)**: C_shot_01 出现幽灵气泡，内容为乱码（疑似模型将 `char_003` 标识符误解读并渲染为乱码中文）
+**问题 2 (中等)**: B/C 组无参考图（ref_manager 实例化 bug），对比不公平
+**问题 3 (代码层面)**: 生产代码第 829 行未传入 `characters`/`speaker_format` 参数（死代码）+ 类型不匹配 (list vs dict)
+
+### Founder 决策
+
+1. **补测 B/C 组（有参考图）**: Founder 直觉认为英文名/char_id 在全英文 prompt 中可能更好。修复 ref_manager 后重跑 A/B/C 三组，控制变量公平对比
+2. **代码修复等补测后再做**: 先确定最终 speaker_format → 再修代码（传参/清理/类型修复）
+3. **繁体字问题 → 多语言 prompt 约束**: 通过 prompt 约束 NB2 渲染简体中文，同时预留多语言扩展（繁体中文/英语/西班牙语/法文等）
+
+### @AI-ML 新任务派发: TASK-PROMPT-BUBBLE-FOLLOWUP-R2
+
+**任务 A: 补测 B/C 组（修复参考图）** (P0)
+- 修复 `test_speaker_format_abc.py` 中 ref_manager 实例化 bug
+- 三组 A/B/C 全部用参考图重跑（控制唯一变量: speaker_format）
+- 使用同一组 shot 数据（dialogue_dense_illustration 10 shots）
+- 输出: 30 张新图 + 对比报告到 `test_output/manualtest/prompt_bubble/speaker_format_test_r2/`
+
+**任务 B: 繁简约束 + 多语言预留** (P1, 可与补测并行)
+- 在 `build_dialogue_scene_embed()` 或 System Instruction 中添加语言约束
+- 默认: `"All text in speech bubbles must be in Simplified Chinese (简体中文)"`
+- 预留 `text_language` 参数扩展点（当前仅实现简体中文，不实现其他语言）
+- 设计时考虑未来扩展: 繁体中文/英语/西班牙语/法文等
+- **核心原则**: 我们是通用 AI 短视频生成工具，不是为单一故事/语言服务
+
+---
+
+### @PM @Founder AI-ML 完成报告: TASK-PROMPT-BUBBLE-FOLLOWUP-R2 (2026-03-06 14:10)
+
+**两项任务全部完成。**
+
+#### Task A: R2 补测 (P0) -- 30/30 成功
+
+R1 Bug 已修复: 循环外生成参考图一次，三组共用同一个 `ref_manager` 实例。
+
+| 组 | speaker_format | 成功率 | 对话嵌入 | 平均参考图/shot | 耗时 |
+|---|---|---|---|---|---|
+| A (Chinese Name) | chinese | 10/10 | 10/10 | 4.4 | 305s |
+| B (English Name) | english | 10/10 | 10/10 | 4.4 | 416s |
+| C (char_ID) | char_id | 10/10 | 10/10 | 4.4 | 332s |
+
+**R1 vs R2 关键差异**:
+- R1: B/C 组 ref_count=0 (bug), 对比不公平
+- R2: 三组 ref_count=4.4/shot (公平对比), text_language=zh-CN 约束已生效
+
+**交付物**:
+- 30 张图: `test_output/manualtest/prompt_bubble/speaker_format_test_r2/{A_chinese,B_english,C_char_id}/images/`
+- 30 份 prompt 文本: `.../{A_chinese,B_english,C_char_id}/prompts/`
+- 对比报告: `test_output/manualtest/prompt_bubble/speaker_format_test_r2/comparison_report.md`
+- 测试脚本: `tests/test_speaker_format_abc_r2.py`
+
+#### Task B: text_language 约束 + 多语言预留 (P1)
+
+- `build_dialogue_scene_embed()` 新增 `text_language: str = "zh-CN"` 参数
+- 新增 `_TEXT_LANGUAGE_CONFIG` 字典 (zh-CN/zh-TW/en 三种语言配置)
+- 气泡描述从 "Chinese text" -> "Simplified Chinese text"
+- 对话行末尾追加语言约束: "All text in speech bubbles MUST be in Simplified Chinese characters only. Do NOT use Traditional Chinese characters."
+- 向后兼容: 生产代码第 829 行无需改动，默认 zh-CN
+- python3 import + 功能验证通过
+
+**等待 Founder 人工检查 30 张图，确定最优 speaker_format 后再修改生产代码传参。**
+
+---
+
+### @Founder @AI-ML @Backend PM R2 审查报告 + Founder 决策: speaker_format=english (2026-03-06 14:45)
+
+**审查范围**: R2 全部 30 张图片逐一检查，7 个维度对比。
+
+#### 审查结果汇总
+
+| 维度 | A (中文名) | B (英文名) | C (char_id) | 结论 |
+|---|---|---|---|---|
+| 气泡出现率 | 10/10 | 10/10 | 10/10 | 三组持平 |
+| 台词准确性 | 10/10 | 10/10 | 9/10 | C 组 shot_07 乱码 |
+| 气泡定位 | 正常 | 正常 | 正常 | 三组持平 |
+| 幽灵气泡 | 0 | 0 | 1 (shot_07) | C 组有系统性风险 |
+| 重复渲染 | 1 (shot_01) | 2 (shot_01, shot_14) | 0 | NB2 随机性，非格式相关 |
+| 繁简体 | 全部简体 | 全部简体 | 全部简体 | text_language=zh-CN 完全修复 R1 繁体问题 |
+| 角色一致性 | pre-existing issues | pre-existing issues | pre-existing issues | 非 speaker_format 相关，延后处理 |
+
+#### C 组淘汰原因
+
+Shot_07 出现幽灵气泡，内容为乱码 "顾传付，庿菖志...人"。这与 R1 的 C_shot_01 幽灵气泡问题同源 — `char_id` 格式（char_002/char_003）在模型高注意力区域被误解读为需要渲染的内容。**系统性风险，淘汰 C 组。**
+
+#### B 组推荐原因
+
+1. **语言一致性**: 全英文 prompt 中 "Near Gu Jianguo" 比 "Near 顾建国" 语言统一，模型解析更清晰
+2. **多语言扩展性**: 未来国际化时，英文名可直接适用于英文/西班牙语等目标语言
+3. **Founder 直觉一致**: Founder 此前提出英文名在英文 prompt 中可能更好，审查结果证实
+
+#### Founder 决策
+
+**确认 speaker_format='english' 为最终选择。**
+
+#### 下一步: @Backend 生产代码修改
+
+`image_generator.py` 第 829 行需传入以下参数:
+```python
+build_dialogue_scene_embed(
+    characters=characters_dict,    # dict, 非 list — 需修复类型不匹配
+    speaker_format='english',       # Founder 决策
+    text_language='zh-CN'           # 默认简体中文
+)
+```
+
+具体修改:
+1. 传入 `characters` dict（当前 shot 的角色信息映射）
+2. 传入 `speaker_format='english'`
+3. 传入 `text_language='zh-CN'`
+4. 清理死代码路径（如有）
+5. 修复类型不匹配（list vs dict）
+
+**PM 将在 Backend 完成后进行 Code Review。**
+
+---
+
+### @frontend — TASK-RESPONSIVE-OPT 完成 (2026-03-06)
+
+**任务**: 响应式优化 / 移动端适配
+**状态**: 完成，待 PM 复验
+
+修改 7 个文件，在保持现有 UI 和交互体验不变的前提下优化移动端适配：
+
+- `DashboardContent.tsx` — 统计卡片响应式堆叠
+- `Showcase.tsx` — Lightbox 触控优化（关闭按钮/箭头/圆点加大）
+- `HeroSection.tsx` — 100dvh 修复移动浏览器高度问题
+- `StoryDetailContent.tsx` — 导航箭头/缩略图/标题响应式
+- `StageB.tsx` — 删除按钮触屏可见 + "点击编辑"桌面限定
+- `StageD.tsx` — 导航箭头加大 + Shot meta 文字调整
+- `Header.tsx` — 移动菜单 body scroll lock
+
+`npm run build` 18 路由通过，0 错误。
+
+另外，**视频预览器组件**已记录到 `frontend-progress/current.md` 待做列表，等 Phase 4.5 视频合成就绪后再实现。
+
+---
+
+### 2026-03-06 14:56 — @backend → @pm
+
+**TASK-BUBBLE-SPEAKER-FORMAT-DEPLOY 完成**
+
+**文件**: `app/services/image_generator.py:848-853`
+
+**修改内容**: `build_dialogue_scene_embed(text_overlay)` 补全三个参数:
+
+```python
+dialogue_embed = build_dialogue_scene_embed(
+    text_overlay,
+    characters=characters.get("characters", []),
+    speaker_format='english',
+    text_language='zh-CN'
+)
+```
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| `characters` | `characters.get("characters", [])` | 从 dict 包装器提取角色列表，供 `_resolve_speaker_label` 查找英文名 |
+| `speaker_format` | `'english'` | Founder 决策: 英文名（避免 char_id 幽灵气泡风险） |
+| `text_language` | `'zh-CN'` | 简体中文约束，防止繁体字问题 |
+
+**类型匹配说明**: `generate_shot_image_phase2` 的 `characters` 参数是 `dict`（`{"characters": [...]}`），通过 `.get("characters", [])` 提取列表，与 `build_dialogue_scene_embed` 和 `_resolve_speaker_label` 内部 `list` 遍历逻辑一致。无需修改函数签名。
+
+**死代码检查**: 无需清理。`build_native_text_prompt` dialogue 分支正确返回 `""`；`_extract_speaker_name` / `_strip_speaker_for_native` 仍在 `build_dialogue_scene_embed` 中使用。
+
+**验证**: `python3 -c "from app.services.image_generator import ImageGenerator"` 无报错。
+
+@PM 请 Code Review。
+
+---
+
+### 2026-03-06 15:26 — @pm
+
+#### PM Code Review — TASK-BUBBLE-SPEAKER-FORMAT-DEPLOY: **PASS** (零问题)
+
+**审查范围**: `image_generator.py:848-853` 单处修改，12 个维度全覆盖深度审查。
+
+| # | 审查维度 | 结果 | 说明 |
+|---|---------|------|------|
+| 1 | 参数正确性 | PASS | 3 参数值与 Founder 决策一致 |
+| 2 | 类型链验证 | PASS | dict → .get() → list，全链匹配 (`pipeline_orchestrator:133` → `generate_shot_image_phase2:753` → `build_dialogue_scene_embed:199` → `_resolve_speaker_label:140`) |
+| 3 | 数据源保障 | PASS | `character_designer.py:268` 验证 `name_en` 为 required 字段，实际数据 3/3 角色均有 name_en |
+| 4 | 回退安全性 | PASS | 3 层防护: 空 list → 回退中文名 → 缺 name_en 回退中文名 |
+| 5 | 死代码审计 | PASS | dialogue 分支返回 ""，helper 函数仍被使用，无需清理 |
+| 6 | Safe wrapper 兼容 | PASS | `generate_shot_image_phase2_safe:1083-1093` 透传 characters |
+| 7 | 复合类型覆盖 | PASS | dialogue_with_thought 等复合类型 line 272-276 同样使用 _resolve_speaker_label |
+| 8 | Pipeline 调用验证 | PASS | `pipeline_orchestrator.py:320` 唯一调用点，数据流正确 |
+| 9 | R2 测试对等性 | PASS | 生产代码与 R2 测试脚本使用完全相同的数据提取模式和参数值，B 组 10/10 已验证 |
+| 10 | 边缘场景 | PASS | characters=None 不可能(Stage2必产出) / 空说话者名(无Near前缀,可接受) / 中文名不匹配(回退中文名) |
+| 11 | 修改范围 | PASS | 1 文件 1 处 6 行，无新依赖、无接口变更 |
+| 12 | 派发一致性 | PASS | 实现与 PM 派发 100% 一致 |
+
+**结论**: speaker_format 功能从 AI-ML 代码实现 → R2 30 张图验证 → Founder 决策 → Backend 生产接入 → PM Code Review，**全链路闭环**。
+
+**下一步**:
+- speaker_format 功能已闭环，后续统一 E2E 回归测试时 Tester 会覆盖
+- PM 继续进行 TASK-DEPLOY-PREP Step 3 二次审核
+- Frontend 有 TASK-RESPONSIVE-OPT 待 PM 复验
+
+---
+
+### 2026-03-06 16:00 — @pm
+
+#### PM 二次审核 — TASK-DEPLOY-PREP Step 3: **PASS** (1 项非阻塞建议)
+
+**审查范围**: DevOps 更新后的 `DOCKER_COMPOSE_DEPLOYMENT_PLAN.md` 全文（561 行），验证 PM Step 2 审查 4 项修改建议是否全部正确落实。
+
+**4 项落实验证**:
+
+| # | PM 修改建议 | 落实状态 | 验证详情 |
+|---|------------|---------|---------|
+| R1 | worker `profiles: ["celery"]` | PASS | Line 117 `profiles: ["celery"]` + Line 111 注释说明 + Line 158 设计决策解释 |
+| R2 | CORS D6 标注 | PASS | Line 519 新增 D6 条目，说明 `allow_origins=["*"]` 需限制为 prefaceai.mov |
+| R6 | 移除 `version: "3.8"` | PASS | docker-compose.yml 无 version 字段 + Line 159 解释原因 |
+| Nginx HTTPS | Origin Certificate + 301 重定向 | PASS | 完整 HTTPS 配置（Lines 249-361），详见下方 |
+
+**Nginx HTTPS 配置深度验证** (8 维度):
+
+| 维度 | 结果 | 说明 |
+|------|------|------|
+| HTTP 80 重定向 | PASS | `return 301 https://$host$request_uri` |
+| HTTPS 443 + SSL | PASS | `listen 443 ssl http2` + Origin Certificate 路径正确 |
+| SSL 证书路径 | PASS | `/etc/ssl/prefaceai-mov/prefaceai-mov-origin.pem` + `.key` |
+| SSL Session Cache | PASS | `SSL_MOV:10m` 避免与旧站 `SSL:10m` 冲突 |
+| HSTS | PASS | `max-age=63072000` 与旧站一致 |
+| Cloudflare Real IP | PASS | 15 个 CF IP 段 + `CF-Connecting-IP` |
+| 安全头 | PASS | X-Frame-Options + X-Content-Type-Options + X-XSS-Protection |
+| 部署步骤 | PASS | Step 3 包含 SSL 证书复制 + `chmod 600` 权限设置 |
+
+**架构图 + 端口表 + 风险表 一致性**: PASS — 均已更新为 HTTPS 443 + Origin Certificate，Cloudflare SSL 风险标记为已解决。
+
+**1 项非阻塞建议**:
+
+| # | 类型 | 内容 | 阻塞？ |
+|---|------|------|--------|
+| N1 | 文档一致性 | Step 4 验证清单 `docker compose ps` 预期 "4 个容器 Up"，但 profiles 下初始部署仅 3 个容器（api+frontend+redis）。Step 2.6 正确写了 "3 个容器"。建议 Step 4 改为 "3 个容器 Up（初始）/ 4 个（启用 Celery 后）" | 否 |
+
+**结论**: DevOps 落实质量高，4 项修改建议 100% 正确实现。Nginx HTTPS 配置专业且完整。TASK-DEPLOY-PREP Step 3 **PASS**，方案可提交 Founder 最终批准后执行部署。
+
+---
+
+#### PM 复验 — TASK-RESPONSIVE-OPT: **PASS** (4.5/5)
+
+**审查范围**: Frontend 7 个文件的移动端响应式优化，逐文件代码审查。
+
+**逐文件审查结果**:
+
+| # | 文件 | 修改项 | 结果 | 验证详情 |
+|---|------|--------|------|---------|
+| 1 | `DashboardContent.tsx:74` | 统计卡片响应式 | PASS | `grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4` — 移动端单列，桌面三列 |
+| 2 | `Showcase.tsx:252,274,306,323` | Lightbox 触控优化 | PASS | 关闭按钮 44px(mobile)/40px(desktop)，导航箭头 40px/48px，圆点 12px/10px — 均符合 Apple 44px 最低触控标准 |
+| 3 | `HeroSection.tsx:100` | 移动浏览器高度修复 | PASS | `min-h-[100dvh]` 使用 Dynamic Viewport Height，修复 iOS Safari 地址栏高度问题 |
+| 4 | `StoryDetailContent.tsx:110,118,136,173` | 导航/缩略图/标题响应式 | PASS | 箭头 `p-2.5 sm:p-2`（移动端更大），缩略图 `w-12 h-16 sm:w-14 sm:h-20`，标题 `text-lg sm:text-xl` |
+| 5 | `StageB.tsx:52,237` | 删除按钮+编辑提示 | PASS | 删除按钮 `sm:opacity-0 sm:group-hover:opacity-100`（移动端始终可见），"点击编辑" `hidden sm:inline`（桌面限定） |
+| 6 | `StageD.tsx:107,114,168` | 导航箭头+Meta 文字 | PASS | 箭头 `w-10 h-10 sm:w-8 sm:h-8`（移动端更大 40px vs 32px），Meta `text-[11px] sm:text-[10px]`（移动端略大） |
+| 7 | `Header.tsx:20-27` | 移动菜单 scroll lock | PASS | `document.body.style.overflow="hidden"` + unmount cleanup |
+
+**综合评估**:
+
+| 维度 | 评分 | 说明 |
+|------|------|------|
+| 功能正确性 | 5/5 | 7/7 文件修改点全部正确实现 |
+| 响应式断点一致性 | 5/5 | 统一使用 `sm:` (640px) 断点，符合 Tailwind 规范 |
+| 触控目标规范 | 4/5 | 大部分符合 44px 标准，少数 40px 可接受 |
+| 构建验证 | 5/5 | Frontend 确认 `npm run build` 18 路由通过，0 错误 |
+| 无副作用 | 4/5 | 修改范围精确（仅 className），无新依赖、无逻辑变更 |
+
+**总评**: **4.5/5** — 精准的最小化修改，每处改动都有明确的移动端改善目标。
+
+---
+
+#### 派发 @tester — TASK-E2E-REGRESSION (综合 E2E 回归测试)
+
+@tester 请执行以下综合回归测试，覆盖近期所有代码改动。
+
+**背景**: 近期完成多项功能改动（speaker_format=english + text_language=zh-CN + prompt 精简 + 对话嵌入场景描述 + SQ-1~SQ-8 shot 质量改进），需要统一 E2E 回归验证。
+
+**测试要求**:
+
+| 项目 | 要求 |
+|------|------|
+| 故事数量 | 2 个不同题材 |
+| 每个故事 Shot 数 | **10 shots**（Founder 明确要求，不是 20-29） |
+| 风格 | 2 个不同风格（建议: illustration + slam_dunk 或 ink） |
+| 流程 | 完整 Stage 1 -> 5（含 NB2 原生文字渲染） |
+
+**验收维度** (7 项):
+
+| # | 维度 | 标准 |
+|---|------|------|
+| 1 | 生成成功率 | 10/10 每组 |
+| 2 | 角色一致性 | 同一角色跨 shot 可辨识 |
+| 3 | 风格一致性 | 全部 shot 风格统一 |
+| 4 | 对话气泡渲染 | 气泡出现率 + 中文正确 + 定位合理 |
+| 5 | speaker_format=english | "Near {英文名}" 格式生效 |
+| 6 | text_language=zh-CN | 全部简体中文，无繁体 |
+| 7 | 场景描述准确性 | 构图/光线/氛围与 image_prompt 一致 |
+
+**注意**:
+- 对话气泡通过场景嵌入实现（`build_dialogue_scene_embed`），不再有独立 TEXT OVERLAY REQUIREMENT
+- thought/narration 仍然使用 TEXT OVERLAY REQUIREMENT
+- `use_native_text=True` 为当前默认
+
+**输出要求**:
+- 2 组各 10 张图片
+- 每组验收评分（7 维度 + 总评）
+- 对比报告: `test_output/manualtest/e2e_regression/comparison_report.md`
+- 测试脚本: `tests/test_e2e_regression.py`
+
+完成后通知 PM。
+
+---
+
+### 2026-03-06 16:15 — @pm
+
+#### Founder 批准 DEPLOY-PREP 部署方案 + @DevOps 正式部署派发
+
+**Founder 决策**: 批准 Docker Compose 部署方案，DevOps 开始实际部署。
+
+---
+
+#### 正式派发 @devops — TASK-DEPLOY-EXEC (VPS 实际部署)
+
+@devops 请按 `DOCKER_COMPOSE_DEPLOYMENT_PLAN.md` 方案执行 VPS 实际部署。
+
+**方案文档**: `.team-brain/knowledge/DOCKER_COMPOSE_DEPLOYMENT_PLAN.md`（已通过 PM Step 2 审查 + Step 3 二次审核 + Founder 批准）
+
+**执行步骤**:
+
+1. **Step 1: VPS 系统准备** (root)
+   - 创建 4GB Swap
+   - 安装 Docker + Compose
+   - trader 用户加入 docker 组
+
+2. **Step 2: 项目部署** (trader)
+   - 克隆代码 (`git clone` 到 `/opt/xuhua-story`)
+   - 创建 `.env.production`（手动填入 API Key）
+   - 创建 Dockerfile + docker-compose.yml
+   - `docker compose up -d --build`（不含 worker，Celery 代码不存在）
+   - 验证 3 个容器: api + frontend + redis
+
+3. **Step 3: SSL 证书 + Nginx 配置** (root)
+   - 复制 Origin Certificate 到 `/etc/ssl/prefaceai-mov/`
+   - 创建 `/etc/nginx/sites-enabled/prefaceai-mov`（HTTPS 443 + 80 重定向）
+   - `nginx -t` + `systemctl reload nginx`
+
+4. **Step 4: 验证清单**
+   - Docker 容器状态: 3 个 Up（初始，不含 worker）
+   - API + 前端 + Redis + Nginx 代理 + 外部访问 + 旧站不受影响
+
+**前置依赖**:
+- **D1（阻塞）**: Frontend 需改 `next.config.mjs` 添加 `output: 'standalone'`
+  - @devops 如遇此问题，通知 PM 派发给 Frontend
+- D2-D6 均可延后
+
+**PM 二次审核建议 N1**: Step 4 验证清单中 `docker compose ps` 预期改为 "3 个容器 Up"（初始部署不含 worker）。
+
+**注意事项**:
+- `.env.production` 中的 API Key 需要 Founder 提供真实值
+- `docker/ssl/` 下的 Origin Certificate 已在项目中，需复制到 VPS
+- 与旧站 prefaceai.net 互不干扰（独立 server_name + 独立 SSL session cache）
+
+**输出要求**:
+- 每步完成后在 TEAM_CHAT 报告进度
+- 遇到问题立即通知 PM
+- 全部完成后提交 Step 4 验证清单结果
+
+---
+
+#### PM 备忘 — Tester E2E 完成后待推进事项
+
+以下 2 项在 Tester TASK-E2E-REGRESSION 完成 + PM 复核后安排：
+
+| # | 事项 | 说明 | 涉及 Agent |
+|---|------|------|-----------|
+| 1 | Phase 4.5 视频合成 | FFmpeg 集成方案选型 + 实现（当前 5%） | @Backend |
+| 2 | 前后端联调 (D5) | 前端 Mock 数据 → 对接真实 API | @Frontend + @Backend |
+
+---
+
+### 2026-03-06 17:00 — @devops → @pm @founder
+
+#### TASK-DEPLOY-EXEC 启动 — 全面状态检查 + 3 项阻塞待确认
+
+收到 PM 派发 TASK-DEPLOY-EXEC（VPS 实际部署），已完成全面状态检查。
+
+**已确认就绪**:
+- 部署方案文档 DOCKER_COMPOSE_DEPLOYMENT_PLAN.md（PM 二次审核 PASS + Founder 批准）
+- VPS 环境: 107.148.1.199 (8C/16GB/200GB, Ubuntu 20.04), root 密钥登录可用
+- SSL: Cloudflare Full (Strict) + Origin Certificate 本地存在 (`docker/ssl/`)
+- `/health` endpoint 已就绪（`app/main.py:63-66`）
+- `requirements.txt` 已确认（celery 可延后，不阻塞初始部署）
+
+**发现 3 项阻塞**:
+
+| # | 阻塞项 | 说明 | 需要谁 |
+|---|--------|------|--------|
+| 1 | **D1: `frontend/next.config.mjs` 缺 `output: 'standalone'`** | 当前为空配置 `{}`，Docker 前端多阶段构建必需此选项。不加无法生成 standalone 产物，`COPY --from=builder /app/.next/standalone` 会失败 | @Frontend 或 DevOps 直接加（1行配置） |
+| 2 | **45 文件未提交/未推送** | 工作区含 TASK-PROMPT-BUBBLE + 响应式优化 + 部署文档等。VPS `git clone` 只能拿到 2026-03-05 push 的旧代码 | 需 PM 确认 commit+push 节奏 |
+| 3 | **`.env.production` API Key** | VPS 上需手动创建，6 个敏感 Key 需 Founder 提供真实值 | @Founder |
+
+**额外发现**:
+- `docker/` 目录下只有 `ssl/`，Dockerfile 和 docker-compose.yml 需部署时创建（方案文档有完整草案）
+- SSL 证书被 `.gitignore` 排除，需 SCP 手动传到 VPS
+- `app/main.py:40` CORS `allow_origins=["*"]`（D6 可延后）
+
+**请确认**:
+1. D1: 我直接加 `output: 'standalone'` 可以吗？还是需要 PM 派发给 Frontend？
+2. 45 文件 commit+push: 我是否先执行？
+3. API Key: VPS 上手动创建 `.env.production` 时 Founder 提供？
+
+确认后立即开始 Step 1-4 执行。
+
+---
+
+### 2026-03-06 17:30 — @tester → @pm @founder
+
+#### TASK-E2E-REGRESSION 已接收，开始执行
+
+收到 PM 派发 TASK-E2E-REGRESSION，已完成全面文档阅读和测试准备。
+
+**测试设计**:
+
+| 组 | 题材 | 风格 | Shots | Idea |
+|----|------|------|-------|------|
+| A | 都市情感 | illustration | 10 | 深夜便利店，一个独居程序员和便利店夜班女孩，从每晚的一碗关东煮开始的温暖故事 |
+| B | 古装武侠 | ink | 10 | 江湖传闻中的神秘剑客，为了寻找失踪的师父，踏上了一段充满恩怨的武林之旅 |
+
+**7 维度验收**:
+1. 成功率 — shots 生成成功比例
+2. 角色一致性 — 同角色跨 shot 外貌一致
+3. 风格一致性 — 全组风格统一
+4. 对话气泡渲染 — NB2 原生气泡出现率+质量
+5. speaker_format=english — "Near {英文名}" 格式
+6. text_language=zh-CN — 全部简体中文
+7. 场景描述准确性 — 构图与 prompt 一致
+
+**覆盖变更**:
+- TASK-PROMPT-BUBBLE 全链路（对话嵌入 + speaker_format + text_language）
+- SQ-1~SQ-8 shot 质量改进
+- DEC-014 previous_shot_image 移除
+- System Instruction 精简 + Quality Suffix 禁用
+
+测试脚本: `tests/test_e2e_regression.py`
+输出目录: `test_output/manualtest/e2e_regression/`
+
+开始执行，完成后通知 PM。
+
+---

@@ -4,6 +4,37 @@
 
 ---
 
+## 2026-03-06
+
+### TASK-RESPONSIVE-OPT 响应式 / 移动端适配 ✅
+
+**完成时间**: 2026-03-06
+**验收状态**: 待 PM 复验
+
+**完成内容（7 文件修改）**:
+
+在保持现有 UI 和交互体验不变的前提下，优化移动端适配：
+
+| 文件 | 变更 |
+|------|------|
+| `app/dashboard/DashboardContent.tsx` | 统计卡片 grid-cols-3 -> grid-cols-1 sm:grid-cols-3，手机上纵向堆叠 |
+| `components/sections/Showcase.tsx` | Lightbox: 关闭按钮加大触控区域(w-11 h-11)，图片 mx-16->mx-4 sm:mx-16，导航箭头缩小，圆点指示器加大 |
+| `components/sections/HeroSection.tsx` | min-h-screen -> min-h-[100dvh]，修复移动浏览器地址栏高度问题 |
+| `app/dashboard/[storyId]/StoryDetailContent.tsx` | 导航箭头 p-2->p-2.5 sm:p-2，缩略图 w-12 h-16 sm:w-14 sm:h-20，标题 text-lg sm:text-xl |
+| `components/create/StageB.tsx` | 删除按钮 sm:opacity-0（触屏始终可见），"点击编辑" hidden sm:inline |
+| `components/create/StageD.tsx` | 导航箭头 w-10 h-10 sm:w-8 sm:h-8，Shot meta text-[11px] sm:text-[10px] |
+| `components/layout/Header.tsx` | 移动菜单打开时 body scroll lock（useEffect + overflow hidden） |
+
+**验收指标**:
+- 7/7 文件修改: ✅
+- `npm run build` 18 路由通过: ✅
+- 触控目标 ≥ 44px: ✅
+- hover 状态桌面限定: ✅
+- 100dvh 修复: ✅
+- body scroll lock: ✅
+
+---
+
 ## 2026-03-04
 
 ### TASK-CREATE-UPGRADE P2 P3/P4 修复 ✅

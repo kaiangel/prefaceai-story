@@ -5,7 +5,9 @@
 
 # --- 安全红线：绝对不能进仓库 ---
 .env
+.env.*
 *.db
+docker/ssl/
 
 # --- 大型生成产物 (2.4GB) ---
 test_output/

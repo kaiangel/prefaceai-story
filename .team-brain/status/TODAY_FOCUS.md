@@ -1,7 +1,7 @@
 # 今日重点 (2026-03-03)
 
 > 每天更新，所有 Agent 开工前必读
-> **当前状态**: 4daad77 已提交 ✅ → **@DevOps 剩余 ~120 文件批次提交 + push 进行中**
+> **当前状态**: Founder 批准部署 → **@DevOps 实际部署 + @Tester E2E 回归（并行）**
 > **⚠️ 文档更新协议**: 共享文档由PM统一更新，详见 `.team-brain/TEAM_PROTOCOL.md`
 
 ---
@@ -260,7 +260,47 @@
         ↓
 9️⃣2️⃣ ✅ @DevOps TASK-GIT-COMMIT-3 (4daad77, 7 文件)
         ↓
-9️⃣3️⃣ 🔧 @DevOps 剩余文件批次提交 (Batch A/B/C ~120 文件) + push  ← 当前
+9️⃣3️⃣ ✅ @DevOps 剩余文件批次提交 (131 文件, 4 commits) + push 完成
+        ↓
+9️⃣4️⃣ ✅ @Backend TASK-SHOT10-REGEN — shot_10 补生成完成 + Bug #6 发现并修复
+        ↓ (并行)
+9️⃣5️⃣ ✅ @DevOps TASK-DEPLOY-PREP Step 2 — Docker Compose 部署方案已提交
+        ↓
+9️⃣6️⃣ ✅ PM 审查 Shot_10 + Bug #6 深度分析 + Founder 碰撞 → 简化方案
+        ↓
+9️⃣7️⃣ ✅ @Backend TASK-BUBBLE-SIMPLIFY — 测试完成（3 组均无气泡，NB2 将对话理解为情绪上下文）
+        ↓
+9️⃣8️⃣ ✅ PM 审查 Docker Compose 部署方案 — PASS（8 维度 + 6 项建议 + 3 项确认）
+        ↓
+9️⃣9️⃣ ✅ Cloudflare SSL 配置: Full (Strict) + Origin Certificate + 边缘证书 12/12
+        ↓
+🔟0️⃣ ✅ PM 深度分析 + Founder 新证据（NB2 具备能力）→ 方向确定: 修复 prompt 架构
+        ↓
+🔟1️⃣ ✅ 并行完成:
+    ├─ @AI-ML: TASK-PROMPT-BUBBLE ✅ — 20/20 成功, 14/14 对话嵌入
+    └─ @DevOps: TASK-DEPLOY-PREP Step 3 ✅ — R1/R2/R6 + Nginx HTTPS 已更新
+        ↓
+🔟2️⃣ ✅ PM 独立审查 TASK-PROMPT-BUBBLE — PASS (20 图片 + 代码深度审查 + 6 项侧效)
+        ↓
+🔟3️⃣ ✅ 并行完成:
+    ├─ @AI-ML: TASK-PROMPT-BUBBLE-FOLLOWUP ✅ — 精确测量(8%精简) + A/B/C对比(30张)
+    └─ @PM: FOLLOWUP PM 审查 ✅ + Founder 3项决策 + FOLLOWUP-R2 派发
+        ↓
+🔟4️⃣ ✅ 并行完成:
+    ├─ @AI-ML: TASK-PROMPT-BUBBLE-FOLLOWUP-R2 ✅ — 补测30张(P0) + 繁简约束(P1)
+    └─ @PM: R2 审查 ✅ + Founder 决策 speaker_format=english
+        ↓
+🔟5️⃣ ✅ 完成:
+    ├─ @Backend: 生产代码修改 ✅ (image_generator.py:848-853)
+    └─ @PM: Code Review 12 维度 PASS ✅ — speaker_format 全链路闭环
+        ↓
+🔟6️⃣ ✅ 完成:
+    ├─ @PM: TASK-DEPLOY-PREP Step 3 二次审核 PASS (4/4 落实 + Nginx HTTPS 8 维度)
+    └─ @PM: TASK-RESPONSIVE-OPT 复验 PASS (4.5/5, 7 文件全部通过)
+        ↓
+🔟7️⃣ ⏳ 并行执行中:  ← 当前
+    ├─ @Tester: TASK-E2E-REGRESSION 综合回归测试 (2 故事 × 10 shots, 7 维度)
+    └─ @DevOps: TASK-DEPLOY-EXEC VPS 实际部署 (Founder 批准, Step 1-4)
 ```
 
 ---
@@ -275,12 +315,12 @@
 
 | Agent | 状态 | 说明 |
 |-------|------|------|
-| @pm | ✅ 任务派发完成 | Founder 确认 → @DevOps 已派发 |
-| @frontend | ✅ 空闲 | P0+P1+P2 全部完成 + P3/P4 修复完成 |
-| @devops | 🔧 批次提交 + push | 4daad77 ✅ + Batch A/B/C ~120 文件 + push |
-| @backend | ✅ 全部完成 | Bug#1/#2/#4/#5 修复 — PM Review PASS |
-| @ai-ml | ✅ 全部完成 | Rule#6/#7/#8 + SQ-3/4/5 — PM Review PASS |
-| @tester | ✅ 回归验证完成 | 4.36/5 + 4/4 Bug PASS + Bug #5 发现 |
+| @pm | ⏳ 等 DevOps 部署 + Tester E2E 结果 | 两项并行监控 |
+| @frontend | ✅ 空闲 | 可能收到 D1 (next.config.mjs) 请求 |
+| @devops | ⏳ TASK-DEPLOY-EXEC | VPS 实际部署 Step 1-4 |
+| @backend | ✅ 空闲 | E2E 后安排 Phase 4.5 + 联调 |
+| @ai-ml | ✅ 空闲 | 代码已在生产启用 |
+| @tester | ⏳ TASK-E2E-REGRESSION | 2 故事 × 10 shots, 7 维度 |
 
 ---
 
@@ -362,5 +402,5 @@ Phase 4 任务:
         ↓
   回归验证: ✅ @Tester 4.36/5 + PM 独立复核 4.36/5 (差异 0)
         ↓
-  Bug #5 修复 (@Backend) → TASK-GIT-COMMIT-3  ⏳  ← 当前
+  Bug #5 修复 (@Backend) → TASK-GIT-COMMIT-3 ✅ → TASK-SHOT10-REGEN ✅ → PM 审查 + Bug #6 分析 ✅ → TASK-BUBBLE-SIMPLIFY ✅ → TASK-PROMPT-BUBBLE ✅ → FOLLOWUP ✅ + PM审查 + Founder决策 → FOLLOWUP-R2 ✅ + R2审查 + Founder决策(english) → Backend 生产代码修改 ✅ + PM Code Review PASS ✅ — **speaker_format 全链路闭环**
 ```

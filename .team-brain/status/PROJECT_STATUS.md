@@ -1,6 +1,6 @@
 # 序话Story 项目状态看板
 
-> 最后更新: 2026-03-04
+> 最后更新: 2026-03-06
 > 更新者: PM
 
 ---
@@ -11,7 +11,7 @@
 项目名称: 序话Story - AI条漫/短视频生成系统
 目标: 用户输入创意 → 自动生成可发布的条漫或短视频
 当前版本: v0.6.6
-当前主线: 🟢 主线稳定（回归验证 4.36/5 ✅ + PM 4.36/5 ✅ → **4daad77 ✅** → @DevOps 剩余批次提交 + push 进行中）
+当前主线: 🟢 主线稳定（Founder 批准部署 → DevOps 实际部署 + Tester E2E 回归 并行执行中）
 核心内容: 都市情感短剧 (DEC-005)
 产品形态: 条漫优先 → 短视频保留
 Pipeline品牌: FrameSpark™
@@ -29,7 +29,7 @@ Pipeline品牌: FrameSpark™
 | 4 | 条漫MVP技术验证 | ✅ **完成** | 100% | PM + AI-ML + Backend + Tester |
 | 4.5 | 视频合成 | 🔄 WIP | 5% | Backend |
 | 5 | 前端开发 | ✅ **LP+Stage A+Create P0+P1+P2 全部完成, PM 复验全部通过** | 95% | Frontend (LP 5.0/5 + 子页面 4.8/5 + Stage A 4.8/5 + P0 4.8/5 + P1 4.7/5 + P2 4.8/5) |
-| 6 | 优化部署 | 🟡 **GitHub远程仓库就绪** | 8% | DevOps (prefaceai-story推送完成) |
+| 6 | 优化部署 | 🔄 **Founder 批准 → DevOps 实际部署中 + Tester E2E 回归中** | 35% | DevOps + Tester |
 
 ---
 
@@ -247,7 +247,7 @@ Pipeline品牌: FrameSpark™
   - @AI-ML: TASK-STYLE-DESC-REWRITE ✅ (15/15 风格 + slam_dunk 修复确认) — Step 3 闭环
   - @Tester: TASK-CROSS-STYLE-TEST ✅ + TASK-DIALOGUE-DENSE-TEST ✅
   - @Frontend: TASK-CREATE-UPGRADE P2 ✅ (PM 复验 4.8/5)
-- ✅ **Step 7 PASS + Bugfix 4/4 PASS + 回归验证 4.36/5 + PM 独立复核 4.36/5** → **Bug #5 (P2) 修复 → TASK-GIT-COMMIT-3**
+- ✅ **Step 7 PASS + Bugfix 4/4 PASS + 回归验证 4.36/5 + PM 独立复核 4.36/5** → Bug #5 修复 → TASK-GIT-COMMIT-3 ✅ → TASK-SHOT10-REGEN ✅ → TASK-BUBBLE-SIMPLIFY ✅ → **TASK-PROMPT-BUBBLE AI-ML ✅ + PM 审查 PASS ✅** → TASK-PROMPT-BUBBLE-FOLLOWUP ✅ + PM 审查 + Founder 决策 → TASK-PROMPT-BUBBLE-FOLLOWUP-R2 ✅ + Founder 决策 speaker_format=english → Backend 生产接入 ✅ + PM Code Review PASS ✅ — **speaker_format 全链路闭环**
 
 ### 🟡 P1 - 保留任务
 - [ ] Phase 4: 视频合成 (Backend) - **保留，后续短视频模式需要**
@@ -263,18 +263,18 @@ Pipeline品牌: FrameSpark™
 
 ### Backend (后端)
 ```
-状态: ✅ Bug #5 修复完成 + PM Review PASS
-更新时间: 2026-03-04
-当前任务: 无 — 等 TASK-GIT-COMMIT-3
+状态: ✅ 空闲 (TASK-BUBBLE-SPEAKER-FORMAT-DEPLOY PM Code Review PASS)
+更新时间: 2026-03-06
+当前任务: 无
 阻塞: 无
-已完成: TASK-NATIVE-TEXT-ROBUSTNESS ⚠️ (PM核验 PARTIAL PASS, 关键字回退不一致) + TASK-NB2-NATIVE-TEXT ✅ + TASK-NB2-SWITCH ✅ + TASK-DIALOGUE-SYSTEM L1 ✅ + TASK-TEAM-UNIFORM ✅ + TASK-SPEAKER-PREFIX ✅ + TASK-MODEL-UPGRADE ✅ + TASK-STYLE-DEFAULT-FIX ✅ + TASK-MODEL-UPGRADE-RETEST ✅ + TASK-E2E-VALIDATE ✅ + TASK-SCENE-REF-ASPECT ✅
+已完成: TASK-SHOT10-REGEN ✅ + TASK-NATIVE-TEXT-ROBUSTNESS ⚠️→TASK-ROBUSTNESS-FIX ✅ + TASK-NB2-NATIVE-TEXT ✅ + TASK-NB2-SWITCH ✅ + TASK-DIALOGUE-SYSTEM L1 ✅ + TASK-TEAM-UNIFORM ✅ + TASK-SPEAKER-PREFIX ✅ + TASK-MODEL-UPGRADE ✅ + TASK-STYLE-DEFAULT-FIX ✅ + TASK-MODEL-UPGRADE-RETEST ✅ + TASK-E2E-VALIDATE ✅ + TASK-SCENE-REF-ASPECT ✅
 待解决: FFmpeg 集成方案选型（Phase 4.5）
 ```
 
 ### Frontend (前端)
 ```
-状态: ✅ P0+P1+P2 全部完成 + PM 复验全部通过
-更新时间: 2026-03-03
+状态: ✅ P0+P1+P2 全部完成 + PM 复验全部通过 + RESPONSIVE-OPT PM 复验 PASS (4.5/5)
+更新时间: 2026-03-06
 阻塞: 无
 
 已完成:
@@ -292,37 +292,37 @@ Pipeline品牌: FrameSpark™
 
 ### Tester (测试)
 ```
-状态: ✅ 回归验证完成 (4.36/5) + PM 独立复核一致
-更新时间: 2026-03-04
-当前任务: 无 — 等 @AI-ML + @Backend 完成 + TASK-GIT-COMMIT-3
+状态: ⏳ TASK-E2E-REGRESSION 综合回归测试执行中
+更新时间: 2026-03-06
+当前任务: TASK-E2E-REGRESSION — 2 故事 × 10 shots, 7 维度验收
 已完成: 回归验证 4.36/5 (4/4 Bug PASS + Bug #5 发现) ✅ + Step 7 A/B ✅ + Step 4 (ink+realistic) ✅ + DIALOGUE-DENSE-TEST ✅ + CROSS-STYLE-TEST ✅ + AB-STYLE-DESC ✅ + E2E-TEST-2 ✅ + NB2-TEXT-TEST ✅ + E2E-VALIDATE ✅
 阻塞: 无
 ```
 
 ### AI_ML (AI/ML)
 ```
-状态: ✅ Shot 15/18 Prompt 优化完成 + PM Review PASS
-更新时间: 2026-03-04
-当前任务: 无 — 等 TASK-GIT-COMMIT-3
-已完成: TASK-STYLE-DESC-REWRITE ✅ (15/15 + Step 4 PM核验通过) + illustration 场域式前置 ✅ + TASK-SLAMDUNK-COLOR ✅ + TASK-DIALOGUE-SYSTEM L2+3 ✅ + TASK-STYLE-SLAMDUNK ✅ + TASK-TEXT-TYPE-OPT ✅ + TASK-IDENTITY-DESIGN ✅
+状态: ✅ 空闲 (TASK-PROMPT-BUBBLE-FOLLOWUP-R2 完成，Founder 决策 speaker_format=english)
+更新时间: 2026-03-06
+当前任务: 无
+已完成: TASK-PROMPT-BUBBLE-FOLLOWUP-R2 ✅ (PM 审查 + Founder 决策 speaker_format=english) + TASK-PROMPT-BUBBLE-FOLLOWUP ✅ + TASK-PROMPT-BUBBLE ✅ (PM 审查 PASS) + TASK-STYLE-DESC-REWRITE ✅ (15/15 + Step 4 PM核验通过) + illustration 场域式前置 ✅ + TASK-SLAMDUNK-COLOR ✅ + TASK-DIALOGUE-SYSTEM L2+3 ✅ + TASK-STYLE-SLAMDUNK ✅ + TASK-TEXT-TYPE-OPT ✅ + TASK-IDENTITY-DESIGN ✅
 阻塞: 无
 ```
 
 ### DevOps (运维)
 ```
-状态: 🔧 批次提交 + push 进行中
-更新时间: 2026-03-05
-当前任务: 4daad77 已提交 → Batch A/B/C (~120 文件) + git push
+状态: ⏳ TASK-DEPLOY-EXEC VPS 实际部署执行中
+更新时间: 2026-03-06
+当前任务: TASK-DEPLOY-EXEC — Founder 批准, Step 1-4 执行
 阻塞: 无
 
 已完成:
   - ✅ GitHub远程仓库 prefaceai-story (private) 推送完成 (2026-02-26 11:02)
   - ✅ TASK-GIT-COMMIT-2 三批提交 (67文件, PM核验通过)
   - ✅ TASK-GIT-COMMIT + TASK-GIT-INIT
+  - ✅ TASK-GIT-COMMIT-3 (4daad77 + Batch A/B/C, 131 文件, push 完成)
 
 待做:
-  1️⃣ TASK-GIT-COMMIT-3（🔧 进行中, PM 已派发 03-04 21:00）
-  2️⃣ 云服务选型
+  1️⃣ 云服务选型
 ```
 
 ---
@@ -391,6 +391,67 @@ Pipeline品牌: FrameSpark™
 ---
 
 ## 更新日志
+
+### 2026-03-06 16:15
+- **[Founder] 批准 DEPLOY-PREP 部署方案** ⭐
+  - Docker Compose 部署方案通过 PM Step 2 + Step 3 双重审核，Founder 最终批准
+- **[PM] TASK-DEPLOY-EXEC 派发 @DevOps** 📋
+  - VPS 实际部署 Step 1-4，与 Tester E2E 并行
+  - 前置 D1: Frontend next.config.mjs output: 'standalone'
+- **[PM] 备忘记录: Tester E2E 后推进 Phase 4.5 视频合成 + 前后端联调 D5**
+
+### 2026-03-06 16:00
+- **[PM] TASK-DEPLOY-PREP Step 3 二次审核 PASS** 📋
+  - 4 项修改建议 100% 正确落实，Nginx HTTPS 8 维度验证全 PASS
+  - 1 项非阻塞建议 (N1: 验证清单容器数描述)
+  - 方案待 Founder 最终批准后部署
+- **[PM] TASK-RESPONSIVE-OPT 复验 PASS (4.5/5)** 📋
+  - 7 文件逐一审查全部通过
+  - 触控目标、断点一致性、构建验证均 PASS
+- **[PM] TASK-E2E-REGRESSION 派发 @Tester** 📋
+  - 综合回归: 2 故事 × 10 shots，不同题材+风格，7 维度验收
+  - 覆盖: speaker_format + text_language + prompt 精简 + 对话嵌入 + SQ 改进
+
+### 2026-03-06 15:26
+- **[PM] TASK-BUBBLE-SPEAKER-FORMAT-DEPLOY Code Review PASS** 📋
+  - 12 维度全覆盖深度审查（类型链/数据源/回退安全/Safe wrapper/复合类型/边缘场景等）
+  - 零问题，Backend 修改准确干净
+  - **speaker_format 全链路闭环**: AI-ML→R2验证→Founder决策→Backend接入→PM审查
+- **[Backend] TASK-BUBBLE-SPEAKER-FORMAT-DEPLOY 完成** ✅ (14:56)
+  - `image_generator.py:848-853` 传入 characters/speaker_format='english'/text_language='zh-CN'
+- **[Frontend] TASK-RESPONSIVE-OPT 完成** ✅
+  - 响应式优化 7 文件，待 PM 复验
+
+### 2026-03-06 14:45
+- **[PM] R2 审查完成 + Founder 决策 speaker_format=english + @Backend 派发** 📋
+  - 30 张 R2 图片逐一检查（7 维度对比）
+  - C 组淘汰 (shot_07 幽灵气泡+乱码)，B 组推荐 (语言一致性+扩展性)
+  - text_language=zh-CN 完全修复 R1 繁体问题
+  - Founder 决策: speaker_format='english' 确定
+  - 派发 @Backend: image_generator.py:829 传参修改
+- **[AI-ML] TASK-PROMPT-BUBBLE-FOLLOWUP-R2 完成** ✅ (14:10)
+  - 30/30 成功，三组 avg 4.4 refs/shot
+  - text_language=zh-CN 约束已生效
+  - 总耗时 ~17.5 分钟
+
+### 2026-03-06 11:33
+- **[PM] TASK-PROMPT-BUBBLE-FOLLOWUP PM 审查 + Founder 决策 + R2 派发** 📋
+  - 任务1 精确测量 PASS（手工验证全文，优化后 ~8% 精简）
+  - 任务2 命名格式 A/B/C 有条件 PASS: C组幽灵气泡 + B/C组无参考图 + 死代码
+  - Founder 3 项决策: 补测B/C有参考图 + 代码修复等补测后 + 繁简约束+多语言预留
+  - 派发 @AI-ML TASK-PROMPT-BUBBLE-FOLLOWUP-R2: 任务A(P0补测) + 任务B(P1繁简约束)
+  - 全文档同步更新
+- **[AI-ML] TASK-PROMPT-BUBBLE-FOLLOWUP 完成** ✅ (11:00)
+  - 任务1: prompt 精确测量 Shot1 -8.0% / Shot5 -8.7%
+  - 任务2: A/B/C 30张 (10+10+10)，B/C组无参考图(ref_manager bug)
+
+### 2026-03-05 22:46
+- **[PM] TASK-PROMPT-BUBBLE 独立审查 PASS + FOLLOWUP 派发** 📋
+  - 20 张图片逐一查看 + 代码深度审查 + 6 项侧效评估（均低风险）
+  - PM 独立发现: 场景环境不一致(pre-existing) + prompt 文件未保存 + prompt 精简无精确数据
+  - Founder 讨论: Near {中文名} 跨语言映射 + 命名格式对比需求
+  - 派发 @AI-ML TASK-PROMPT-BUBBLE-FOLLOWUP: (1) 精确 prompt 测量 (2) Near {speaker} A/B/C 对比
+  - 全文档同步更新
 
 ### 2026-03-03
 - **[Founder] 场域式批准为默认策略** ⭐ → Step 4 派发 (ink + realistic 验证)

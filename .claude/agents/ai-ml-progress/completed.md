@@ -4,6 +4,83 @@
 
 ---
 
+## 2026-03-06
+
+### TASK-PROMPT-BUBBLE-FOLLOWUP-R2 -- R2 补测 + text_language 约束 ✅
+
+**完成时间**: 2026-03-06 14:10
+**关联任务**: TASK-PROMPT-BUBBLE-FOLLOWUP-R2 (PM 派发, 2 项后续)
+**修改文件**: `app/services/image_generator.py`
+**新增文件**: `tests/test_speaker_format_abc_r2.py`
+
+**Task A: R2 补测 (P0)** -- 修复 R1 ref_manager bug:
+- R1 Bug: 每组 `new ReferenceImageManager()`，B/C 组 ref_count=0 (不公平对比)
+- R2 Fix: 循环外生成参考图一次，三组共用同一个实例
+- A 组 (中文名): 10/10 成功, 10/10 对话嵌入, avg 4.4 refs/shot, 305s
+- B 组 (英文名): 10/10 成功, 10/10 对话嵌入, avg 4.4 refs/shot, 416s
+- C 组 (char_ID): 10/10 成功, 10/10 对话嵌入, avg 4.4 refs/shot, 332s
+- 总耗时: 1054s (~17.5 分钟)
+
+**Task B: text_language 约束 (P1)** -- 繁简约束 + 多语言预留:
+- 新增 `_TEXT_LANGUAGE_CONFIG` 字典 (zh-CN/zh-TW/en)
+- `build_dialogue_scene_embed()` 新增 `text_language: str = "zh-CN"` 参数
+- 气泡描述 "Chinese text" -> "Simplified Chinese text" + 末尾语言约束
+- 向后兼容: 生产代码第 829 行默认 zh-CN
+
+**测试脚本**: `tests/test_speaker_format_abc_r2.py`
+**报告**: `test_output/manualtest/prompt_bubble/speaker_format_test_r2/comparison_report.md`
+
+---
+
+### TASK-PROMPT-BUBBLE-FOLLOWUP -- 精确测量 + 命名格式 A/B/C 对比 ✅
+
+**完成时间**: 2026-03-06
+**关联任务**: TASK-PROMPT-BUBBLE-FOLLOWUP (PM 22:46 派发, 2 项后续)
+**修改文件**: `app/services/image_generator.py`
+**新增文件**: `tests/test_prompt_size_measurement.py` + `tests/test_speaker_format_abc.py`
+
+**任务 1: 精确 prompt 尺寸测量**:
+- 逐模块对比: System Instruction -296, Quality Suffix -59, TEXT OVERLAY -210, Dialogue Embed +113
+- Shot 1 (dialogue): 5707 → 5252 chars (-455, -8.0%)
+- Shot 5 (dialogue_with_thought): 5258 → 4803 chars (-455, -8.7%)
+- Before/After prompt 全文保存到 `test_output/manualtest/prompt_bubble/prompts/`
+
+**任务 2: Near {speaker} 命名格式 A/B/C 对比**:
+- 新增 `_resolve_speaker_label()` 函数 (chinese/english/char_id 格式转换)
+- 修改 `build_dialogue_scene_embed()` 新增 `characters` + `speaker_format` 参数 (向后兼容)
+- 3 组 × 10 shots = 30 张: A 10/10, B 10/10, C 10/10 (全部成功)
+- **注意**: B/C 组无参考图 (测试脚本问题), 需 Founder 人工对比时考虑
+
+**测试脚本**: `tests/test_prompt_size_measurement.py` + `tests/test_speaker_format_abc.py`
+**报告**: `test_output/manualtest/prompt_bubble/speaker_format_test/comparison_report.md`
+
+---
+
+## 2026-03-05
+
+### TASK-PROMPT-BUBBLE — Prompt 架构优化（NB2 原生对话气泡）✅
+
+**完成时间**: 2026-03-05
+**关联任务**: TASK-PROMPT-BUBBLE (Founder 确定方向, PM 19:00 派发)
+**修改文件**: `app/services/image_generator.py` + `app/prompts/storyboard_prompts.py`
+
+**代码改动**:
+- 新增 `build_dialogue_scene_embed()`: 对话气泡嵌入 [SCENE DESCRIPTION] ("Near {speaker}, a white speech bubble...")
+- `build_native_text_prompt()`: dialogue 分支返回 "" + 复合类型跳过 dialogue 子项
+- `generate_shot_image_phase2()`: 对话嵌入场景描述 + Quality Suffix 禁用 (add_quality_suffix=False)
+- `build_system_instruction_phase2()`: 精简 ~400→~150 chars (移除 Style Enforcement/Aspect Ratio 冗余行)
+- thought/narration TEXT OVERLAY REQUIREMENT 保持不变
+
+**验证**: 2 × 10-shot (不同风格, 使用已有 dialogue-rich storyboard 数据)
+- dialogue_dense_illustration: 10/10 成功, 10/10 对话嵌入
+- slamdunk_dialogue: 10/10 成功, 4/4 对话嵌入
+- Prompt 净减少 ~400-600 chars
+
+**测试脚本**: `tests/test_prompt_bubble.py`
+**报告**: `test_output/manualtest/prompt_bubble/comparison_report.md`
+
+---
+
 ## 2026-03-04
 
 ### Shot 15/18 Prompt 工程优化 + SQ-4/SQ-5/Bug#3 恢复 ✅

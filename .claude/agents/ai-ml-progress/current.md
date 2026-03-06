@@ -1,42 +1,31 @@
 # AI-ML Agent - 当前任务
 
-> **最后更新**: 2026-03-04
-> **状态**: ✅ Shot 15/18 Prompt 优化完成 + SQ-4/SQ-5/Bug#3 重新应用完成
+> **最后更新**: 2026-03-06
+> **状态**: TASK-PROMPT-BUBBLE-FOLLOWUP-R2 两项任务完成
 
 ---
 
 ## 刚完成
 
-### Shot 15/18 Prompt 工程优化 + 代码恢复 ✅
+### TASK-PROMPT-BUBBLE-FOLLOWUP-R2 -- R2 补测 + text_language 约束
 
-**完成时间**: 2026-03-04
-**修改文件**: `app/services/storyboard_director.py`
+**完成时间**: 2026-03-06 14:10
+**修改文件**: `app/services/image_generator.py`
+**新增文件**: `tests/test_speaker_format_abc_r2.py`
 
-**⚠️ 重要事件**: PM 回滚代码时误删了 AI-ML 此前所有改动（SQ-4/SQ-5/Bug#3 Rule #6），本次一并重新应用。
+**Task A: R2 补测 (P0)** -- 修复 R1 ref_manager bug，三组公平对比:
+- R1 Bug: 每组 `new ReferenceImageManager()`，B/C 组无参考图
+- R2 Fix: 循环外生成参考图一次，所有组共用同一个实例
+- A 组 (中文名): 10/10 成功, 10/10 对话嵌入, avg 4.4 refs/shot, 305s
+- B 组 (英文名): 10/10 成功, 10/10 对话嵌入, avg 4.4 refs/shot, 416s
+- C 组 (char_ID): 10/10 成功, 10/10 对话嵌入, avg 4.4 refs/shot, 332s
+- 报告: `test_output/manualtest/prompt_bubble/speaker_format_test_r2/comparison_report.md`
 
-**本次修改内容** (两处规则区):
-
-#### 主规则区 `_build_scene_prompt()` — 完整版
-
-| 编号 | 规则 | 行号 | 状态 |
-|------|------|------|------|
-| Rule #6 | STRICT CHARACTER COUNT — NO EXTRA PEOPLE | L414-423 | 🔄 重新应用（Bug #3 修复） |
-| Rule #7 | OBJECT PHYSICAL PLAUSIBILITY ON SHARED SURFACES | L425-433 | 🆕 新增（Shot 15 手机叠菜） |
-| Rule #8 | MULTI-CHARACTER LIMB INTERACTION LIMITS | L435-443 | 🆕 新增（Shot 18 筷子归属） |
-| SQ-4 | NARRATIVE VISUAL PROPS | L445-454 | 🔄 重新应用 |
-| SQ-4 | SPATIAL DEPTH RULES | L456-462 | 🔄 重新应用 |
-| SQ-5 | SHOT TRANSITION RULES (5 subsections) | L464-489 | 🔄 重新应用 |
-| SQ-5 | JSON template 增强 (focal_length + foreground/background/depth_layers) | L503-504 | 🔄 重新应用 |
-
-#### 强化规则区 `_build_prompt()` — 精简版
-
-| 编号 | 规则 | 行号 |
-|------|------|------|
-| Rule #6 | STRICT CHARACTER COUNT | L712-713 |
-| Rule #7 | OBJECT PHYSICAL PLAUSIBILITY | L715-716 |
-| Rule #8 | MULTI-CHARACTER LIMB INTERACTION LIMITS | L718-719 |
-
-**验证**: ✅ Python 语法检查通过（0 error, 935 lines）
+**Task B: text_language 约束 (P1)** -- 繁简约束 + 多语言预留:
+- `build_dialogue_scene_embed()` 新增 `text_language: str = "zh-CN"` 参数
+- 新增 `_TEXT_LANGUAGE_CONFIG` 字典 (zh-CN/zh-TW/en)
+- 气泡描述 "Chinese text" -> "Simplified Chinese text" + 末尾语言约束
+- 向后兼容: 生产代码第 829 行默认 zh-CN，无需改动
 
 ---
 
@@ -44,10 +33,10 @@
 
 | 任务 | 优先级 | 状态 |
 |------|--------|------|
-| TASK-SHOT-QUALITY-UPGRADE SQ-3/4/5 | P0/P1 | ✅ 完成（SQ-4/5 已重新应用） |
-| TASK-SHOT-QUALITY-BUGFIX Bug #3 | P2 | ✅ 完成（已重新应用） |
-| Shot 15/18 Prompt 优化 (Rule #7/#8) | P3 | ✅ 完成 |
-| 6人场景一致性 90%→95% | P2 | 暂缓 |
+| TASK-PROMPT-BUBBLE | P0 | PM PASS |
+| TASK-PROMPT-BUBBLE-FOLLOWUP | P1 | 完成 (R1, 有 ref_manager bug) |
+| TASK-PROMPT-BUBBLE-FOLLOWUP-R2 | P0 | 完成 (等 Founder 人工检查 30 张图) |
+| 6人场景一致性 90%->95% | P2 | 暂缓 |
 
 ---
 
@@ -55,8 +44,10 @@
 
 | 时间 | 更新内容 |
 |------|----------|
-| 2026-03-04 | Shot 15/18 优化 (Rule #7/#8) + SQ-4/SQ-5/Bug#3 重新应用（PM 误回滚恢复） |
+| 2026-03-06 | TASK-PROMPT-BUBBLE-FOLLOWUP-R2: R2 补测 30/30 成功 + text_language zh-CN 约束 |
+| 2026-03-06 | TASK-PROMPT-BUBBLE-FOLLOWUP: 精确测量 (-455 chars, -8.0%) + A/B/C 命名格式对比 (30/30 成功) |
+| 2026-03-05 | TASK-PROMPT-BUBBLE: 对话气泡嵌入场景描述 + prompt 冗余精简 + 2x10-shot 验证 |
+| 2026-03-04 | Shot 15/18 优化 (Rule #7/#8) + SQ-4/SQ-5/Bug#3 重新应用 |
 | 2026-03-04 | Bug #3 修复: 神秘路人负面约束 (Rule #6) |
 | 2026-03-04 | Step 5b 完成: SQ-3/4/5 代码修改 |
-| 2026-03-03 17:05 | slam_dunk 句序修复完成 |
-| 2026-03-03 15:56 | TASK-STYLE-DESC-REWRITE 完成：15个风格全部改为场域式 |
+| 2026-03-03 | slam_dunk 句序修复 + TASK-STYLE-DESC-REWRITE 15个风格场域式 |

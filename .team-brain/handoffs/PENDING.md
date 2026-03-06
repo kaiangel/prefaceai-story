@@ -307,8 +307,105 @@ TASK-SHOT-QUALITY-BUGFIX: ✅ 4 Bug 修复完成 + PM Code Review 4/4 PASS
 → @Backend Bug #5 修复: ✅ PM Review PASS
 → Founder 确认: ✅
 → @DevOps TASK-GIT-COMMIT-3 (4daad77): ✅ 7 文件
-→ @DevOps Batch A/B/C (~120 文件) + push  ← 当前
+→ @DevOps Batch A/B/C (131 文件) + push  ✅ 完成
+→ @Backend TASK-SHOT10-REGEN ✅ + Bug #6 ✅ → PM 审查 + Founder 碰撞 → TASK-BUBBLE-SIMPLIFY ✅ 测试完成
+→ PM Docker Compose 审查 PASS + Cloudflare SSL Full (Strict) 配置完成  ← 当前
 ```
+
+### TASK-SHOT10-REGEN — ✅ 完成 + Bug #6 发现并修复
+
+| 字段 | 内容 |
+|------|------|
+| **优先级** | P2 |
+| **来源** | Founder 指示 → PM 派发 (2026-03-05 10:36) |
+| **负责人** | @Backend |
+| **状态** | ✅ 完成 (15:17) — shot_10 生成成功 + Bug #6 修复。PM 审查: Bug #5 PASS, 角色一致性 PASS, **Bug #6 气泡定位不够可靠** |
+
+### TASK-BUBBLE-SIMPLIFY — ✅ 测试完成 → Founder 新证据 → TASK-PROMPT-BUBBLE 派发
+
+| 字段 | 内容 |
+|------|------|
+| **优先级** | P2 |
+| **来源** | PM 审查 Bug #6 + Founder 碰撞 → PM 派发 (2026-03-05 15:55) |
+| **负责人** | @Backend |
+| **测试结果** | 3 组均未渲染气泡 — 原因不是 NB2 能力不足，而是 prompt 架构导致对话指令被淹没 |
+| **Founder 新证据** | Gemini 网页版实测: 漫画+写实两种风格均成功渲染指定中文对话气泡 |
+| **PM 分析修正** | 初始结论（NB2 能力边界）被推翻 → 问题是 ~9000 字 prompt 中对话权重 < 1% |
+| **状态** | ✅ 已闭环 → 后续由 TASK-PROMPT-BUBBLE 接棒 |
+
+### TASK-PROMPT-BUBBLE — ✅ AI-ML 完成 + PM 审查 PASS + 后续任务派发
+
+| 字段 | 内容 |
+|------|------|
+| **优先级** | P0 |
+| **来源** | Founder 实测 + PM 分析 → PM 派发 (2026-03-05 19:00) |
+| **负责人** | @AI-ML |
+| **说明** | 方向 2+3 融合: 对话气泡融入场景描述 + 精简 prompt 冗余。2 × 10-shot 不同风格验证 |
+| **AI-ML 完成** | ✅ (2026-03-05): 20/20 成功, 14/14 对话嵌入, `build_dialogue_scene_embed()` + System Instruction 精简 |
+| **PM 审查** | ✅ PASS (2026-03-05 22:46): 20 张图片逐一查看 + 代码深度审查 + 6 项侧效评估（均低风险） |
+| **状态** | ✅ 主体完成 → 后续 TASK-PROMPT-BUBBLE-FOLLOWUP |
+
+### TASK-PROMPT-BUBBLE-FOLLOWUP — ✅ 完成 + PM 审查 + Founder 决策 → R2 派发
+
+| 字段 | 内容 |
+|------|------|
+| **优先级** | P1 |
+| **来源** | PM 审查 TASK-PROMPT-BUBBLE 发现交付缺口 → PM 派发 (2026-03-05 22:46) |
+| **负责人** | @AI-ML |
+| **AI-ML 完成** | ✅ (2026-03-06 11:00): 任务1 精确测量(8%精简) + 任务2 A/B/C 30张 |
+| **PM 审查** | ✅ (2026-03-06 11:33): 任务1 PASS + 任务2 有条件PASS(3问题: C组幽灵气泡+B/C无参考图+死代码) |
+| **Founder 决策** | 补测B/C有参考图 + 代码修复等补测后 + 繁体→多语言约束 |
+| **状态** | ✅ 已闭环 → 后续由 TASK-PROMPT-BUBBLE-FOLLOWUP-R2 接棒 |
+
+### TASK-PROMPT-BUBBLE-FOLLOWUP-R2 — ✅ 完成 + Founder 决策 speaker_format=english
+
+| 字段 | 内容 |
+|------|------|
+| **优先级** | P0(补测) + P1(繁简约束) |
+| **来源** | Founder 决策 + PM 派发 (2026-03-06 11:33) |
+| **负责人** | @AI-ML |
+| **AI-ML 完成** | ✅ (2026-03-06 14:10): 30/30 成功，三组 avg 4.4 refs/shot，text_language=zh-CN 生效 |
+| **PM 审查** | ✅ (2026-03-06 14:45): C 组淘汰(shot_07 乱码)，B 组推荐(语言一致+扩展性) |
+| **Founder 决策** | ✅ speaker_format='english' 确定 |
+| **状态** | ✅ 已闭环 → 后续 @Backend 生产代码修改 |
+
+### TASK-BUBBLE-SPEAKER-FORMAT-DEPLOY — ✅ 完成 + PM Code Review PASS
+
+| 字段 | 内容 |
+|------|------|
+| **优先级** | P0 |
+| **来源** | Founder 决策 speaker_format=english + PM 派发 (2026-03-06 14:45) |
+| **负责人** | @Backend |
+| **Backend 完成** | ✅ (2026-03-06 14:56): `image_generator.py:848-853` 传入 3 参数 |
+| **PM Code Review** | ✅ (2026-03-06 15:26): 12 维度零问题 PASS |
+| **状态** | ✅ **闭环** — speaker_format 全链路完成 |
+
+### TASK-DEPLOY-PREP — ✅ Founder 批准 → TASK-DEPLOY-EXEC 实际部署中
+
+| 字段 | 内容 |
+|------|------|
+| **优先级** | P1 |
+| **来源** | PM + Founder |
+| **负责人** | @DevOps |
+| **Step 1** | ✅ VPS 环境检查 (10 维度 PASS) |
+| **Step 2** | ✅ Docker Compose 方案 (PM 审查 PASS, 6 项修改建议) |
+| **SSL** | ✅ Cloudflare Full (Strict) + Origin Certificate (到期 2041) |
+| **Step 3** | ✅ 更新完成 + PM 二次审核 PASS (4/4 落实 + Nginx HTTPS 8 维度验证) |
+| **Founder 批准** | ✅ (2026-03-06 16:15) |
+| **TASK-DEPLOY-EXEC** | ⏳ @DevOps 执行 VPS 实际部署 (Step 1-4) |
+| **前置 D1** | Frontend `next.config.mjs` output: 'standalone' — DevOps 遇到时通知 PM |
+| **状态** | ⏳ @DevOps 执行中 |
+
+### TASK-E2E-REGRESSION — ⏳ @Tester 综合 E2E 回归测试
+
+| 字段 | 内容 |
+|------|------|
+| **优先级** | P0 |
+| **来源** | PM 派发 (2026-03-06 16:00) |
+| **负责人** | @Tester |
+| **说明** | 2 个故事 × 10 shots，不同题材+风格，7 维度验收。覆盖 speaker_format + text_language + prompt 精简 + 对话嵌入 + SQ 改进 |
+| **详细派发** | TEAM_CHAT 2026-03-06 16:00 @pm → @tester |
+| **状态** | ⏳ @Tester 执行中 → 完成后 PM 独立复核 |
 
 ---
 
