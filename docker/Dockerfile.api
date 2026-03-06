@@ -1,0 +1,30 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# System dependencies (Pillow build + FFmpeg + curl for healthcheck)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libjpeg62-turbo-dev \
+    libpng-dev \
+    libfreetype6-dev \
+    ffmpeg \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir celery[redis] redis
+
+# Chinese fonts (TextOverlay needs CJK fonts)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/*
+
+# Application code
+COPY app/ ./app/
+COPY docs/ ./docs/
+
+# Default command (API server)
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

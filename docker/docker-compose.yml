@@ -1,0 +1,81 @@
+services:
+  # --- Redis (Celery Broker + Cache) ---
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - xuhua_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # --- FastAPI Backend ---
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - ../.env.production
+    volumes:
+      - storage_data:/app/storage
+      - sqlite_data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - xuhua_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # --- Celery Worker (async tasks) ---
+  # Not started initially (Celery code doesn't exist yet)
+  # Enable with: docker compose --profile celery up -d
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    restart: unless-stopped
+    profiles: ["celery"]
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    env_file:
+      - ../.env.production
+    volumes:
+      - storage_data:/app/storage
+      - sqlite_data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - xuhua_net
+
+  # --- Next.js Frontend ---
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: ../docker/Dockerfile.frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=https://prefaceai.mov/api
+    networks:
+      - xuhua_net
+
+volumes:
+  redis_data:
+  storage_data:     # Generated images + audio
+  sqlite_data:      # SQLite database files
+
+networks:
+  xuhua_net:
+    driver: bridge
