@@ -1,42 +1,39 @@
 # Backend Agent - 当前任务
 
-> **最后更新**: 2026-03-06 14:58
-> **状态**: ✅ TASK-BUBBLE-SPEAKER-FORMAT-DEPLOY 完成，等待 PM Code Review
+> **最后更新**: 2026-03-10 14:15
+> **状态**: ✅ PRO_MODEL 命名清理完成，等待 PM 快速确认 → Step 9 E2E R4
 
 ---
 
 ## 刚完成
 
-### ✅ TASK-BUBBLE-SPEAKER-FORMAT-DEPLOY — 生产代码 speaker_format 传参 (2026-03-06 14:56)
+### ✅ PRO_MODEL → NB2_MODEL 命名清理 (2026-03-10 14:15)
 
-**来源**: PM 派发 (Founder 决策 speaker_format='english')
-**优先级**: P0
+**来源**: PM 全局 Double-Check [P3] 派发
 
-**修改文件**: `app/services/image_generator.py` (第 845-853 行)
+| # | 修改内容 | 文件 | 状态 |
+|---|----------|------|------|
+| 1 | 类常量 `PRO_MODEL` → `NB2_MODEL` | `image_generator.py` | ✅ |
+| 2 | 7 处 `self.PRO_MODEL` → `self.NB2_MODEL` | `image_generator.py` | ✅ |
+| 3 | 误导性注释/docstring 清理 | `image_generator.py` | ✅ |
+| 4 | 测试文件同步 `ig.PRO_MODEL` → `ig.NB2_MODEL` | `tests/test_nb2_switch.py` | ✅ |
 
-**修改内容**:
-```python
-# BEFORE:
-dialogue_embed = build_dialogue_scene_embed(text_overlay)
+**验证**: Python import ✅ + PRO_MODEL 零残留 ✅
 
-# AFTER:
-dialogue_embed = build_dialogue_scene_embed(
-    text_overlay,
-    characters=characters.get("characters", []),
-    speaker_format='english',
-    text_language='zh-CN'
-)
-```
+### ✅ Step 8.5: T13-INT + T12-UNIFY 完成 (2026-03-10 13:48)
 
-**关键决策**:
-- `characters.get("characters", [])` — 从 dict wrapper 提取 list，匹配 `build_dialogue_scene_embed` 的 `characters: list` 参数签名
-- `speaker_format='english'` — Founder 决策，R2 A/B/C 对比后确认
-- `text_language='zh-CN'` — 强制简体中文，修复 R1 繁体问题
+| # | 任务 | 文件 | 状态 |
+|---|------|------|------|
+| T13-INT | COMIC_MODE_NARRATIVE_RULES 常量集成 | `storyboard_director.py` | ✅ |
+| T12-UNIFY | TextOverlay skip 分支合并 | `pipeline_orchestrator.py` | ✅ |
 
-**验证**:
-- Python 语法/import 检查通过 ✅
-- 类型匹配确认: `pipeline_orchestrator.py:133` 返回 `{"characters": [...]}` 格式 ✅
-- 无死代码发现 ✅
+### ✅ Step 7 Phase 1: T11+T12+T16 全部完成 (2026-03-10 13:21)
+
+| # | 任务 | P | 文件 | 状态 |
+|---|------|---|------|------|
+| T11 | 移除参考图 PIL 标签 | P0 | `scene_reference_manager.py` + `reference_image_manager.py` | ✅ |
+| T12 | TextOverlay native_text 模式修复 | P0 | `pipeline_orchestrator.py` | ✅ |
+| T16 | OB-6 降级分支补充 | P3 | `storyboard_director.py` | ✅ |
 
 ---
 
@@ -52,13 +49,16 @@ dialogue_embed = build_dialogue_scene_embed(
 
 | 时间 | 更新内容 |
 |------|----------|
-| 2026-03-06 14:56 | ✅ TASK-BUBBLE-SPEAKER-FORMAT-DEPLOY 完成 (speaker_format='english' 传参) |
-| 2026-03-05 16:14 | ✅ TASK-BUBBLE-SIMPLIFY 测试完成（3 组均无气泡渲染） |
-| 2026-03-05 15:17 | ✅ TASK-SHOT10-REGEN + Bug #6 修复 (shot_10 补生成 + 气泡说话者指向) |
-| 2026-03-04 18:07 | ✅ Bug #5 修复 (dialogue handler dict check，1 文件) |
-| 2026-03-04 16:09 | ✅ TASK-SHOT-QUALITY-BUGFIX Backend 3 项修复 (Bug#1+#2+#4，3 文件) |
-| 2026-03-04 10:50 | ✅ Step 5c 全部完成 (SQ-8+SQ-2+SQ-1+SQ-6，6 文件修改) |
-| 2026-02-28 11:31 | ✅ TASK-ROBUSTNESS-FIX 完成 |
-| 2026-02-28 10:37 | ✅ TASK-NATIVE-TEXT-ROBUSTNESS 完成 |
-| 2026-02-27 17:50 | ✅ TASK-NB2-NATIVE-TEXT 完成 |
-| 2026-02-27 16:09 | ✅ Phase 3 四项任务完成 |
+| 2026-03-10 14:15 | ✅ PRO_MODEL → NB2_MODEL 命名清理完成 |
+| 2026-03-10 13:48 | ✅ Step 8.5 完成 (T13-INT+T12-UNIFY) |
+| 2026-03-10 13:21 | ✅ Step 7 Phase 1 完成 (T11+T12+T16) |
+| 2026-03-09 16:36 | ✅ Step 3 全部完成 (T5+T6+T7+T8+T9) |
+| 2026-03-09 15:55 | ✅ T4 [P0] TextOverlay 条件判断完成 |
+| 2026-03-09 11:07 | ✅ TASK-BACKUP-MODEL-FLASH 完成 |
+| 2026-03-09 10:21 | ✅ Issue #2 DEC-012 Stage 4 模型落地 |
+| 2026-03-06 14:56 | ✅ TASK-BUBBLE-SPEAKER-FORMAT-DEPLOY 完成 |
+| 2026-03-05 16:14 | ✅ TASK-BUBBLE-SIMPLIFY 测试完成 |
+| 2026-03-05 15:17 | ✅ TASK-SHOT10-REGEN + Bug #6 修复 |
+| 2026-03-04 18:07 | ✅ Bug #5 修复 |
+| 2026-03-04 16:09 | ✅ TASK-SHOT-QUALITY-BUGFIX Backend 3 项修复 |
+| 2026-03-04 10:50 | ✅ Step 5c 全部完成 |

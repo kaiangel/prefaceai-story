@@ -1,55 +1,48 @@
 # Tester Agent - 当前任务
 
-> **最后更新**: 2026-03-06 17:30
-> **状态**: 🔄 TASK-E2E-REGRESSION 执行中
+> **最后更新**: 2026-03-09 18:00
+> **状态**: ✅ TASK-E2E-REGRESSION-R3 完成 — 7/10 PASS + 1 PARTIAL + 1 FAIL + 1 新 Bug → 等 PM Step 6 独立复核
 
 ---
 
-## 当前任务
+## 刚完成
 
-### TASK-E2E-REGRESSION — 综合 E2E 回归测试
+### TASK-E2E-REGRESSION-R3 — 10 维度 E2E 回归验证 ✅ (7 PASS / 1 PARTIAL / 1 FAIL)
 
-**目标**: 覆盖所有近期代码变更的端到端回归验证
+**测试概况**:
+- Story A: 红烧肉的味道 / illustration / 4 角色 / 10/10 成功 / 1479s
+- Story B: 墨痕 / ink / 2 角色 / 10/10 成功 / 1268s
+- **全部 40+ 张图片逐一人工查看**
 
-**测试参数**:
-- 2 组故事 × 10 shots:
-  - Story A: 都市情感 / illustration 风格
-  - Story B: 古装武侠 / ink 风格
-- 完整 Stage 1→5 pipeline (不 resume)
-- NB2 模型 (默认)
-- speaker_format='english', text_language='zh-CN'
-- use_native_text=True
+**10 维度评分**:
 
-**7 维度验收**:
+| # | 维度 | Story A | Story B | 综合 |
+|---|------|---------|---------|------|
+| 1 | 生成成功率 | 10/10 ✅ | 10/10 ✅ | **PASS** |
+| 2 | text_overlay 输出完整性 | 10/10 ✅ | 10/10 ✅ | **PASS** |
+| 3 | text_type 分布 | d=70% t=30% ✅ | d=90% t=10% ✅ | **PASS** |
+| 4 | thought 出现率 (T1+T10) | S3=32.7% S4=70% ✅ | S3=40.4% S4=60% ✅ | **PASS** |
+| 5 | 无 speaker 错位 (T2+T5+T6) | 0/13 ✅ | 0/12 ✅ | **PASS** |
+| 6 | plot_points 1:1 覆盖 (T3) | 5/6 ❌ | 6/6 ✅ | **PARTIAL** |
+| 7 | 无对话气泡重复 (T4+T8) | 0 issues ✅ | 0 issues ✅ | **PASS** |
+| 8 | 无标签泄露 | 1/10 ❌ | 2/10 ❌ | **FAIL** |
+| 9 | 无 NB2 乱码文字 | 无乱码 ✅ | 无乱码 ✅ | **PASS** |
+| 10 | 角色/风格一致性 | 4.5/5 ✅ | 4.8/5 ✅ | **PASS** |
 
-| # | 维度 | 说明 |
-|---|------|------|
-| 1 | 成功率 | shots 生成成功比例 |
-| 2 | 角色一致性 | 同角色跨 shot 外貌是否一致 |
-| 3 | 风格一致性 | 全 10 shots 风格统一 |
-| 4 | 对话气泡渲染 | NB2 原生气泡出现率+质量 |
-| 5 | speaker_format=english | "Near {英文名}" 格式生效 |
-| 6 | text_language=zh-CN | 全部简体中文，无繁体 |
-| 7 | 场景描述准确性 | 构图/光线/氛围与 image_prompt 一致 |
-
-**覆盖变更点**:
-- TASK-PROMPT-BUBBLE: 对话嵌入场景描述 (build_dialogue_scene_embed)
-- TASK-PROMPT-BUBBLE-FOLLOWUP: speaker_format + text_language
-- TASK-BUBBLE-SPEAKER-FORMAT-DEPLOY: 生产代码接入
-- SQ-1~SQ-8: Shot 质量改进
-- DEC-014: previous_shot_image 移除
-- System Instruction 精简 (~400→~150 chars)
-- Quality Suffix 禁用
+**新发现 Bug**: thought 文字双重渲染（NB2 + TextOverlay 重复叠加，影响 11/20 with_text shots）
 
 **输出**:
-- 测试脚本: `tests/test_e2e_regression.py`
-- 图片: `test_output/manualtest/e2e_regression/{timestamp}/`
-- 对比报告: `test_output/manualtest/e2e_regression/comparison_report.md`
+- 测试脚本: `tests/test_e2e_regression_r3.py`
+- 对比报告: `test_output/manualtest/e2e_regression_r3/20260309_165927/comparison_report.md`
+- Story A: `test_output/manualtest/e2e_regression_r3/20260309_165927/story_A/20260309_165927/`
+- Story B: `test_output/manualtest/e2e_regression_r3/20260309_165927/story_B/20260309_172406/`
 
 ---
 
 ## 历史完成
 
+### TASK-E2E-REGRESSION-R2 ✅ PASS (4.65/5)
+### TASK-E2E-REGRESSION ✅ PASS (4.63/5)
 ### TASK-SHOT-QUALITY-BUGFIX 回归验证 ✅ PASS (4/4 Bug + 4.36/5)
 ### Step 7: SQ-1~SQ-8 A/B 对比验证 ✅ PASS (B 4.27/5 vs A 3.58/5, +19.3%)
 ### Step 4: ink + realistic 验证 ✅ (ink 4.2 + realistic 4.575)

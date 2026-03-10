@@ -1,29 +1,45 @@
 # Frontend 当前任务进度
 
-> 更新时间: 2026-03-06
-> 状态: TASK-RESPONSIVE-OPT 响应式优化完成
+> 更新时间: 2026-03-10
+> 状态: Contact 更新 + 风格缩略图集成完成，待 DevOps 部署
 
 ---
 
-## 当前任务: TASK-RESPONSIVE-OPT 响应式 / 移动端适配
+## 最新完成: Contact 页面更新 + TASK-STYLE-THUMBNAILS 集成
 
 ### 状态: 完成，`npm run build` 18 路由通过
 
-在保持现有 UI 和交互体验不变的前提下，优化移动端适配。
+#### 1. Contact 页面更新 (`ContactContent.tsx`)
+- 微信客服: XuhuaStory → `Andrea@PrefaceAI`（微信号 `xingxiwh016`）
+- 地址: 中国 · 深圳 → `中国 · 上海`（黄浦区黄陂南路838号中海国际）
 
-### 修改文件（7 个）
+#### 2. 风格缩略图集成（接 @AI-ML TASK-STYLE-THUMBNAILS）
+- 15 张 AI 生成风格缩略图从 `test_output/` 压缩移动到 `public/styles/`
+  - 1024×1024 PNG → 400×400 JPEG (quality 75)，~27MB → ~1MB
+  - 中文文件名 → 英文 key（如 `吉卜力.png` → `ghibli.jpg`）
+- `types/create.ts`: `StylePreset` 接口新增 `thumbnail` 字段
+- `StyleSelector.tsx`: 风格卡片从 CSS 渐变色块替换为真实缩略图
+
+#### 修改文件
 
 | 文件 | 变更 |
 |------|------|
-| `app/dashboard/DashboardContent.tsx` | 统计卡片 grid-cols-3 -> grid-cols-1 sm:grid-cols-3，手机上纵向堆叠不再挤压 |
-| `components/sections/Showcase.tsx` | Lightbox: 关闭按钮加大触控区域，图片区 margin 减小(mx-16->mx-4 sm:mx-16)，导航箭头移动端缩小间距，圆点指示器加大触控面积 |
-| `components/sections/HeroSection.tsx` | min-h-screen -> min-h-[100dvh]，修复移动浏览器地址栏导致的高度计算问题 |
-| `app/dashboard/[storyId]/StoryDetailContent.tsx` | 导航箭头触控区域加大(p-2->p-2.5)，缩略图移动端适当缩小(w-12 h-16)，标题 text-lg sm:text-xl |
-| `components/create/StageB.tsx` | 情节点删除按钮在触屏设备始终可见(sm:opacity-0)，"点击编辑"提示仅桌面显示 |
-| `components/create/StageD.tsx` | 导航箭头加大(w-10 h-10)，Shot meta 文字移动端稍大(text-[11px]) |
-| `components/layout/Header.tsx` | 移动菜单打开时锁定 body 滚动 |
+| `ContactContent.tsx` | 微信+地址更新 |
+| `types/create.ts` | StylePreset +thumbnail，15 个预设添加图片路径 |
+| `StyleSelector.tsx` | 渐变色块 → `<img>` 缩略图 |
+| `public/styles/*.jpg` × 15 | 新增压缩后的风格缩略图 |
 
 ### 构建验证: `npm run build` 18 路由通过，0 错误
+
+---
+
+## 此前完成: TASK-GCLOUD-OPT Google for Startups Cloud 申请网站优化
+
+### 状态: 完成，待 Founder 确认 + DevOps 部署
+
+8 文件修改 + 4 新增静态资源（About 团队信息、邮箱域名替换、AI-first 定位、Gemini 标识+Demo 视频、Traction 指标）
+
+详见 `completed.md` 2026-03-10 条目。
 
 ---
 
@@ -45,7 +61,9 @@
 
 | 任务 | 评分 | 完成时间 |
 |------|------|----------|
-| TASK-RESPONSIVE-OPT | 待 PM 复验 | 2026-03-06 |
+| Contact 更新 + 缩略图集成 | 待确认 | 2026-03-10 |
+| TASK-GCLOUD-OPT | 待 Founder 确认 | 2026-03-10 |
+| TASK-RESPONSIVE-OPT | PM 复验 4.5/5 | 2026-03-06 |
 | TASK-CREATE-UPGRADE P2 | PM 复验 4.8/5 | 2026-03-03 |
 | TASK-CREATE-UPGRADE P1 | PM 复验 4.7/5 | 2026-03-02 |
 | TASK-CREATE-UPGRADE P0 | PM 复验 4.8/5 | 2026-03-02 |

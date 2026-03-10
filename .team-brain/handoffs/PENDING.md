@@ -396,16 +396,111 @@ TASK-SHOT-QUALITY-BUGFIX: ✅ 4 Bug 修复完成 + PM Code Review 4/4 PASS
 | **前置 D1** | Frontend `next.config.mjs` output: 'standalone' — DevOps 遇到时通知 PM |
 | **状态** | ⏳ @DevOps 执行中 |
 
-### TASK-E2E-REGRESSION — ⏳ @Tester 综合 E2E 回归测试
+### TASK-E2E-REGRESSION — ✅ 分析完成 → 修复完成 → PM Code Review PASS → 待 Tester E2E 验证
 
 | 字段 | 内容 |
 |------|------|
 | **优先级** | P0 |
 | **来源** | PM 派发 (2026-03-06 16:00) |
 | **负责人** | @Tester |
-| **说明** | 2 个故事 × 10 shots，不同题材+风格，7 维度验收。覆盖 speaker_format + text_language + prompt 精简 + 对话嵌入 + SQ 改进 |
-| **详细派发** | TEAM_CHAT 2026-03-06 16:00 @pm → @tester |
-| **状态** | ⏳ @Tester 执行中 → 完成后 PM 独立复核 |
+| **Tester 完成** | ✅ (2026-03-06): 20/20 shots 成功, 4.63/5 |
+| **PM 深度分析** | ✅ (2026-03-06 17:30): 发现 P0 架构缺陷 + 5 项问题 |
+| **Backend 修复** | ✅ (2026-03-09): Issue #2 模型配置 + style_preset 回退 (4 处) |
+| **AI-ML 修复** | ✅ (2026-03-09): Issues #1/#3/#4/#5 (10 处) |
+| **PM Code Review** | ✅ (2026-03-09 12:00): 14/14 PASS, 0 阻塞 |
+| **Founder 决策** | Stage 1-4 备用模型统一 Flash (2026-03-09) |
+| **TASK-BACKUP-MODEL-FLASH** | ✅ @Backend 完成 (11:07, 3文件12处 Pro→Flash) |
+| **TASK-E2E-REGRESSION-R2** | ✅ @Tester 完成 (14:00, 20/20, 4.65/5) |
+| **PM 独立复核** | ✅ 完成 (15:00, 4.63/5, 5 新发现 F1-F5) |
+| **PM F1-F5 深挖** | ✅ 完成 (15:39, 7 项修复任务 T1-T7 已派发) |
+| **Step 4 Code Review** | ✅ 22/22 PASS (17:30) + 3 非阻塞观察 (OB-6/7/8) |
+| **Step 5 派发** | ⏳ @Tester TASK-E2E-REGRESSION-R3 (2 故事 × 10 shots, 10 维度) |
+| **状态** | 🟡 **Step 5 E2E 验证中** — 等 Tester 完成后 PM Step 6 独立复核 |
+
+### E2E 回归 6 项问题修复状态（R1 已闭环）
+
+| # | Issue | 严重性 | 修复 | Code Review |
+|---|-------|--------|------|------------|
+| 1 | text_overlay 缺失 | P0 | ✅ AI-ML (schema+rules+dialogue_beats) | ✅ PASS |
+| 2 | DEC-012 模型未落地 | P1 | ✅ Backend (Claude primary, Gemini fallback) | ✅ PASS |
+| 3 | SQ-1 标签泄露 | P1 | ✅ AI-ML (DO NOT reproduce label text) | ✅ PASS |
+| 4 | 单角色三只手 | P2 | ✅ AI-ML (Rule #9 两路径) | ✅ PASS |
+| 5 | NB2 乱码文字 | P2 | ✅ AI-ML (TEXT-FREE system instruction) | ✅ PASS |
+| 6 | Story B 第 3 角色缺失 | P3 | N/A (测试设计问题) | N/A |
+
+### TASK-F1-F5-FIX — 🟡 Step 6 完成 → Step 7 修复中 (T1-T10 PASS + T11-T16 新增)
+
+| 字段 | 内容 |
+|------|------|
+| **优先级** | P0 |
+| **来源** | PM 独立复核 F1-F5 深挖 (03-09) + Step 6 PM 独立审查 (03-10) |
+| **状态** | 🟡 Step 1-8.5 全部 PASS + PRO_MODEL 修复确认 PASS → **Step 9 E2E R4 已派发 @Tester** |
+
+**10 项修复任务**：
+
+| # | 任务 | 负责人 | P | 涉及文件 | Step | 状态 |
+|---|------|--------|---|---------|------|------|
+| T1 | Stage 3 dialogue_beats type + 覆盖 | @AI-ML | P0 | screenplay_writer.py | 1 | ✅ PASS |
+| T2 | Stage 4 MAPPING RULES 增强 | @AI-ML | P0 | storyboard_director.py | 1 | ✅ PASS |
+| T3 | Stage 3 plot_points 1:1 硬约束 | @AI-ML | P0 | screenplay_writer.py | 1 | ✅ PASS |
+| T4 | pipeline dialogue TextOverlay 跳过 | @Backend | P0 | pipeline_orchestrator.py | 1 | ✅ PASS |
+| T5 | _validate_storyboard() speaker 检查 | @Backend | P1 | storyboard_director.py | 3 | ✅ PASS |
+| T6 | build_dialogue_scene_embed() speaker 降级 | @Backend | P1 | image_generator.py | 3 | ✅ PASS |
+| T7 | _rebalance_text_types() 分布后处理 | @Backend | P2 | storyboard_director.py | 3 | ✅ PASS |
+| T8 | pipeline compound type 拆分渲染 | @Backend | P2 | pipeline_orchestrator.py | 3 | ✅ PASS |
+| T9 | use_native_text 参数同步 | @Backend | P3 | pipeline_orchestrator.py | 3 | ✅ PASS |
+| T10 | Stage 3 thought 比例强化 | @AI-ML | P3 | screenplay_writer.py | 3 | ✅ PASS |
+
+**执行顺序**：
+```
+Step 1 (并行): @AI-ML T1+T2+T3 + @Backend T4              ✅ 完成
+Step 2: PM Code Review                                      ✅ 14/14 PASS
+Step 3 (并行): @Backend T5+T6+T7+T8+T9 + @AI-ML T10       ✅ 完成
+Step 4: PM Code Review                                      ✅ 22/22 PASS + 3 非阻塞观察 (OB-6/7/8)
+Step 5: @Tester E2E 验证 (2 故事 × 10 shots)               ⏳ 已派发
+Step 6: PM 独立复核                                          ✅ 完成 (03-10)
+Step 7 Phase 1: @Backend T11+T12+T16 / @AI-ML T13+T15       ✅ 完成
+Step 7 Phase 2: @AI-ML T14                                    ✅ 完成
+Step 8: PM Code Review                                        ✅ 5/6 PASS + 2 修复项
+Step 8.5: @Backend T13-INT + T12-UNIFY                        ✅ 完成 + PM 复核 PASS
+全局 Double-Check: PM                                          ✅ 通过 + CLAUDE.md 修正
+PRO_MODEL 命名修复: @Backend                                   ✅ 完成 + PM 确认 PASS
+Step 9: E2E R4 @Tester                                        ⏳ 已派发（16 项验证维度）
+```
+
+**Step 7 新增任务 (T11-T16)**:
+
+| # | 任务 | 负责人 | P | 状态 |
+|---|------|--------|---|------|
+| T11 | 移除参考图 PIL 标签 | @Backend | P0 | ✅ PASS |
+| T12 | TextOverlay native_text 模式修复 | @Backend | P0 | ✅ 有条件 PASS (T12-UNIFY 待合并) |
+| T13 | 条漫叙事自足 prompt | @AI-ML | P1 | ✅ 常量 PASS / ⚠️ 集成待完成 (T13-INT) |
+| T14 | 角色风格统一 (reference_image_manager.py) | @AI-ML | P1 | ✅ PASS |
+| T15 | NB2 气泡重复抑制 | @AI-ML | P2 | ✅ PASS |
+| T16 | OB-6 降级分支补充 | @Backend | P3 | ✅ PASS |
+
+### TASK-STYLE-THUMBNAILS — ⏳ @AI-ML 15 种风格缩略图生成 (P0)
+
+| 字段 | 内容 |
+|------|------|
+| **优先级** | P0 |
+| **来源** | Founder 指令 → Coordinator 派发 (2026-03-10) |
+| **负责人** | @AI-ML |
+| **前置** | 无（与 E2E R4 并行，不阻塞主线） |
+| **说明** | 为 create 页面 15 种视觉风格生成 NB2 缩略图。统一场景（城市街头年轻女生），只变风格。1:1 宽高比，中文命名，prompt 保存 |
+| **交付物** | `test_output/manualtest/style_thumbnails/` — 15 张 PNG + 15 份 prompt |
+| **验收** | Founder 人工审图 → 通过后 @Frontend 集成到 create 页面 |
+| **状态** | ⏳ 待 @AI-ML 执行 |
+
+### TASK-STYLE-EXPANSION — 📝 暂缓 (P1，备忘)
+
+| 字段 | 内容 |
+|------|------|
+| **优先级** | P1（暂缓） |
+| **说明** | 从剩余 80 种风格中筛选适合普通用户的上架风格（预计 25-35 种），补写 StyleEnforcer 规则 + 生成缩略图 |
+| **前置** | TASK-STYLE-THUMBNAILS 15 张通过后再启动 |
+| **背景** | style_config.py 有 95 种风格，当前仅 15 种有 enforcer 规则并上架 |
+| **状态** | 📝 已记录，暂缓 |
 
 ---
 

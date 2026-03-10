@@ -4,10 +4,49 @@
 
 ---
 
+### TASK-DEPLOY-EXEC Step 1-4: VPS 生产环境部署 ✅
+
+**完成时间**: 2026-03-06
+**验收状态**: 基础设施部署完成，等待 Founder 填入 API Key
+
+**任务类型**: 基础设施 / 生产部署
+
+**完成内容**:
+- [x] Step 1: VPS 系统准备
+  - Swap 4GB 创建 + /etc/fstab 持久化
+  - Docker 28.1.1 + Compose v2.35.1 安装
+  - trader 加入 docker 组
+  - FFmpeg 4.2.7 安装
+- [x] Step 2: 项目部署
+  - rsync 代码到 /opt/xuhua-story（排除 .git/node_modules/venv/ssl）
+  - 清理误传的 venv 目录 + 删除开发 .env
+  - 创建 .env.production（PLACEHOLDER 占位符）
+  - docker compose up -d --build（3 容器全部启动）
+- [x] Step 3: SSL + Nginx HTTPS
+  - SCP Origin Certificate 到 /etc/ssl/prefaceai-mov/
+  - 创建 Nginx 站点配置 prefaceai-mov
+  - nginx -t 通过 + reload
+- [x] Step 4: 全面验证
+  - Docker 3 容器 Up + Healthy ✅
+  - API /health → {"status":"healthy"} ✅
+  - Frontend → 200, 57KB HTML ✅
+  - Redis → PONG ✅
+  - Nginx HTTPS → API/Frontend 代理正常 ✅
+  - 外部 https://prefaceai.mov → HTTP/2 200 ✅
+  - 外部 https://prefaceai.mov/api/health → healthy ✅
+  - 旧站 prefaceai.net + Legacy Flask → 未受影响 ✅
+
+**关键决策**:
+- 使用 rsync 而非 git clone（私有仓库无 deploy key）
+- 删除误传的 .env 和 venv（安全 + 清洁）
+- .env.production 使用占位符，等 Founder 填入真实值
+
+---
+
 ### TASK-DEPLOY-EXEC 启动 — 全面状态检查 + 阻塞项识别 ✅
 
 **完成时间**: 2026-03-06
-**验收状态**: 检查完成，3 项阻塞待确认
+**验收状态**: 检查完成，3 项阻塞已全部解决
 
 **任务类型**: 部署执行 / 状态检查
 

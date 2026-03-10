@@ -1,49 +1,52 @@
 # Frontend 状态速览（供其他Agent参考）
 
-> 更新时间: 2026-03-06
+> 更新时间: 2026-03-10
 
 ---
 
-## 当前状态: TASK-RESPONSIVE-OPT 响应式优化完成，待 PM 复验
+## 当前状态: Contact 更新 + 风格缩略图集成完成，待部署到 prefaceai.mov
 
 **可预览地址**: http://localhost:3000 (需要运行 `npm run dev`)
 
 ---
 
-## TASK-RESPONSIVE-OPT 响应式 / 移动端适配
+## 最新完成 (2026-03-10 下午)
 
-在保持现有 UI 和交互体验不变的前提下，优化移动端适配。修改 7 个文件，`npm run build` 18 路由通过。
+### 1. Contact 页面更新
+- 微信客服: Andrea@PrefaceAI（微信号 xingxiwh016）
+- 地址: 中国 · 上海，黄浦区黄陂南路838号中海国际
 
-### 修改概要
+### 2. TASK-STYLE-THUMBNAILS 集成（接 @AI-ML 缩略图）
+- 15 张缩略图压缩至 `public/styles/{key}.jpg`（35-82KB/张，总 ~1MB）
+- `StyleSelector` 风格卡片从渐变色块 → 真实 AI 生成风格示例图
+- `StylePreset` 类型新增 `thumbnail` 字段
 
-| 文件 | 变更 |
-|------|------|
-| `DashboardContent.tsx` | 统计卡片 grid-cols-3 -> grid-cols-1 sm:grid-cols-3 |
-| `Showcase.tsx` | Lightbox: 关闭按钮加大触控区域，图片 margin 减小，导航箭头缩小间距，圆点指示器加大 |
-| `HeroSection.tsx` | min-h-screen -> min-h-[100dvh]，修复移动浏览器地址栏高度问题 |
-| `StoryDetailContent.tsx` | 导航箭头触控区域加大，缩略图移动端缩小，标题响应式字号 |
-| `StageB.tsx` | 情节点删除按钮在触屏设备始终可见，"点击编辑"提示仅桌面显示 |
-| `StageD.tsx` | 导航箭头加大，Shot meta 文字移动端稍大 |
-| `Header.tsx` | 移动菜单打开时锁定 body 滚动 |
+---
 
-### 关键适配原则
+## TASK-GCLOUD-OPT Google for Startups Cloud 申请网站优化
 
-- 触控目标最小 44px（Apple HIG 推荐）
-- `hover:` 状态加 `sm:` 前缀（触屏无 hover）
-- `100dvh` 替代 `100vh`（修复移动浏览器地址栏问题）
-- body scroll lock 防止移动端覆盖层下方穿透滚动
+| 优化项 | 修改文件 | 说明 |
+|--------|---------|------|
+| About 团队信息 | `AboutContent.tsx` | 3 人照片+背景+GitHub，中英双语 |
+| 邮箱域名 | 4 个文件 6 处 | xuhuastory.com → prefaceai.mov |
+| AI-first 定位 | `HeroSection.tsx` + `ValueProposition.tsx` | 英文副标题，AI 技术描述 |
+| Gemini 标识 + Demo | `Pipeline.tsx` | "Powered by Google Gemini" 标签 + 产品 Demo 视频 |
+| Traction 指标 | `Stats.tsx` | 新增 683+ Beta Users |
+
+### 新增静态资源
+- `public/team/` — 团队照片 3 张（压缩至 ~20KB/张）
+- `public/demo.mp4` — 产品 Demo 视频（8.3MB）
+- `public/styles/` — 15 张风格缩略图（压缩至 35-82KB/张）
+
+### 部署状态
+- 本地 build 通过（18/18 路由）
+- **需要 DevOps push 到服务器才能在 prefaceai.mov 生效**
 
 ---
 
 ## 待做（记录）
 
 ### 视频预览器组件（等后端 Phase 4.5 视频合成就绪后再做）
-
-用户故事完成后的"检查站"——对应用户旅程 Stage D（预览）：
-- 播放器区域：播放/暂停合成视频
-- 镜头缩略图条：点击跳转到对应镜头
-- 单镜头操作：重新生成、编辑旁白文案
-- BGM 切换
 
 当前 Phase 4.5（视频合成）进度 5%，暂无真实视频可播放。Founder 确认先记录，后续做。
 

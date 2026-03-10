@@ -4,6 +4,248 @@
 
 ---
 
+### 2026-03-10 14:25 — PRO_MODEL 命名确认 PASS + CLAUDE.md 同步 + Step 9 派发
+
+**Backend 代码确认**: `image_generator.py` PRO_MODEL 零残留，NB2_MODEL 定义+8引用+docstring 清理正确，`test_nb2_switch.py` 4 处同步 ✅
+
+**PM 额外完成**: `CLAUDE.md:390` 模型配置说明 `PRO_MODEL → NB2_MODEL` 同步
+
+**Step 9 派发**: @Tester E2E R4，16 项验证维度
+
+---
+
+### 2026-03-10 14:05 — 全局 Double-Check + CLAUDE.md 修正
+
+**工作链验证**: Step 7→8.5 全部 7 文件变更逐一确认，无遗漏无冲突 ✅
+
+**全局健康检查**:
+- [P3] PRO_MODEL 命名混乱 → 派发 @Backend 快速修复
+- [排除] `_get_character_type()` 字段问题 — R3 实测确认 Stage 2 输出 `character_type`，非 bug
+
+**CLAUDE.md 修正** (PM 直接完成):
+- 角色数据示例: `"type": "human"` → `"character_type": "human"`
+- 字段说明: `character_type 或 type` → `character_type`
+- "已踩过的坑": 更正为实际正确做法
+
+---
+
+### 2026-03-10 13:55 — Step 8.5 PM 快速复核: T13-INT + T12-UNIFY
+
+**审查范围**: 2 文件 2 项微型修复
+
+**结果**: 2/2 PASS
+
+- **T13-INT**: `storyboard_director.py` L20 import + L401/L668 两处注入 `COMIC_MODE_NARRATIVE_RULES`，与 `NARRATION_TO_VISUAL_EXTRACTION_RULES` 完全同模式 ✅
+- **T12-UNIFY**: `pipeline_orchestrator.py` L347 单一 `if use_native_text:` 分支替代原 T4+T12 两分支，else 备用通道保留 ✅
+
+Step 8 + 8.5 全部通过 → Step 9 E2E R4 待派发
+
+---
+
+### 2026-03-10 13:37 — Step 8 PM Code Review: T11~T16
+
+**审查范围**: 7 文件 6 项任务
+
+**结果**: 5/6 PASS + 1 集成缺口 + 1 代码质量改进
+
+| # | 任务 | 判定 | 说明 |
+|---|------|------|------|
+| T11 | 移除参考图 PIL 标签 (×2文件) | ✅ PASS | 调用移除正确，函数体保留，无遗漏 |
+| T12 | TextOverlay native_text 跳过 | ✅ 有条件 PASS | 功能正确，两分支未统一（T12-UNIFY） |
+| T13 | 条漫叙事自足 prompt | ⚠️ 常量 PASS / 集成 FAIL | 常量好但未被 import（T13-INT 派发 Backend） |
+| T14 | 跨年龄风格统一 | ✅ PASS | 两方法正确追加，placement 在 StyleEnforcer 前 |
+| T15 | 气泡去重指令 | ✅ PASS | EXACTLY ONCE 正确追加，仅 dialogue 非空时触发 |
+| T16 | OB-6 降级分支 | ✅ PASS | narration_with_dialogue 正确加入 |
+
+**后续**: Step 8.5 @Backend T13-INT + T12-UNIFY → PM 快速复核 → Step 9
+
+---
+
+### 2026-03-10 — Step 6 PM 独立深度审查 + Step 7 修复任务派发
+
+**审查范围**: 62 张图片逐张查看 + 完整 JSON 数据 + 全链路代码追踪
+
+**关键发现**:
+1. **Tester 准确性**: Story A 6/10 shot 描述事实性错误（JSON 数据交叉验证）
+2. **标签泄露根因**: `scene_reference_manager.py:275-276` 动态 PIL 标签 → Gemini 复现（SQ-1 设计缺陷）
+3. **双重渲染根因**: T8 在 `use_native_text=True` 下调用 TextOverlay → 违反 DEC-012（TextOverlay 仅作备用）
+4. **NB2 气泡重复**: 100% 模型问题（prompt 追踪: 每行对话只送一次）
+5. **Story A 叙事弱**: 管道对多角色故事的结构性短板 + 条漫 narration 未渲染
+6. **OB-6**: 确认真实代码漏洞（narration_with_dialogue 降级缺失）
+7. **OB-7**: T7 warning-only 是合理设计
+8. **OB-8**: partial match fallback 有价值，非冗余
+
+**Founder 反馈集成**:
+- DEC-012 TextOverlay 备用方案定位重新确认
+- 条漫叙事: 先通过 prompt 优化 thought/dialogue 叙事承载力，再考虑渲染 narration
+- 风格统一: 通过 prompt 约束解决跨年龄风格分裂
+- NB2 气泡重复: 确认模型问题后再加抑制指令
+
+**Step 7 任务派发**: T11-T16（@Backend 3 项 + @AI-ML 3 项并行）
+
+---
+
+### 2026-03-09 17:30 — Step 4 PM Code Review: 22/22 PASS + Step 5 派发
+
+**审查范围**: 4 文件 22 检查点（storyboard_director.py 11处 + image_generator.py 5处 + pipeline_orchestrator.py 4处 + screenplay_writer.py 2处）
+
+**结果**: 22/22 PASS, 0 阻塞
+
+**任务级验证**:
+- T5 (7处): `_validate_storyboard()` characters 参数 + 中文名→char_id 映射 + regex speaker 提取 + 降级逻辑(dialogue→thought, compound→narration_with_thought) + `direct()` 调用 — PASS
+- T6 (5处): `build_dialogue_scene_embed()` characters_in_scene 参数 + `_is_speaker_visible()` + 安全回退 + 调用方传入 chars_visible — PASS
+- T7 (4处): `_rebalance_text_types()` 方法 + narration>15%/thought<10% 警告 + `direct()` 调用 — PASS
+- T8 (3处): compound type 拆分 + 结构化/纯文本双路处理 + 仅非 dialogue 子项走 TextOverlay — PASS
+- T9 (1处): `self.use_native_text = True` 单一配置源 — PASS
+- T10 (2处): thought ≥20% 双重约束 (L404 + L430) — PASS
+
+**跨组件验证**:
+- T5 regex 与 `_extract_speaker_name()` 匹配确认
+- T6 安全回退: 无 characters_in_scene 时默认返回 True（不误删有效对话）
+- T9 配置源覆盖 L331(dialogue skip) + L345(compound split) 两条路径
+
+**非阻塞观察 (3 项)**:
+- **OB-6 [P3]** T5 `narration_with_dialogue` 降级遗漏: L1044 检查了此类型 speaker visibility，但 L1078 降级分支只处理 `dialogue_with_thought` 和 `dialogue_with_narration`。此类型极其罕见，不阻塞。
+- **OB-7 [P3]** T7 仅警告不自动修改: PM 原始规格建议"触发调整"，Backend 实现为打印警告。实际更安全——自动修改可能引入新错误。Stage 4 SELF-CHECK 是主要纠偏机制。
+- **OB-8 [Info]** T6 `_name_to_id` 冗余循环: L245-247 `for name_part in [char_name]` 单元素循环，注释说"支持部分匹配"但代码未实现。无害（`_is_speaker_visible` 已有 partial match fallback）。
+
+**下一步**: @Tester Step 5 E2E 回归验证 (10 维度) → PM Step 6 独立复核
+
+---
+
+### 2026-03-09 17:15 — Step 3 任务扩展: T8/T9/T10 补充
+
+Founder 要求 5 项非阻塞观察全部定义为正式任务：
+- **T8 [P2] @Backend**: pipeline compound type 拆分渲染（OB-1 → dialogue_with_thought 重复气泡）
+- **T9 [P3] @Backend**: use_native_text 参数同步（OB-2 → 硬编码风险）
+- **T10 [P3] @AI-ML**: Stage 3 thought 最低比例强化（OB-4 → "至少1个" 改为 "≥20%"）
+- OB-3 → T5, OB-5 → T6 已有覆盖
+
+Step 3 扩展为: @Backend T5+T6+T7+T8+T9 + @AI-ML T10（并行）
+
+---
+
+### 2026-03-09 17:00 — Step 2 PM Code Review: 14/14 PASS
+
+**审查范围**: 2 文件 14 处修改（screenplay_writer.py 7处 + storyboard_director.py 6处 + pipeline_orchestrator.py 1处）
+
+**结果**: 14/14 PASS, 0 阻塞
+
+**深度验证**:
+- T1 (6处): type 字段 + 覆盖约束 + 分布目标 + thought 示例 + 写法指导 + 输出要求 — 全部 PASS
+- T2 (6处): _build_scene_prompt + _build_prompt 各 3 处（THOUGHT GENERATION + SPEAKER VISIBILITY + SELF-CHECK）— 两处完全一致 PASS
+- T3 (1处): PLOT POINT COVERAGE 约束块 — PASS（与循环结构双保险）
+- T4 (1处): dialogue+native_text 条件跳过 — PASS（逻辑正确 + 目录结构一致）
+- **跨阶段数据链**: Stage 3 type 字段 → Stage 4 dialogue_beats 传入 → Mapping Logic 消费 — 全链路完整
+
+**非阻塞观察**: 5 项（OB-1 dialogue_with_thought 边界 P2，其余 P3/Info）
+
+**下一步**: @Backend Step 3 T5+T6 → PM Step 4 Review
+
+---
+
+### 2026-03-09 15:39 — F1-F5 深挖分析 + 7 项修复任务派发
+
+**Founder 要求**：对 PM 复核发现的 F1-F5 逐一深挖根因。
+
+**深挖结果**：
+- **F1**: ScreenplayWriter prompt 缺 plot_points 1:1 硬约束 → T3
+- **F2**: 双层问题——NB2 偶发(2 气泡) + pipeline_orchestrator 代码 bug(第 3 个气泡) → T4
+- **F3+F4 同根**：Stage 3 dialogue_beats 覆盖率仅 52-63%，无 thought 类型；Stage 4 兜底逻辑将无对话 beat 全标为 narration。大量 narration 语义上其实是 thought → T1+T2
+- **F5 升级 P3→P1**：全量扫描发现 6/30(20%) speaker 错位。LLM 用电影思维做漫画分镜（反应镜头+画外音），整条链路零验证 → T2+T5+T6
+- **关键洞察**：F3/F4/F5 是同一系统性问题的三个症状——Stage 3 素材供给不足 + dialogue ≥60% 目标逼 LLM 硬塞
+
+**派发 7 项任务**：T1-T3(@AI-ML P0) + T4(@Backend P0) + T5-T6(@Backend P1) + T7(@Backend P2)
+**执行顺序**：Step 1(并行) → Step 2(PM Review) → Step 3(Backend P1) → Step 4(PM Review) → Step 5(Tester E2E) → Step 6(PM 复核)
+**报告**：TEAM_CHAT 20075+ 行
+
+---
+
+### 2026-03-09 15:00 — PM 独立深度复核: TASK-E2E-REGRESSION-R2
+
+**审查范围**: 逐一审查两组完整数据链（16 个数据文件 + 40 张图片）。
+
+**审查清单** (每个故事各 8 文件):
+- 1_outline.json, 2_characters.json, 3_screenplay.json, 4_storyboard.json (text_overlay)
+- 5_image_results.json, summary.json, reference_images_log.json, prompt_quality_report.md
+- 角色参考图 (12张) + 场景参考图 (8张) + shot 图片 (20张) = 40 张图片
+
+**5 项修复验证**: 全部有效 ✅
+| Issue | 修复前→修复后 | 结论 |
+|-------|-------------|------|
+| P0 text_overlay | 0/20→20/20 | ✅ 架构缺陷已根治 |
+| P1 模型配置 | Gemini→Claude primary | ✅ Stage 1-4 统一 |
+| P1 标签泄露 | 2/20→0/20 | ✅ 修复确认 |
+| P2 三手 | 1/20→0/20 | ✅ 修复确认 |
+| P2 乱码 | 5/20→1/20 | ✅ CONDITIONAL PASS |
+
+**5 项独立新发现**:
+- F1 [P1] Story B crisis 场景被 ScreenplayWriter 丢弃 (6→5 scene)
+- F2 [P2] Shot 6 对话气泡重复渲染 (NB2 偶发)
+- F3 [P2] narration 超标 (40%/30% vs ≤15%)
+- F4 [P2] thought 不足 (0%/8.7% vs 10-20%)
+- F5 [P3] 气泡 speaker 与画面焦点角色不匹配
+
+**综合评分**: Story A 4.5/5, Story B 4.75/5, **平均 4.63/5**
+**与 Tester 对比**: PM 4.63 vs Tester 4.65 (差异 0.02)
+**亮点**: Story B ink 风格系统最佳表现; Shot 10 可作产品宣传素材
+**报告**: TEAM_CHAT 19874-20074 行
+
+---
+
+### 2026-03-09 12:30 — Founder 决策落地 + Backend/Tester 双派发
+
+**Founder 决策**: Stage 1-4 备用模型统一改为 Gemini 3 Flash（成本和性价比考量）。
+- 派发 @Backend TASK-BACKUP-MODEL-FLASH: 3 文件 Stage 1-3 备用 Pro→Flash
+- 派发 @Tester TASK-E2E-REGRESSION-R2: 2 故事×10 shots, 9 维度验收（前置: Backend 完成后）
+- 全文档同步: TEAM_CHAT + pm-progress×3 + PENDING + TODAY_FOCUS + PROJECT_STATUS + daily-sync
+
+---
+
+### 2026-03-09 12:00 — Code Review: Backend Issue #2 + AI-ML Issues #1/#3/#4/#5
+
+**审查范围**: 2 文件 14 处修改，5 项 E2E 回归问题修复。
+
+| 来源 | 文件 | 修改数 | 结果 |
+|------|------|--------|------|
+| Backend | storyboard_director.py | 4 处（模型配置+调用顺序+style_preset） | PASS |
+| AI-ML | storyboard_director.py | 8 处（dialogue_beats+text_overlay schema+Rule#9） | PASS |
+| AI-ML | storyboard_prompts.py | 2 处（标签防复制+TEXT-FREE） | PASS |
+
+**深度验证**:
+- 下游消费链: 3 消费者（TextOverlayService + dialogue_embed + native_text）与 schema 100% 匹配
+- 两套 prompt 路径一致性: 规则+schema 完全一致
+- TEXT-FREE 与 use_native_text 兼容性: "unless explicitly requested" 逃生口正确覆盖
+
+**结论**: 14/14 PASS, 0 阻塞, 1 项非阻塞观察（Stage 4 备用 Flash vs Pro）
+
+---
+
+### 2026-03-06 17:30 — E2E 回归测试深度分析（Founder 要求的独立洞察）
+
+**分析范围**: Founder 指出的 3 个关键问题 + 20 张图片逐张审查
+
+**根因分析**:
+1. **[P0] text_overlay 缺失** — Stage 4 schema 从未定义 text_overlay（整个 TASK-PROMPT-BUBBLE 链条为死代码）
+   - 代码证据: `storyboard_director.py` 全文零次出现 "text_overlay"，git 四个版本均无
+   - 之前 3/4 测试有 text_overlay 是 LLM 非确定性"自由发挥"
+   - Stage 3 `dialogue_beats` 数据存在但未传递到 Stage 4 output
+2. **[P1] "Scene:" 文字泄露** — `scene_reference_manager.py:275` PIL 标签被 NB2 复制
+   - `storyboard_prompts.py:1446-1449` 无"勿复制标签"指令
+3. **[P2] shot_01 三只手** — image_prompt 描述单角色同时两个手部动作
+
+**额外发现**:
+- DEC-012 模型未落地: Stage 4 用 Gemini 3 Flash，非 Sonnet 4.6
+- NB2 多张图生成乱码文字: 缺少 TEXT-FREE 约束
+- Story B 第 3 角色未在 10 shots 内出现
+
+**20 图审查**: Story A 3.9/5 角色一致性 + Story B 3.8/5 角色一致性, 风格均 4.5/5
+
+**交付**: TEAM_CHAT 详细报告 + 6 项优先级排序 + 修复建议
+**文档同步**: TEAM_CHAT + pm-progress×3 + PENDING + TODAY_FOCUS + PROJECT_STATUS
+
+---
+
 ### 2026-03-06 16:15 — Founder 批准部署 + TASK-DEPLOY-EXEC 派发 @DevOps
 
 - Founder 批准 Docker Compose 部署方案

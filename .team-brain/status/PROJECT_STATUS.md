@@ -11,7 +11,7 @@
 项目名称: 序话Story - AI条漫/短视频生成系统
 目标: 用户输入创意 → 自动生成可发布的条漫或短视频
 当前版本: v0.6.6
-当前主线: 🟢 主线稳定（Founder 批准部署 → DevOps 实际部署 + Tester E2E 回归 并行执行中）
+当前主线: 🟡 **Step 9 E2E R4 已派发 @Tester**（16 项验证维度）
 核心内容: 都市情感短剧 (DEC-005)
 产品形态: 条漫优先 → 短视频保留
 Pipeline品牌: FrameSpark™
@@ -29,7 +29,7 @@ Pipeline品牌: FrameSpark™
 | 4 | 条漫MVP技术验证 | ✅ **完成** | 100% | PM + AI-ML + Backend + Tester |
 | 4.5 | 视频合成 | 🔄 WIP | 5% | Backend |
 | 5 | 前端开发 | ✅ **LP+Stage A+Create P0+P1+P2 全部完成, PM 复验全部通过** | 95% | Frontend (LP 5.0/5 + 子页面 4.8/5 + Stage A 4.8/5 + P0 4.8/5 + P1 4.7/5 + P2 4.8/5) |
-| 6 | 优化部署 | 🔄 **Founder 批准 → DevOps 实际部署中 + Tester E2E 回归中** | 35% | DevOps + Tester |
+| 6 | 优化部署 | ✅ **VPS 部署完成** — https://prefaceai.mov 上线，等 Founder 填 API Key | 70% | DevOps |
 
 ---
 
@@ -263,11 +263,11 @@ Pipeline品牌: FrameSpark™
 
 ### Backend (后端)
 ```
-状态: ✅ 空闲 (TASK-BUBBLE-SPEAKER-FORMAT-DEPLOY PM Code Review PASS)
-更新时间: 2026-03-06
-当前任务: 无
+状态: ✅ Step 3 T4+T5+T6+T7+T8+T9 全部完成 — PM Code Review 22/22 PASS
+更新时间: 2026-03-09
+当前任务: 无（等 Step 5 E2E 结果）
 阻塞: 无
-已完成: TASK-SHOT10-REGEN ✅ + TASK-NATIVE-TEXT-ROBUSTNESS ⚠️→TASK-ROBUSTNESS-FIX ✅ + TASK-NB2-NATIVE-TEXT ✅ + TASK-NB2-SWITCH ✅ + TASK-DIALOGUE-SYSTEM L1 ✅ + TASK-TEAM-UNIFORM ✅ + TASK-SPEAKER-PREFIX ✅ + TASK-MODEL-UPGRADE ✅ + TASK-STYLE-DEFAULT-FIX ✅ + TASK-MODEL-UPGRADE-RETEST ✅ + TASK-E2E-VALIDATE ✅ + TASK-SCENE-REF-ASPECT ✅
+已完成: Step 1 T4 ✅ + Step 3 T5-T9 ✅ + TASK-BACKUP-MODEL-FLASH ✅ + E2E Issue #2 修复 ✅ + TASK-BUBBLE-SPEAKER-FORMAT-DEPLOY ✅ + TASK-SHOT10-REGEN ✅ + TASK-ROBUSTNESS-FIX ✅ + TASK-NB2-NATIVE-TEXT ✅ + TASK-NB2-SWITCH ✅ + TASK-DIALOGUE-SYSTEM L1 ✅ + TASK-TEAM-UNIFORM ✅ + TASK-SPEAKER-PREFIX ✅ + TASK-MODEL-UPGRADE ✅ + TASK-STYLE-DEFAULT-FIX ✅
 待解决: FFmpeg 集成方案选型（Phase 4.5）
 ```
 
@@ -292,37 +292,47 @@ Pipeline品牌: FrameSpark™
 
 ### Tester (测试)
 ```
-状态: ⏳ TASK-E2E-REGRESSION 综合回归测试执行中
-更新时间: 2026-03-06
-当前任务: TASK-E2E-REGRESSION — 2 故事 × 10 shots, 7 维度验收
-已完成: 回归验证 4.36/5 (4/4 Bug PASS + Bug #5 发现) ✅ + Step 7 A/B ✅ + Step 4 (ink+realistic) ✅ + DIALOGUE-DENSE-TEST ✅ + CROSS-STYLE-TEST ✅ + AB-STYLE-DESC ✅ + E2E-TEST-2 ✅ + NB2-TEXT-TEST ✅ + E2E-VALIDATE ✅
+状态: ✅ Step 5 完成: TASK-E2E-REGRESSION-R3 — 7/10 PASS + 1 PARTIAL + 1 FAIL + 1 新 Bug → 等 PM Step 6
+更新时间: 2026-03-09
+当前任务: 无（等 PM Step 6 独立复核）
+已完成: TASK-E2E-REGRESSION-R3 ✅ (7/10 PASS, 10 维度) + R2 ✅ (4.65/5) + 回归验证 4.36/5 ✅ + Step 7 A/B ✅ + Step 4 ✅ + DIALOGUE-DENSE-TEST ✅ + CROSS-STYLE-TEST ✅ + AB-STYLE-DESC ✅ + E2E-TEST-2 ✅ + NB2-TEXT-TEST ✅ + E2E-VALIDATE ✅
 阻塞: 无
 ```
 
 ### AI_ML (AI/ML)
 ```
-状态: ✅ 空闲 (TASK-PROMPT-BUBBLE-FOLLOWUP-R2 完成，Founder 决策 speaker_format=english)
-更新时间: 2026-03-06
-当前任务: 无
-已完成: TASK-PROMPT-BUBBLE-FOLLOWUP-R2 ✅ (PM 审查 + Founder 决策 speaker_format=english) + TASK-PROMPT-BUBBLE-FOLLOWUP ✅ + TASK-PROMPT-BUBBLE ✅ (PM 审查 PASS) + TASK-STYLE-DESC-REWRITE ✅ (15/15 + Step 4 PM核验通过) + illustration 场域式前置 ✅ + TASK-SLAMDUNK-COLOR ✅ + TASK-DIALOGUE-SYSTEM L2+3 ✅ + TASK-STYLE-SLAMDUNK ✅ + TASK-TEXT-TYPE-OPT ✅ + TASK-IDENTITY-DESIGN ✅
+状态: ✅ Step 1 T1+T2+T3 + Step 3 T10 全部完成 — PM Code Review 22/22 PASS
+更新时间: 2026-03-09
+当前任务: 无（等 Step 5 E2E 结果）
+已完成: Step 1 T1+T2+T3 ✅ + Step 3 T10 ✅ + E2E Issues #1/#3/#4/#5 修复 ✅ + TASK-PROMPT-BUBBLE-FOLLOWUP-R2 ✅ + TASK-PROMPT-BUBBLE-FOLLOWUP ✅ + TASK-PROMPT-BUBBLE ✅ + TASK-STYLE-DESC-REWRITE ✅ + TASK-SLAMDUNK-COLOR ✅ + TASK-DIALOGUE-SYSTEM L2+3 ✅ + TASK-STYLE-SLAMDUNK ✅ + TASK-TEXT-TYPE-OPT ✅ + TASK-IDENTITY-DESIGN ✅
 阻塞: 无
 ```
 
 ### DevOps (运维)
 ```
-状态: ⏳ TASK-DEPLOY-EXEC VPS 实际部署执行中
+状态: ✅ TASK-DEPLOY-EXEC 完成 — VPS 生产环境已上线
 更新时间: 2026-03-06
-当前任务: TASK-DEPLOY-EXEC — Founder 批准, Step 1-4 执行
+当前任务: 等待 Founder 填入 API Key
 阻塞: 无
 
 已完成:
+  - ✅ TASK-DEPLOY-EXEC Step 1-4 (VPS 部署, https://prefaceai.mov 上线)
+  - ✅ Docker 配置文件 commit + push (702361d)
   - ✅ GitHub远程仓库 prefaceai-story (private) 推送完成 (2026-02-26 11:02)
   - ✅ TASK-GIT-COMMIT-2 三批提交 (67文件, PM核验通过)
   - ✅ TASK-GIT-COMMIT + TASK-GIT-INIT
   - ✅ TASK-GIT-COMMIT-3 (4daad77 + Batch A/B/C, 131 文件, push 完成)
 
+生产环境:
+  - VPS: 107.148.1.199 (Docker 28.1.1 + Compose v2.35.1)
+  - 容器: api (healthy) + frontend (up) + redis (healthy)
+  - SSL: Cloudflare Full Strict + Origin Certificate
+  - 域名: https://prefaceai.mov
+
 待做:
-  1️⃣ 云服务选型
+  1️⃣ Founder 填入 API Key → 重启 api 容器
+  2️⃣ CI/CD 基础流水线
+  3️⃣ 监控告警系统
 ```
 
 ---
@@ -391,6 +401,54 @@ Pipeline品牌: FrameSpark™
 ---
 
 ## 更新日志
+
+### 2026-03-09 17:30
+- **[PM] Step 4 Code Review 22/22 PASS + Step 5 E2E 派发** 📋
+  - 4 文件 22 检查点: T5(7)+T6(5)+T7(4)+T8(3)+T9(1)+T10(2) 全部 PASS
+  - 跨组件验证: T5 regex 匹配 + T6 安全回退 + T9 双路径覆盖
+  - 3 项非阻塞观察: OB-6(narration_with_dialogue降级遗漏P3) + OB-7(T7仅警告P3) + OB-8(_name_to_id冗余Info)
+  - 10/10 修复任务全部 PM Review PASS
+  - 派发 Step 5: @Tester E2E 回归验证 (2 故事 × 10 shots, 10 维度)
+  - Backend + AI-ML 暂无新任务，等 Step 5 结果
+
+### 2026-03-09 15:39
+- **[PM] F1-F5 深挖分析 + 7 项修复任务派发** 📋
+  - Founder 要求深挖 F1-F5 根因
+  - F2: 双层问题——NB2 偶发 + pipeline_orchestrator 代码 bug
+  - F3/F4/F5: 同一系统性问题——Stage 3 素材不足 + dialogue≥60% 逼 LLM 硬塞
+  - F5 升级 P3→P1: 全量扫描 6/30(20%) speaker 错位
+  - 派发 T1-T7: @AI-ML P0×3 + @Backend P0×1+P1×2+P2×1
+  - 执行顺序: Step 1(并行) → PM Review → Step 3(Backend P1) → PM Review → Tester E2E → PM 复核
+
+### 2026-03-09 15:00
+- **[PM] 独立深度复核完成 — TASK-E2E-REGRESSION-R2** 📋
+  - 审查范围: 16 数据文件 + 40 图片，全部逐一查看
+  - 5 项修复验证: **全部有效** (P0 text_overlay 20/20)
+  - 5 项独立新发现: F1(crisis缺失P1) + F2(气泡重复P2) + F3(narration超标P2) + F4(thought不足P2) + F5(speaker不匹配P3→P1)
+  - 综合评分: **4.63/5** (与 Tester 4.65 差异 0.02)
+  - 亮点: Story B ink 风格系统最佳表现; Shot 10 可作产品宣传素材
+- **[Tester] TASK-E2E-REGRESSION-R2 完成** ✅ (14:00, 4.65/5, 20/20)
+- **[Backend] TASK-BACKUP-MODEL-FLASH 完成** ✅ (11:07, 3文件12处)
+
+### 2026-03-09 12:30
+- **[Founder] 决策: Stage 1-4 备用模型统一 Gemini 3 Flash** ⭐
+  - 原因: 都是文本生成，Flash 成本和性价比更优
+  - Stage 1-3 需改 Pro→Flash，Stage 4 已是 Flash 无需动
+- **[PM] TASK-BACKUP-MODEL-FLASH 派发 @Backend + TASK-E2E-REGRESSION-R2 派发 @Tester** 📋
+  - Backend: 3 文件 Stage 1-3 备用 Pro→Flash
+  - Tester: 2 故事×10 shots, 9 维度验收（Backend 完成后启动）
+
+### 2026-03-09 12:00
+- **[PM] Code Review PASS — Backend Issue #2 + AI-ML Issues #1/#3/#4/#5** 📋
+  - 2 文件 14 处修改全部通过 (0 阻塞)
+  - Backend: 模型配置(Claude primary→Gemini fallback) + style_preset 回退修复
+  - AI-ML: text_overlay schema + dialogue_beats 传入 + TEXT OVERLAY MAPPING RULES + Rule #9 + 标签防复制 + TEXT-FREE
+  - 下游消费链 3 个消费者与 schema 100% 匹配
+  - 待 Tester E2E 回归验证
+- **[Backend] Issue #2 修复完成** ✅ (10:21)
+  - storyboard_director.py 4 处: 主模型→Claude Sonnet 4.6, 备用→Gemini 3 Flash, 调用顺序反转, style_preset 回退
+- **[AI-ML] Issues #1/#3/#4/#5 修复完成** ✅ (11:30)
+  - storyboard_director.py 8 处 + storyboard_prompts.py 2 处
 
 ### 2026-03-06 16:15
 - **[Founder] 批准 DEPLOY-PREP 部署方案** ⭐

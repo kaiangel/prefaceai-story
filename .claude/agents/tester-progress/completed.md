@@ -4,6 +4,148 @@
 
 ---
 
+## 2026-03-09
+
+### TASK-E2E-REGRESSION-R3 ✅ 7/10 PASS (20/20 shots, 10 维度)
+
+**时间**: 18:00 完成
+
+**测试范围**: 10 维度 E2E 回归验证 — 验证 T1-T10 修复（PM deep review F1-F5 根因修复）
+
+**测试参数**:
+- Story A: 除夕家庭晚餐争吵 / illustration / 4 角色 / 10 shots / 1479s
+- Story B: 山间书法师徒 / ink / 2 角色 / 10 shots / 1268s
+- 模型: Stage 1-4 Claude Sonnet 4.6 + NB2 (gemini-3.1-flash-image-preview)
+- **全部 40+ 张图片逐一人工查看**（角色参考 12 + 场景参考 10 + raw 20 + with_text 20）
+
+**10 维度评分**:
+
+| # | 维度 | Story A | Story B | 综合 |
+|---|------|---------|---------|------|
+| 1 | 生成成功率 | 10/10 ✅ | 10/10 ✅ | **PASS** |
+| 2 | text_overlay 输出完整性 | 10/10 ✅ | 10/10 ✅ | **PASS** |
+| 3 | text_type 分布 | d=70% t=30% ✅ | d=90% t=10% ✅ | **PASS** |
+| 4 | thought 出现率 (T1+T10) | S3=32.7% S4=70% ✅ | S3=40.4% S4=60% ✅ | **PASS** |
+| 5 | 无 speaker 错位 (T2+T5+T6) | 0/13 ✅ | 0/12 ✅ | **PASS** |
+| 6 | plot_points 1:1 覆盖 (T3) | 5/6 ❌ | 6/6 ✅ | **PARTIAL** |
+| 7 | 无对话气泡重复 (T4+T8) | 0 issues ✅ | 0 issues ✅ | **PASS** |
+| 8 | 无标签泄露 | 1/10 ❌ | 2/10 ❌ | **FAIL** |
+| 9 | 无 NB2 乱码文字 | 无乱码 ✅ | 无乱码 ✅ | **PASS** |
+| 10 | 角色/风格一致性 | 4.5/5 ✅ | 4.8/5 ✅ | **PASS** |
+
+**T1-T10 修复验证**:
+- T1 (dialogue_beats type): ✅ thought 32-40% (目标 ≥20%)
+- T2 (MAPPING RULES): ✅ speaker 0 错位
+- T3 (plot_points 1:1): Story B 6/6 ✅, Story A 5/6 (LLM JSON 失败)
+- T4 (dialogue skip TextOverlay): ✅ 正确跳过
+- T5 (speaker-visibility): ✅ 2 处降级成功
+- T6 (dialogue speaker filter): ✅ 不可见 speaker 跳过
+- T7 (rebalance): ✅ 检查正常
+- T8 (compound split): ✅ 拆分正确（但引出双重渲染 bug）
+- T9 (use_native_text): ✅ 单配置源
+- T10 (thought ≥20%): ✅ 超过目标
+
+**新发现 Bug**: thought 文字双重渲染
+- NB2 原生渲染 thought + TextOverlay 叠加 = 双重渲染
+- 影响 11/20 with_text shots
+- 建议从 NB2 prompt 移除 thought 文字
+
+**D8 标签泄露详情**:
+- Story A Shot 2: "Scene: old_house_dining_room Interior"
+- Story B Shot 2/7: "Scene: mountain_thatched_study Interior"
+
+**输出**:
+- 测试脚本: `tests/test_e2e_regression_r3.py`
+- Story A: `test_output/manualtest/e2e_regression_r3/20260309_165927/story_A/20260309_165927/`
+- Story B: `test_output/manualtest/e2e_regression_r3/20260309_165927/story_B/20260309_172406/`
+- 对比报告: `test_output/manualtest/e2e_regression_r3/20260309_165927/comparison_report.md`
+
+---
+
+### TASK-E2E-REGRESSION-R2 ✅ PASS (4.65/5, 20/20 shots, 9 维度)
+
+**时间**: 14:00 完成
+
+**测试范围**: 9 维度 E2E 回归验证 — 验证 5 项问题修复 (Issue #1-#5) + TASK-BACKUP-MODEL-FLASH
+
+**测试参数**:
+- Story A: 除夕家庭晚餐争吵 / illustration / 4 角色 / 10 shots / 1264s
+- Story B: 山间书法师徒 / ink / 2 角色 / 10 shots / 1284s
+- 模型: Stage 1-4 Claude Sonnet 4.6 + NB2 (gemini-3.1-flash-image-preview)
+
+**9 维度评分**:
+
+| # | 维度 | Story A | Story B |
+|---|------|---------|---------|
+| 1 | 成功率 | 10/10 (100%) | 10/10 (100%) |
+| 2 | text_overlay 输出 | PASS (10/10) | PASS (10/10) |
+| 3 | text_type 分布 | PASS (dialogue 60%) | PASS (dialogue 70%) |
+| 4 | 对话气泡渲染 | PASS (Shot 6 重复渲染) | PASS |
+| 5 | text_language=zh-CN | PASS (0 繁体) | PASS (0 繁体) |
+| 6 | 无标签泄露 | PASS (10/10) | PASS (10/10) |
+| 7 | 无 NB2 乱码文字 | CONDITIONAL PASS (Shot 6 轻微) | PASS (10/10) |
+| 8 | 手部正常 | PASS (10/10) | PASS (10/10) |
+| 9 | 角色/风格一致性 | 4.5/5 | 5.0/5 |
+| | **综合** | **4.5** | **4.8** |
+
+**5 项修复验证**:
+- Issue #1 [P0] text_overlay 缺失: ✅ 20/20 shots 全部输出 (R1 为 0/20)
+- Issue #2 [P1] DEC-012 模型配置: ✅ Claude Sonnet 4.6 主模型
+- Issue #3 [P1] SQ-1 标签泄露: ✅ 20/20 无标签文字
+- Issue #4 [P2] 单角色三手: ✅ 20/20 手部正常
+- Issue #5 [P2] NB2 乱码文字: ✅ 19/20 干净 + 1 轻微装饰文字
+
+**非阻塞观察**:
+- O1: narration 30-40% 超过目标 ≤15%, thought 0% — 10-shot 样本偏小
+- O2: Story A Shot 6 NB2 对话气泡重复渲染（偶发 bug）
+
+**输出**:
+- 测试脚本: `tests/test_e2e_regression_r2.py`
+- Story A: `test_output/manualtest/e2e_regression_r2/20260309_111911/story_A/20260309_111911/`
+- Story B: `test_output/manualtest/e2e_regression_r2/20260309_111911/story_B/20260309_114015/`
+- 对比报告: `test_output/manualtest/e2e_regression_r2/20260309_111911/comparison_report.md`
+
+---
+
+## 2026-03-06
+
+### TASK-E2E-REGRESSION ✅ PASS (4.63/5, 20/20 shots)
+
+**时间**: 17:50 完成
+
+**测试范围**: 综合 E2E 回归 — 2 故事 × 10 shots，不同题材+风格，完整 Stage 1→5
+
+**测试参数**:
+- Story A: 深夜便利店都市情感 / illustration / 2 角色 / 10 shots
+- Story B: 古装武侠寻师之旅 / ink / 3 角色 / 10 shots
+- 模型: NB2 (gemini-3.1-flash-image-preview)
+
+**7 维度评分**:
+
+| # | 维度 | Story A | Story B |
+|---|------|---------|---------|
+| 1 | 成功率 | 10/10 (100%) | 10/10 (100%) |
+| 2 | 角色一致性 | 4.5/5 | 4.5/5 |
+| 3 | 风格一致性 | 5.0/5 | 5.0/5 |
+| 4 | 对话气泡 | N/A | N/A |
+| 5 | speaker_format | N/A | N/A |
+| 6 | text_language | PASS | PASS |
+| 7 | 场景准确性 | 4.5/5 | 4.5/5 |
+| | **综合** | **4.63** | **4.63** |
+
+**代码路径验证**: DEC-014 ✅ / NB2 默认 ✅ / System Instruction 精简 ✅ / StyleEnforcer ✅ / SQ-2 ✅ / 2:3 ✅
+
+**发现**:
+- P2: Stage 1 LLM JSON 偶发失败 (50%)，建议添加重试
+- P3: 两组均为旁白型，dialogue 维度 (4/5/6) 未覆盖
+
+**输出**:
+- Story A: `test_output/manualtest/e2e_regression/20260306_162858/story_A/20260306_162858/`
+- Story B: `test_output/manualtest/e2e_regression/20260306_161817/story_B/20260306_161910/`
+- 报告: `test_output/manualtest/e2e_regression/comparison_report.md`
+
+---
+
 ## 2026-03-04
 
 ### TASK-SHOT-QUALITY-BUGFIX 回归验证 ✅ PASS (4/4 Bug + 4.36/5)

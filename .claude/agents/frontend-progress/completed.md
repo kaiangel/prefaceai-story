@@ -4,6 +4,77 @@
 
 ---
 
+## 2026-03-10
+
+### Contact 页面更新 + 风格缩略图集成 ✅
+
+**完成时间**: 2026-03-10
+**验收状态**: 待 Founder 确认
+
+**完成内容（3 文件修改 + 15 新增静态资源）**:
+
+#### Contact 页面更新
+- [x] `ContactContent.tsx` — 微信客服: XuhuaStory → Andrea@PrefaceAI（微信号 xingxiwh016），地址: 深圳 → 上海 黄浦区黄陂南路838号中海国际
+
+#### TASK-STYLE-THUMBNAILS 集成（接 @AI-ML 缩略图）
+- [x] 15 张缩略图压缩: 1024×1024 PNG → 400×400 JPEG (quality 75)，~27MB → ~1MB
+- [x] 移动到 `public/styles/{key}.jpg`（中文文件名 → 英文 key）
+- [x] `types/create.ts` — `StylePreset` 接口新增 `thumbnail` 字段，15 个预设添加图片路径
+- [x] `StyleSelector.tsx` — 风格卡片从 CSS 渐变色块替换为真实 AI 生成风格示例图（渐变保留 fallback）
+
+**新增静态资源**:
+- `public/styles/pixar_3d.jpg` (51KB)、`ghibli.jpg` (82KB)、`illustration.jpg` (72KB)、`ink.jpg` (35KB)、`slam_dunk.jpg` (77KB)、`korean_webtoon.jpg` (58KB)、`oil_painting.jpg` (60KB)、`cyberpunk.jpg` (62KB)、`realistic.jpg` (59KB)、`cartoon.jpg` (71KB)、`anime.jpg` (62KB)、`watercolor.jpg` (74KB)、`children_book.jpg` (75KB)、`manga.jpg` (79KB)、`pixel.jpg` (69KB)
+
+**验收指标**:
+- 3/3 文件修改: ✅
+- 15/15 缩略图压缩+移动: ✅
+- `npm run build` 18 路由通过: ✅
+
+---
+
+### TASK-GCLOUD-OPT Google for Startups Cloud 申请网站优化 ✅
+
+**完成时间**: 2026-03-10
+**验收状态**: 待 Founder 确认 + DevOps 部署
+**任务背景**: 申请 Google for Startups Cloud Program 赠金，降低前期测试成本
+
+**完成内容（8 文件修改 + 4 新增静态资源）**:
+
+#### About 页面团队信息（审核重点）
+- [x] `AboutContent.tsx` — 新增 3 人团队卡片（Kai/Ben/Amy），真实照片+中英文名+职位+详细背景+GitHub 链接，新增英文产品摘要（提及 Google Gemini）
+
+#### 邮箱域名替换（6 处 xuhuastory.com → prefaceai.mov）
+- [x] `ContactContent.tsx` — support@xuhuastory.com → kai@prefaceai.mov
+- [x] `PrivacyContent.tsx` — privacy@xuhuastory.com → kai@prefaceai.mov
+- [x] `TermsContent.tsx` — support@xuhuastory.com → kai@prefaceai.mov
+- [x] `CareersContent.tsx` — hr@xuhuastory.com → hr@prefaceai.mov（4 处）
+
+#### AI-first 定位强化
+- [x] `HeroSection.tsx` — 英文副标题 "Turn one sentence into a complete AI-generated story"，slogan 改 "FrameSpark™ AI Story Engine"
+- [x] `ValueProposition.tsx` — 三卡片重写为 AI-first 定位（中英双语标题），描述强调 LLM + 多模态 AI
+
+#### Google Gemini 标识 + Demo 视频 + Traction
+- [x] `Pipeline.tsx` — 技术标签（Powered by Google Gemini 等），嵌入产品 Demo 视频（横屏 MP4）
+- [x] `Stats.tsx` — 新增 683+ Beta Users，所有指标加英文标签
+
+#### 新增静态资源
+- [x] `public/team/kai.jpg`、`ben.jpg`、`amy.jpg`（压缩至 ~20KB/张）
+- [x] `public/demo.mp4`（MOV→MP4，8.3MB）
+
+**Google for Startups 研究发现（已向 Founder 汇报）**:
+- AI-first tier 最高可获 $350K credits
+- 审核重点：团队信息+专业网站+AI-first 定位+Google 生态对齐+Traction
+- 申请前须确保 GCP Billing Account 管理员邮箱为 @prefaceai.mov
+
+**验收指标**:
+- 8/8 文件修改: ✅
+- 4/4 新增静态资源: ✅
+- `npm run build` 18 路由通过: ✅
+- xuhuastory.com 在 src/ 中全部清除: ✅
+- 团队照片压缩至 ~20KB: ✅
+
+---
+
 ## 2026-03-06
 
 ### TASK-RESPONSIVE-OPT 响应式 / 移动端适配 ✅

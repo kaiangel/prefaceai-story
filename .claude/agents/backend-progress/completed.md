@@ -4,6 +4,139 @@
 
 ---
 
+## 2026-03-10
+
+### PRO_MODEL → NB2_MODEL 命名清理 ✅ (14:15)
+
+**来源**: PM 全局 Double-Check [P3] 派发
+
+**修改**:
+- `image_generator.py`: 类常量 `PRO_MODEL` → `NB2_MODEL` + 7 处引用 + 误导性注释/docstring 清理
+- `tests/test_nb2_switch.py`: 4 处 `ig.PRO_MODEL` → `ig.NB2_MODEL`
+- 不改功能逻辑，`use_pro_model` 参数名保留
+
+**验证**: Python import ✅ + PRO_MODEL 零残留 ✅
+
+### Step 8.5: T13-INT + T12-UNIFY 完成 ✅ (13:48)
+
+**来源**: PM Step 8 Code Review → 2 项微型修复
+**优先级**: P0 (阻塞) + P3 (代码质量)
+
+| # | 任务 | 文件 | 修改内容 |
+|---|------|------|---------|
+| T13-INT | COMIC_MODE_NARRATIVE_RULES 集成 | `storyboard_director.py` | import + 两处 prompt 注入 |
+| T12-UNIFY | skip 分支合并 | `pipeline_orchestrator.py` | `if use_native_text:` 单一分支 |
+
+**验证**: Python import 2/2 ✅
+
+---
+
+### Step 7 Phase 1: T11+T12+T16 全部完成 ✅ (13:21)
+
+**来源**: TASK-F1-F5-FIX Step 7 → PM 派发 (R3 修复)
+**优先级**: P0-P3
+
+**修改文件**: 4 个文件，3 项任务
+
+| # | 任务 | P | 文件 | 修改内容 |
+|---|------|---|------|---------|
+| T11 | 移除参考图 PIL 标签 | P0 | `scene_reference_manager.py` + `reference_image_manager.py` | `get_references_for_location()` 移除 `_label_scene_image()` 调用；`get_smart_references_for_scene()` 移除 `_label_reference_image()` 调用 |
+| T12 | TextOverlay native_text 模式修复 | P0 | `pipeline_orchestrator.py` | `use_native_text=True` 时全部跳过 TextOverlay（DEC-012），替换原 T8 compound split 逻辑 |
+| T16 | OB-6 降级分支补充 | P3 | `storyboard_director.py` | elif 加 `"narration_with_dialogue"` |
+
+**验证**: Python import 4/4 ✅
+
+---
+
+## 2026-03-09
+
+### Step 3: T5+T6+T7+T8+T9 全部完成 ✅ (16:36)
+
+**来源**: TASK-F1-F5-FIX Step 3 → PM 派发
+**优先级**: P1-P3
+
+**修改文件**: 3 个文件，5 项任务
+
+| # | 任务 | 优先级 | 文件 | 修改内容 |
+|---|------|--------|------|---------|
+| T5 | speaker-visibility 验证 | P1 | `storyboard_director.py` | `_validate_storyboard()` 新增 characters 参数 + speaker-visibility 校验（中文名→char_id 映射，不匹配降级） |
+| T6 | dialogue speaker 降级 | P1 | `image_generator.py` | `build_dialogue_scene_embed()` 新增 characters_in_scene 参数 + 不可见 speaker 跳过 + 调用方传参 |
+| T7 | text_type 分布检查 | P2 | `storyboard_director.py` | 新增 `_rebalance_text_types()` 方法，narration>15%/thought<10% 警告 |
+| T8 | compound type 拆分渲染 | P2 | `pipeline_orchestrator.py` | compound type dialogue 子项 NB2 渲染、非 dialogue 子项 TextOverlay 渲染 |
+| T9 | use_native_text 参数同步 | P3 | `pipeline_orchestrator.py` | `self.use_native_text = True` 统一配置源 |
+
+**验证**: Python import 3/3 ✅
+
+---
+
+### T4 [P0] pipeline TextOverlay 条件判断 ✅ (15:55)
+
+**来源**: TASK-F1-F5-FIX Step 1 → PM 派发 (F2 修复)
+**优先级**: P0
+
+**修改文件**: `app/services/pipeline_orchestrator.py` (L335-357, 1 处修改)
+
+**根因**: `use_native_text=True` 时 NB2 通过 `build_dialogue_scene_embed()` 原生渲染 dialogue 气泡，但 pipeline 无条件对所有 `text_type != "none"` 执行 `text_overlay_service.process_shot()`，导致 dialogue 被双重/三重渲染。
+
+**修改内容**:
+
+| # | 修改点 | 修改前 | 修改后 |
+|---|--------|--------|--------|
+| 1 | TextOverlay 条件判断 | 无条件对 text_type != "none" 执行 | `use_native_text=True` 且 `text_type == "dialogue"` 时跳过，复制 raw image |
+
+```python
+# 新增逻辑
+text_type = text_overlay_data.get("text_type", "none")
+use_native_text = True
+if text_type != "none":
+    if use_native_text and text_type == "dialogue":
+        # 直接复制 raw image 作为 with_text 版本
+        result["pil_image"].copy().save(with_text_path)
+    else:
+        text_overlay_service.process_shot(...)
+```
+
+**验证**: Python import ✅
+
+---
+
+### TASK-BACKUP-MODEL-FLASH — Stage 1-3 备用模型统一 Flash ✅ (11:07)
+
+**来源**: Founder 决策（成本和性价比）→ PM 派发
+**优先级**: P1
+
+**修改文件**: 3 个文件，每文件 4 处修改
+
+| # | 文件 | 修改内容 |
+|---|------|---------|
+| 1 | `story_outline_generator.py` | `gemini-3-pro-preview` → `gemini-3-flash-preview` + docstring + 注释×2 |
+| 2 | `character_designer.py` | `gemini-3-pro-preview` → `gemini-3-flash-preview` + docstring + 注释×2 |
+| 3 | `screenplay_writer.py` | `gemini-3-pro-preview` → `gemini-3-flash-preview` + docstring + 注释×2 |
+
+**验证**: Python import + 模型配置确认 (3/3 = gemini-3-flash-preview) ✅
+
+---
+
+### Issue #2 — DEC-012 Stage 4 模型配置修复 ✅ (10:21)
+
+**来源**: E2E 回归测试 PM 深度分析 Issue #2 (Extra #1) → Founder 批准修复
+**优先级**: P1
+
+**修改文件**: `app/services/storyboard_director.py` (4 处修改)
+
+| # | 修改点 | 修改前 | 修改后 |
+|---|--------|--------|--------|
+| 1 | 主模型 | `gemini-3-flash-preview` | `claude-sonnet-4-6` |
+| 2 | 备用模型 | `claude-haiku-4-5-20251001` | `gemini-3-flash-preview` |
+| 3 | 调用顺序 | Gemini 优先 → Claude fallback | Claude 优先 → Gemini fallback |
+| 4 | style_preset 默认值 (×2) | `"realistic"` | `"anime"` |
+
+**根因**: AI-ML 后续修改此文件（TASK-PROMPT-BUBBLE 系列）时覆盖了 TASK-MODEL-UPGRADE + TASK-STYLE-DEFAULT-FIX 的变更。
+
+**验证**: Python import + 模型配置确认 (claude-sonnet-4-6 / gemini-3-flash-preview) ✅
+
+---
+
 ## 2026-03-06
 
 ### TASK-BUBBLE-SPEAKER-FORMAT-DEPLOY ✅ (14:56)

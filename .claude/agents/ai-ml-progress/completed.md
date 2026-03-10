@@ -4,6 +4,94 @@
 
 ---
 
+## 2026-03-10
+
+### TASK-STYLE-THUMBNAILS — 15 种风格缩略图生成 ✅
+
+**完成时间**: 2026-03-10
+**Founder 审图**: ✅ 通过（"图片质量非常好"）
+**新增文件**: `tests/test_style_thumbnails.py`
+**输出**: `test_output/manualtest/style_thumbnails/` (15 张 PNG + 15 个 prompt)
+
+**任务类型**: 图像生成（NB2 缩略图）
+
+**完成内容**:
+- [x] 统一场景 prompt（英文）: 城市街头年轻女生 + 温暖街景
+- [x] 15 种风格各生成 1 张缩略图（StyleEnforcer.enforce_prompt() + add_quality_suffix=True）
+- [x] 模型: NB2 (`gemini-3.1-flash-image-preview`)，宽高比 1:1
+- [x] 15/15 全部成功，1024×1024 PNG
+- [x] Prompt 保存到 `prompts/` 子文件夹
+- [x] 总耗时 ~383s（平均 25.5s/张）
+- [x] Founder 审图通过
+
+**15 种风格**:
+pixar_3d/皮克斯3D, ghibli/吉卜力, illustration/数字插画, ink/中国水墨, slam_dunk/井上雄彦, korean_webtoon/韩漫, oil_painting/油画, cyberpunk/赛博朋克, realistic/写实摄影, cartoon/卡通动画, anime/日式动画, watercolor/水彩, children_book/儿童绘本, manga/日漫, pixel/像素艺术
+
+**关键产出**:
+| 文件 | 说明 |
+|------|------|
+| `tests/test_style_thumbnails.py` | 生成脚本 |
+| `test_output/manualtest/style_thumbnails/*.png` | 15 张缩略图 |
+| `test_output/manualtest/style_thumbnails/prompts/*.txt` | 15 个 prompt |
+
+**下一步**: @Frontend 集成到 create 页面替换渐变色块
+
+---
+
+### Step 7 — T13+T14+T15 R3 修复 ✅
+
+**完成时间**: 2026-03-10
+**修改文件**: `app/prompts/storyboard_prompts.py`, `app/services/image_generator.py`, `app/services/reference_image_manager.py`
+
+| # | 任务 | P | 修改 |
+|---|------|---|------|
+| T13 | 条漫模式叙事自足 prompt | P1 | 新增 COMIC_MODE_NARRATIVE_RULES 常量（3 条规则） |
+| T14 | 角色参考图跨年龄风格统一 | P1 | portrait + reference prompt 各加 CROSS-AGE STYLE CONSISTENCY |
+| T15 | NB2 气泡重复抑制 | P2 | build_dialogue_scene_embed() 加 EXACTLY ONCE 指令 |
+
+---
+
+## 2026-03-09
+
+### Step 3 — T10 Stage 3 thought 比例强化 ✅
+
+**完成时间**: 2026-03-09
+**修改文件**: `app/services/screenplay_writer.py` (2 处)
+
+| # | 修改项 | 内容 |
+|---|-------|------|
+| 1 | 分布目标 L404 | "每 scene 至少 1 个 thought" → "thought 占比 ≥20%（5 beats ≥1，6+ beats ≥2）" |
+| 2 | 输出要求 L430 | 同上双重约束 |
+
+---
+
+### Step 1 — T1+T2+T3 F1-F5 深层修复 ✅
+
+**完成时间**: 2026-03-09
+**修改文件**: `app/services/screenplay_writer.py`, `app/services/storyboard_director.py`
+
+| # | 任务 | P | 修改 |
+|---|------|---|------|
+| T1 | Stage 3 dialogue_beats type 字段 | P0 | schema + thought 示例 + 强制覆盖 + 分布目标 |
+| T2 | Stage 4 MAPPING RULES 增强 | P0 | THOUGHT GENERATION + SPEAKER VISIBILITY + SELF-CHECK (×2) |
+| T3 | Stage 3 plot_points 1:1 | P0 | PLOT POINT COVERAGE 约束块 |
+
+---
+
+### E2E 回归修复 — 4 项 AI-ML 任务 (Issue #1/#3/#4/#5) ✅
+
+**完成时间**: 2026-03-09
+**修改文件**: `app/services/storyboard_director.py`, `app/prompts/storyboard_prompts.py`
+
+| # | Issue | P | 修改 |
+|---|-------|---|------|
+| 1 | text_overlay 缺失 (Pipeline 架构缺陷) | P0 | Stage 4 两套 schema + TEXT OVERLAY MAPPING RULES + dialogue_beats 传入 |
+| 3 | SQ-1 标签泄露 | P1 | 标签防复制指令 |
+| 4 | 单角色多手动作 | P2 | Rule #9 SINGLE-CHARACTER HAND ACTION LIMIT (两处) |
+| 5 | NB2 乱码文字 | P2 | TEXT-FREE 全局约束 |
+
+---
+
 ## 2026-03-06
 
 ### TASK-PROMPT-BUBBLE-FOLLOWUP-R2 -- R2 补测 + text_language 约束 ✅
