@@ -6,21 +6,24 @@ import { Zap, Users, Film } from "lucide-react";
 const features = [
   {
     icon: Zap,
-    title: "即发即用",
-    description: "标题+文案+图片+BGM，完成即可发布到抖音/小红书/视频号",
-    highlight: "完成即发布",
+    title: "AI-Powered Creation",
+    titleCn: "AI 驱动创作",
+    description: "由 LLM 驱动叙事生成，AI 图像模型自动合成画面，一句话创意到完整故事全自动",
+    highlight: "End-to-End AI",
   },
   {
     icon: Users,
-    title: "角色如一",
-    description: "至多可保持6人在不同场景中的一致性",
+    title: "Character Consistency",
+    titleCn: "角色如一",
+    description: "基于多模态 AI 模型的角色一致性引擎，至多6人在不同场景中保持稳定的视觉一致性",
     highlight: "6人一致",
   },
   {
     icon: Film,
-    title: "双输出形式",
-    description: "条漫素材包或完整视频，任你选择下载",
-    highlight: "任你选择",
+    title: "Dual Output",
+    titleCn: "双输出形式",
+    description: "条漫素材包或完整视频，完成即可发布到抖音/小红书/视频号",
+    highlight: "即发即用",
   },
 ];
 
@@ -59,7 +62,7 @@ export default function ValueProposition() {
             为什么选择<span className="text-gradient">序话Story</span>
           </h2>
           <p className="text-text-tertiary max-w-2xl mx-auto">
-            我们重新定义了AI创作的标准，让每个人都能轻松创作专业级作品
+            AI-native 创作引擎，从叙事生成到画面合成全链路 AI 驱动
           </p>
         </motion.div>
 
@@ -83,9 +86,10 @@ export default function ValueProposition() {
               </div>
 
               {/* Title */}
-              <h3 className="text-xl font-semibold text-text-primary mb-3">
-                {feature.title}
+              <h3 className="text-xl font-semibold text-text-primary mb-1">
+                {feature.titleCn}
               </h3>
+              <p className="text-xs text-text-muted mb-3">{feature.title}</p>
 
               {/* Description */}
               <p className="text-text-secondary leading-relaxed">

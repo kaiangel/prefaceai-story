@@ -13,7 +13,7 @@ const sections = [
   { id: "rights", title: "6. 用户权利", content: "你有权：\n\n6.1 访问和导出你的个人数据。\n\n6.2 更正不准确的个人信息。\n\n6.3 删除你的账号和相关数据（注销后30天内数据将被永久删除）。\n\n6.4 撤回授权同意（可能影响部分服务使用）。" },
   { id: "minors", title: "7. 未成年人保护", content: "7.1 本平台不面向14周岁以下的未成年人提供服务。\n\n7.2 如我们发现收集了未成年人的信息，将立即删除相关数据。" },
   { id: "updates", title: "8. 政策更新", content: "我们可能不时更新本隐私政策。重大更新会通过邮件或站内通知告知你。继续使用本平台即表示你接受更新后的隐私政策。" },
-  { id: "contact", title: "9. 联系方式", content: "如对本隐私政策有任何疑问，请联系：privacy@xuhuastory.com" },
+  { id: "contact", title: "9. 联系方式", content: "如对本隐私政策有任何疑问，请联系：kai@prefaceai.mov" },
 ];
 
 export default function PrivacyContent() {

@@ -120,10 +120,20 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="text-4xl md:text-5xl lg:text-6xl font-bold text-center mb-4"
+          className="text-4xl md:text-5xl lg:text-6xl font-bold text-center mb-3"
         >
           一句话，一个<span className="text-gradient">完整故事</span>
         </motion.h1>
+
+        {/* English subtitle */}
+        <motion.p
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+          className="text-base md:text-lg text-text-muted text-center mb-2"
+        >
+          Turn one sentence into a complete AI-generated story
+        </motion.p>
 
         {/* Slogan */}
         <motion.p
@@ -132,7 +142,7 @@ export default function HeroSection() {
           transition={{ delay: 0.4 }}
           className="text-xl md:text-2xl text-text-tertiary text-center mb-8 font-serif"
         >
-          FrameSpark™ AI条漫引擎
+          FrameSpark™ AI Story Engine
         </motion.p>
 
         {/* CTA Buttons */}

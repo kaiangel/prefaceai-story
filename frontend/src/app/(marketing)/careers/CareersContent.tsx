@@ -11,21 +11,21 @@ const jobs = [
     type: "全职 · 深圳",
     description:
       "负责产品核心功能开发，参与前后端架构设计。熟悉 Python/TypeScript，有 AI 应用开发经验者优先。",
-    mailto: "mailto:hr@xuhuastory.com?subject=应聘全栈工程师",
+    mailto: "mailto:hr@prefaceai.mov?subject=应聘全栈工程师",
   },
   {
     title: "AI/ML 工程师",
     type: "全职 · 深圳/远程",
     description:
       "负责图像生成模型优化、Prompt 工程和角色一致性算法。熟悉 Diffusion Models / LLM 应用开发，有多模态 AI 经验者优先。",
-    mailto: "mailto:hr@xuhuastory.com?subject=应聘AI/ML工程师",
+    mailto: "mailto:hr@prefaceai.mov?subject=应聘AI/ML工程师",
   },
   {
     title: "产品运营",
     type: "全职 · 深圳",
     description:
       "负责产品在抖音、小红书等平台的内容运营和用户增长。有短视频运营经验，了解 AIGC 行业者优先。",
-    mailto: "mailto:hr@xuhuastory.com?subject=应聘产品运营",
+    mailto: "mailto:hr@prefaceai.mov?subject=应聘产品运营",
   },
 ];
 
@@ -100,10 +100,10 @@ export default function CareersContent() {
         <p className="text-text-tertiary">
           没有匹配的职位？发送简历到{" "}
           <a
-            href="mailto:hr@xuhuastory.com"
+            href="mailto:hr@prefaceai.mov"
             className="text-brand-primary hover:underline"
           >
-            hr@xuhuastory.com
+            hr@prefaceai.mov
           </a>
           ，我们始终欢迎优秀的人才。
         </p>

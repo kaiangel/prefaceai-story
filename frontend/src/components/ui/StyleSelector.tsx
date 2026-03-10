@@ -71,9 +71,15 @@ export default function StyleSelector({
                 }`}
               >
                 <div
-                  className="h-20 sm:h-24"
+                  className="h-20 sm:h-24 relative"
                   style={{ background: style.gradient }}
-                />
+                >
+                  <img
+                    src={style.thumbnail}
+                    alt={style.label}
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                </div>
                 <div className={`px-2 py-1.5 text-center ${
                   isSelected ? "text-brand-primary bg-brand-primary/5" : "text-text-secondary bg-bg-secondary"
                 }`}>

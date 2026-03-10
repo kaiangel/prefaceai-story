@@ -5,25 +5,29 @@ import { useRef, useEffect, useState } from "react";
 
 const stats = [
   {
-    value: "100",
-    suffix: "%",
-    label: "3人场景角色一致性",
+    value: "683",
+    suffix: "+",
+    label: "Beta Users",
+    labelCn: "内测用户",
   },
   {
-    value: "90",
-    suffix: "%+",
-    label: "6人场景角色一致性",
+    value: "100",
+    suffix: "%",
+    label: "Character Consistency (3 chars)",
+    labelCn: "3人场景角色一致性",
   },
   {
     value: "80",
     suffix: "+",
-    label: "支持视觉风格",
+    label: "Visual Styles",
+    labelCn: "支持视觉风格",
   },
   {
     value: "80",
     prefix: "≤",
     suffix: "ms",
-    label: "音画对齐精度",
+    label: "Audio-Visual Sync",
+    labelCn: "音画对齐精度",
   },
 ];
 
@@ -110,6 +114,9 @@ export default function Stats() {
                 />
               </div>
               <p className="text-text-tertiary text-sm md:text-base">
+                {stat.labelCn}
+              </p>
+              <p className="text-text-muted text-xs">
                 {stat.label}
               </p>
             </motion.div>

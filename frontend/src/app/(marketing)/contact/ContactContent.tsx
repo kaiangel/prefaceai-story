@@ -10,20 +10,20 @@ const contactInfo = [
   {
     icon: Mail,
     title: "邮箱",
-    content: "support@xuhuastory.com",
+    content: "kai@prefaceai.mov",
     sub: "工作日 24 小时内回复",
   },
   {
     icon: MessageCircle,
     title: "微信客服",
-    content: "XuhuaStory",
-    sub: "添加时请备注\"序话用户\"",
+    content: "Andrea@PrefaceAI",
+    sub: "微信号：xingxiwh016",
   },
   {
     icon: MapPin,
     title: "地址",
-    content: "中国 · 深圳",
-    sub: "欢迎来访，请提前预约",
+    content: "中国 · 上海",
+    sub: "黄浦区黄陂南路838号中海国际",
   },
 ];
 

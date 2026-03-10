@@ -54,7 +54,7 @@ export default function Pipeline() {
         >
           <span className="inline-flex items-center gap-2 px-4 py-2 bg-bg-secondary rounded-full text-brand-primary font-medium">
             <Sparkles className="w-4 h-4" />
-            故事引擎
+            AI Story Engine
           </span>
         </motion.div>
 
@@ -99,17 +99,56 @@ export default function Pipeline() {
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8, delay: 0.7 }}
-          className="text-center text-text-tertiary max-w-lg mx-auto text-lg leading-relaxed mb-10"
+          className="text-center text-text-tertiary max-w-lg mx-auto text-lg leading-relaxed mb-6"
         >
           一句话变成完整故事，不需要任何技术技能
         </motion.p>
+
+        {/* Tech Stack Tags */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.9 }}
+          className="flex flex-wrap justify-center gap-3 mb-10"
+        >
+          {["Powered by Google Gemini", "LLM Narrative Generation", "AI Image Synthesis", "Multi-modal AI"].map((tag) => (
+            <span
+              key={tag}
+              className="px-3 py-1.5 rounded-full text-xs border border-white/10 text-text-muted bg-white/[0.03]"
+            >
+              {tag}
+            </span>
+          ))}
+        </motion.div>
+
+        {/* Demo Video */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 1.0 }}
+          className="max-w-3xl mx-auto mb-10"
+        >
+          <video
+            src="/demo.mp4"
+            controls
+            playsInline
+            preload="metadata"
+            poster=""
+            className="w-full rounded-xl border border-white/10 shadow-lg"
+          >
+            Your browser does not support the video tag.
+          </video>
+          <p className="text-center text-text-muted text-xs mt-3">Product Demo — From idea to finished story in minutes</p>
+        </motion.div>
 
         {/* Tagline */}
         <motion.p
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          transition={{ delay: 1.0 }}
+          transition={{ delay: 1.2 }}
           className="text-center text-text-muted font-serif italic"
         >
           &ldquo;专业能力平民化，让每个人都能做电影&rdquo;

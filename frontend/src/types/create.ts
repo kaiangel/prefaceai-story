@@ -230,28 +230,29 @@ export interface StylePreset {
   key: string;
   label: string;
   description: string;
-  gradient: string; // CSS gradient for preview
+  gradient: string; // CSS gradient fallback
+  thumbnail: string; // path to style thumbnail image
 }
 
 // 前 8 个为默认显示，其余需点击"更多"展开
 export const STYLE_PRESETS: StylePreset[] = [
   // — 默认显示 8 个 —
-  { key: "pixar_3d", label: "皮克斯3D", description: "家庭温情", gradient: "linear-gradient(135deg, #4facfe, #00f2fe)" },
-  { key: "ghibli", label: "吉卜力", description: "治愈系", gradient: "linear-gradient(135deg, #89f7fe, #66a6ff)" },
-  { key: "illustration", label: "数字插画", description: "通用", gradient: "linear-gradient(135deg, #f6d365, #fda085)" },
-  { key: "ink", label: "中国水墨", description: "古风武侠", gradient: "linear-gradient(135deg, #2c3e50, #bdc3c7)" },
-  { key: "slam_dunk", label: "井上雄彦", description: "运动/热血", gradient: "linear-gradient(135deg, #1a1a2e, #e94560)" },
-  { key: "korean_webtoon", label: "韩漫", description: "都市恋爱", gradient: "linear-gradient(135deg, #667eea, #764ba2)" },
-  { key: "oil_painting", label: "油画", description: "复古文艺", gradient: "linear-gradient(135deg, #8B6914, #DAA520)" },
-  { key: "cyberpunk", label: "赛博朋克", description: "科幻", gradient: "linear-gradient(135deg, #0f0c29, #302b63)" },
+  { key: "pixar_3d", label: "皮克斯3D", description: "家庭温情", gradient: "linear-gradient(135deg, #4facfe, #00f2fe)", thumbnail: "/styles/pixar_3d.jpg" },
+  { key: "ghibli", label: "吉卜力", description: "治愈系", gradient: "linear-gradient(135deg, #89f7fe, #66a6ff)", thumbnail: "/styles/ghibli.jpg" },
+  { key: "illustration", label: "数字插画", description: "通用", gradient: "linear-gradient(135deg, #f6d365, #fda085)", thumbnail: "/styles/illustration.jpg" },
+  { key: "ink", label: "中国水墨", description: "古风武侠", gradient: "linear-gradient(135deg, #2c3e50, #bdc3c7)", thumbnail: "/styles/ink.jpg" },
+  { key: "slam_dunk", label: "井上雄彦", description: "运动/热血", gradient: "linear-gradient(135deg, #1a1a2e, #e94560)", thumbnail: "/styles/slam_dunk.jpg" },
+  { key: "korean_webtoon", label: "韩漫", description: "都市恋爱", gradient: "linear-gradient(135deg, #667eea, #764ba2)", thumbnail: "/styles/korean_webtoon.jpg" },
+  { key: "oil_painting", label: "油画", description: "复古文艺", gradient: "linear-gradient(135deg, #8B6914, #DAA520)", thumbnail: "/styles/oil_painting.jpg" },
+  { key: "cyberpunk", label: "赛博朋克", description: "科幻", gradient: "linear-gradient(135deg, #0f0c29, #302b63)", thumbnail: "/styles/cyberpunk.jpg" },
   // — 点击"更多"展开 —
-  { key: "realistic", label: "写实摄影", description: "都市情感", gradient: "linear-gradient(135deg, #2c3e50, #4ca1af)" },
-  { key: "cartoon", label: "卡通动画", description: "轻松喜剧", gradient: "linear-gradient(135deg, #f093fb, #f5576c)" },
-  { key: "anime", label: "日式动画", description: "青春校园", gradient: "linear-gradient(135deg, #a18cd1, #fbc2eb)" },
-  { key: "watercolor", label: "水彩", description: "文艺清新", gradient: "linear-gradient(135deg, #a1c4fd, #c2e9fb)" },
-  { key: "children_book", label: "儿童绘本", description: "童话寓言", gradient: "linear-gradient(135deg, #ffecd2, #fcb69f)" },
-  { key: "manga", label: "日漫", description: "热血/搞笑", gradient: "linear-gradient(135deg, #ff9a9e, #fecfef)" },
-  { key: "pixel", label: "像素艺术", description: "怀旧游戏", gradient: "linear-gradient(135deg, #11998e, #38ef7d)" },
+  { key: "realistic", label: "写实摄影", description: "都市情感", gradient: "linear-gradient(135deg, #2c3e50, #4ca1af)", thumbnail: "/styles/realistic.jpg" },
+  { key: "cartoon", label: "卡通动画", description: "轻松喜剧", gradient: "linear-gradient(135deg, #f093fb, #f5576c)", thumbnail: "/styles/cartoon.jpg" },
+  { key: "anime", label: "日式动画", description: "青春校园", gradient: "linear-gradient(135deg, #a18cd1, #fbc2eb)", thumbnail: "/styles/anime.jpg" },
+  { key: "watercolor", label: "水彩", description: "文艺清新", gradient: "linear-gradient(135deg, #a1c4fd, #c2e9fb)", thumbnail: "/styles/watercolor.jpg" },
+  { key: "children_book", label: "儿童绘本", description: "童话寓言", gradient: "linear-gradient(135deg, #ffecd2, #fcb69f)", thumbnail: "/styles/children_book.jpg" },
+  { key: "manga", label: "日漫", description: "热血/搞笑", gradient: "linear-gradient(135deg, #ff9a9e, #fecfef)", thumbnail: "/styles/manga.jpg" },
+  { key: "pixel", label: "像素艺术", description: "怀旧游戏", gradient: "linear-gradient(135deg, #11998e, #38ef7d)", thumbnail: "/styles/pixel.jpg" },
 ];
 
 export const STYLE_PRESETS_DEFAULT_COUNT = 8;

@@ -12,7 +12,7 @@ const sections = [
   { id: "conduct", title: "5. 用户行为规范", content: "5.1 不得利用技术手段绕过系统限制（如额度限制、生成频率限制）。\n\n5.2 不得对平台进行反向工程、爬虫抓取或其他未授权的技术操作。\n\n5.3 不得使用本平台生成侵犯他人知识产权、肖像权或隐私权的内容。" },
   { id: "disclaimer", title: "6. 免责声明", content: "6.1 AI 生成的内容可能存在不准确或不适当的情况，本平台不对生成内容的准确性承担责任。\n\n6.2 因不可抗力（包括但不限于网络故障、系统维护、自然灾害）导致的服务中断，本平台不承担责任。\n\n6.3 本平台不对因使用生成内容所产生的任何直接或间接损失承担责任。" },
   { id: "changes", title: "7. 条款修改", content: "本平台保留随时修改本条款的权利。修改后的条款将在本页面公布，继续使用本平台即表示你同意修改后的条款。重大变更会通过邮件或站内通知的方式告知。" },
-  { id: "contact", title: "8. 联系方式", content: "如对本条款有任何疑问，请联系：support@xuhuastory.com" },
+  { id: "contact", title: "8. 联系方式", content: "如对本条款有任何疑问，请联系：kai@prefaceai.mov" },
 ];
 
 export default function TermsContent() {
