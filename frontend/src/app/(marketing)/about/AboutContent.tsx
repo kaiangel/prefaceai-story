@@ -29,7 +29,7 @@ const values = [
 const team = [
   {
     name: "Kai Sun",
-    nameCn: "孙恺觅",
+    nameCn: "",
     role: "Founder & CEO",
     roleCn: "创始人 & CEO",
     photo: "/team/kai.jpg",
@@ -42,13 +42,13 @@ const team = [
   },
   {
     name: "Ben Li",
-    nameCn: "李本根",
+    nameCn: "",
     role: "Co-founder & CTO",
     roleCn: "联合创始人 & CTO",
     photo: "/team/ben.jpg",
     bio: [
       "58安居客 3年资深架构师",
-      "车轮互联 6年 AI 智能路考项目产品技术负责人，项目从0到上亿级年收入",
+      "车轮互联 7~8年 AI 智能路考项目产品技术负责人，项目从0到上亿级年收入",
       "曾技术参与创业 2年，拿过 2 轮机构投资",
       "擅长构建稳定、高效且可扩展的技术架构，具备丰富的 AI 和 NLP 领域经验",
     ],
