@@ -22,7 +22,7 @@ class CharacterDesigner:
     输入: outline.json
     输出: characters.json
 
-    模型优先级: Claude Sonnet 4.6 (主) → Gemini 3 Pro (备用)
+    模型优先级: Claude Sonnet 4.6 (主) → Gemini 3 Flash (备用)
     """
 
     def __init__(self):
@@ -34,9 +34,9 @@ class CharacterDesigner:
                 api_key=os.getenv("ANTHROPIC_API_KEY")
             )
 
-        # 备用模型: Gemini 3 Pro
+        # 备用模型: Gemini 3 Flash
         self.gemini_client = None
-        self.gemini_model = "gemini-3-pro-preview"
+        self.gemini_model = "gemini-3-flash-preview"
         if os.getenv("GEMINI_API_KEY"):
             self.gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -81,7 +81,7 @@ class CharacterDesigner:
             except Exception as e:
                 print(f"  [Claude失败: {e}，尝试Gemini备用]")
 
-        # Fallback到Gemini 3 Pro
+        # Fallback到Gemini 3 Flash
         if content is None and self.gemini_client:
             try:
                 response = await self.gemini_client.aio.models.generate_content(

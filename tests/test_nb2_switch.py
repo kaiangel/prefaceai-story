@@ -68,8 +68,8 @@ async def main():
 
     # 确认模型
     ig = ImageGenerator()
-    print(f"  PRO_MODEL = {ig.PRO_MODEL}")
-    assert "3.1-flash" in ig.PRO_MODEL, f"模型未切换！当前: {ig.PRO_MODEL}"
+    print(f"  NB2_MODEL = {ig.NB2_MODEL}")
+    assert "3.1-flash" in ig.NB2_MODEL, f"模型未切换！当前: {ig.NB2_MODEL}"
     print("  ✅ 模型已切换到 Nano Banana 2")
 
     # 加载数据
@@ -185,7 +185,7 @@ async def main():
     print(f"\n{'='*60}")
     print("NB2 验证结果")
     print(f"{'='*60}")
-    print(f"  模型: {ig.PRO_MODEL}")
+    print(f"  模型: {ig.NB2_MODEL}")
     print(f"  成功: {success}/{len(shots)}")
     print(f"  平均生成时间: {avg_time:.1f}s/张")
     print(f"  总耗时: {sum(gen_times):.1f}s (仅 shot 生成)")
@@ -195,7 +195,7 @@ async def main():
             print(f"  Shot {r['shot_id']}: {r['size']} | {r['time_seconds']}s | refs={r['refs']}")
 
     save_json(os.path.join(OUTPUT_DIR, "nb2_verify_results.json"), {
-        "model": ig.PRO_MODEL,
+        "model": ig.NB2_MODEL,
         "shots_tested": len(shots),
         "success_count": success,
         "avg_generation_time": round(avg_time, 1),

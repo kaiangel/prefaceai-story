@@ -198,7 +198,8 @@ def build_dialogue_scene_embed(
     text_overlay: dict,
     characters: list = None,
     speaker_format: str = "chinese",
-    text_language: str = "zh-CN"
+    text_language: str = "zh-CN",
+    characters_in_scene: list = None
 ) -> str:
     """
     TASK-PROMPT-BUBBLE: 将对话气泡指令嵌入 [SCENE DESCRIPTION]，
@@ -213,6 +214,8 @@ def build_dialogue_scene_embed(
         characters: 角色数据列表（用于 speaker_format 转换）
         speaker_format: "chinese"(默认) | "english" | "char_id"
         text_language: 气泡文字语言 "zh-CN"(默认简体中文) | "zh-TW" | "en" 等
+        characters_in_scene: T6 — 当前 shot 可见角色 char_id 列表，
+            speaker 不在列表中时跳过该 dialogue 行
 
     Returns:
         嵌入场景描述的对话气泡文本，空字符串表示无对话
@@ -229,6 +232,34 @@ def build_dialogue_scene_embed(
     lang_constraint = lang_config["constraint"]
 
     dialogue_lines = []
+
+    # T6: 构建 中文名→char_id 映射，用于 speaker-visibility 校验
+    _name_to_id = {}
+    if characters and characters_in_scene is not None:
+        for c in characters:
+            char_id = c.get("id", "")
+            char_name = c.get("name", "")
+            if char_id and char_name:
+                _name_to_id[char_name] = char_id
+                # 也支持部分匹配（如 "林守正" 匹配 "林守正（老林）"）
+                for name_part in [char_name]:
+                    if name_part not in _name_to_id:
+                        _name_to_id[name_part] = char_id
+
+    def _is_speaker_visible(speaker_zh: str) -> bool:
+        """T6: 检查说话者是否在当前 shot 可见角色列表中"""
+        if characters_in_scene is None or not speaker_zh:
+            return True  # 未提供列表时不做过滤
+        char_id = _name_to_id.get(speaker_zh)
+        if not char_id:
+            # 尝试部分匹配
+            for name, cid in _name_to_id.items():
+                if speaker_zh in name or name in speaker_zh:
+                    char_id = cid
+                    break
+        if not char_id:
+            return True  # 找不到映射时不过滤（安全降级）
+        return char_id in characters_in_scene
 
     def _build_bubble_line(speaker: str, clean_text: str) -> str:
         if speaker:
@@ -248,6 +279,10 @@ def build_dialogue_scene_embed(
                 txt = txt.get('text', '')
             clean = _strip_speaker_for_native(txt)
             speaker_zh = _extract_speaker_name(txt)
+            # T6: speaker 不在画面中时跳过该 dialogue 行
+            if not _is_speaker_visible(speaker_zh):
+                print(f"    [T6] 跳过不可见 speaker dialogue: {speaker_zh}")
+                continue
             speaker = _resolve_speaker_label(speaker_zh, characters, speaker_format)
             dialogue_lines.append(_build_bubble_line(speaker, clean))
 
@@ -272,12 +307,17 @@ def build_dialogue_scene_embed(
             if sub_type == "dialogue":
                 clean = _strip_speaker_for_native(txt)
                 speaker_zh = _extract_speaker_name(txt)
+                # T6: speaker 不在画面中时跳过该 dialogue 行
+                if not _is_speaker_visible(speaker_zh):
+                    print(f"    [T6] 跳过不可见 speaker dialogue(compound): {speaker_zh}")
+                    continue
                 speaker = _resolve_speaker_label(speaker_zh, characters, speaker_format)
                 dialogue_lines.append(_build_bubble_line(speaker, clean))
 
     if dialogue_lines:
-        # 追加语言约束指令（确保模型输出正确字体/字形）
-        return " ".join(dialogue_lines) + f" {lang_constraint}"
+        # 追加语言约束 + T15 气泡去重指令
+        dedup_instruction = "Render each speech bubble EXACTLY ONCE at its designated position. Never duplicate any dialogue line in the image."
+        return " ".join(dialogue_lines) + f" {lang_constraint} {dedup_instruction}"
     return ""
 
 
@@ -315,7 +355,7 @@ class ImageGenerator:
 
     # 模型配置
     FAST_MODEL = "gemini-2.5-flash-image"  # 快速模型（主用）
-    PRO_MODEL = "gemini-3.1-flash-image-preview"  # Nano Banana 2（主力生图模型，原 Pro）
+    NB2_MODEL = "gemini-3.1-flash-image-preview"  # Nano Banana 2（主力生图模型）
 
     # 重试配置
     MAX_RETRIES = 3
@@ -493,7 +533,7 @@ class ImageGenerator:
             aspect_ratio: 宽高比 (16:9, 9:16, 1:1, 4:3, 3:4 等)
             reference_images: 参考图像列表（PIL Image对象）
             style_preset: 风格预设
-            use_pro_model: 是否使用Pro模型（支持参考图）
+            use_pro_model: 是否使用NB2主力模型（默认False用Flash）
             image_size: 图像尺寸 (1K, 2K, 4K)
 
         Returns:
@@ -515,9 +555,9 @@ class ImageGenerator:
             }
 
         # 选择模型
-        # 注意：gemini-2.5-flash-image 也支持参考图，只是质量可能不如Pro
-        # model = self.PRO_MODEL if (use_pro_model or reference_images) else self.FAST_MODEL
-        model = self.PRO_MODEL if use_pro_model else self.FAST_MODEL  # Flash也支持参考图
+        # 注意：gemini-2.5-flash-image 也支持参考图，只是质量可能不如NB2
+        # model = self.NB2_MODEL if (use_pro_model or reference_images) else self.FAST_MODEL
+        model = self.NB2_MODEL if use_pro_model else self.FAST_MODEL  # Flash也支持参考图
 
         # 构建完整prompt
         full_prompt = prompt
@@ -668,22 +708,9 @@ class ImageGenerator:
         """
         生成单个shot的场景图片
 
-        🚨🚨🚨 重要警告 🚨🚨🚨
-
-        use_pro_model=True 是角色一致性的关键！
-
-        - Pro模型对参考图的理解能力远超Flash
-        - 3人场景100%一致性、6人场景~90%一致性的成果依赖于此
-        - 除非有明确的成本优化需求，否则不要改为False
-
-        验证结果（teststory6.4-6.6）：
-        - use_pro_model=True: 3人100%一致性, 6人~90%一致性
-        - use_pro_model=False: 3人~75%一致性, 6人~50%一致性
-
-        修改此参数默认值前，必须运行回归测试：
-        python tests/test_character_consistency_regression.py
-
-        🚨🚨🚨 警告结束 🚨🚨🚨
+        Phase 2.0 默认使用 NB2（Nano Banana 2, gemini-3.1-flash-image-preview）生成 shot 图。
+        NB2 角色一致性 ~95%，速度快 3-5x，成本降 50%。
+        generate_shot_image() 始终调用 NB2_MODEL，不经过 use_pro_model 切换。
 
         优先使用shot的image_prompt字段，并自动翻译为英文
 
@@ -696,7 +723,7 @@ class ImageGenerator:
             reference_images: 参考图像列表（PIL Image对象）
             aspect_ratio: 宽高比
             use_llm_translation: 是否使用LLM翻译（True则异步翻译，False则使用简单字典翻译）
-            use_pro_model: 🚨 是否使用Pro模型（必须为True以保证角色一致性）
+            use_pro_model: 已弃用参数（Phase 2.0 始终使用 NB2_MODEL）
 
         Returns:
             生成结果字典
@@ -845,11 +872,14 @@ class ImageGenerator:
         dialogue_embed = ""
         if use_native_text:
             text_overlay = shot.get("text_overlay", {})
+            # T6: 传入 characters_in_scene 用于 speaker-visibility 校验
+            chars_visible = shot.get("character_direction", {}).get("characters_visible", [])
             dialogue_embed = build_dialogue_scene_embed(
                 text_overlay,
                 characters=characters.get("characters", []),
                 speaker_format='english',
-                text_language='zh-CN'
+                text_language='zh-CN',
+                characters_in_scene=chars_visible
             )
 
         # 主prompt（场景描述）+ 嵌入的对话气泡
@@ -917,7 +947,7 @@ class ImageGenerator:
 
         # 5. 调试日志
         print(f"\n    [ImageGenerator Phase2] === Gemini请求结构 ===")
-        print(f"      model: {self.PRO_MODEL}")
+        print(f"      model: {self.NB2_MODEL}")
         print(f"      style_preset: {style_preset}")
         print(f"      has_system_instruction: {bool(system_instruction)}")
         print(f"      has_continuity: False (DEC-014: removed)")
@@ -934,7 +964,7 @@ class ImageGenerator:
             ),
         )
 
-        # 7. 调用生成（始终使用Pro模型保证质量）
+        # 7. 调用生成（始终使用NB2主力模型）
         start_time = time.time()
         last_error = None
         last_error_type = ErrorType.UNKNOWN
@@ -942,7 +972,7 @@ class ImageGenerator:
         for attempt in range(self.MAX_RETRIES):
             try:
                 response = await self.client.aio.models.generate_content(
-                    model=self.PRO_MODEL,  # Phase 2.0 始终使用Pro模型
+                    model=self.NB2_MODEL,  # Phase 2.0 始终使用NB2
                     contents=contents,
                     config=config,
                 )
@@ -996,7 +1026,7 @@ class ImageGenerator:
                             "image_format": "png",
                             "width": pil_image.width,
                             "height": pil_image.height,
-                            "model_used": self.PRO_MODEL,
+                            "model_used": self.NB2_MODEL,
                             "generation_time_seconds": round(generation_time, 2),
                             # Phase 2.0 额外信息
                             "shot_id": shot.get("shot_id"),
@@ -1030,7 +1060,7 @@ class ImageGenerator:
             "success": False,
             "error": f"Image generation failed after {self.MAX_RETRIES} attempts: {last_error}",
             "error_type": last_error_type.value,  # 返回错误类型供上层处理
-            "model_used": self.PRO_MODEL,
+            "model_used": self.NB2_MODEL,
             "generation_time_seconds": round(time.time() - start_time, 2),
             "phase2": True,
             "original_prompt": full_prompt  # 返回原始prompt供改写使用

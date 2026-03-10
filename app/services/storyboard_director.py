@@ -12,11 +12,12 @@ Phase 2.0 第四阶段 - 分镜脚本生成器（核心升级）
 
 import json
 import os
+import re
 from typing import Optional
 import anthropic
 from google import genai
 
-from app.prompts.storyboard_prompts import NARRATION_TO_VISUAL_EXTRACTION_RULES
+from app.prompts.storyboard_prompts import NARRATION_TO_VISUAL_EXTRACTION_RULES, COMIC_MODE_NARRATIVE_RULES
 
 
 # 专业摄影知识库
@@ -72,30 +73,30 @@ class StoryboardDirector:
     输入: screenplay.json + characters.json + visual_tone
     输出: storyboard.json
 
-    模型优先级: Gemini 3 Flash (主) → Claude Haiku (备用)
+    模型优先级: Claude Sonnet 4.6 (主) → Gemini 3 Flash (备用)
     """
 
     def __init__(self):
-        # 主模型: Gemini 3 Flash
-        self.gemini_client = None
-        self.gemini_model = "gemini-3-flash-preview"
-        if os.getenv("GEMINI_API_KEY"):
-            self.gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-
-        # 备用模型: Claude Haiku
+        # 主模型: Claude Sonnet 4.6
         self.claude_client = None
-        self.claude_model = "claude-haiku-4-5-20251001"
+        self.claude_model = "claude-sonnet-4-6"
         if os.getenv("ANTHROPIC_API_KEY"):
             self.claude_client = anthropic.Anthropic(
                 api_key=os.getenv("ANTHROPIC_API_KEY")
             )
+
+        # 备用模型: Gemini 3 Flash
+        self.gemini_client = None
+        self.gemini_model = "gemini-3-flash-preview"
+        if os.getenv("GEMINI_API_KEY"):
+            self.gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
     async def direct(
         self,
         screenplay: dict,
         characters: dict,
         visual_tone: dict,
-        style_preset: str = "realistic"
+        style_preset: str = "anime"
     ) -> dict:
         """
         生成分镜脚本（按scene分批生成，解决LLM输出不完整问题）
@@ -179,6 +180,10 @@ class StoryboardDirector:
             "shot_continuity_notes": []
         }
 
+        # T5+T7: 验证 + speaker-visibility 校验 + text_type 分布检查
+        self._validate_storyboard(storyboard, characters=characters)
+        self._rebalance_text_types(storyboard)
+
         return storyboard
 
     async def _generate_scene_shots(
@@ -210,8 +215,22 @@ class StoryboardDirector:
 
                 content = None
 
-                # 优先使用 Gemini 3 Flash
-                if self.gemini_client:
+                # 优先使用 Claude Sonnet 4.6
+                if self.claude_client:
+                    try:
+                        response = self.claude_client.messages.create(
+                            model=self.claude_model,
+                            max_tokens=8631,
+                            messages=[
+                                {"role": "user", "content": prompt}
+                            ]
+                        )
+                        content = response.content[0].text
+                    except Exception as ce:
+                        pass  # 静默失败，尝试Gemini
+
+                # Fallback到Gemini 3 Flash
+                if content is None and self.gemini_client:
                     try:
                         response = await self.gemini_client.aio.models.generate_content(
                             model=self.gemini_model,
@@ -220,18 +239,7 @@ class StoryboardDirector:
                         )
                         content = response.text
                     except Exception as ge:
-                        pass  # 静默失败，尝试Claude
-
-                # Fallback到Claude Haiku
-                if content is None and self.claude_client:
-                    response = self.claude_client.messages.create(
-                        model=self.claude_model,
-                        max_tokens=8631,
-                        messages=[
-                            {"role": "user", "content": prompt}
-                        ]
-                    )
-                    content = response.content[0].text
+                        pass  # Gemini也失败
 
                 if content is None:
                     raise ValueError("无可用的LLM服务")
@@ -373,6 +381,7 @@ class StoryboardDirector:
             "atmosphere": scene.get("atmosphere", {}),
             "characters_in_scene": scene.get("characters_in_scene", []),
             "action_beats": beats,
+            "dialogue_beats": scene.get("dialogue_beats", []),
             "narration": scene.get("narration", "")
         }, ensure_ascii=False, indent=2)
 
@@ -388,6 +397,8 @@ Character data:
 {characters_json}
 
 {NARRATION_TO_VISUAL_EXTRACTION_RULES}
+
+{COMIC_MODE_NARRATIVE_RULES}
 
 ## IMAGE PROMPT QUALITY REQUIREMENTS (MANDATORY)
 
@@ -442,6 +453,11 @@ At most 2 characters' hands/arms may actively interact with the SAME object in o
 ❌ BAD: "all four hands reach for the same document on the table"
 ✅ GOOD: "close-up of char_001's hand sliding the document across the table toward char_002, whose fingers hover at the paper's edge"
 
+### 9. SINGLE-CHARACTER HAND ACTION LIMIT
+Each character may perform AT MOST ONE active hand/arm action per shot. If the narration describes multiple hand actions for one character, choose the most dramatically important one. Other actions can be implied or shown in a subsequent shot.
+❌ BAD: "char_001 wipes his cheek with the back of his hand while reaching out to push the glass door"
+✅ GOOD: "char_001 pushes the glass door open with one hand, rain dripping from his face"
+
 ## NARRATIVE VISUAL PROPS (MANDATORY)
 
 Every image_prompt MUST include at least one plot-relevant prop or environmental detail that conveys story information visually:
@@ -486,6 +502,49 @@ Match focal_length to shot_size for natural perspective:
 - close_up / medium_close_up: 85mm (portrait compression, background separation)
 - extreme_close_up: 100mm-135mm (detail isolation)
 
+## TEXT OVERLAY MAPPING RULES (MANDATORY)
+
+For each shot, generate a `text_overlay` field by mapping from the scene's `dialogue_beats`:
+
+### Mapping Logic:
+1. Match each shot's action_beat_id to corresponding dialogue_beats (by beat_id prefix, e.g. beat "1a" matches "1a_dialogue", "1a_thought")
+2. Use the dialogue_beat's `type` field: "dialogue" → text_type="dialogue", "thought" → text_type="thought"
+3. Beat has BOTH dialogue AND thought beats → text_type="dialogue_with_thought", chinese_text=mixed list
+4. Beat has NO matching dialogue_beat → check emotional_note: character feeling/realization → text_type="thought", pure action/environment → text_type="narration"
+5. Only use text_type="none" if the beat truly has zero text content (rare)
+
+### THOUGHT GENERATION RULE (CRITICAL):
+When a beat has NO dialogue_beat match, do NOT default to narration.
+Check the beat's emotional_note:
+- Character internal state/feeling/realization → text_type="thought", create inner monologue
+- Pure external action/environment description → text_type="narration"
+**Prefer thought over narration.** narration should be the last resort.
+
+### SPEAKER VISIBILITY RULE (MANDATORY - COMIC MEDIUM):
+If text_type is "dialogue", EVERY speaker in chinese_text MUST appear in that shot's characters_visible.
+Comics have NO audio channel — readers attribute bubbles to the most prominent visible character.
+- Single-character reaction shot → use "thought" or "narration", NOT "dialogue"
+- Multi-speaker dialogue → ALL speakers must be in characters_visible
+- Do NOT borrow dialogue from other beats to fill the distribution target
+
+### Distribution Target:
+- dialogue: ≥60% of shots (stories are driven by conversation)
+- thought: 10-20%
+- narration: ≤15%
+- none: ≤5% (purely visual, use sparingly)
+
+### SELF-CHECK (before output):
+Count your text_type distribution across all shots. If narration > 15%, convert some to thought (use emotional_note to create inner monologue). If thought < 10%, create thought content for beats with strong emotional_note.
+
+### speaker_position:
+- Match to the speaking character's position in composition.subject_position
+- "left"/"right" for dialogue, "bottom" for narration/thought, "center" for centered text
+
+### chinese_text Format:
+- dialogue: ["角色名：「台词」", "角色名：「台词」"]
+- thought: "（角色内心独白内容）"
+- narration: "旁白描述文字"
+
 Output format (JSON only, no other text):
 ```json
 {{
@@ -506,6 +565,7 @@ Output format (JSON only, no other text):
             "character_direction": {{"characters_visible": ["char_id"]}},
             "image_prompt": "Full English prompt, 80-100 words, including scene + character appearance + SPECIFIC POSTURE/GESTURE from narration + facial expression + lighting + mood",
             "narration_segment": "Chinese narration segment for TTS",
+            "text_overlay": {{"text_type": "dialogue|thought|narration|dialogue_with_thought|none", "chinese_text": ["角色名：「台词」"] or "旁白/心理文字", "speaker_position": "left|right|center|bottom"}},
             "estimated_duration": 5.0
         }}
     ]
@@ -548,6 +608,7 @@ You MUST generate one shot for each action_beat! Do NOT stop after 1-2 shots!
                 "atmosphere": scene.get("atmosphere"),
                 "characters_in_scene": scene.get("characters_in_scene"),
                 "action_beats": scene.get("action_beats"),
+                "dialogue_beats": scene.get("dialogue_beats", []),
                 "narration": scene.get("narration")
             })
         screenplay_json = json.dumps(scenes_simplified, ensure_ascii=False, indent=2)
@@ -603,6 +664,8 @@ You MUST generate a shot for each beat above, total {total_beats} shots.
 {CINEMATOGRAPHY_GUIDE}
 
 {NARRATION_TO_VISUAL_EXTRACTION_RULES}
+
+{COMIC_MODE_NARRATIVE_RULES}
 
 ## Visual Tone
 {visual_tone_json}
@@ -673,6 +736,11 @@ Strictly follow this JSON format (MUST include {min_shots} shots):
             "emotional_beat": "desperate_hope",
             "image_prompt": "Wide shot at eye level of a rain-soaked bus station at night...(full English prompt)",
             "narration_segment": "Chinese narration for TTS",
+            "text_overlay": {{
+                "text_type": "dialogue",
+                "chinese_text": ["陈默：「你到了吗？」", "苏晨：「快了，别等我。」"],
+                "speaker_position": "left"
+            }},
             "estimated_duration": 5.0
         }}
     ],
@@ -717,6 +785,54 @@ Multiple objects on the same surface (table/desk/floor) MUST have distinct spati
 
 ### 8. MULTI-CHARACTER LIMB INTERACTION LIMITS
 At most 2 characters' hands may actively interact with the SAME object in one shot. If 3+ characters need to touch one object, split into sequential shots or use a reaction shot instead.
+
+### 9. SINGLE-CHARACTER HAND ACTION LIMIT
+Each character may perform AT MOST ONE active hand/arm action per shot. If the narration describes multiple hand actions for one character, choose the most dramatically important one. Other actions can be implied or shown in a subsequent shot.
+❌ BAD: "char_001 wipes his cheek with the back of his hand while reaching out to push the glass door"
+✅ GOOD: "char_001 pushes the glass door open with one hand, rain dripping from his face"
+
+## TEXT OVERLAY MAPPING RULES (MANDATORY)
+
+For each shot, generate a `text_overlay` field by mapping from the scene's `dialogue_beats`:
+
+### Mapping Logic:
+1. Match each shot's action_beat_id to corresponding dialogue_beats (by beat_id prefix, e.g. beat "1a" matches "1a_dialogue", "1a_thought")
+2. Use the dialogue_beat's `type` field: "dialogue" → text_type="dialogue", "thought" → text_type="thought"
+3. Beat has BOTH dialogue AND thought beats → text_type="dialogue_with_thought", chinese_text=mixed list
+4. Beat has NO matching dialogue_beat → check emotional_note: character feeling/realization → text_type="thought", pure action/environment → text_type="narration"
+5. Only use text_type="none" if the beat truly has zero text content (rare)
+
+### THOUGHT GENERATION RULE (CRITICAL):
+When a beat has NO dialogue_beat match, do NOT default to narration.
+Check the beat's emotional_note:
+- Character internal state/feeling/realization → text_type="thought", create inner monologue
+- Pure external action/environment description → text_type="narration"
+**Prefer thought over narration.** narration should be the last resort.
+
+### SPEAKER VISIBILITY RULE (MANDATORY - COMIC MEDIUM):
+If text_type is "dialogue", EVERY speaker in chinese_text MUST appear in that shot's characters_visible.
+Comics have NO audio channel — readers attribute bubbles to the most prominent visible character.
+- Single-character reaction shot → use "thought" or "narration", NOT "dialogue"
+- Multi-speaker dialogue → ALL speakers must be in characters_visible
+- Do NOT borrow dialogue from other beats to fill the distribution target
+
+### Distribution Target:
+- dialogue: ≥60% of shots (stories are driven by conversation)
+- thought: 10-20%
+- narration: ≤15%
+- none: ≤5% (purely visual, use sparingly)
+
+### SELF-CHECK (before output):
+Count your text_type distribution across all shots. If narration > 15%, convert some to thought (use emotional_note to create inner monologue). If thought < 10%, create thought content for beats with strong emotional_note.
+
+### speaker_position:
+- Match to the speaking character's position in composition.subject_position
+- "left"/"right" for dialogue, "bottom" for narration/thought, "center" for centered text
+
+### chinese_text Format:
+- dialogue: ["角色名：「台词」", "角色名：「台词」"]
+- thought: "（角色内心独白内容）"
+- narration: "旁白描述文字"
 
 ═══════════════════════════════════════════════════════════════════════════════
 REMEMBER: You MUST generate {min_shots} complete shots! One shot per beat!
@@ -839,8 +955,8 @@ Output JSON only, no other text:
 
         return result
 
-    def _validate_storyboard(self, storyboard: dict) -> None:
-        """验证分镜脚本"""
+    def _validate_storyboard(self, storyboard: dict, characters: dict = None) -> None:
+        """验证分镜脚本（含 T5 speaker-visibility 校验）"""
         shots = storyboard.get("shots", [])
 
         if len(shots) == 0:
@@ -856,6 +972,15 @@ Output JSON only, no other text:
                 "overall_lighting": "natural",
                 "lens_style": "35mm"
             }
+
+        # T5: 构建 中文名→char_id 映射
+        name_to_id = {}
+        if characters:
+            for c in characters.get("characters", []):
+                char_id = c.get("id", "")
+                char_name = c.get("name", "")
+                if char_id and char_name:
+                    name_to_id[char_name] = char_id
 
         for shot in shots:
             shot_id = shot.get("shot_id", "?")
@@ -913,9 +1038,85 @@ Output JSON only, no other text:
             if "estimated_duration" not in shot:
                 shot["estimated_duration"] = 5.0
 
+            # T5: speaker-visibility 校验
+            # 若 text_type 含 dialogue，speaker 必须在 characters_visible 中
+            if name_to_id:
+                text_overlay = shot.get("text_overlay", {})
+                if text_overlay:
+                    text_type = text_overlay.get("text_type", "none")
+                    chars_visible = shot.get("character_direction", {}).get("characters_visible", [])
+                    if text_type in ["dialogue", "dialogue_with_thought",
+                                     "dialogue_with_narration", "narration_with_dialogue"]:
+                        chinese_text = text_overlay.get("chinese_text", "")
+                        texts = chinese_text if isinstance(chinese_text, list) else [chinese_text]
+                        has_invisible_speaker = False
+                        for txt in texts:
+                            if isinstance(txt, dict):
+                                sub_type = txt.get("type", "dialogue")
+                                txt_str = txt.get("text", "")
+                            else:
+                                txt_str = txt
+                                sub_type = "dialogue" if ("：「" in txt_str or ":「" in txt_str or "：\"" in txt_str) else "other"
+                            if sub_type != "dialogue":
+                                continue
+                            # 提取说话者中文名
+                            match = re.match(r'^([\w\u4e00-\u9fff]+?)(?:内心)?[：:]', txt_str.strip())
+                            if match:
+                                speaker_zh = match.group(1)
+                                # 查找 char_id
+                                char_id = name_to_id.get(speaker_zh)
+                                if not char_id:
+                                    for name, cid in name_to_id.items():
+                                        if speaker_zh in name or name in speaker_zh:
+                                            char_id = cid
+                                            break
+                                if char_id and char_id not in chars_visible:
+                                    has_invisible_speaker = True
+                                    print(f"  ⚠️ [T5] Shot {shot_id}: speaker '{speaker_zh}' ({char_id}) "
+                                          f"不在 characters_visible {chars_visible} 中")
+                        # 降级处理：dialogue → thought
+                        if has_invisible_speaker:
+                            if text_type == "dialogue":
+                                text_overlay["text_type"] = "thought"
+                                print(f"  ⚠️ [T5] Shot {shot_id}: text_type 'dialogue' → 'thought'（speaker 不可见降级）")
+                            elif text_type in ["dialogue_with_thought", "dialogue_with_narration", "narration_with_dialogue"]:
+                                text_overlay["text_type"] = "narration_with_thought"
+                                print(f"  ⚠️ [T5] Shot {shot_id}: text_type '{text_type}' → 'narration_with_thought'（speaker 不可见降级）")
+
         # 验证shot_continuity_notes（可选）
         if "shot_continuity_notes" not in storyboard:
             storyboard["shot_continuity_notes"] = []
+
+    def _rebalance_text_types(self, storyboard: dict) -> None:
+        """T7: 检查 text_type 分布，narration > 15% 或 thought < 10% 时打印警告"""
+        shots = storyboard.get("shots", [])
+        if not shots:
+            return
+
+        counts = {"dialogue": 0, "thought": 0, "narration": 0, "none": 0, "compound": 0}
+        for shot in shots:
+            text_overlay = shot.get("text_overlay", {})
+            text_type = text_overlay.get("text_type", "none") if text_overlay else "none"
+            if text_type in counts:
+                counts[text_type] += 1
+            elif text_type != "none":
+                counts["compound"] += 1
+
+        total = len(shots)
+        dialogue_pct = (counts["dialogue"] + counts["compound"]) / total * 100
+        thought_pct = counts["thought"] / total * 100
+        narration_pct = counts["narration"] / total * 100
+        none_pct = counts["none"] / total * 100
+
+        print(f"  [T7] text_type 分布: dialogue={dialogue_pct:.0f}% thought={thought_pct:.0f}% "
+              f"narration={narration_pct:.0f}% none={none_pct:.0f}% (共{total}shots)")
+
+        if narration_pct > 15:
+            print(f"  ⚠️ [T7] narration 超标 ({narration_pct:.0f}% > 15%)，"
+                  f"建议检查 Stage 3 dialogue_beats 覆盖率")
+        if thought_pct < 10:
+            print(f"  ⚠️ [T7] thought 不足 ({thought_pct:.0f}% < 10%)，"
+                  f"建议检查 Stage 3 thought 类型 beats 比例")
 
 
 # 便捷函数
@@ -923,7 +1124,7 @@ async def direct_storyboard(
     screenplay: dict,
     characters: dict,
     visual_tone: dict,
-    style_preset: str = "realistic"
+    style_preset: str = "anime"
 ) -> dict:
     """便捷函数：生成分镜脚本"""
     director = StoryboardDirector()

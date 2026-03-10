@@ -275,6 +275,14 @@ Front-facing close-up view focusing on head and face area.
 Clear details of all distinctive features.
 Single character only, simple solid background, no text."""
 
+        # T14: 跨年龄风格统一指令
+        core_prompt += """
+
+CROSS-AGE STYLE CONSISTENCY (MANDATORY):
+Maintain IDENTICAL illustration style for ALL characters regardless of age, gender, or body type.
+Same line weight, same shading technique, same level of stylization.
+DO NOT shift toward anime for younger characters or realistic for older characters."""
+
         # 应用风格强制
         enforced_prompt = StyleEnforcer.enforce_prompt(
             core_prompt,
@@ -428,6 +436,14 @@ COMPOSITION:
 
 Single {type_label} only, no other elements, no text."""
 
+        # T14: 跨年龄风格统一指令
+        core_prompt += """
+
+CROSS-AGE STYLE CONSISTENCY (MANDATORY):
+Maintain IDENTICAL illustration style for ALL characters regardless of age, gender, or body type.
+Same line weight, same shading technique, same level of stylization.
+DO NOT shift toward anime for younger characters or realistic for older characters."""
+
         # 应用风格强制（适用于所有角色类型）
         enforced_prompt = StyleEnforcer.enforce_prompt(
             core_prompt,
@@ -568,9 +584,9 @@ Single {type_label} only, no other elements, no text."""
                 else:
                     continue
 
-                # SQ-1: 叠加身份标签
-                label = f"Character: {name_en}"
-                refs.append(_label_reference_image(img, label))
+                # T11: 移除 _label_reference_image() 调用，直接返回原图
+                # 原因: PIL 标签被 Gemini 在生成图中复现（标签泄露）
+                refs.append(img)
         return refs
 
     def get_portrait_refs(self, character_ids: List[str]) -> List[Image.Image]:

@@ -24,7 +24,7 @@ class ScreenplayWriter:
     输入: outline.json + characters.json
     输出: screenplay.json
 
-    模型优先级: Claude Sonnet 4.6 (主) → Gemini 3 Pro (备用)
+    模型优先级: Claude Sonnet 4.6 (主) → Gemini 3 Flash (备用)
     """
 
     def __init__(self):
@@ -36,9 +36,9 @@ class ScreenplayWriter:
                 api_key=os.getenv("ANTHROPIC_API_KEY")
             )
 
-        # 备用模型: Gemini 3 Pro
+        # 备用模型: Gemini 3 Flash
         self.gemini_client = None
-        self.gemini_model = "gemini-3-pro-preview"
+        self.gemini_model = "gemini-3-flash-preview"
         if os.getenv("GEMINI_API_KEY"):
             self.gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -156,7 +156,7 @@ class ScreenplayWriter:
                     except Exception as ce:
                         pass  # 静默失败，尝试Gemini
 
-                # Fallback到Gemini 3 Pro
+                # Fallback到Gemini 3 Flash
                 if content is None and self.gemini_client:
                     response = await self.gemini_client.aio.models.generate_content(
                         model=self.gemini_model,
@@ -366,6 +366,13 @@ ALLOWED props for each character (from characters.json):
 ## 当前任务
 生成第 {scene_id} 场戏（共 {total_plot_points} 场）
 
+═══════════════════════════════════════════════════════════
+PLOT POINT COVERAGE (MANDATORY):
+Every plot_point from the outline MUST map to exactly one scene.
+Do NOT merge, skip, or omit any plot_point.
+This is scene {scene_id} of {total_plot_points} — you MUST generate this scene fully.
+═══════════════════════════════════════════════════════════
+
 ## 剧情节点
 - 节拍类型: {beat_name}
 - 描述: {description}
@@ -381,18 +388,27 @@ ALLOWED props for each character (from characters.json):
 ⚠️ 重要：location_id 必须完全匹配上述列表中的值（如 "{first_location_id}"），不要自己编造新的ID。
 
 ═══════════════════════════════════════════════════════════
-## 对话要求（CRITICAL）
+## 对话与内心独白要求（CRITICAL）
 ═══════════════════════════════════════════════════════════
 
-每个 scene 必须包含至少 2 组对话交互（dialogue_beats）。
-即使是独处场景，角色也应有自言自语、回忆对话、或电话/短信对话。
-对话是推动故事最有效的方式——角色应该 SPEAK，而不只是被旁白描述。
+每个 action_beat 必须有至少 1 个对应的 dialogue_beat（对话或内心独白）。
+不允许 action_beat 没有任何 dialogue_beat 对应（"裸奔"）。
+
+每个 dialogue_beat 必须有 `type` 字段区分类型：
+- "dialogue": 外部对话（角色对别人说的话）
+- "thought": 内心独白（角色的内心想法/感受/回忆）
+
+dialogue_beats 分布目标：
+- dialogue 类型: 60-70%（对话是推动故事的主要方式）
+- thought 类型: 20-30%（内心独白让读者进入角色内心）
+- thought 占比 ≥20%（5 beats 场景至少 1 个 thought，6+ beats 场景至少 2 个 thought）
 
 对话写作原则：
 - 对话必须简洁有力，每句≤20字，像真实漫画气泡中的文字
 - 体现角色性格差异（粗犷vs温柔、直白vs含蓄）
 - 包含情绪标注，便于后续分镜确定气泡类型
-- 独处场景可以是：自言自语、内心对话、回忆中的对话、电话/短信
+- 独处场景：自言自语、内心独白、回忆中的对话、电话/短信
+- thought 类型用括号包裹：line="（内心独白内容）"
 
 ### 对话明确化规则（CRITICAL — NO VAGUE REFERENCES）
 
@@ -410,7 +426,9 @@ ALLOWED props for each character (from characters.json):
 ## 输出要求
 这个scene必须包含：
 - 至少 {target_beats} 个 action_beats
-- 至少 2 组 dialogue_beats（对话交互）
+- 每个 action_beat 必须有至少 1 个对应的 dialogue_beat（dialogue 或 thought 类型）
+- dialogue_beats 中 thought 类型 ≥20%（5 beats 至少 1 个，6+ beats 至少 2 个）
+- 每个 dialogue_beat 必须有 type 字段（"dialogue" 或 "thought"）
 - 约 {target_narration_words} 字的 narration（有文学性的旁白）
 
 直接输出JSON，不要```json```包裹，不要任何解释文字：
@@ -434,8 +452,9 @@ ALLOWED props for each character (from characters.json):
         {{"beat_id": "{scene_id}c", "action": "动作描述", "duration_hint": 5, "emotional_note": "情绪"}}
     ],
     "dialogue_beats": [
-        {{"beat_id": "{scene_id}a_dialogue", "speaker": "char_001", "line": "对话内容（≤20字）", "emotion": "情绪标注"}},
-        {{"beat_id": "{scene_id}a_dialogue_2", "speaker": "char_002", "line": "回应内容（≤20字）", "emotion": "情绪标注"}}
+        {{"beat_id": "{scene_id}a_dialogue", "type": "dialogue", "speaker": "char_001", "line": "对话内容（≤20字）", "emotion": "情绪标注"}},
+        {{"beat_id": "{scene_id}a_dialogue_2", "type": "dialogue", "speaker": "char_002", "line": "回应内容（≤20字）", "emotion": "情绪标注"}},
+        {{"beat_id": "{scene_id}b_thought", "type": "thought", "speaker": "char_001", "line": "（角色内心独白≤20字）", "emotion": "情绪标注"}}
     ],
     "narration": "【字数硬性要求：必须≥{target_narration_words}字】这是TTS朗读的旁白，要有文学性。详细描写：人物神态动作、内心活动、环境氛围、情绪变化、感官细节。充分展开，不要惜字如金。写够{target_narration_words}字...",
     "narration_tone": "情绪基调",

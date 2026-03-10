@@ -387,7 +387,7 @@ final.mp4
 
 **🚨 模型配置说明**：
 - `FAST_MODEL = "gemini-2.5-flash-image"` - 用于参考图生成
-- `PRO_MODEL = "gemini-3-pro-image-preview"` - 用于shot生成（角色一致性关键）
+- `NB2_MODEL = "gemini-3.1-flash-image-preview"` - Nano Banana 2，主力生图模型（角色一致性 ~95%）
 
 ---
 
@@ -396,7 +396,7 @@ final.mp4
 ### story.json中的角色
 
 **重要**：角色数据有两种字段组织方式，代码都支持：
-- `character_type` 或 `type`：角色类型（如 "human"）
+- `character_type`：角色类型（如 "human"）— Stage 2 输出统一使用此字段名
 - `gender`, `age_appearance`：在根级别
 - `physical`：外貌特征（必须）
 - `clothing`：服装信息（必须）
@@ -406,7 +406,7 @@ final.mp4
   "id": "char_001",
   "name": "苏晨",
   "name_en": "Su Chen",
-  "type": "human",
+  "character_type": "human",
   "gender": "female",
   "age_appearance": "young_adult",
   "default_expression": "gentle",
@@ -562,7 +562,7 @@ python tests/test_character_consistency_regression.py
 | Gemini拒绝中文 | image_prompt用中文 | 翻译成英文 |
 | 角色外观不一致 | 只用简短description | 完整的physical+clothing描述 |
 | 角色描述为空 | 从`human`字段读取外貌 | 从`physical`和`clothing`字段读取 |
-| 角色类型识别失败 | 只检查`character_type`字段 | 同时检查`type`字段（字符串值如"human"） |
+| 角色类型识别失败 | 只检查`type`字段 | 使用`character_type`字段（Stage 2 输出统一格式），`_get_character_type()` 已正确实现 |
 | 场景构图复制 | 传入前序shot图像但无使用指令 | ~~添加VISUAL CONTINUITY REFERENCE指令块~~ → DEC-014: 移除 previous_shot_image，改用场景参考图 + 文字 prompt 保障连续性 |
 | IMAGE编号错乱 | prompt中Image N与contents数组不对应 | DEC-014 后简化：Image 1 = 第一个角色参考图，无 previous_shot 占位，编号从角色参考图开始依次排列 |
 | 中文泄露到prompt | Stage 1/3输出中文的mood/key_visual_elements | 修改LLM prompt模板要求输出英文 |

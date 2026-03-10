@@ -55,6 +55,9 @@ class Phase2PipelineOrchestrator:
         self.storyboard_director = StoryboardDirector()
         self.image_generator = ImageGenerator()
 
+        # T9: 文字渲染配置（与 generate_shot_image_phase2() 默认值同步）
+        self.use_native_text = True
+
         # 状态跟踪
         self.current_stage = None
         self.stage_results = {}
@@ -324,7 +327,8 @@ class Phase2PipelineOrchestrator:
                         style_preset=style_preset,
                         reference_images=all_refs,  # 合并后的参考图
                         screenplay=screenplay,  # 传入screenplay用于获取场景氛围
-                        aspect_ratio="2:3"
+                        aspect_ratio="2:3",
+                        use_native_text=self.use_native_text  # T9: 与 TextOverlay 逻辑同步
                     )
 
                     if result.get("success"):
@@ -335,16 +339,26 @@ class Phase2PipelineOrchestrator:
                         # TextOverlay: 生成带文字版本
                         text_overlay_data = shot.get("text_overlay", {})
                         with_text_path = None
-                        if text_overlay_data and text_overlay_data.get("text_type", "none") != "none":
-                            try:
-                                with_text_image = text_overlay_service.process_shot(
-                                    result["pil_image"].copy(), text_overlay_data
-                                )
+                        text_type = text_overlay_data.get("text_type", "none") if text_overlay_data else "none"
+                        # T12-UNIFY: use_native_text 时 NB2 已渲染所有文字（DEC-012 架构），
+                        # TextOverlay 完全不调用；仅 use_native_text=False 时走 TextOverlay 备用通道
+                        use_native_text = self.use_native_text  # T9: 统一配置源
+                        if text_type != "none":
+                            if use_native_text:
+                                # DEC-012: NB2 原生渲染所有文字，直接复制 raw image
                                 with_text_path = os.path.join(with_text_dir, f"shot_{shot_id:02d}.png")
-                                with_text_image.save(with_text_path)
-                                print(f"    ✅ TextOverlay: {with_text_path}")
-                            except Exception as te:
-                                print(f"    ⚠️ TextOverlay失败: {te}")
+                                result["pil_image"].copy().save(with_text_path)
+                                print(f"    ✅ TextOverlay跳过(NB2原生{text_type}): {with_text_path}")
+                            else:
+                                try:
+                                    with_text_image = text_overlay_service.process_shot(
+                                        result["pil_image"].copy(), text_overlay_data
+                                    )
+                                    with_text_path = os.path.join(with_text_dir, f"shot_{shot_id:02d}.png")
+                                    with_text_image.save(with_text_path)
+                                    print(f"    ✅ TextOverlay: {with_text_path}")
+                                except Exception as te:
+                                    print(f"    ⚠️ TextOverlay失败: {te}")
 
                         image_results.append({
                             "shot_id": shot_id,

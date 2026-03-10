@@ -628,6 +628,43 @@ EXTRACTION PRIORITY ORDER:
 ═══════════════════════════════════════════════════════════
 """
 
+# ============================================================================
+# Stage 4 Prompt增强：条漫模式叙事自足规则
+# ============================================================================
+
+COMIC_MODE_NARRATIVE_RULES = """
+═══════════════════════════════════════════════════════════
+COMIC/MANGA MODE: NARRATIVE SELF-SUFFICIENCY (CRITICAL)
+═══════════════════════════════════════════════════════════
+
+In comic/manga mode, readers have NO narration voiceover — they can ONLY read
+dialogue bubbles and thought bubbles visible in each panel. Therefore:
+
+## RULE 1: SELF-CONTAINED CONTEXT
+Every shot's dialogue and thought MUST contain enough information for readers
+to understand the story WITHOUT any external narration.
+
+BAD:  thought="（怎么会这样……）" (readers don't know what happened)
+GOOD: thought="（他居然把房子卖了……）" (readers understand the situation)
+
+## RULE 2: TRANSITION SHOTS
+When a scene/location/time changes between shots, the FIRST shot in the new
+context MUST include a thought or dialogue that establishes:
+- WHERE we are now (if location changed)
+- WHEN this is happening (if time jumped)
+- WHY we are here (narrative connection to previous scene)
+
+Example: After a fight scene → cut to character alone at night →
+thought="（刚才那些话……我是不是太过分了）" (bridges the two scenes)
+
+## RULE 3: DO NOT RELY ON NARRATION
+Do NOT assume narration_segment will be shown to readers.
+If critical plot information exists only in narration_segment,
+move it into a thought bubble or dialogue line.
+
+═══════════════════════════════════════════════════════════
+"""
+
 # 情绪到面部表情映射字典（用于程序化提取）
 EMOTION_TO_EXPRESSION_MAP = {
     # 愤怒类
@@ -1384,7 +1421,8 @@ def build_system_instruction_phase2(global_visual_direction: dict) -> str:
     # - Condensed CRITICAL REQUIREMENTS into single concise line
     return f"""GLOBAL VISUAL DIRECTION:
 Color Grade: {color_grade} | Lighting: {lighting} | Lens: {lens_style}
-CONSISTENCY: Maintain identical character appearances, color palette, and lighting mood across all shots."""
+CONSISTENCY: Maintain identical character appearances, color palette, and lighting mood across all shots.
+TEXT-FREE: DO NOT generate any text, signs, labels, captions, or written characters in the image unless explicitly requested in this prompt."""
 
 
 def build_continuity_context_phase2(
@@ -1446,7 +1484,8 @@ def build_character_reference_mapping_phase2(
     lines = ["""CHARACTER & SCENE REFERENCES:
 Each reference image is labeled directly on the image.
 - Images labeled "Character: XXX" → use to maintain that character's appearance
-- Images labeled "Scene: XXX" → use to maintain environment consistency"""]
+- Images labeled "Scene: XXX" → use to maintain environment consistency
+The text labels on reference images are for YOUR identification only. DO NOT reproduce any label text (e.g. "Character:", "Scene:") in the generated image."""]
 
     # 角色身份描述（让模型知道每个角色长什么样）
     if characters_in_shot:

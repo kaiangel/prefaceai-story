@@ -266,14 +266,15 @@ class SceneReferenceManager:
         return None
 
     def get_references_for_location(self, location_id: str) -> List[Image.Image]:
-        """获取指定场景的所有参考图（SQ-1: 带场景标签）"""
+        """获取指定场景的所有参考图（T11: 返回无标签原图，避免 Gemini 复现标签文字）"""
         if location_id not in self.scene_references:
             return []
 
         refs = []
         for view_type, image in self.scene_references[location_id].items():
-            label = f"Scene: {location_id} {view_type.capitalize()}"
-            refs.append(_label_scene_image(image, label))
+            # T11: 移除 _label_scene_image() 调用，直接返回原图
+            # 原因: PIL 标签被 Gemini 在生成图中复现（3/20 泄露）
+            refs.append(image)
         return refs
 
     def has_reference(self, location_id: str) -> bool:
