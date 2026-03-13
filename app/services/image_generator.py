@@ -40,7 +40,9 @@ def _extract_speaker_name(text: str) -> str:
     return ""
 
 
-def build_native_text_prompt(text_overlay: dict) -> str:
+def build_native_text_prompt(text_overlay: dict,
+                             characters: list = None,
+                             characters_in_scene: list = None) -> str:
     """
     根据 text_overlay 数据构建 TEXT OVERLAY REQUIREMENT 指令块，
     用于 NB2 原生渲染中文文字（不依赖 TextOverlay 后处理）。
@@ -49,6 +51,8 @@ def build_native_text_prompt(text_overlay: dict) -> str:
 
     Args:
         text_overlay: shot 的 text_overlay 数据字典，包含 text_type, chinese_text, speaker_position 等
+        characters: T-A — 角色数据列表（用于 speaker→char_id 映射）
+        characters_in_scene: T-A — 当前 shot 可见角色 char_id 列表
 
     Returns:
         TEXT OVERLAY REQUIREMENT 指令块字符串，空字符串表示无需文字渲染
@@ -59,6 +63,34 @@ def build_native_text_prompt(text_overlay: dict) -> str:
 
     if text_type == "none" or not chinese_text:
         return ""
+
+    # T-A: 构建 speaker→char_id 映射（复用 build_dialogue_scene_embed 中的模式）
+    _name_to_id = {}
+    if characters and characters_in_scene is not None:
+        for c in characters:
+            char_id = c.get("id", "")
+            char_name = c.get("name", "")
+            if char_id and char_name:
+                _name_to_id[char_name] = char_id
+
+    def _is_speaker_off_screen(txt_line: str) -> bool:
+        """T-A: 检查该对话行的 speaker 是否不在画面中。
+        返回 True = speaker 不可见（应生成 voiceover），False = speaker 可见（由 embed 处理）。
+        当 characters_in_scene 为 None 时安全降级：返回 True（全部渲染）。"""
+        if characters_in_scene is None:
+            return True  # 安全降级：无可见信息时全部渲染
+        speaker_zh = _extract_speaker_name(txt_line)
+        if not speaker_zh:
+            return True  # 无法提取 speaker 时渲染（安全降级）
+        char_id = _name_to_id.get(speaker_zh)
+        if not char_id:
+            for name, cid in _name_to_id.items():
+                if speaker_zh in name or name in speaker_zh:
+                    char_id = cid
+                    break
+        if not char_id:
+            return True  # 找不到映射时渲染（安全降级）
+        return char_id not in characters_in_scene
 
     blocks = []
 
@@ -85,9 +117,30 @@ def build_native_text_prompt(text_overlay: dict) -> str:
         )
 
     elif text_type == "dialogue":
-        # TASK-PROMPT-BUBBLE: dialogue now embedded in [SCENE DESCRIPTION]
-        # via build_dialogue_scene_embed(), no longer appended as TEXT OVERLAY
-        return ""
+        off_screen = text_overlay.get("off_screen_speaker", False)
+        if off_screen:
+            # T29+T-A: 画外音对话 — 仅为不在画面中的 speaker 生成 voiceover 底条
+            # 可见 speaker 的对话已由 build_dialogue_scene_embed() 生成气泡，不重复
+            texts = chinese_text if isinstance(chinese_text, list) else [chinese_text]
+            for txt in texts:
+                if isinstance(txt, dict):
+                    txt = txt.get("text", "")
+                # T-A: 只为不可见 speaker 生成 voiceover
+                if not _is_speaker_off_screen(txt):
+                    continue  # 该 speaker 在画面中，由 embed 处理
+                clean = _strip_speaker_for_native(txt)
+                if clean:
+                    blocks.append(
+                        f"TEXT OVERLAY REQUIREMENT:\n"
+                        f"A semi-transparent black bar (at the {position}) spanning the full width of the image, "
+                        f"height approximately 18% of frame.\n"
+                        f"Display Chinese text '{clean}' in white font, centered alignment.\n"
+                        f"Off-screen dialogue style: character speaking from outside the frame."
+                    )
+        else:
+            # TASK-PROMPT-BUBBLE: dialogue now embedded in [SCENE DESCRIPTION]
+            # via build_dialogue_scene_embed(), no longer appended as TEXT OVERLAY
+            return ""
 
     elif text_type in ["dialogue_with_thought", "narration_with_thought",
                         "narration_with_dialogue", "dialogue_with_narration"]:
@@ -127,10 +180,18 @@ def build_native_text_prompt(text_overlay: dict) -> str:
                     f"Display Chinese text '{clean}' in white font, centered."
                 )
             elif sub_type == "dialogue":
-                # TASK-PROMPT-BUBBLE: dialogue sub-items in compound types
-                # are now handled by build_dialogue_scene_embed() and embedded
-                # in [SCENE DESCRIPTION]. Skip TEXT OVERLAY for dialogue.
-                pass
+                off_screen = text_overlay.get("off_screen_speaker", False)
+                if off_screen:
+                    # T29+T-A: 画外音对话子项 — 仅为不可见 speaker 渲染 voiceover 底条
+                    if not _is_speaker_off_screen(txt):
+                        continue  # 该 speaker 在画面中，由 embed 处理
+                    blocks.append(
+                        f"TEXT OVERLAY REQUIREMENT ({i+1} - Off-screen dialogue):\n"
+                        f"A semi-transparent black bar (at the bottom) spanning the full width, "
+                        f"height approximately 15% of frame.\n"
+                        f"Display Chinese text '{clean}' in white font, centered."
+                    )
+                # else: TASK-PROMPT-BUBBLE — dialogue handled by build_dialogue_scene_embed()
 
     return "\n\n".join(blocks)
 
@@ -554,10 +615,8 @@ class ImageGenerator:
                 "error": "Gemini client not initialized. Check GEMINI_API_KEY."
             }
 
-        # 选择模型
-        # 注意：gemini-2.5-flash-image 也支持参考图，只是质量可能不如NB2
-        # model = self.NB2_MODEL if (use_pro_model or reference_images) else self.FAST_MODEL
-        model = self.NB2_MODEL if use_pro_model else self.FAST_MODEL  # Flash也支持参考图
+        # T23: 所有图像生成统一使用 NB2（角色参考图+场景参考图+shot 生成）
+        model = self.NB2_MODEL
 
         # 构建完整prompt
         full_prompt = prompt
@@ -910,7 +969,12 @@ class ImageGenerator:
         # 当 use_native_text=False 时，不附加文字指令，由 TextOverlay 后处理叠加
         if use_native_text:
             text_overlay = shot.get("text_overlay", {})
-            native_text_block = build_native_text_prompt(text_overlay)
+            # T-A: 传入 characters + characters_in_scene，避免 off_screen 时可见 speaker 文字双重渲染
+            native_text_block = build_native_text_prompt(
+                text_overlay,
+                characters=characters.get("characters", []),
+                characters_in_scene=chars_visible
+            )
             if native_text_block:
                 full_prompt += "\n\n" + native_text_block
                 print(f"    [ImageGenerator Phase2] 原生文字渲染 (thought/narration): text_type={text_overlay.get('text_type', 'none')}")

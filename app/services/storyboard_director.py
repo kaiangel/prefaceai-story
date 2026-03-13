@@ -20,6 +20,249 @@ from google import genai
 from app.prompts.storyboard_prompts import NARRATION_TO_VISUAL_EXTRACTION_RULES, COMIC_MODE_NARRATIVE_RULES
 
 
+# T18: 场景道具连续性规则（同 NARRATION_TO_VISUAL_EXTRACTION_RULES 模式注入）
+SCENE_PROP_CONTINUITY_RULES = """
+═══════════════════════════════════════════════════════════
+SCENE PROP CONTINUITY (IMPORTANT)
+═══════════════════════════════════════════════════════════
+
+When generating multiple shots within the SAME scene_id, you SHOULD maintain
+consistent descriptions of key visible props and environmental details across
+consecutive shots. This creates visual continuity for the reader.
+
+## Rules:
+
+1. PERSISTENT PROPS: If a shot establishes specific props on a shared surface
+   (dishes on a table, items on a desk, objects in a room), subsequent shots
+   in the same scene SHOULD describe those props in a consistent manner.
+   Props do not vanish between shots unless the narrative explains why.
+
+2. NARRATIVE-DRIVEN CHANGES ONLY: Props may change state ONLY when the story
+   explicitly describes the change (e.g., "she finishes the soup" → bowl now
+   empty; "he slams the book shut" → book now closed). Do not silently add
+   or remove props between shots.
+
+3. QUANTITY CONSISTENCY: If shot 1 describes "a table with 8 dishes",
+   shot 2 in the same scene should NOT show an empty table or only 2 dishes
+   — maintain approximate quantity unless consumption/removal is narrated.
+
+4. FLEXIBILITY: You do NOT need to copy the exact prop list word-for-word.
+   Different camera angles naturally show different portions of the scene.
+   The goal is logical consistency, not verbatim repetition.
+
+## Examples:
+
+❌ BAD: Shot 1 "a table laden with 8 steaming dishes and a clay pot of soup"
+        → Shot 3 (same scene) "the two characters sit at a bare wooden table"
+        (Props vanished without narrative reason)
+
+✅ GOOD: Shot 1 "a table laden with 8 steaming dishes and a clay pot of soup"
+         → Shot 3 (same scene, close-up) "char_001 picks up chopsticks,
+         several half-eaten dishes and the clay soup pot visible on the table behind"
+         (Props persist, quantity roughly consistent, camera angle changed)
+
+❌ BAD: Shot 2 "an open laptop and scattered papers on the desk"
+        → Shot 4 (same scene) "char_002 types on a desktop computer at a clean desk"
+        (Laptop changed to desktop, papers vanished)
+
+✅ GOOD: Shot 2 "an open laptop and scattered papers on the desk"
+         → Shot 4 (same scene) "char_002 leans toward the laptop screen,
+         papers pushed to the side of the desk"
+         (Same laptop, papers repositioned naturally)
+
+═══════════════════════════════════════════════════════════
+"""
+
+
+# T27: 角色关系映射规则（P-S1 修复：跨Stage称谓混乱）
+# 配合 T24 传入的 characters_overview 关系数据使用
+CHARACTER_RELATIONSHIP_MAPPING_RULES = """
+═══════════════════════════════════════════════════════════
+CHARACTER RELATIONSHIP MAPPING (IMPORTANT)
+═══════════════════════════════════════════════════════════
+
+When generating text_overlay (dialogue and thought), you MUST use the CORRECT family
+title/appellation for each character based on the CHARACTER RELATIONSHIPS data
+provided above in the "CHARACTER RELATIONSHIPS" section.
+
+## Rules:
+
+1. STRICT TITLE MATCHING: Each character's chinese_text dialogue SHOULD use the
+   family title that matches their actual role (e.g., if char_004 is "mother",
+   narration and dialogue MUST call her "妈妈" — NOT "奶奶", "阿姨", or other titles).
+
+2. PERSPECTIVE-AWARE TITLES: The title used depends on WHO is speaking/thinking:
+   - A child calling their mother: "妈妈"
+   - A grandchild calling their grandmother: "奶奶" / "外婆"
+   - A son calling his father: "爸" / "爸爸"
+   - Characters of the same generation: use given names
+
+3. CROSS-SHOT CONSISTENCY: Once a title is established for a character in shot 1,
+   ALL subsequent shots MUST use the same title for the same speaker-listener pair.
+   Do NOT switch between "妈妈" and "慧兰" for the same character in the same scene.
+
+4. TEXT_OVERLAY SELF-CHECK: Before finalizing each shot's text_overlay, verify:
+   - Is the speaker using the correct title for the person they address?
+   - Does the title match the CHARACTER RELATIONSHIPS data?
+   - Is this title consistent with what was used in earlier shots?
+
+═══════════════════════════════════════════════════════════
+"""
+
+# T27: 背景多样性规则（P-S3 修复：同场景连续shot背景单调）
+BACKGROUND_VARIETY_RULES = """
+═══════════════════════════════════════════════════════════
+BACKGROUND VARIETY (IMPORTANT)
+═══════════════════════════════════════════════════════════
+
+When generating 3 or more consecutive shots in the SAME location (same scene_id),
+you SHOULD describe DIFFERENT background focus areas across shots to avoid visual
+monotony. Small spaces (kitchens, bedrooms, offices) are especially prone to
+repetitive backgrounds.
+
+## Rules:
+
+1. SHIFT BACKGROUND FOCUS: Each shot in the same location SHOULD highlight a
+   different portion or detail of the environment.
+   ❌ BAD: Shot 1/2/3 all describe "warm kitchen with wooden cabinets"
+   ✅ GOOD: Shot 1 "stove with a steaming pot, tiled backsplash"
+            Shot 2 "window above the sink, afternoon light on hanging herbs"
+            Shot 3 "refrigerator door covered with family photos, calendar on the wall"
+
+2. VARY CAMERA ORIENTATION: Even in the same small room, rotate the implied
+   camera direction — face different walls, corners, or angles.
+   ❌ BAD: 3 shots all facing the same wall
+   ✅ GOOD: Shot 1 faces the dining table, Shot 2 faces the window,
+            Shot 3 looks toward the hallway entrance
+
+3. USE ENVIRONMENTAL STORYTELLING: Each background shift SHOULD reveal new
+   information about the characters or setting (family photos, bookshelf contents,
+   weather outside the window, items on a shelf).
+
+4. FLEXIBILITY: This rule applies to locations with 3+ shots. For locations with
+   only 1-2 shots, normal background description is sufficient.
+
+═══════════════════════════════════════════════════════════
+"""
+
+# T27: 室内纵深感强化规则（P-S4 修复：人物-背景比例不协调）
+INTERIOR_SPATIAL_DEPTH_RULES = """
+═══════════════════════════════════════════════════════════
+INTERIOR SPATIAL DEPTH (IMPORTANT)
+═══════════════════════════════════════════════════════════
+
+For medium_shot and medium_close_up in INTERIOR scenes, you SHOULD include specific
+spatial depth cues to prevent flat, portrait-like compositions where characters
+appear pasted onto backgrounds.
+
+## Rules:
+
+1. DEPTH ANCHORING: Place at least one object BETWEEN the camera and the character
+   (foreground), and at least one object BEHIND the character (background), to
+   establish three-dimensional space.
+   ❌ BAD: "char_001 sits at the dining table" (no depth cues)
+   ✅ GOOD: "blurred edge of a rice bowl in the near foreground, char_001 sits at
+            the dining table, the kitchen doorway and hanging calendar visible behind"
+
+2. INTERIOR PERSPECTIVE LINES: Reference architectural elements that create
+   depth — doorframes, hallways, window recesses, ceiling beams, floor tile
+   patterns receding into distance.
+   ❌ BAD: "two characters talk in the living room"
+   ✅ GOOD: "two characters face each other across the coffee table, the long
+            hallway stretches behind them toward a half-open bedroom door"
+
+3. SCALE REFERENCE: Include objects of known size at different depths to help
+   the viewer gauge spatial relationships — a chair in the foreground, characters
+   in the midground, a bookshelf against the far wall.
+
+4. AVOID FLAT COMPOSITION: Do NOT describe interior scenes as if characters are
+   standing against a flat backdrop. Always imply room volume and depth.
+
+═══════════════════════════════════════════════════════════
+"""
+
+# T35: 多人空间锚定规则（P-R7: 4人场景缺1人 + P-R10: 人物比例失调）
+MULTI_CHARACTER_SPATIAL_ANCHORING_RULES = """
+═══════════════════════════════════════════════════════════
+MULTI-CHARACTER SPATIAL ANCHORING (IMPORTANT)
+═══════════════════════════════════════════════════════════
+
+When a shot contains 3 or more characters, you SHOULD follow these rules to ensure
+every character is visible, properly scaled, and spatially grounded.
+
+## Rules:
+
+1. HEADCOUNT GUARANTEE: The image_prompt MUST explicitly state the total number of
+   visible people (e.g., "four people gathered around the dining table"). Every
+   character listed in characters_in_scene SHOULD be accounted for in the prompt
+   with a distinct spatial position. Do NOT leave any character implied or off-screen
+   unless the narrative specifically requires it.
+   ❌ BAD: "the family sits at the table" (how many? who is where?)
+   ✅ GOOD: "four people at the dining table: grandfather at the head, father and
+            mother on opposite sides, granddaughter in the near-left seat"
+
+2. FURNITURE-TO-BODY SCALE: Characters SHOULD be proportionally correct relative to
+   furniture and environment objects. Seated characters' heads should be at chair-back
+   height. Standing characters should be taller than table height. Children should be
+   visibly shorter than adults. Elderly characters may be slightly hunched.
+   ❌ BAD: "child and adult stand side by side" (no scale difference implied)
+   ✅ GOOD: "the grandfather sits in the armchair, his head level with the chair back,
+            the 8-year-old granddaughter stands beside him, her head barely reaching
+            his shoulder"
+
+3. ENVIRONMENT INTERACTION: Each character SHOULD have a physical interaction with the
+   environment — holding an object, leaning on furniture, resting hands on a surface,
+   or touching another character. Avoid floating or idle poses where characters stand
+   stiffly with no spatial connection to their surroundings.
+   ❌ BAD: "three people stand in the kitchen"
+   ✅ GOOD: "mother stirs a pot at the stove, father leans against the counter holding
+            a mug, daughter sits on the kitchen stool peeling an apple"
+
+4. SPATIAL DISTRIBUTION: In group scenes (3+ characters), distribute characters across
+   at least two depth planes (foreground + midground, or midground + background). Avoid
+   lining up all characters in a single flat row at the same distance from camera.
+   ❌ BAD: "four family members stand side by side facing the camera" (flat lineup)
+   ✅ GOOD: "grandmother and granddaughter sit on the sofa in the midground, grandfather
+            stands behind them resting his hand on the sofa back, father walks in from
+            the hallway in the background carrying a tray"
+
+5. OVERLAP AVOIDANCE: When characters are close together, use slight staggering or
+   height variation so that no character is fully occluded by another. Partially
+   overlapping is acceptable if faces remain visible.
+
+═══════════════════════════════════════════════════════════
+"""
+
+# T34 Plan A: 镜头信息完整性规则（P-R6: 早期shot缺镜头信息）
+CAMERA_INFORMATION_COMPLETENESS_RULE = """
+═══════════════════════════════════════════════════════════
+CAMERA INFORMATION IN IMAGE PROMPT (IMPORTANT)
+═══════════════════════════════════════════════════════════
+
+Every image_prompt SHOULD explicitly include the camera framing and angle as natural
+English phrases. This helps the image generation model produce the intended composition.
+
+## Rules:
+
+1. SHOT SIZE IN PROMPT: The image_prompt SHOULD contain a phrase describing the shot size
+   (e.g., "wide shot of...", "close-up of...", "medium shot showing..."). This should
+   match the shot's `camera.shot_size` metadata.
+   ❌ BAD: "char_001 sits at the dining table looking sad" (no framing info)
+   ✅ GOOD: "medium shot of char_001 sitting at the dining table looking sad"
+
+2. CAMERA ANGLE IN PROMPT: When the camera angle is NOT eye_level, the image_prompt
+   SHOULD mention the angle perspective to guide composition.
+   ❌ BAD: "char_001 stands alone on the rooftop" (shot metadata says high_angle but prompt doesn't reflect it)
+   ✅ GOOD: "high-angle shot looking down at char_001 standing alone on the rooftop"
+
+3. NATURAL INTEGRATION: Camera information should be woven into the description
+   naturally, not appended as a technical tag.
+   ❌ BAD: "char_001 walks through the rain. Shot size: medium_shot. Angle: low_angle."
+   ✅ GOOD: "low-angle medium shot of char_001 walking through the rain, his silhouette framed against the stormy sky"
+
+═══════════════════════════════════════════════════════════
+"""
+
 # 专业摄影知识库
 CINEMATOGRAPHY_GUIDE = """
 ## 镜头语言指南
@@ -96,7 +339,9 @@ class StoryboardDirector:
         screenplay: dict,
         characters: dict,
         visual_tone: dict,
-        style_preset: str = "anime"
+        style_preset: str = "anime",
+        characters_overview: list = None,
+        family_relationships: list = None
     ) -> dict:
         """
         生成分镜脚本（按scene分批生成，解决LLM输出不完整问题）
@@ -106,6 +351,8 @@ class StoryboardDirector:
             characters: Stage 2生成的角色设计
             visual_tone: Stage 1大纲中的视觉风调
             style_preset: 风格预设
+            characters_overview: Stage 1大纲中的角色概述（含关系信息）
+            family_relationships: Stage 1大纲中的角色间关系映射
 
         Returns:
             storyboard dict
@@ -140,7 +387,9 @@ class StoryboardDirector:
                 characters=characters,
                 visual_tone=visual_tone,
                 style_preset=style_preset,
-                shot_id_start=shot_id_counter
+                shot_id_start=shot_id_counter,
+                characters_overview=characters_overview,
+                family_relationships=family_relationships
             )
 
             if scene_shots:
@@ -193,7 +442,9 @@ class StoryboardDirector:
         characters: dict,
         visual_tone: dict,
         style_preset: str,
-        shot_id_start: int
+        shot_id_start: int,
+        characters_overview: list = None,
+        family_relationships: list = None
     ) -> tuple:
         """为单个scene生成shots"""
         max_attempts = 2
@@ -204,7 +455,9 @@ class StoryboardDirector:
                 characters=characters,
                 visual_tone=visual_tone,
                 style_preset=style_preset,
-                shot_id_start=shot_id_start
+                shot_id_start=shot_id_start,
+                characters_overview=characters_overview,
+                family_relationships=family_relationships
             )
 
             try:
@@ -350,7 +603,9 @@ class StoryboardDirector:
         characters: dict,
         visual_tone: dict,
         style_preset: str,
-        shot_id_start: int
+        shot_id_start: int,
+        characters_overview: list = None,
+        family_relationships: list = None
     ) -> str:
         """为单个scene构建prompt"""
         scene_id = scene.get("scene_id", 1)
@@ -385,6 +640,50 @@ class StoryboardDirector:
             "narration": scene.get("narration", "")
         }, ensure_ascii=False, indent=2)
 
+        # T24: 构建角色关系表（PM Code Review Fix: 修正字段名匹配 Stage 1 输出）
+        char_relationships_block = ""
+        if characters_overview:
+            rel_lines = []
+            for idx, co in enumerate(characters_overview):
+                # Stage 1 输出字段: name_suggestion, age_range, family_role, archetype
+                name = co.get("name_suggestion", co.get("name", ""))
+                age = co.get("age_range", "")
+                family_role = co.get("family_role", "")
+                archetype = co.get("archetype", "")
+                # 用 name 作为标识（Stage 1 无 char_id，Stage 2 才分配）
+                label = name or f"char_{idx + 1:03d}"
+                if name:
+                    parts = [label]
+                    if age:
+                        parts.append(age)
+                    if family_role and family_role != "none":
+                        parts.append(family_role)
+                    elif archetype:
+                        parts.append(archetype)
+                    rel_lines.append(f"- {', '.join(parts)}")
+
+            # 追加顶层 family_relationships（T25 新增的角色间关系映射）
+            fr_lines = []
+            if family_relationships:
+                for fr in family_relationships:
+                    fr_from = fr.get("from", "")
+                    fr_to = fr.get("to", "")
+                    fr_rel = fr.get("relationship", "")
+                    if fr_from and fr_to and fr_rel:
+                        fr_lines.append(f"- {fr_from} → {fr_to}: {fr_rel}")
+
+            if rel_lines:
+                block_parts = [
+                    "\n## CHARACTER RELATIONSHIPS (use to ensure correct family titles in text_overlay and interpersonal dynamics)\n",
+                    "### Characters:",
+                    *rel_lines
+                ]
+                if fr_lines:
+                    block_parts.append("\n### Family Relationships:")
+                    block_parts.extend(fr_lines)
+                block_parts.append("")
+                char_relationships_block = "\n".join(block_parts)
+
         return f"""Generate {num_beats} shots for Scene {scene_id}.
 
 Required shots (one shot per beat):
@@ -395,7 +694,7 @@ Scene data:
 
 Character data:
 {characters_json}
-
+{char_relationships_block}
 {NARRATION_TO_VISUAL_EXTRACTION_RULES}
 
 {COMIC_MODE_NARRATIVE_RULES}
@@ -458,6 +757,36 @@ Each character may perform AT MOST ONE active hand/arm action per shot. If the n
 ❌ BAD: "char_001 wipes his cheek with the back of his hand while reaching out to push the glass door"
 ✅ GOOD: "char_001 pushes the glass door open with one hand, rain dripping from his face"
 
+### 10. BACK-VIEW / HIGH-ANGLE CHARACTER CONSISTENCY (IMPORTANT)
+When a shot uses back-view, over-the-shoulder, bird's-eye, or high-angle camera looking DOWN at characters:
+- REINFORCE clothing with EXACT color names and garment types (not "her top" but "sage-green cotton T-shirt")
+- REINFORCE hair with EXACT color and style ("jet-black shoulder-length straight hair", not "her hair")
+- Add explicit note: "Even viewed from behind/above, [character_name]'s [specific_color] [specific_garment] must remain clearly identifiable and match the reference image."
+This ensures character recognition even when face is not visible.
+❌ BAD: "char_001 walks away from camera in her top and jeans"
+✅ GOOD: "char_001 walks away from camera in her sage-green cotton T-shirt and dark-blue denim jeans, jet-black shoulder-length straight hair swaying. Even viewed from behind, her sage-green T-shirt must remain clearly identifiable and match the reference image."
+
+### 11. OFF-SCREEN CHARACTER PHYSICAL CONTACT (CRITICAL)
+When a character in characters_visible interacts with a character who is NOT in characters_visible (off-screen):
+- FORBIDDEN: describing direct physical contact between the visible character and the off-screen character
+  ❌ "His right arm is extended forward, pulled by Xiaohe's grip off-screen left"
+  ❌ "She holds hands with someone outside the frame"
+- REQUIRED: show the visible character's INDEPENDENT body language that implies the interaction
+  ✅ "His right arm reaches forward toward off-frame left, fingers open in a beckoning gesture"
+  ✅ "She extends her hand toward the left edge of the frame"
+- Reason: image generation models render invisible characters' body parts as floating/disconnected limbs
+- This rule does NOT apply to interactions with objects or environment (reaching for a door, picking up items)
+
+### 12. SPATIAL DIRECTION SELF-CONSISTENCY CHECK (IMPORTANT)
+Before finalizing each shot's image_prompt, verify that camera_angle, character actions, and spatial descriptions form a coherent picture:
+- If camera faces a character's FRONT → character should NOT be described as "walking away from camera" or "trailing behind"
+- If character is "leading the group, walking ahead" → camera should show their BACK or SIDE, not their FACE
+- If character is "at the rear of the group" → they should be further from camera or partially occluded, not centered in foreground
+❌ CONTRADICTORY: camera_angle "eye level front-facing" + action "mom trails at the rear while family walks ahead"
+  (This places mom in the foreground facing camera, but the family walks away in the background — spatially impossible if she's trailing behind them)
+✅ CONSISTENT: camera_angle "low angle from behind" + action "mom trails at the rear while family walks ahead"
+  (Camera behind the group, mom closest to camera, family ahead — spatially coherent)
+
 ## NARRATIVE VISUAL PROPS (MANDATORY)
 
 Every image_prompt MUST include at least one plot-relevant prop or environmental detail that conveys story information visually:
@@ -468,6 +797,14 @@ Every image_prompt MUST include at least one plot-relevant prop or environmental
 
 Props should tell the story even if the viewer cannot read the text overlay. The viewer should understand WHAT the conflict is about from the visual elements alone.
 
+{SCENE_PROP_CONTINUITY_RULES}
+
+{CHARACTER_RELATIONSHIP_MAPPING_RULES}
+
+{BACKGROUND_VARIETY_RULES}
+
+{MULTI_CHARACTER_SPATIAL_ANCHORING_RULES}
+
 ## SPATIAL DEPTH RULES (MANDATORY)
 
 For medium_shot, medium_close_up, close_up: AT LEAST 30% of the frame must show visible background/environment.
@@ -476,6 +813,8 @@ For medium_shot, medium_close_up, close_up: AT LEAST 30% of the frame must show 
 
 Use foreground objects (blurred cup, door frame, rain streaks) to create depth layers.
 Aim for at least 2 depth layers per shot; 3 layers for emotional beats.
+
+{INTERIOR_SPATIAL_DEPTH_RULES}
 
 ## SHOT TRANSITION RULES (MANDATORY — between consecutive shots in the same scene)
 
@@ -501,6 +840,8 @@ Match focal_length to shot_size for natural perspective:
 - medium_shot / medium_wide: 35mm-50mm (balanced)
 - close_up / medium_close_up: 85mm (portrait compression, background separation)
 - extreme_close_up: 100mm-135mm (detail isolation)
+
+{CAMERA_INFORMATION_COMPLETENESS_RULE}
 
 ## TEXT OVERLAY MAPPING RULES (MANDATORY)
 
@@ -667,6 +1008,8 @@ You MUST generate a shot for each beat above, total {total_beats} shots.
 
 {COMIC_MODE_NARRATIVE_RULES}
 
+{SCENE_PROP_CONTINUITY_RULES}
+
 ## Visual Tone
 {visual_tone_json}
 
@@ -790,6 +1133,15 @@ At most 2 characters' hands may actively interact with the SAME object in one sh
 Each character may perform AT MOST ONE active hand/arm action per shot. If the narration describes multiple hand actions for one character, choose the most dramatically important one. Other actions can be implied or shown in a subsequent shot.
 ❌ BAD: "char_001 wipes his cheek with the back of his hand while reaching out to push the glass door"
 ✅ GOOD: "char_001 pushes the glass door open with one hand, rain dripping from his face"
+
+### 10. BACK-VIEW / HIGH-ANGLE CHARACTER CONSISTENCY
+When a shot uses back-view, over-the-shoulder, bird's-eye, or high-angle camera: REINFORCE clothing with EXACT color names and garment types, REINFORCE hair with EXACT color and style, and add an explicit note that the character must remain identifiable from behind/above matching the reference image.
+
+### 11. OFF-SCREEN CHARACTER PHYSICAL CONTACT
+FORBIDDEN: describing direct physical contact between a visible character and an off-screen character (grip, pull, hold, embrace). Instead show the visible character's INDEPENDENT body language that implies interaction (reaching toward frame edge, beckoning gesture). Reason: models render invisible characters' body parts as floating limbs.
+
+### 12. SPATIAL DIRECTION SELF-CONSISTENCY CHECK
+Verify camera_angle, character actions, and spatial descriptions are coherent: front-facing camera → character should not be "walking away"; character "leading ahead" → camera should show back/side not face; character "at the rear" → should not be centered in foreground.
 
 ## TEXT OVERLAY MAPPING RULES (MANDATORY)
 
@@ -1074,14 +1426,64 @@ Output JSON only, no other text:
                                     has_invisible_speaker = True
                                     print(f"  ⚠️ [T5] Shot {shot_id}: speaker '{speaker_zh}' ({char_id}) "
                                           f"不在 characters_visible {chars_visible} 中")
-                        # 降级处理：dialogue → thought
+                        # T29: 不降级 text_type，改为打标 off_screen_speaker
+                        # 原逻辑（已移除）：dialogue→thought 导致气泡变成黑底白字旁白条
+                        # 新逻辑：保留 dialogue 类型 + 标记画外音，渲染为画外音对话风格
                         if has_invisible_speaker:
+                            text_overlay["off_screen_speaker"] = True
                             if text_type == "dialogue":
-                                text_overlay["text_type"] = "thought"
-                                print(f"  ⚠️ [T5] Shot {shot_id}: text_type 'dialogue' → 'thought'（speaker 不可见降级）")
+                                print(f"  ℹ️ [T29] Shot {shot_id}: dialogue 保留，标记 off_screen_speaker=true（画外音对话）")
                             elif text_type in ["dialogue_with_thought", "dialogue_with_narration", "narration_with_dialogue"]:
-                                text_overlay["text_type"] = "narration_with_thought"
-                                print(f"  ⚠️ [T5] Shot {shot_id}: text_type '{text_type}' → 'narration_with_thought'（speaker 不可见降级）")
+                                print(f"  ℹ️ [T29] Shot {shot_id}: '{text_type}' 保留，标记 off_screen_speaker=true（含画外音子类型）")
+
+            # T34 Plan B: 检测 image_prompt 是否含镜头信息，缺失时从 shot 元数据注入
+            image_prompt = shot.get("image_prompt", "")
+            camera = shot.get("camera", {})
+            shot_size = camera.get("shot_size", "")
+            camera_angle = camera.get("angle", "")
+
+            if image_prompt and shot_size:
+                # 将 shot_size 映射到 image_prompt 中可能出现的关键词
+                size_keywords = {
+                    "wide_shot": ["wide shot", "wide-shot", "wide angle"],
+                    "establishing": ["establishing shot", "wide shot", "panoramic"],
+                    "medium_wide": ["medium wide", "medium-wide"],
+                    "medium_shot": ["medium shot", "medium-shot", "mid shot", "mid-shot"],
+                    "medium_close_up": ["medium close", "medium close-up"],
+                    "close_up": ["close-up", "close up", "closeup"],
+                    "extreme_close_up": ["extreme close", "extreme close-up", "macro"]
+                }
+                angle_keywords = {
+                    "low_angle": ["low angle", "low-angle", "looking up"],
+                    "high_angle": ["high angle", "high-angle", "looking down", "overhead", "bird"],
+                    "dutch_angle": ["dutch angle", "dutch-angle", "tilted"],
+                    "eye_level": ["eye level", "eye-level"]
+                }
+
+                # 检测 shot_size 是否在 image_prompt 中
+                prompt_lower = image_prompt.lower()
+                keywords_for_size = size_keywords.get(shot_size, [shot_size.replace("_", " ")])
+                has_size = any(kw in prompt_lower for kw in keywords_for_size)
+
+                # 检测 camera_angle 是否在 image_prompt 中（eye_level 不强制要求）
+                has_angle = True  # eye_level 默认不需要
+                if camera_angle and camera_angle != "eye_level":
+                    keywords_for_angle = angle_keywords.get(camera_angle, [camera_angle.replace("_", " ")])
+                    has_angle = any(kw in prompt_lower for kw in keywords_for_angle)
+
+                if not has_size or not has_angle:
+                    # 构建自然的镜头描述短语并注入 image_prompt 开头
+                    size_phrase = shot_size.replace("_", " ")
+                    angle_phrase = camera_angle.replace("_", " ") if camera_angle and camera_angle != "eye_level" else ""
+
+                    if angle_phrase:
+                        camera_prefix = f"{angle_phrase} {size_phrase}"
+                    else:
+                        camera_prefix = size_phrase
+
+                    # 注入到 image_prompt 开头，自然融合
+                    shot["image_prompt"] = f"{camera_prefix} — {image_prompt}"
+                    print(f"  ℹ️ [T34] Shot {shot_id}: 注入镜头信息 '{camera_prefix}'（原 prompt 缺失 shot_size/angle 关键词）")
 
         # 验证shot_continuity_notes（可选）
         if "shot_continuity_notes" not in storyboard:

@@ -294,7 +294,8 @@ class SceneReferenceManager:
         project_style: ProjectStyleConfig,
         image_generator,
         unique_locations: List[Dict[str, Any]] = None,
-        delay: float = 3.0
+        delay: float = 3.0,
+        location_character_counts: Dict[str, int] = None
     ) -> Dict[str, Dict[str, Any]]:
         """
         P2.0核心方法：为每种场景类型生成锚点图
@@ -335,6 +336,8 @@ class SceneReferenceManager:
         # 3. 按location逐个处理，确保内外景关联
         for location_id, anchors in location_groups.items():
             interior_image = None
+            # T21: 获取该场景的角色数量
+            loc_num_chars = (location_character_counts or {}).get(location_id)
 
             # 3.1 先生成内景（如果有）
             interior_key = f"{location_id}_interior_anchor"
@@ -350,7 +353,8 @@ class SceneReferenceManager:
                     project_style=project_style,
                     image_generator=image_generator,
                     reference_image=None,  # 内景无参考图
-                    location_id=location_id  # 🚨 传入原始location_id用于存储
+                    location_id=location_id,  # 🚨 传入原始location_id用于存储
+                    num_characters=loc_num_chars  # T21: 角色数量
                 )
 
                 results[interior_key] = interior_result
@@ -376,7 +380,8 @@ class SceneReferenceManager:
                     project_style=project_style,
                     image_generator=image_generator,
                     reference_image=interior_image,  # 🚨 关键：内景作为参考
-                    location_id=location_id  # 🚨 传入原始location_id用于存储
+                    location_id=location_id,  # 🚨 传入原始location_id用于存储
+                    num_characters=loc_num_chars  # T21: 角色数量
                 )
 
                 results[exterior_key] = exterior_result
@@ -430,7 +435,8 @@ class SceneReferenceManager:
         project_style: ProjectStyleConfig,
         image_generator,
         reference_image: Optional[Image.Image] = None,
-        location_id: str = None
+        location_id: str = None,
+        num_characters: int = None
     ) -> tuple:
         """
         生成单个锚点图
@@ -459,6 +465,7 @@ class SceneReferenceManager:
             'atmosphere': representative_scene.get('mood', ''),
             'lighting': representative_scene.get('scene_style', {}).get('lighting', ''),
             'key_visual_elements': anchor_info.get('key_visual_elements', []),
+            'signage_text': anchor_info.get('signage_text', ''),
         }
 
         # 构建锚点图prompt（外景时添加内景一致性指令）
@@ -466,7 +473,8 @@ class SceneReferenceManager:
             location_info,
             view_type,
             project_style,
-            has_interior_reference=(reference_image is not None)
+            has_interior_reference=(reference_image is not None),
+            num_characters=num_characters
         )
         negative_prompt = self._get_location_negative_prompt()
 
@@ -581,7 +589,8 @@ class SceneReferenceManager:
                     'representative_scene': self._find_representative_scene(
                         scenes, location_id, 'interior'
                     ),
-                    'time_of_day': ''
+                    'time_of_day': '',
+                    'signage_text': loc.get('signage_text', '')
                 }
 
             if location_type in ['exterior', 'exterior_only', 'both']:
@@ -595,7 +604,8 @@ class SceneReferenceManager:
                     'representative_scene': self._find_representative_scene(
                         scenes, location_id, 'exterior'
                     ),
-                    'time_of_day': ''
+                    'time_of_day': '',
+                    'signage_text': loc.get('signage_text', '')
                 }
 
         return needs
@@ -668,12 +678,43 @@ class SceneReferenceManager:
 
         return needs
 
+    # T31: 含招牌/门面的场景关键词
+    _SIGNAGE_KEYWORDS_ZH = {'铺', '店', '坊', '馆', '堂', '楼', '阁', '庄', '号', '行'}
+    _SIGNAGE_KEYWORDS_EN = {
+        'shop', 'store', 'restaurant', 'café', 'cafe', 'inn', 'tavern',
+        'bakery', 'clinic', 'hospital', 'academy', 'studio', 'office',
+        'bar', 'pub', 'diner', 'pharmacy', 'boutique', 'gallery',
+        'tailor', 'workshop', 'mill', 'forge', 'smithy'
+    }
+
+    def _detect_signage_name(self, location_name: str, location_desc: str,
+                              signage_text: str = '') -> Optional[str]:
+        """T31+T-C: 检测场景是否含招牌，返回招牌文字（中文名）或 None
+        优先使用 Stage 1 生成的 signage_text，fallback 到 display_name 清洗"""
+        # T-C: 优先使用 Stage 1 生成的 signage_text
+        if signage_text:
+            return signage_text
+        # T-C: Fallback — 从 display_name 清洗（去除 · 分隔符后部分）
+        cleaned = location_name.split('·')[0].strip()
+        # 检查中文关键词
+        for kw in self._SIGNAGE_KEYWORDS_ZH:
+            if kw in cleaned:
+                return cleaned
+        # 检查英文关键词（在 description 或 location_name 中）
+        combined = (cleaned + " " + location_desc).lower()
+        for kw in self._SIGNAGE_KEYWORDS_EN:
+            if kw in combined:
+                if cleaned:
+                    return cleaned
+        return None
+
     def _build_anchor_prompt(
         self,
         location: Dict[str, Any],
         view_type: str,
         project_style: ProjectStyleConfig,
-        has_interior_reference: bool = False
+        has_interior_reference: bool = False,
+        num_characters: int = None
     ) -> str:
         """
         构建高质量锚点图的prompt
@@ -732,6 +773,16 @@ The reference image shows the interior of this location.
 - The exterior should feel like it belongs to the same building/space as the interior
 - Preserve the lighting mood and atmosphere from the interior reference"""
 
+            # T31: 检测招牌名称并注入
+            signage_section = ""
+            signage_name = self._detect_signage_name(location_name, location_full_desc,
+                                                         signage_text=location.get('signage_text', ''))
+            if signage_name:
+                signage_section = f"""
+REQUIRED TEXT ON SIGNAGE (CRITICAL):
+The storefront/building sign MUST display: "{signage_name}"
+Do NOT invent or substitute any other name. The sign text must match EXACTLY."""
+
             core_prompt = f"""MASTER ANCHOR IMAGE - EXTERIOR
 
 This is the DEFINITIVE VISUAL REFERENCE for this location's exterior.
@@ -740,6 +791,7 @@ ALL subsequent shots will use this image as the visual foundation.
 Location: {location_full_desc}
 {elements_str}
 {interior_consistency_section}
+{signage_section}
 
 REQUIREMENTS:
 1. WIDE ESTABLISHING SHOT - capture the complete exterior
@@ -755,9 +807,18 @@ COMPOSITION:
 
 QUALITY: Highest detail, sharp focus, professional photography
 
-STRICT: No people, no characters, no moving objects, no text overlay"""
+STRICT: No people, no characters, no moving objects"""
 
         else:  # interior
+            # T31: 检测招牌名称（室内也可能有墙面招牌/匾额）
+            signage_section = ""
+            signage_name = self._detect_signage_name(location_name, location_full_desc,
+                                                         signage_text=location.get('signage_text', ''))
+            if signage_name:
+                signage_section = f"""
+If any wall sign, plaque, or banner is visible inside, it MUST display: "{signage_name}"
+Do NOT invent or substitute any other name."""
+
             core_prompt = f"""MASTER ANCHOR IMAGE - INTERIOR
 
 This is the DEFINITIVE VISUAL REFERENCE for this location's interior.
@@ -765,6 +826,7 @@ ALL subsequent shots will use this image as the visual foundation.
 
 Location: {location_full_desc}
 {elements_str}
+{signage_section}
 
 REQUIREMENTS:
 1. WIDE INTERIOR SHOT - capture the complete indoor space layout
@@ -772,6 +834,7 @@ REQUIREMENTS:
 3. High detail quality for all visual elements
 4. Consistent lighting throughout the image
 {f"Time/Atmosphere: {context_desc}" if context_desc else ""}
+{f"5. The space is arranged for {num_characters} people (e.g., {num_characters} seats, table set for {num_characters})" if num_characters else ""}
 
 COMPOSITION:
 - High angle (slightly elevated) to show spatial layout
@@ -780,7 +843,7 @@ COMPOSITION:
 
 QUALITY: Highest detail, sharp focus, professional interior photography
 
-STRICT: No people, no characters, no text overlay"""
+STRICT: No people, no characters"""
 
         # 应用风格强制
         enforced_prompt = StyleEnforcer.enforce_prompt(

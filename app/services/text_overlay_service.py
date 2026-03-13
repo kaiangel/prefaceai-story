@@ -605,7 +605,15 @@ class TextOverlayService:
             result, _ = self.add_monologue(result, processed, position=position, pre_stripped=True)
 
         elif text_type == "dialogue":
-            if isinstance(chinese_text, list):
+            # T29: off_screen_speaker 时渲染为旁白条（voiceover），非气泡
+            off_screen = shot.get("off_screen_speaker", False)
+            if off_screen:
+                position = shot.get("speaker_position", "bottom")
+                text = chinese_text if isinstance(chinese_text, str) else chinese_text[0] if chinese_text else ""
+                if text:
+                    processed = _smart_strip(text)
+                    result, _ = self.add_monologue(result, processed, position=position, pre_stripped=True)
+            elif isinstance(chinese_text, list):
                 total_bubbles = len(chinese_text)
                 for i, txt in enumerate(chinese_text):
                     x_pct, y_pct = get_bubble_position_for_index(i, total_bubbles)
@@ -659,8 +667,16 @@ class TextOverlayService:
                     )
                     position_offsets["bottom"] += bar_height + 5
                 elif sub_type == "dialogue":
-                    x_pct, y_pct = get_bubble_position_for_index(dialogue_index, total_dialogues)
-                    result = self.add_speech_bubble(result, processed, bubble_x_percent=x_pct, bubble_y_percent=y_pct, pre_stripped=True)
+                    # OB-T29: off_screen_speaker 时渲染为旁白条（voiceover），非气泡
+                    if shot.get("off_screen_speaker", False):
+                        result, bar_height = self.add_monologue(
+                            result, processed, position="bottom",
+                            y_offset=position_offsets["bottom"], pre_stripped=True
+                        )
+                        position_offsets["bottom"] += bar_height + 5
+                    else:
+                        x_pct, y_pct = get_bubble_position_for_index(dialogue_index, total_dialogues)
+                        result = self.add_speech_bubble(result, processed, bubble_x_percent=x_pct, bubble_y_percent=y_pct, pre_stripped=True)
                     dialogue_index += 1
 
         return result

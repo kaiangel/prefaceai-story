@@ -194,7 +194,7 @@ class StoryOutlineGenerator:
     "visual_tone": {{
         "overall_mood": "整体情绪基调（如: melancholic_intimate, warm_nostalgic, tense_mysterious）",
         "lighting_style": "光影风格（如: low_key_dramatic, high_key_bright, natural_soft, chiaroscuro）",
-        "color_palette": ["主色调1", "主色调2", "点缀色"],
+        "color_palette": ["primary color in English", "secondary color in English", "accent color in English"],
         "composition_style": "构图风格（如: negative_space_isolation, dynamic_diagonal, symmetrical_formal）"
     }},
 
@@ -212,7 +212,16 @@ class StoryOutlineGenerator:
             "archetype": "角色原型（如: exhausted_office_worker, cheerful_student, wise_elder）",
             "age_range": "young_adult / adult / middle_aged / elderly / child / teen",
             "gender": "male / female",
+            "family_role": "grandfather / grandmother / father / mother / son / daughter / granddaughter / grandson / uncle / aunt / friend / colleague / stranger / none",
             "emotional_journey": "角色的情感变化轨迹"
+        }}
+    ],
+
+    "family_relationships": [
+        {{
+            "from": "char_name_1",
+            "to": "char_name_2",
+            "relationship": "grandfather_of / mother_of / father_of / sibling_of / spouse_of / friend_of / colleague_of"
         }}
     ],
 
@@ -234,7 +243,8 @@ class StoryOutlineGenerator:
             "atmosphere": "desolate_urban / cozy_warm / mysterious_quiet / tense_suspenseful",
             "interior_description": "English description of interior (if has interior)",
             "exterior_description": "English description of exterior (if has exterior)",
-            "key_visual_elements": ["visual element 1 in English", "visual element 2 in English"]
+            "key_visual_elements": ["visual element 1 in English", "visual element 2 in English"],
+            "signage_text": "店铺/建筑招牌上实际显示的文字（中文），无招牌则为空字符串"
         }}
     ]
 }}
@@ -247,9 +257,59 @@ class StoryOutlineGenerator:
 3. **角色差异**：每个角色必须有明显的视觉差异和性格特点
 4. **场景利用**：unique_locations应该覆盖故事的主要发生地
 5. **时长控制**：plot_points的estimated_duration_seconds总和应接近{target_seconds}秒
+6. **家庭关系**：如果故事涉及家庭成员，characters_overview中的family_role必须准确标注，family_relationships必须完整记录角色间关系
+7. **招牌文字**：如果 unique_location 是店铺、餐馆、客栈等有招牌的场所，signage_text 应填写该店铺在故事世界中的真实招牌名称（如 "李记桂花糕"、"百味居"）。signage_text 是用于图像生成的店铺招牌文字，不是开发标签。如果场所没有招牌（如街道、公园、家中），signage_text 为空字符串 ""。
+
+## TITLE CONSISTENCY (IMPORTANT)
+
+The story title SHOULD be consistent with the actual characters and their roles:
+- If the title mentions a family role (e.g. "爷爷", "奶奶", "妈妈", "外婆"), at least one character
+  in characters_overview MUST have the matching family_role and gender
+- If the title implies a specific gender (e.g. "她的..." implies female), the relevant character
+  SHOULD match that gender
+- If the title references a specific relationship (e.g. "父子", "母女"), the family_relationships
+  array MUST contain a matching relationship entry
+
+Examples:
+❌ BAD: title="外婆的抽屉" but no character has family_role="grandmother"
+✅ GOOD: title="外婆的抽屉" with a character having family_role="grandmother", age_range="elderly", gender="female"
+❌ BAD: title="父子对弈" but characters are mother and daughter
+✅ GOOD: title="父子对弈" with family_relationships containing {{"from": "father_name", "to": "son_name", "relationship": "father_of"}}
+
+## RELATIONSHIP CONSISTENCY RULES (IMPORTANT)
+
+The family_relationships array SHOULD be logically consistent. When multiple relationships
+are defined, they must form a coherent family tree — no contradictions.
+
+### Triangle Consistency:
+If A is grandfather_of C, and B is father_of C, then A SHOULD be father_of B (not grandfather_of B).
+All three-way relationships must be transitively correct.
+
+❌ BAD:
+  {{"from": "陈守正", "to": "陈建国", "relationship": "grandfather_of"}}
+  {{"from": "陈守正", "to": "陈晓桐", "relationship": "grandfather_of"}}
+  {{"from": "陈建国", "to": "陈晓桐", "relationship": "father_of"}}
+  (陈守正 cannot be grandfather_of his own son 陈建国 — should be father_of)
+
+✅ GOOD:
+  {{"from": "陈守正", "to": "陈建国", "relationship": "father_of"}}
+  {{"from": "陈守正", "to": "陈晓桐", "relationship": "grandfather_of"}}
+  {{"from": "陈建国", "to": "陈晓桐", "relationship": "father_of"}}
+  (陈守正 is father of 陈建国, grandfather of 陈晓桐 — transitively correct)
+
+### Spouse Transitivity:
+If A is spouse_of B, and A is parent_of C, then B SHOULD also be parent_of C
+(unless explicitly stated otherwise, e.g. step-parent).
+
+### Self-Check Before Output:
+Review all family_relationships entries together. For each person mentioned:
+- Count how many generations separate them from the oldest character
+- Verify that relationship labels match the generational distance
+  (1 generation = parent_of, 2 generations = grandparent_of)
 
 ## 注意事项
 
+- visual_tone.color_palette 中的颜色名必须是**英文**（如 "warm amber", "deep navy", "muted sage green"），不要使用中文颜色名
 - 所有location的interior_description和exterior_description必须是**英文**
 - 所有location的key_visual_elements必须是**英文**（用于图像生成）
 - characters_overview只是概览，详细外貌在Stage 2生成

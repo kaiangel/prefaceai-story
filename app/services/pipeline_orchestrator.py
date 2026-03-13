@@ -14,6 +14,7 @@ idea → outline.json → characters.json → screenplay.json → storyboard.jso
 
 import json
 import os
+import re
 import asyncio
 from datetime import datetime
 from typing import Optional, List
@@ -28,6 +29,7 @@ from app.services.reference_image_manager import ReferenceImageManager
 from app.services.scene_reference_manager import SceneReferenceManager
 from app.models.style_config import ProjectStyleConfig
 from app.services.text_overlay_service import TextOverlayService
+from app.services.shot_validator import ShotValidator
 
 
 class Phase2PipelineOrchestrator:
@@ -57,6 +59,8 @@ class Phase2PipelineOrchestrator:
 
         # T9: 文字渲染配置（与 generate_shot_image_phase2() 默认值同步）
         self.use_native_text = True
+        # T17: Shot 后置视觉验证
+        self.shot_validator = ShotValidator()
 
         # 状态跟踪
         self.current_stage = None
@@ -149,7 +153,10 @@ class Phase2PipelineOrchestrator:
             print(f"Stage 3: 编写分场剧本")
             print(f"{'='*40}")
 
-            screenplay = await self.screenplay_writer.write(outline, characters)
+            screenplay = await self.screenplay_writer.write(
+                outline, characters,
+                family_relationships=outline.get("family_relationships", [])
+            )
 
             self.stage_results["screenplay"] = screenplay
             self._save_json(project_dir, "3_screenplay.json", screenplay)
@@ -171,7 +178,9 @@ class Phase2PipelineOrchestrator:
                 screenplay=screenplay,
                 characters=characters,
                 visual_tone=visual_tone,
-                style_preset=style_preset
+                style_preset=style_preset,
+                characters_overview=outline.get("characters_overview", []),
+                family_relationships=outline.get("family_relationships", [])
             )
 
             self.stage_results["storyboard"] = storyboard
@@ -193,11 +202,12 @@ class Phase2PipelineOrchestrator:
                 print(f"{'='*40}")
 
                 images_dir = os.path.join(project_dir, "images")
-                refs_dir = os.path.join(project_dir, "refs")
-                with_text_dir = os.path.join(project_dir, "with_text_images")
                 os.makedirs(images_dir, exist_ok=True)
-                os.makedirs(refs_dir, exist_ok=True)
-                os.makedirs(with_text_dir, exist_ok=True)
+                # T22: with_text_dir 仅在 TextOverlay 备用通道时创建
+                with_text_dir = None
+                if not self.use_native_text:
+                    with_text_dir = os.path.join(project_dir, "with_text_images")
+                    os.makedirs(with_text_dir, exist_ok=True)
 
                 # TextOverlay 服务初始化
                 text_overlay_service = TextOverlayService()
@@ -240,13 +250,24 @@ class Phase2PipelineOrchestrator:
                     scene_ref_manager = SceneReferenceManager()
                     print(f"  共 {len(unique_locations)} 个场景位置")
 
+                    # T21: 计算每个 location 的最大角色数量
+                    location_char_counts = {}
+                    for sc in screenplay.get("scenes", []):
+                        loc_ref = sc.get("location_ref", "")
+                        chars = sc.get("characters_in_scene", [])
+                        if loc_ref and chars:
+                            location_char_counts[loc_ref] = max(
+                                location_char_counts.get(loc_ref, 0), len(chars)
+                            )
+
                     try:
                         scene_anchors = await scene_ref_manager.generate_anchor_images(
                             scenes=[],  # Phase 2.0 直接用 unique_locations
                             project_style=project_style,
                             image_generator=self.image_generator,
                             unique_locations=unique_locations,
-                            delay=3.0
+                            delay=3.0,
+                            location_character_counts=location_char_counts  # T21
                         )
 
                         # 保存场景参考图
@@ -319,36 +340,84 @@ class Phase2PipelineOrchestrator:
                         "total_refs": len(all_refs)
                     })
 
-                    # 使用Phase 2.0增强生成 (DEC-014: previous_shot removed)
-                    result = await self.image_generator.generate_shot_image_phase2(
-                        shot=shot,
-                        storyboard=storyboard,
-                        characters=characters,
-                        style_preset=style_preset,
-                        reference_images=all_refs,  # 合并后的参考图
-                        screenplay=screenplay,  # 传入screenplay用于获取场景氛围
-                        aspect_ratio="2:3",
-                        use_native_text=self.use_native_text  # T9: 与 TextOverlay 逻辑同步
-                    )
+                    # T-I: Prompt Pre-Check (v1 log-only, 不阻断不修改 prompt)
+                    pre_check_warnings = self._pre_check_prompt(shot, characters)
+                    for w in pre_check_warnings:
+                        print(f"    [PromptPreCheck] Shot {shot_id}: ⚠️ {w}")
 
+                    # T17: Shot 生成 + Haiku 视觉验证 + Auto-Retry
+                    MAX_SHOT_RETRIES = 1  # T-B: 最多 retry 1 次，共 2 次尝试（R7 数据：第 3 次尝试 0% 通过率）
+                    best_result = None
+                    text_overlay_data = shot.get("text_overlay", {})
+
+                    for attempt in range(MAX_SHOT_RETRIES + 1):
+                        if attempt > 0:
+                            print(f"    [T17] Retry {attempt}/{MAX_SHOT_RETRIES} Shot {shot_id}...")
+
+                        # 使用Phase 2.0增强生成 (DEC-014: previous_shot removed)
+                        result = await self.image_generator.generate_shot_image_phase2(
+                            shot=shot,
+                            storyboard=storyboard,
+                            characters=characters,
+                            style_preset=style_preset,
+                            reference_images=all_refs,
+                            screenplay=screenplay,
+                            aspect_ratio="2:3",
+                            use_native_text=self.use_native_text
+                        )
+
+                        if not result.get("success"):
+                            best_result = result
+                            break  # 生成失败不 retry（API 错误由 image_generator 内部处理）
+
+                        best_result = result
+
+                        # T28: 从 composition 中提取关键道具（Stage 4 输出含 foreground/background）
+                        key_props = []
+                        composition = shot.get("composition", {})
+                        if composition:
+                            for field in ["foreground", "background", "key_object"]:
+                                val = composition.get(field, "")
+                                if val and isinstance(val, str) and len(val) > 2:
+                                    key_props.append(val)
+
+                        # T17+T28+T30: Haiku 视觉验证（含道具存在性检测）
+                        props_log = f" + {len(key_props)} props" if key_props else ""
+                        print(f"    [ShotValidator] Shot {shot_id}: 开始验证 (expect {len(chars_in_scene)} chars{props_log})")
+                        validation = await self.shot_validator.validate_shot(
+                            pil_image=result["pil_image"],
+                            expected_character_count=len(chars_in_scene),
+                            text_overlay_data=text_overlay_data,
+                            key_props=key_props if key_props else None
+                        )
+                        print(f"    [ShotValidator] Shot {shot_id}: valid={validation['valid']}, reason={validation['reason']}")
+
+                        if validation["valid"]:
+                            if attempt > 0:
+                                print(f"    [T17] ✅ Shot {shot_id} retry 后验证通过")
+                            break
+                        else:
+                            print(f"    [T17] ⚠️ Shot {shot_id} 验证失败: {validation['reason']}")
+                            if attempt == MAX_SHOT_RETRIES:
+                                print(f"    [T17] Shot {shot_id} 已达最大重试次数，使用当前结果")
+
+                    # 处理最终结果
+                    result = best_result
                     if result.get("success"):
                         # 保存无文字版图像
                         image_path = os.path.join(images_dir, f"shot_{shot_id:02d}.png")
                         result["pil_image"].save(image_path)
 
                         # TextOverlay: 生成带文字版本
-                        text_overlay_data = shot.get("text_overlay", {})
                         with_text_path = None
                         text_type = text_overlay_data.get("text_type", "none") if text_overlay_data else "none"
-                        # T12-UNIFY: use_native_text 时 NB2 已渲染所有文字（DEC-012 架构），
-                        # TextOverlay 完全不调用；仅 use_native_text=False 时走 TextOverlay 备用通道
-                        use_native_text = self.use_native_text  # T9: 统一配置源
+                        # T12-UNIFY + T22: use_native_text 时 NB2 已渲染所有文字（DEC-012 架构），
+                        # 直接指向 raw image，不复制；仅 use_native_text=False 时走 TextOverlay 备用通道
+                        use_native_text = self.use_native_text
                         if text_type != "none":
                             if use_native_text:
-                                # DEC-012: NB2 原生渲染所有文字，直接复制 raw image
-                                with_text_path = os.path.join(with_text_dir, f"shot_{shot_id:02d}.png")
-                                result["pil_image"].copy().save(with_text_path)
-                                print(f"    ✅ TextOverlay跳过(NB2原生{text_type}): {with_text_path}")
+                                # T22: NB2 原生渲染，with_text_path 直接指向 raw image（不复制）
+                                with_text_path = image_path
                             else:
                                 try:
                                     with_text_image = text_overlay_service.process_shot(
@@ -442,6 +511,86 @@ class Phase2PipelineOrchestrator:
                 "stage_results": self.stage_results
             }
 
+    def _pre_check_prompt(self, shot: dict, characters: dict) -> list:
+        """
+        T-I: Prompt Pre-Check — v1 仅日志，不阻断不修改 prompt
+
+        4 个预检维度:
+        - P1: characters_visible 数量 vs prompt 中 "EXACTLY N"
+        - P2: 画外角色物理接触描述
+        - P3: 空间矛盾（v2 预留）
+        - P4: dialogue embed + native text 对同一 speaker 重复指令
+        """
+        warnings = []
+        image_prompt = shot.get("image_prompt", "")
+        char_direction = shot.get("character_direction", {})
+        chars_visible = char_direction.get("characters_visible", [])
+        text_overlay = shot.get("text_overlay", {})
+
+        # P1: characters_visible count vs prompt "EXACTLY N"
+        match = re.search(r'EXACTLY\s+(\d+)\s+characters?', image_prompt, re.IGNORECASE)
+        if match:
+            prompt_count = int(match.group(1))
+            actual_count = len(chars_visible)
+            if prompt_count != actual_count:
+                warnings.append(
+                    f"P1 — prompt 指定 EXACTLY {prompt_count} 角色，"
+                    f"但 characters_visible 有 {actual_count} 人"
+                )
+
+        # P2: off-screen physical contact keywords
+        prompt_lower = image_prompt.lower()
+        offscreen_kws = ["off-screen", "off screen", "outside the frame", "beyond the frame"]
+        contact_kws = [
+            "grip", "pull", "pulled", "hold", "holding", "held",
+            "embrace", "embracing", "grab", "grabbing", "drag", "dragging",
+            "tug", "tugging", "clutch", "clutching"
+        ]
+        has_offscreen = any(kw in prompt_lower for kw in offscreen_kws)
+        has_contact = any(kw in prompt_lower for kw in contact_kws)
+        if has_offscreen and has_contact:
+            warnings.append("P2 — 检测到画外角色物理接触描述（off-screen + 物理接触关键词）")
+
+        # P3: spatial contradiction — reserved for v2
+
+        # P4: off_screen_speaker=True 但 speaker 在 characters_visible 中
+        if text_overlay and text_overlay.get("off_screen_speaker"):
+            text_type = text_overlay.get("text_type", "")
+            chinese_text = text_overlay.get("chinese_text", "")
+            if text_type in ("dialogue", "dialogue_with_thought",
+                             "dialogue_with_narration", "narration_with_dialogue"):
+                # 提取 speaker 名
+                speaker_names = set()
+                texts = chinese_text if isinstance(chinese_text, list) else [chinese_text]
+                for txt in texts:
+                    if isinstance(txt, str):
+                        m = re.match(r'^([\w\u4e00-\u9fff]+?)(?:内心)?[：:]', txt)
+                        if m:
+                            speaker_names.add(m.group(1))
+
+                # 构建 name→id 映射
+                char_name_to_id = {}
+                for c in characters.get("characters", []):
+                    cid = c.get("id", "")
+                    cname = c.get("name", "")
+                    if cid and cname:
+                        char_name_to_id[cname] = cid
+
+                for speaker in speaker_names:
+                    char_id = char_name_to_id.get(speaker)
+                    if not char_id:
+                        for name, cid in char_name_to_id.items():
+                            if speaker in name or name in speaker:
+                                char_id = cid
+                                break
+                    if char_id and char_id in chars_visible:
+                        warnings.append(
+                            f"P4 — speaker '{speaker}' 同时出现在 "
+                            f"off_screen dialogue 和 characters_visible 中"
+                        )
+
+        return warnings
+
     def _save_json(self, directory: str, filename: str, data: dict) -> str:
         """保存JSON文件"""
         filepath = os.path.join(directory, filename)
@@ -518,11 +667,37 @@ class Phase2PipelineOrchestrator:
             report_lines.append(f"**字符数**: {len(prompt)}\n")
             report_lines.append(f"**Prompt内容**:\n```\n{prompt}\n```\n")
 
-            # 检查关键元素
+            # T-D: 扩展关键词（复用 storyboard_director.py _check_prompt_quality 的 ~90 关键词列表）
+            prompt_lower = prompt.lower()
             checks = {
-                "镜头信息 (shot/angle)": any(k in prompt.lower() for k in ["shot", "angle"]),
-                "光线描述 (light/shadow)": any(k in prompt.lower() for k in ["light", "shadow", "lighting"]),
-                "角色外观 (wearing/expression)": any(k in prompt.lower() for k in ["wearing", "expression", "hair"]),
+                "镜头信息 (camera/framing)": any(k in prompt_lower for k in [
+                    "shot", "close-up", "closeup", "wide", "medium", "extreme", "full",
+                    "establishing", "insert", "cutaway", "pov", "over-the-shoulder",
+                    "angle", "high angle", "low angle", "eye level", "dutch", "bird's eye",
+                    "overhead", "tilted", "lens", "focus", "depth of field", "bokeh",
+                    "35mm", "50mm", "telephoto", "wide-angle",
+                    "composition", "framing", "foreground", "background", "midground",
+                    "rule of thirds", "centered", "negative space", "symmetry",
+                ]),
+                "光线描述 (lighting/mood)": any(k in prompt_lower for k in [
+                    "light", "lighting", "sunlight", "moonlight", "neon", "streetlight",
+                    "ambient", "backlight", "rim light", "fill light", "key light",
+                    "shadow", "shadows", "silhouette", "highlight", "contrast",
+                    "glow", "reflection", "mood", "moody", "atmosphere", "atmospheric",
+                    "dramatic", "cinematic", "ethereal", "dreamy", "gritty", "noir",
+                    "warm", "cold", "cool", "golden hour", "blue hour",
+                    "foggy", "misty", "hazy", "diffused", "harsh", "soft light",
+                ]),
+                "角色外观 (appearance/clothing)": any(k in prompt_lower for k in [
+                    "expression", "face", "facial", "eyes", "gaze", "look", "stare",
+                    "smile", "frown", "tears", "crying", "laughing",
+                    "posture", "pose", "stance", "standing", "sitting", "leaning",
+                    "gesture", "reaching", "holding", "gripping", "pointing", "walking",
+                    "wearing", "dressed", "outfit", "clothes", "clothing",
+                    " in a ", " in an ", " in his ", " in her ",
+                    "shirt", "pants", "dress", "jacket", "coat", "sweater",
+                    "glasses", "watch", "bag", "hat", "scarf", "hair",
+                ]),
             }
 
             report_lines.append("**质量检查**:\n")

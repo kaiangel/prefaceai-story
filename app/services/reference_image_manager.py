@@ -275,13 +275,32 @@ Front-facing close-up view focusing on head and face area.
 Clear details of all distinctive features.
 Single character only, simple solid background, no text."""
 
-        # T14: 跨年龄风格统一指令
-        core_prompt += """
+        # T14+T19: 跨年龄风格统一指令（强化版）
+        age_appearance = character.get('age_appearance', '')
+        young_ages = {'child', 'teen', 'teenager', 'young_adult', 'baby', 'toddler', 'kid'}
+        is_young = age_appearance.lower() in young_ages if age_appearance else False
+
+        core_prompt += f"""
 
 CROSS-AGE STYLE CONSISTENCY (MANDATORY):
-Maintain IDENTICAL illustration style for ALL characters regardless of age, gender, or body type.
-Same line weight, same shading technique, same level of stylization.
-DO NOT shift toward anime for younger characters or realistic for older characters."""
+This character MUST be rendered in {style_name} style — the SAME style used for every
+other character in this story, regardless of age, gender, or body type.
+
+Requirements:
+- IDENTICAL line weight, shading technique, and level of stylization as all other characters
+- Express age differences through FACIAL FEATURES (wrinkles, skin smoothness, face proportions,
+  eye size) and BODY PROPORTIONS (height, build) — NOT through art style changes
+- DO NOT shift toward anime, chibi, or cartoon for younger characters
+- DO NOT shift toward photorealistic or painterly for older characters
+- A child and an elderly person in the same story must look like they belong in the same artwork"""
+
+        if is_young:
+            core_prompt += f"""
+
+AGE-SPECIFIC STYLE ANCHOR (this character appears young — {age_appearance}):
+Even though this character is young, render with the EXACT SAME {style_name} technique
+as adult characters. Show youth through softer facial features, rounder face shape,
+and smaller build — NOT by switching to a cuter or more cartoon-like art style."""
 
         # 应用风格强制
         enforced_prompt = StyleEnforcer.enforce_prompt(
@@ -436,13 +455,32 @@ COMPOSITION:
 
 Single {type_label} only, no other elements, no text."""
 
-        # T14: 跨年龄风格统一指令
-        core_prompt += """
+        # T14+T19: 跨年龄风格统一指令（强化版）
+        age_appearance = character.get('age_appearance', '')
+        young_ages = {'child', 'teen', 'teenager', 'young_adult', 'baby', 'toddler', 'kid'}
+        is_young = age_appearance.lower() in young_ages if age_appearance else False
+
+        core_prompt += f"""
 
 CROSS-AGE STYLE CONSISTENCY (MANDATORY):
-Maintain IDENTICAL illustration style for ALL characters regardless of age, gender, or body type.
-Same line weight, same shading technique, same level of stylization.
-DO NOT shift toward anime for younger characters or realistic for older characters."""
+This character MUST be rendered in {style_name} style — the SAME style used for every
+other character in this story, regardless of age, gender, or body type.
+
+Requirements:
+- IDENTICAL line weight, shading technique, and level of stylization as all other characters
+- Express age differences through FACIAL FEATURES (wrinkles, skin smoothness, face proportions,
+  eye size) and BODY PROPORTIONS (height, build) — NOT through art style changes
+- DO NOT shift toward anime, chibi, or cartoon for younger characters
+- DO NOT shift toward photorealistic or painterly for older characters
+- A child and an elderly person in the same story must look like they belong in the same artwork"""
+
+        if is_young:
+            core_prompt += f"""
+
+AGE-SPECIFIC STYLE ANCHOR (this character appears young — {age_appearance}):
+Even though this character is young, render with the EXACT SAME {style_name} technique
+as adult characters. Show youth through softer facial features, rounder face shape,
+and smaller build — NOT by switching to a cuter or more cartoon-like art style."""
 
         # 应用风格强制（适用于所有角色类型）
         enforced_prompt = StyleEnforcer.enforce_prompt(
@@ -564,7 +602,11 @@ DO NOT shift toward anime for younger characters or realistic for older characte
             参考图列表（每个角色 1 张）
         """
         portrait_types = {"close_up", "extreme_close_up", "medium_close_up"}
-        use_portrait = shot_type in portrait_types
+        # T20: medium_shot + ≤2 角色也使用 portrait（面部细节更丰富，提升一致性）
+        if shot_type == "medium_shot" and len(character_ids) <= 2:
+            use_portrait = True
+        else:
+            use_portrait = shot_type in portrait_types
 
         refs = []
         for char_id in character_ids:

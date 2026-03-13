@@ -42,17 +42,19 @@ class ScreenplayWriter:
         if os.getenv("GEMINI_API_KEY"):
             self.gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-    async def write(self, outline: dict, characters: dict) -> dict:
+    async def write(self, outline: dict, characters: dict, family_relationships: list = None) -> dict:
         """
         生成分场剧本（分批生成：每个plot_point生成一个scene）
 
         Args:
             outline: Stage 1生成的故事大纲
             characters: Stage 2生成的角色设计
+            family_relationships: T32 — Stage 1 输出的家庭/人物关系列表（可选）
 
         Returns:
             screenplay dict
         """
+        self._family_relationships = family_relationships or []
         plot_points = outline.get("plot_points", [])
         target_metrics = outline.get("target_metrics", {})
         target_seconds = target_metrics.get("target_duration_seconds", 180)
@@ -322,6 +324,27 @@ class ScreenplayWriter:
         chars_str = "\n".join(chars_info)
         chars_props_str = "\n".join(chars_props) if chars_props else "  （无角色定义配饰）"
 
+        # T32: 构建家庭/人物关系块（格式参考 T24 在 Stage 4 的注入方式）
+        relationships_block = ""
+        if self._family_relationships:
+            rel_lines = []
+            for rel in self._family_relationships:
+                if isinstance(rel, dict):
+                    from_char = rel.get("from", "")
+                    to_char = rel.get("to", "")
+                    relation = rel.get("relationship", "")
+                    if from_char and to_char and relation:
+                        rel_lines.append(f"  - {from_char} → {to_char}: {relation}")
+                elif isinstance(rel, str):
+                    rel_lines.append(f"  - {rel}")
+            if rel_lines:
+                relationships_block = (
+                    "\n\n## CHARACTER RELATIONSHIPS\n"
+                    "Use these relationships to inform dialogue tone, forms of address, "
+                    "and emotional dynamics between characters:\n"
+                    + "\n".join(rel_lines)
+                )
+
         # 场景位置信息 - 构建详细的location列表
         locations = outline.get("unique_locations", [])
         if locations:
@@ -380,7 +403,7 @@ This is scene {scene_id} of {total_plot_points} — you MUST generate this scene
 {previous_context}
 ## 角色
 {chars_str}
-
+{relationships_block}
 ## 可用场景位置
 以下是本故事中定义的所有场景位置，你必须从中选择：
 {locations_str}
@@ -420,6 +443,55 @@ dialogue_beats 分布目标：
 - 第1-2组 dialogue_beats 必须让观众明确理解：谁要什么？谁反对什么？矛盾焦点是什么？
 - 使用具体的事件、术语、地名、人名，不要留给观众猜测
 - 例: 故事关于"女儿不愿考公"→ 前2组对话必须出现"公务员"、"报名表"、"体制内"等具体词
+
+### DIALOGUE NATURALNESS RULES (IMPORTANT)
+
+When writing dialogue_beats, you SHOULD follow these guidelines to ensure natural, believable dialogue:
+
+1. **LOGICAL COMMON SENSE**: Dialogue should not contradict common knowledge or physical reality.
+   Actions and references in dialogue should make sense in context.
+   ❌ BAD: "这西瓜趁热吃！" (watermelon is eaten cold, not hot)
+   ❌ BAD: "快把冰淇淋放微波炉热一下" (ice cream is not meant to be heated)
+   ✅ GOOD: "这西瓜冰过了，快来吃！"
+   ✅ GOOD: "汤趁热喝，凉了就不好喝了"
+
+2. **CLEAR SUBJECT**: Each line of dialogue should have an unambiguous subject.
+   Avoid omitting subjects when it could cause confusion about who is doing what.
+   ❌ BAD: "去拿一下" (who should go? unclear)
+   ❌ BAD: "不是说好了吗" (who agreed? about what?)
+   ✅ GOOD: "小糖，帮奶奶去拿一下碗筷"
+   ✅ GOOD: "建国，我们不是说好让她自己选吗"
+
+3. **AGE AND IDENTITY MATCH**: Dialogue tone, vocabulary, and references should match
+   the speaker's age, education, and social role. A child should not speak like an adult professor;
+   an elderly person should not use teen slang (unless intentionally for comedic effect).
+   ❌ BAD: 6-year-old says "从辩证法的角度来看..."
+   ✅ GOOD: 6-year-old says "可是为什么呀？"
+   ❌ BAD: elderly grandfather says "这也太绝了吧 yyds"
+   ✅ GOOD: elderly grandfather says "这个味道，和你奶奶当年做的一模一样"
+
+4. **COLLOQUIAL NATURALNESS**: Dialogue should sound like real spoken language,
+   not written prose or formal essays. Use contractions, sentence fragments, and
+   natural speech rhythms that people actually use in daily conversation.
+   ❌ BAD: "我认为我们应该对此事进行深入的探讨与分析"
+   ✅ GOOD: "我觉得这事儿得好好聊聊"
+   ❌ BAD: "此刻我的内心充满了感动与温暖"
+   ✅ GOOD: "（鼻子一酸，说不出话来）"
+
+5. **KINSHIP ADDRESS CLARITY**: In multi-generational family stories, each character
+   SHOULD use kinship terms that unambiguously identify the person being addressed,
+   from the SPEAKER's perspective. Refer to the CHARACTER RELATIONSHIPS data (if provided
+   above) to determine the correct form of address between any two characters.
+   - A child calling their parent's parent: "爷爷"/"奶奶"/"外公"/"外婆" (NOT "爸"/"妈")
+   - A parent talking to their child: use the child's name or "儿子"/"女儿"/"闺女"
+   - When "妈" could refer to multiple women (grandmother, mother, aunt), add the
+     character's name or a distinguishing word to disambiguate: "你妈" vs "奶奶" vs "婶婶"
+   - Narrator (旁白) SHOULD also use unambiguous references: "陈晓桐的母亲" rather than
+     just "妈妈" when both a grandmother and a mother are present
+   ❌ BAD: (3-generation story) child says "妈，你看" — unclear if addressing mother or grandmother
+   ✅ GOOD: (3-generation story) child says "妈妈，你看" to mother; says "奶奶，你看" to grandmother
+   ❌ BAD: narrator says "妈妈走了过来" when both mother and grandmother are in the scene
+   ✅ GOOD: narrator says "林秀梅走了过来" or "晓桐的母亲走了过来"
 
 ═══════════════════════════════════════════════════════════
 
@@ -533,7 +605,7 @@ dialogue_beats 分布目标：
 
 
 # 便捷函数
-async def write_screenplay(outline: dict, characters: dict) -> dict:
+async def write_screenplay(outline: dict, characters: dict, family_relationships: list = None) -> dict:
     """便捷函数：生成分场剧本"""
     writer = ScreenplayWriter()
-    return await writer.write(outline, characters)
+    return await writer.write(outline, characters, family_relationships=family_relationships)
