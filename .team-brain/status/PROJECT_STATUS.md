@@ -1,6 +1,6 @@
 # 序话Story 项目状态看板
 
-> 最后更新: 2026-03-06
+> 最后更新: 2026-03-13
 > 更新者: PM
 
 ---
@@ -11,7 +11,7 @@
 项目名称: 序话Story - AI条漫/短视频生成系统
 目标: 用户输入创意 → 自动生成可发布的条漫或短视频
 当前版本: v0.6.6
-当前主线: 🟡 **Step 9 E2E R4 已派发 @Tester**（16 项验证维度）
+当前主线: 🔄 **12/12 Code Review PASS + OB-1 PASS → DevOps 部署中 → T-J + R8 E2E (44 维度)**
 核心内容: 都市情感短剧 (DEC-005)
 产品形态: 条漫优先 → 短视频保留
 Pipeline品牌: FrameSpark™
@@ -292,10 +292,10 @@ Pipeline品牌: FrameSpark™
 
 ### Tester (测试)
 ```
-状态: ✅ Step 5 完成: TASK-E2E-REGRESSION-R3 — 7/10 PASS + 1 PARTIAL + 1 FAIL + 1 新 Bug → 等 PM Step 6
-更新时间: 2026-03-09
-当前任务: 无（等 PM Step 6 独立复核）
-已完成: TASK-E2E-REGRESSION-R3 ✅ (7/10 PASS, 10 维度) + R2 ✅ (4.65/5) + 回归验证 4.36/5 ✅ + Step 7 A/B ✅ + Step 4 ✅ + DIALOGUE-DENSE-TEST ✅ + CROSS-STYLE-TEST ✅ + AB-STYLE-DESC ✅ + E2E-TEST-2 ✅ + NB2-TEXT-TEST ✅ + E2E-VALIDATE ✅
+状态: 🔄 TASK-E2E-REGRESSION-R7 执行中 (36 维度, T29-T37 验证)
+更新时间: 2026-03-13
+当前任务: R7 E2E (1 故事 × 10 shots × 36 维度)
+已完成: R6 ✅ (27/27 PASS) + R4 ✅ (14/16 PASS) + R3 ✅ + R2 ✅ + 回归验证 ✅ + Step 7 A/B ✅ + DIALOGUE-DENSE-TEST ✅ + CROSS-STYLE-TEST ✅ + AB-STYLE-DESC ✅ + E2E-TEST-2 ✅ + NB2-TEXT-TEST ✅ + E2E-VALIDATE ✅
 阻塞: 无
 ```
 
@@ -310,12 +310,13 @@ Pipeline品牌: FrameSpark™
 
 ### DevOps (运维)
 ```
-状态: ✅ TASK-DEPLOY-EXEC 完成 — VPS 生产环境已上线
-更新时间: 2026-03-06
+状态: ✅ TASK-DEPLOY-UPDATE 完成 — 最新代码已推送 + VPS 部署更新
+更新时间: 2026-03-10
 当前任务: 等待 Founder 填入 API Key
 阻塞: 无
 
 已完成:
+  - ✅ TASK-DEPLOY-UPDATE (3 commits push + VPS frontend/api rebuild, 2026-03-10)
   - ✅ TASK-DEPLOY-EXEC Step 1-4 (VPS 部署, https://prefaceai.mov 上线)
   - ✅ Docker 配置文件 commit + push (702361d)
   - ✅ GitHub远程仓库 prefaceai-story (private) 推送完成 (2026-02-26 11:02)
@@ -328,6 +329,7 @@ Pipeline品牌: FrameSpark™
   - 容器: api (healthy) + frontend (up) + redis (healthy)
   - SSL: Cloudflare Full Strict + Origin Certificate
   - 域名: https://prefaceai.mov
+  - 最新 commit: 232f2f0 (2026-03-10)
 
 待做:
   1️⃣ Founder 填入 API Key → 重启 api 容器
@@ -401,6 +403,22 @@ Pipeline品牌: FrameSpark™
 ---
 
 ## 更新日志
+
+### 2026-03-13 10:05
+- **[PM] Founder 确认 Phase 2 Code Review + R7 E2E 派发** 📋
+  - Founder 确认 T29-T37 + OB-T29 Code Review 10/10 PASS 通过
+  - Minor 项结论: 无遗留 bugs (OB-T29 已修复, 3 项观察不修改)
+  - R7 E2E 正式派发 @Tester: TASK-E2E-REGRESSION-R7
+  - 规格: 1 故事 × 10 shots × **36 维度** (R6 的 27 项 + R7 新增 N7-N15)
+  - R7 新增验证: 画外音(T29) + 家庭关系(T32) + 称谓(T37) + 镜头(T34) + 空间锚定(T35) + 关系一致性(T33) + 英文色板(T36) + 招牌(T31)
+  - 全文档同步更新 (TEAM_CHAT + pm-progress×3 + TODAY_FOCUS + PROJECT_STATUS + PENDING + daily-sync)
+
+### 2026-03-10 18:30
+- **[Tester] TASK-E2E-REGRESSION-R4 完成** ✅ (14/16 PASS, 2 PARTIAL)
+  - 16 维度 E2E 回归验证: T1-T16 全量回归 + 60+ 张图片逐一人工查看
+  - R3→R4 关键改进: D6 PARTIAL→PASS, D8 FAIL→PASS, D11 Bug→PASS
+  - D13 PARTIAL (跨年龄风格), D14 PARTIAL (NB2 气泡偶发重复)
+  - 等 PM Step 10 独立复核
 
 ### 2026-03-09 17:30
 - **[PM] Step 4 Code Review 22/22 PASS + Step 5 E2E 派发** 📋

@@ -4,6 +4,183 @@
 
 ---
 
+## 2026-03-13
+
+### Phase 3 — T-H-AIML (画面自然度 Haiku Prompt 设计) ✅
+
+**完成时间**: 2026-03-13
+**交付物**: TEAM_CHAT 中的 prompt 设计文档（非代码改动）
+
+| # | 任务 | P | 交付 |
+|---|------|---|------|
+| T-H-AIML | 画面自然度维度 prompt 设计 | P2 | 3 子维度 + 风格无关原则 + prompt 文本 + 5 正例 + 5 反例 + 集成确认 |
+
+**设计要点**:
+- **3 个子维度**: D1 ANATOMICAL (断肢/多余肢体/手指数量/关节反折) + D2 PHYSICS (无支撑悬浮/不可能姿态) + D3 SPATIAL (比例矛盾/朝向不一致)
+- **风格无关原则**: 区分"生成失败"(应 flag) vs "艺术风格选择"(不应 flag)
+  - NATURAL: anime 大眼、ink 极简肢体、pixel 方块比例、manga 夸张动态、梦境悬浮
+  - UNNATURAL: 断臂浮空、3 只手、平地双脚悬空、成人与幼儿等身高、7 根手指
+- **集成方案**: 合并到 VALIDATION_PROMPT_BASE Q3 位置，零额外 API 调用
+  - JSON 新增 `has_visual_unnaturalness` (bool) + `unnaturalness_details` (string)
+  - max_tokens 建议 256→384
+  - VALIDATION_PROMPT_PROPS 编号从 Q3→Q4
+- **Phase 1/2 分界**: Phase 1 仅日志不触发 FAIL; Phase 2 需累计数据证明 Haiku 准确率 > 90%
+
+---
+
+### Phase 1 — T-E+T-F+T-G+T-C-AIML (T-A~T-K 派发) ✅
+
+**完成时间**: 2026-03-13
+**修改文件**: `app/services/storyboard_director.py`, `app/services/story_outline_generator.py`
+
+| # | 任务 | P | 修改 |
+|---|------|---|------|
+| T-E | Stage 4 背面/高角度角色一致性 | P1 | Rule #10 BACK-VIEW/HIGH-ANGLE CHARACTER CONSISTENCY (两处规则区同步) |
+| T-F | Stage 4 off-screen 肢体接触 | P1 | Rule #11 OFF-SCREEN CHARACTER PHYSICAL CONTACT (CRITICAL) (两处同步) |
+| T-G | Stage 4 空间方向矛盾 | P1 | Rule #12 SPATIAL DIRECTION SELF-CONSISTENCY CHECK (两处同步) |
+| T-C-AIML | Stage 1 signage_text 字段 | P1 | unique_locations schema 新增 signage_text + 创作要点 #7 |
+
+**T-E 设计要点**:
+- back-view/over-shoulder/bird's-eye/high-angle 时: REINFORCE 服装精确色名+garment type + 发色+发型
+- 显式注明 "Even viewed from behind/above, [character]'s [color] [garment] must remain clearly identifiable"
+- R7 实例: Shot_08 鼠尾草绿 T 恤从背面偏白 → 此规则要求显式重复 "sage-green T-shirt"
+- 含 ❌ BAD (vague "her top") / ✅ GOOD (exact color+garment) 正反例
+
+**T-F 设计要点**:
+- FORBIDDEN: 可见角色与画外角色直接物理接触 (grip, pull, hold, embrace)
+- REQUIRED: 可见角色独立肢体语言暗示互动 (reaching toward frame edge, beckoning gesture)
+- 原因: 图像模型渲染不可见角色肢体为悬空断肢
+- 不影响环境交互（开门、拿物品等）
+- R7 实例: Shot_03 "pulled by Xiaohe's grip off-screen left" → 悬空手
+
+**T-G 设计要点**:
+- camera_angle + character actions + spatial descriptions 自洽验证
+- 前向镜头 → 角色不应"走向远方"; "领队前行" → 应拍背/侧; "落在最后" → 不应前景居中
+- R7 实例: Shot_04 "trailing at the rear" + 正面镜头 → 空间矛盾
+- 含 ❌ CONTRADICTORY / ✅ CONSISTENT 正反例
+
+**T-C-AIML 设计要点**:
+- unique_locations schema 新增 `signage_text` 字段: "店铺/建筑招牌上实际显示的文字（中文），无招牌则为空字符串"
+- 创作要点 #7: 有招牌场所填真实名称（"李记桂花糕"），无招牌场所填 ""
+- 分离 display_name（开发标签 "李记桂花糕铺·外景"）与 signage_text（图像用文字 "李记桂花糕"）
+- Backend T-C-Backend 将改用 signage_text 作为 `_detect_signage_name()` 数据源
+
+---
+
+## 2026-03-12
+
+### Phase 1b — T34+T37 ✅
+
+**完成时间**: 2026-03-12
+**修改文件**: `app/services/storyboard_director.py`, `app/services/screenplay_writer.py`
+
+| # | 任务 | P | 修改 |
+|---|------|---|------|
+| T34 | shot_size/angle 完整性 (P-R6) | P1 | Plan A: CAMERA_INFORMATION_COMPLETENESS_RULE 常量 + Plan B: _validate_storyboard() 检测+注入 |
+| T37 | 称谓歧义消除规则 (P-R9) | P2 | KINSHIP ADDRESS CLARITY (Rule 5) 加入 DIALOGUE NATURALNESS RULES |
+
+**T34 设计要点**:
+- Plan A: 3 条规则 — shot size in prompt + camera angle in prompt + natural integration
+- Plan B: 后验证 — 关键词映射表检测 image_prompt 缺失 → 从 shot.camera 元数据构建 "low angle medium shot" 注入开头
+- eye_level 不强制（最常见角度，省略合理）
+- 注入位置: Plan A 在 SHOT TRANSITION RULES 后；Plan B 在 _validate T29 off_screen 逻辑之后
+- Founder 要求的"创意注入": 自然英文短语融入 prompt，非技术标签
+
+**T37 设计要点**:
+- Rule 5 KINSHIP ADDRESS CLARITY: 多代际家庭称谓从说话者视角消歧
+- "妈"→需确定指谁："你妈" vs "奶奶" vs "婶婶"
+- 旁白同样消歧: "林秀梅走了过来" 而非 "妈妈走了过来"
+- 引用 T32 CHARACTER RELATIONSHIPS 数据
+- SHOULD 措辞，含 3 代家庭 ❌/✅ 正反例
+
+---
+
+### Phase 1a — T33+T35+T36 (T29-T37 派发) ✅
+
+**完成时间**: 2026-03-12
+**修改文件**: `app/services/story_outline_generator.py`, `app/services/storyboard_director.py`
+
+| # | 任务 | P | 修改 |
+|---|------|---|------|
+| T33 | family_relationships 三角关系校验 (P-R4) | P2 | RELATIONSHIP CONSISTENCY RULES (三角一致+配偶传递+代际自检+正反例) |
+| T35 | 多人空间锚定+比例 (P-R7+P-R10) | P2 | MULTI_CHARACTER_SPATIAL_ANCHORING_RULES 5条规则注入 _build_scene_prompt() |
+| T36 | color_palette 英文化 (P-R8) | P3 | Schema 占位符英文化 + 注意事项英文色名要求 |
+
+**T33 设计要点**:
+- Triangle Consistency: A→C grandfather_of + B→C father_of → A→B SHOULD father_of (非 grandfather_of)
+- Spouse Transitivity: A spouse_of B + A parent_of C → B parent_of C
+- Self-Check: 标注每人代际距离，1 代=parent_of，2 代=grandparent_of
+- 含陈守正/陈建国/陈晓桐三代正反例
+
+**T35 设计要点**:
+- 5 条规则: HEADCOUNT GUARANTEE + FURNITURE-TO-BODY SCALE + ENVIRONMENT INTERACTION + SPATIAL DISTRIBUTION (≥2 depth planes) + OVERLAP AVOIDANCE
+- 每条含 ❌/✅ 正反例，"SHOULD" 非 "MUST"
+- 位置: INTERIOR_SPATIAL_DEPTH_RULES 之后，CINEMATOGRAPHY_GUIDE 之前
+- 注入: BACKGROUND_VARIETY_RULES 之后
+- 与 T27 互补: T27=背景+纵深，T35=多人空间+比例
+- ⚠️ 未改 `_validate_storyboard()` — Phase 1b T34 范围
+
+**T36 设计要点**:
+- Schema: `["主色调1","主色调2","点缀色"]` → `["primary color in English","secondary color in English","accent color in English"]`
+- 注意事项: 要求英文色名 (warm amber, deep navy, muted sage green)
+- 仅改 schema+prompt，不改代码逻辑
+
+---
+
+### Phase 1 — T25+T26+T27 平台级改进 ✅
+
+**完成时间**: 2026-03-12
+**修改文件**: `app/services/story_outline_generator.py`, `app/services/screenplay_writer.py`, `app/services/storyboard_director.py`
+
+| # | 任务 | P | 修改 |
+|---|------|---|------|
+| T25 | Stage 1 标题-内容校验 + family_relationships (P-S5) | P2 | characters_overview 新增 family_role + family_relationships 数组 + TITLE CONSISTENCY 规则 |
+| T26 | Stage 3 对话自然度规则 (P-S2) | P1 | DIALOGUE NATURALNESS RULES (4 条) 注入对话明确化规则之后 |
+| T27 | Stage 4 角色关系映射+背景多样性+纵深感 (P-S1/S3/S4) | P1+P2 | 3 个新常量 (CHARACTER_RELATIONSHIP_MAPPING_RULES + BACKGROUND_VARIETY_RULES + INTERIOR_SPATIAL_DEPTH_RULES) 注入 _build_scene_prompt() |
+
+**T25 设计要点**:
+- `family_role` 字段: grandfather/mother/father/daughter 等
+- `family_relationships` 数组: from→to relationship mapping
+- TITLE CONSISTENCY: 标题中的家庭角色称谓/性别必须与 characters_overview 匹配
+- 包含正反例指导
+
+**T26 设计要点**:
+- 4 条规则: 逻辑常识(西瓜不热吃) + 主语明确 + 年龄身份匹配 + 口语自然度
+- 措辞 "SHOULD" 不 "MUST"
+- 注入位置: 对话明确化规则之后、输出要求之前
+
+**T27 设计要点**:
+- CHARACTER_RELATIONSHIP_MAPPING_RULES (P-S1): 配合 T24 传入的 characters_overview 关系数据，强制 text_overlay 使用正确称谓 + 视角感知 + 跨 shot 一致
+- BACKGROUND_VARIETY_RULES (P-S3): 同 location 3+ shots 变换背景焦点/镜头朝向
+- INTERIOR_SPATIAL_DEPTH_RULES (P-S4): medium_shot + interior 需前中后景三层纵深
+- 与 T24 (@Backend) 配合: T24 已完成参数传递，T27 规则引用其生成的关系数据表
+
+---
+
+## 2026-03-11
+
+### Phase 1 — T18+T19 平台级改进 ✅
+
+**完成时间**: 2026-03-11
+**修改文件**: `app/services/storyboard_director.py`, `app/services/reference_image_manager.py`
+
+| # | 任务 | P | 修改 |
+|---|------|---|------|
+| T18 | Stage 4 场景道具连续性规则 (S2) | P1 | 新增 SCENE_PROP_CONTINUITY_RULES 常量（4 条规则 + 4 组正反例），注入 _build_scene_prompt + _build_prompt |
+| T19 | 参考图跨年龄风格统一强化 (S4) | P2 | 两处 T14 CROSS-AGE 替换为强化版：显式引用 style_name + 正面/反面约束 + 条件 AGE-SPECIFIC STYLE ANCHOR |
+
+**T18 设计要点**:
+- 措辞松紧: "SHOULD maintain" (指导原则) 而非 "MUST exactly match" (硬约束)
+- 保留构图创意空间: "不同镜头角度自然展示不同部分"
+- 4 条规则: 持续道具 + 叙事驱动变化 + 数量一致 + 灵活性
+
+**T19 设计要点**:
+- 从 `project_style.style_preset` 提取 style_name 显式注入
+- 从 `character.get('age_appearance')` 判断是否 young 角色
+- young 角色条件追加 AGE-SPECIFIC STYLE ANCHOR（仅 child/teen/teenager/young_adult/baby/toddler/kid）
+
+---
+
 ## 2026-03-10
 
 ### TASK-STYLE-THUMBNAILS — 15 种风格缩略图生成 ✅

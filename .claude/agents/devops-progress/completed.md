@@ -4,6 +4,41 @@
 
 ---
 
+### TASK-DEPLOY-UPDATE: 代码推送 + VPS 部署更新 ✅
+
+**完成时间**: 2026-03-10
+**验收状态**: 全部验证通过
+
+**任务类型**: 版本控制 + 部署更新
+
+**背景**: Frontend 完成 TASK-GCLOUD-OPT + Contact 更新 + TASK-STYLE-THUMBNAILS 集成，Backend 完成 E2E R2/R3 修复 T1-T16，需要统一推送到 GitHub 并部署到 VPS。
+
+**完成内容**:
+- [x] 读取 TEAM_CHAT 最新 1088 行（20200-21288），理解全部改动上下文
+- [x] 确认 frontend build 通过（18 路由，0 错误）
+- [x] 排除敏感文件（.env, docker/ssl）
+- [x] Git 提交 3 批:
+  - `c367abf` feat: E2E regression fixes T1-T16 + backup model Flash + NB2 rename (11 files)
+  - `d57a7c1` feat(frontend): TASK-GCLOUD-OPT + Contact updates + style thumbnails (30 files)
+  - `232f2f0` docs: agent progress + team-brain sync + E2E R2/R3 test scripts (32 files)
+- [x] Push to GitHub: `702361d..232f2f0` → `origin/main`
+- [x] rsync 代码同步到 VPS `/opt/xuhua-story/`
+- [x] Docker rebuild frontend + api（--no-cache）
+- [x] docker compose up -d 重启全部服务
+- [x] 外部验证全部通过
+
+**验证结果**:
+| 验证项 | 结果 |
+|--------|------|
+| `https://prefaceai.mov` | ✅ HTTP 200 |
+| `https://prefaceai.mov/api/health` | ✅ `{"status":"healthy"}` |
+| `/styles/ghibli.jpg` | ✅ HTTP 200 |
+| `/team/kai.jpg` | ✅ HTTP 200 |
+| `/demo.mp4` | ✅ HTTP 200 |
+| Docker 3 容器 (api+frontend+redis) | ✅ 全部 Up |
+
+---
+
 ### TASK-DEPLOY-EXEC Step 1-4: VPS 生产环境部署 ✅
 
 **完成时间**: 2026-03-06

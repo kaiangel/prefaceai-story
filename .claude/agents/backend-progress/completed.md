@@ -4,6 +4,158 @@
 
 ---
 
+## 2026-03-13
+
+### OB-1 修复完成 ✅ (20:20)
+
+- `shot_validator.py` 3 处 early-return 补齐 `has_visual_unnaturalness: False` + `unnaturalness_details: ""`
+- 4 处返回点结构统一
+
+---
+
+### Phase 5 T-H-Backend 完成 ✅ (19:45)
+
+**T-H-Backend [P2] ShotValidator 画面自然度维度（Phase 1 仅日志）**:
+- `shot_validator.py` 6 处改动:
+  1. VALIDATION_PROMPT_BASE 新增 Q3（3 子维度 D1+D2+D3 + 风格排除块）
+  2. VALIDATION_PROMPT_PROPS 编号 3→4
+  3. VALIDATION_RESPONSE_BASE 新增 has_visual_unnaturalness + unnaturalness_details
+  4. VALIDATION_RESPONSE_WITH_PROPS 同上
+  5. max_tokens 256→384
+  6. 结果提取+日志，不纳入 valid 判定，result_dict 含新字段
+
+**验证**: Python import ✅ + 逻辑测试 5/5 ✅
+
+---
+
+### Phase 3 T-C-Backend + T-I 完成 ✅ (19:00)
+
+**T-C-Backend [P1] signage_text 消费（场景参考图 label 泄漏修复）**:
+- `scene_reference_manager.py` 4 处改动:
+  1. `_analyze_anchor_needs_from_structured()`: interior + exterior needs dict 新增 `signage_text`
+  2. `_generate_single_anchor()`: location_info 新增 `signage_text` 传递
+  3. `_detect_signage_name()`: 新增 `signage_text` 参数，优先使用 → fallback 清洗 display_name（去 `·`）
+  4. `_build_anchor_prompt()`: 两处调用传入 `signage_text`
+
+**T-I [P2] Prompt Pre-Check 机制 (v1 log-only)**:
+- `pipeline_orchestrator.py` 新增 `_pre_check_prompt()` 方法 + `import re` + 调用点
+- P1 角色数量一致性 / P2 画外物理接触 / P3 预留 / P4 speaker 数据一致性
+- v1 仅日志，不阻断不修改 prompt
+
+**验证**: Python import 2/2 ✅ + T-C-Backend 5/5 ✅ + T-I 5/5 ✅
+
+---
+
+### Phase 1 T-B+T-A+T-K+T-D 完成 ✅ (17:00)
+
+**T-B [P0] MAX_SHOT_RETRIES 2→1**:
+- `pipeline_orchestrator.py:343`: 常量 `2` → `1`
+
+**T-A [P0] off_screen 文字双重渲染修复**:
+- `image_generator.py` `build_native_text_prompt()`: 新增 `characters` + `characters_in_scene` 参数
+- 新增 `_is_speaker_off_screen()` 内部函数
+- dialogue + off_screen: 仅为不可见 speaker 生成 voiceover，可见 speaker 跳过（由 embed 处理气泡）
+- compound types 同步修复
+- 调用处传入新参数
+- `characters_in_scene=None` → 安全降级全部渲染
+
+**T-K [P1] ShotValidator 人群角色计数容差（方案 α）**:
+- `shot_validator.py` `VALIDATION_PROMPT_BASE`: 优化 Haiku 计数指令
+- 区分 named/featured subjects vs unnamed bystanders/crowd
+- 零 Python 逻辑改动
+
+**T-D [P2] Prompt Quality Report 关键词扩展**:
+- `pipeline_orchestrator.py:584-589`: 8 关键词 → ~90 关键词（复用 storyboard_director.py 列表）
+
+**验证**: Python import 3/3 ✅ + T-A 逻辑测试 5/5 ✅
+
+---
+
+## 2026-03-12
+
+### Phase 1b T29+T32 完成 ✅ (21:15)
+
+**T29 [P1] T5 降级逻辑修复 (P-R1)**:
+- `storyboard_director.py` L1358-1365: 移除 dialogue→thought 降级，改为保留 dialogue + 标记 `off_screen_speaker: true`
+- `image_generator.py` `build_native_text_prompt()`: off_screen dialogue → voiceover 半透明底条；compound types dialogue 子项同理
+- `text_overlay_service.py` `process_shot()`: 备用通道 off_screen → 旁白条（非气泡）
+- 正常 speaker 可见时的 dialogue 气泡渲染完全不受影响
+
+**T32 [P2] family_relationships → Stage 3 (P-R9)**:
+- `pipeline_orchestrator.py` L155: Stage 3 调用传入 `outline["family_relationships"]`
+- `screenplay_writer.py` `write()`: 新增 `family_relationships: list = None` 参数
+- `_build_single_scene_prompt()`: 注入 `## CHARACTER RELATIONSHIPS` prompt 块（格式参考 T24 Stage 4）
+- 缺失时不注入、不报错
+
+**验证**: Python import 5/5 ✅ + T29 逻辑测试 4/4 ✅ + T32 逻辑测试 2/2 ✅
+
+### OB-T29 备用通道复合类型修复 ✅ (21:40)
+
+- `text_overlay_service.py` L669: 复合类型 `sub_type == "dialogue"` 分支新增 `off_screen_speaker` 检查
+- off_screen → `add_monologue()` 渲染旁白条（与纵向堆叠偏移同步）；否则保持原有气泡逻辑
+- Python import ✅
+
+---
+
+### Phase 1a T30+T31 完成 ✅ (20:00)
+
+**T30 [P1] ShotValidator 日志+依赖修复**:
+- `shot_validator.py`: init ✅/❌ 日志 + validate 每次调用入口+出口日志 + 异常标注 fail-open
+- `pipeline_orchestrator.py`: 调用前后各加 `[ShotValidator]` 日志行
+
+**T31 [P2] 场景参考图注入故事特定名称**:
+- `scene_reference_manager.py`: 新增 `_detect_signage_name()` (中文10+英文24关键词)
+- exterior: 匹配时注入 `REQUIRED TEXT ON SIGNAGE: "{name}"`
+- interior: 匹配时注入墙面匾额指令
+- 无招牌场景不注入
+
+**验证**: Python import 3/3 ✅
+
+---
+
+### T23+T24+T28 Phase 1 全部完成 ✅
+
+**T23 [P1] 参考图模型统一使用 NB2**:
+- `image_generator.py` L560: 模型选择从条件判断改为始终 NB2
+- `FAST_MODEL` 常量保留但不再被引用
+
+**T24 [P1] Pipeline 传递 outline.characters_overview 到 Stage 4**:
+- `pipeline_orchestrator.py`: Stage 4 调用新增 characters_overview 参数
+- `storyboard_director.py`: `direct()` → `_generate_scene_shots()` → `_build_scene_prompt()` 三层传递
+- `_build_scene_prompt()` 格式化为 CHARACTER RELATIONSHIPS 数据块，注入 prompt
+
+**T28 [P2] ShotValidator 新增道具存在性检测**:
+- `shot_validator.py`: VALIDATION_PROMPT 拆分动态组装 + validate_shot 新增 key_props 参数
+- 判定: >50% 关键道具缺失 → invalid，返回 missing_props 列表
+- `pipeline_orchestrator.py`: 从 shot.get("key_props") 提取传入 validate_shot
+
+**验证**: Python import 3/3 ✅
+
+---
+
+## 2026-03-11
+
+### T17+T20+T21+T22 Phase 1 全部完成 ✅
+
+**T17 [P1] Shot 后置 Haiku 验证 + Auto-Retry**:
+- 新建 `app/services/shot_validator.py`: Haiku 4.5 视觉验证（角色数量 ±1 容差 + 气泡重复检测）
+- `pipeline_orchestrator.py`: import + 初始化 + shot 循环内验证+retry（最多 2 次，不阻塞）
+
+**T20 [P2] Close-up 参考图选择优化**:
+- `reference_image_manager.py:get_smart_references_for_scene()`: medium_shot + ≤2 角色使用 portrait
+
+**T21 [P3] 场景参考图角色数量传入**:
+- `scene_reference_manager.py`: `_build_anchor_prompt()` / `_generate_single_anchor()` / `generate_anchor_images()` 新增 num_characters 参数链
+- `pipeline_orchestrator.py`: 从 screenplay 计算 location_character_counts 传入
+- Interior prompt 注入 "space arranged for N people"
+
+**T22 [P3] with_text_images 冗余跳过 + refs/ 清理**:
+- `pipeline_orchestrator.py`: 删除 refs_dir + with_text_dir 条件创建 + use_native_text=True 时 with_text_path 指向 raw
+
+**验证**: Python import 4/4 ✅
+
+---
+
 ## 2026-03-10
 
 ### PRO_MODEL → NB2_MODEL 命名清理 ✅ (14:15)

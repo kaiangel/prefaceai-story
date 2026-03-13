@@ -1,37 +1,51 @@
 # PM Agent - 当前任务
 
-> **最后更新**: 2026-03-10 14:25
-> **状态**: ✅ PRO_MODEL 命名确认 PASS → Step 9 E2E R4 已派发 @Tester
+> **最后更新**: 2026-03-13 20:35
+> **状态**: ✅ OB-1 Review PASS + DevOps 部署已派发 → 等部署完成后 Tester R8 E2E
 
 ---
 
 ## 刚完成
 
-### PRO_MODEL → NB2_MODEL 确认 PASS + CLAUDE.md 同步 (14:25)
+### OB-1 Code Review + DevOps 派发 (2026-03-13 20:30-20:35)
 
-**Backend 代码**: ✅ PASS — `image_generator.py` PRO_MODEL 零残留，NB2_MODEL 定义+8引用+docstring 清理全部正确。`test_nb2_switch.py` 4 处已同步。
-
-**PM 额外完成**: `CLAUDE.md:390` 模型配置说明同步 `PRO_MODEL` → `NB2_MODEL`
-
-**Step 9 E2E R4 已派发**: @Tester，16 项验证维度（R3 的 10 项 + 6 项新修复重点）
-
-### 全局 Double-Check — Step 7→8.5 工作链 + 核心管道健康检查 (14:05)
-
-**工作链验证**: 7 文件所有变更逐一确认，无遗漏无冲突无副作用 ✅
-
-**全局健康检查发现**:
-1. **[P3] PRO_MODEL 命名混乱** → 已派发 @Backend → ✅ 已完成+确认 PASS
-2. **[已排除] `_get_character_type()` 字段问题** — R3 实测数据确认正确
-
-**PM 已完成**: CLAUDE.md 3 处文档修正（`type` → `character_type`）+ 1 处模型配置同步
+- OB-1 Code Review: ✅ PASS (4 处返回 × 7 字段 = 28/28 一致)
+- 派发 @DevOps: TASK-DEPLOY-R8 — commit + push + VPS deploy
+- 执行顺序更新: OB-1 ✅ → DevOps 部署 → Tester T-J + R8 E2E
 
 ---
 
 ## 当前等待
 
-| # | 事项 | Agent | 状态 |
-|---|------|-------|------|
-| 1 | Step 9: E2E 回归 R4 | @Tester | ⏳ 已派发 |
+| # | 事项 | 等谁 |
+|---|------|------|
+| 1 | 代码推送 + VPS 部署 | @DevOps |
+| 2 | T-J 修复 + R8 E2E (44 维度) | @Tester（等 DevOps 完成后）|
+| 3 | PM 独立复核 | PM 自行（等 R8 完成后）|
+
+---
+
+## 执行计划
+
+```
+Phase 1-5 + Code Review 12/12:                               ✅ 全部完成
+OB-1 修复 @Backend:                                           ✅ 完成 + PM Review PASS
+DevOps 代码推送+部署:                                         🔄
+T-J 修复 @Tester:                                             ⏳ 等 DevOps
+R8 E2E @Tester (44 维度):                                     ⏳ 等 DevOps
+PM 独立复核:                                                   ⏳
+```
+
+---
+
+## 累计 Code Review 成绩
+
+| Phase | 范围 | 结果 |
+|-------|------|------|
+| Phase 2 | 8 项 | 8/8 PASS |
+| Phase 4 | 3 项 | 3/3 PASS |
+| Phase 6 | 1 项 | 1/1 PASS |
+| **合计** | **12 项** | **12/12 PASS** |
 
 ---
 
@@ -39,9 +53,9 @@
 
 | 时间 | 更新内容 |
 |------|----------|
-| 2026-03-10 14:25 | PRO_MODEL 确认 PASS + CLAUDE.md 同步 + Step 9 派发 |
-| 2026-03-10 14:05 | 全局 Double-Check 完成 + CLAUDE.md 修正 + PRO_MODEL 修复派发 |
-| 2026-03-10 13:55 | Step 8.5 快速复核 2/2 PASS |
-| 2026-03-10 13:37 | Step 8 Code Review 完成 (5/6 PASS) + Step 8.5 修复派发 |
-| 2026-03-10 | Step 6 完成 + Step 7 修复任务派发 (T11-T16) |
-| 2026-03-09 17:30 | Step 4 Code Review 22/22 PASS + Step 5 派发给 Tester |
+| 2026-03-13 20:35 | OB-1 Review PASS + DevOps TASK-DEPLOY-R8 派发 |
+| 2026-03-13 20:15 | 派发 OB-1 + T-J + R8 E2E (44 维度) |
+| 2026-03-13 20:00 | Phase 6 Code Review 1/1 PASS |
+| 2026-03-13 19:30 | Phase 4 Code Review 3/3 PASS |
+| 2026-03-13 18:00 | Phase 2 Code Review 8/8 PASS |
+| 2026-03-13 16:00 | 交叉核对 + 风险评估 + 正式派发 |

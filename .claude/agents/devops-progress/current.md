@@ -1,30 +1,37 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-03-06
-> **状态**: ✅ TASK-DEPLOY-EXEC 基础设施部署完成，等待 Founder 填入 API Key
+> **最后更新**: 2026-03-10
+> **状态**: ✅ TASK-DEPLOY-UPDATE 完成 — 3 批 commit + push + VPS 部署更新
 
 ---
 
-## 正在进行
+## 刚完成
 
-**TASK-DEPLOY-EXEC: VPS 实际部署执行**
-- [x] Step 1: VPS 系统准备（Swap 4GB + Docker 28.1.1 + Compose v2.35.1 + trader docker 组 + FFmpeg）
-- [x] Step 2: 项目部署（rsync 代码 + .env.production 占位符 + docker compose up 3 容器）
-- [x] Step 3: SSL + Nginx HTTPS 配置（Origin Certificate + prefaceai-mov 站点配置 + nginx reload）
-- [x] Step 4: 全面验证（全部通过）
-- [ ] **等待 Founder**: 在 VPS 上填入真实 API Key → 重启 api 容器
+**TASK-DEPLOY-UPDATE: 代码推送 + VPS 部署更新**
 
-**验证结果汇总**:
-| 验证项 | 结果 |
-|--------|------|
-| `https://prefaceai.mov` | ✅ HTTP/2 200 |
-| `https://prefaceai.mov/api/health` | ✅ `{"status":"healthy"}` |
-| Docker 3 容器 (api+frontend+redis) | ✅ 全部 Up + Healthy |
-| Redis PING | ✅ PONG |
-| Nginx HTTPS + Cloudflare | ✅ Full Strict, 安全头完整 |
-| 旧站/Legacy Flask | ✅ 未受影响 |
-| 内存 1GB/16GB | ✅ 充足 |
-| 磁盘 14GB/199GB | ✅ 充足 |
+### 执行内容
+
+1. **Git 提交 (3 commits)**:
+   - `c367abf` feat: E2E regression fixes T1-T16 + backup model Flash + NB2 rename
+   - `d57a7c1` feat(frontend): TASK-GCLOUD-OPT + Contact updates + style thumbnails
+   - `232f2f0` docs: agent progress + team-brain sync + E2E R2/R3 test scripts
+
+2. **Push to GitHub**: `origin/main` 702361d → 232f2f0 (3 commits)
+
+3. **VPS 部署**:
+   - rsync 代码同步到 `/opt/xuhua-story/`（排除 .env, node_modules, .git, test_output 等）
+   - Docker rebuild: frontend + api 容器重新构建（--no-cache）
+   - `docker compose up -d` 重启所有服务
+
+4. **验证通过**:
+   | 验证项 | 结果 |
+   |--------|------|
+   | `https://prefaceai.mov` | ✅ HTTP 200 |
+   | `https://prefaceai.mov/api/health` | ✅ `{"status":"healthy"}` |
+   | `/styles/ghibli.jpg` (缩略图) | ✅ HTTP 200 |
+   | `/team/kai.jpg` (团队照片) | ✅ HTTP 200 |
+   | `/demo.mp4` (产品视频) | ✅ HTTP 200 |
+   | Docker 3 容器 | ✅ 全部 Up |
 
 ---
 
@@ -38,20 +45,11 @@
 
 ---
 
-## 阻塞项
-
-| # | 内容 | 解决方式 | 状态 |
-|---|------|----------|------|
-| 1 | ~~D1: next.config.mjs~~ | DevOps 直接添加 | ✅ 已解决 |
-| 2 | ~~文件未提交/未推送~~ | 4 批 commit + push | ✅ 已解决 |
-| 3 | .env.production API Key | 等待 Founder 决策 | ⏳ 等待中 |
-
----
-
 ## 更新记录
 
 | 时间 | 更新内容 |
 |------|----------|
+| 2026-03-10 | TASK-DEPLOY-UPDATE: 3 commits push + VPS frontend/api rebuild + 全部验证通过 |
 | 2026-03-06 | TASK-DEPLOY-EXEC Step 1-4 全部完成，外部访问验证通过 |
 | 2026-03-06 | TASK-DEPLOY-EXEC 启动，发现 3 项阻塞 |
 | 2026-03-05 | TASK-DEPLOY-PREP Step 3 完成 + PM 二次审核 PASS |

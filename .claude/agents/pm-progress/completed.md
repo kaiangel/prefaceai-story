@@ -4,6 +4,227 @@
 
 ---
 
+### 2026-03-13 — OB-1 Code Review PASS + DevOps 部署派发
+
+**OB-1 审查**: shot_validator.py 4 处返回路径 × 7 字段 = 28/28 完全一致 ✅
+**DevOps 派发**: TASK-DEPLOY-R8 — 11 项代码改动 + OB-1 → commit + push + VPS deploy
+**执行顺序**: OB-1 ✅ → DevOps 部署 → Tester T-J + R8 E2E
+
+---
+
+### 2026-03-13 — Phase 6 Code Review: 1/1 PASS (全部 12/12 完成)
+
+**审查范围**: T-H-Backend (`shot_validator.py` 全文 218 行)
+**6 处改动**: Q3 自然度 prompt + PROPS 编号 + Response 新字段 + max_tokens + Phase 1 日志 + result_dict
+**与 T-H-AIML 设计一致性**: Prompt 文本/JSON 字段/max_tokens/Phase 1 行为 — 四项逐字一致
+**OB-1 非阻塞**: 3 处 early-return 缺 `has_visual_unnaturalness`/`unnaturalness_details`（Phase 2 前修复）
+**全部成绩**: Phase 2 (8/8) + Phase 4 (3/3) + Phase 6 (1/1) = **12/12 PASS**
+
+---
+
+### 2026-03-13 — Phase 4 Code Review: 3/3 PASS
+
+**审查范围**: Phase 3 全部 3 项任务（2 文件 + 1 设计文档）
+**Backend 2 项**: T-C-Backend(signage_text 全链路) ✅ + T-I(Prompt Pre-Check v1) ✅
+**AI-ML 1 项**: T-H-AIML(自然度 prompt 设计) ✅
+**关键审查点**: T-C-Backend 数据流 4 层传递验证 + T-I 4 维度预检逻辑 + T-H-AIML 风格无关原则
+**结论**: 0 阻塞项，0 附注，Phase 5 可启动
+
+---
+
+### 2026-03-13 — Phase 2 Code Review: 8/8 PASS
+
+**审查范围**: Phase 1 全部 8 项任务代码改动（4 文件 5 处修改）
+**Backend 4 项**: T-B(MAX_SHOT_RETRIES) ✅ + T-A(off_screen 文字修复) ✅ + T-K(ShotValidator prompt) ✅ + T-D(关键词扩展) ✅
+**AI-ML 4 项**: T-E(Rule#10) ✅ + T-F(Rule#11) ✅ + T-G(Rule#12) ✅ + T-C-AIML(signage_text) ✅
+**附注**: T-D 关键词 ~120 vs storyboard_director ~149，差 ~30 词（character 类），仅影响报告完整度
+**结论**: 0 阻塞项，Phase 3 可启动
+
+---
+
+### 2026-03-13 — 交叉核对 + 风险评估 + 正式派发 (11 项任务)
+
+**交叉核对**: 3 张清单 (PM 发现 12 项 × Founder 6 板块 × 10 项任务) 逐项比对，发现 1 遗漏 → 新增 T-K (ShotValidator 人群容差)
+**风险评估**: 11 项任务 × 5 维度深度分析。结论：零高风险，T-H 建议 Phase 1 仅日志
+**正式派发**: 11 项任务 (T-A~T-K)，6 Phase 执行计划，3 Agent 并行
+
+---
+
+### 2026-03-13 — Founder 六板块反馈分析 + 任务清单
+
+**输入**: Founder 6 大板块反馈 + 4 项并行代码研究
+**产出**: 10 项任务派发清单 (T-A ~ T-J) → 交叉核对后扩展为 11 项
+**关键技术发现**:
+- Shot_08 确认 NB2 原生渲染（非 text_overlay_service），Bug 在 image_generator.py build_native_text_prompt() 未过滤可见 speaker
+- ShotValidator 当前 3 维度全部需图像验证，提议 4 个 prompt 预检维度 (P1-P4)
+- 场景参考图 label 泄漏根因: display_name → _detect_signage_name() → SIGNAGE 注入，建议方案 A
+- Prompt Quality Report 关键词 8→40 扩展建议
+- MAX_SHOT_RETRIES 2→1 数据支撑（R7 第 3 次尝试无一通过）
+
+---
+
+### 2026-03-13 — R7 PM 独立复核（有条件通过）
+
+**审查范围**: 全部 JSON + MD + 10 shot 图 + 8 角色参考图 + 6 场景参考图 + pipeline_log + prompt_quality_report + excerpts
+**Tester 结果**: 36/36 PASS → PM 同意 33 项
+**新发现 1 Bug**: Shot_08 off_screen_speaker 文字双重渲染（image_generator.py build_native_text_prompt 代码 Bug）
+**新发现 2 Prompt 缺失**: Shot_03 off-screen 肢体接触描述 + Shot_04 空间方向矛盾
+**修正 Tester S5**: Shot_08 文字重复不是假阳性，是真实 Bug（ShotValidator dupes=True 确认）
+**3 测试脚本不准**: N12 多角色 shot 未识别 / N14 color_palette 路径错误 / N15 日志格式不匹配
+**3 平台问题**: 场景参考图标签泄漏 / ShotValidator 人群失效(5/10用尽重试) / 测试覆盖仅 2/6 场景
+**Founder 建议评估**: "画面自然度检测"正面评估，建议 P2 纳入 ShotValidator 扩展
+
+---
+
+### 2026-03-13 — Founder 确认 + R7 E2E 派发
+
+**Founder 确认**: Phase 2 Code Review 10/10 PASS 通过 ✅
+**Minor 项结论**: 无遗留 bugs（OB-T29 已修复，3 项观察不修改）
+**R7 E2E 派发**: TASK-E2E-REGRESSION-R7 @Tester — 1 故事 × 10 shots × 36 维度
+**R7 新增 N7-N15**: 画外音标记+渲染(T29+OB-T29) / 家庭关系传递(T32) / 亲属称谓(T37) / 镜头完整性(T34) / 空间锚定(T35) / 关系一致性(T33) / 英文色板(T36) / 招牌注入(T31)
+**验收标准**: ≥ 32/36 PASS + 0 FAIL
+
+---
+
+### 2026-03-12 — Phase 2 全量 Code Review (T29-T37 + OB-T29)
+
+**全量审查**: 10/10 PASS — 9 文件逐行阅读 + 跨文件交叉验证 + 跨任务冲突检测
+**新审查**: T34(Plan A 3条规则+Plan B 关键词映射+eye_level豁免) ✅ / T37(Rule 5 KINSHIP 引用T32关系数据+旁白覆盖) ✅ / OB-T29(复合类型off_screen→monologue+偏移同步) ✅
+**交叉验证**: storyboard_director.py 5任务零冲突 + screenplay_writer.py 数据在前规则在后 + pipeline_orchestrator.py 不同区域
+**3 Minor 观察**: 全部不阻塞(T31中文名+T31 no text+T34 em-dash)
+
+---
+
+### 2026-03-12 — Phase 1b Backend 代码审查 + AI-ML 派发
+
+**Phase 1b 审查**: T29 ✅ PASS + T32 ✅ PASS — 逐行审查 5 文件(storyboard_director/image_generator/text_overlay_service/pipeline_orchestrator/screenplay_writer)
+**1 Minor 观察**: 备用通道复合类型 dialogue 子项未检查 off_screen_speaker（生产用 native text，不阻塞）→ 记录为 OB-T29 让 Backend 顺手修
+**AI-ML 派发**: T34(shot_size Plan A+B) + T37(称谓歧义规则)
+
+---
+
+### 2026-03-12 — Phase 1a 代码审查 + Phase 1b 派发
+
+**Phase 1a 审查**: 5/5 PASS — T30(日志) + T31(招牌注入) + T33(关系校验) + T35(空间锚定) + T36(色板英文)
+**2 Minor 观察**: T31 仅中文名(NB2更清晰，不修改) + "no text"全局移除(风险极低，不修改)
+**Phase 1b 派发**: @Backend T29+T32 先 → @AI-ML T34+T37 后
+
+---
+
+### 2026-03-12 — Founder 决策 + T29-T37 派发 + 执行计划更正
+
+**P-R1 TextOverlay 确认**: pipeline_orchestrator.py TextOverlay 分支仅备用模式（`use_native_text=False`），生产不受影响
+**Founder 决策**: P-R1~P-R4, P-R6~P-R10 全部修复，P-R5(NB2漂移)确认模型特性不修复，P-R6提升P1
+**任务派发**: T29-T37 共 9 个任务
+**全维度改进方向**: 每个 P-R 项含根因分析 + 具体改进方案 + 涉及文件 + 红线约束
+**执行计划更正**(Founder 要求): 全并行 → Phase 1a/1b 分阶段，消除 3 个文件冲突风险:
+- Phase 1a(并行): @Backend T30+T31 / @AI-ML T33+T35+T36
+- Phase 1b(顺序): @Backend T29+T32 先 → @AI-ML T34+T37 后
+
+---
+
+### 2026-03-12 — R6 独立复核完成
+
+**方法**: 逐字审核全部 JSON/MD (13 文件) + 逐张查看 24 张图片 + pipeline_log 全文 + Tester progress 交叉验证
+**PM 判定**: 21/27 PASS + 4 PARTIAL + 2 FAIL (不同意 Tester 27/27)
+**质量**: 3.8/5
+**调降维度**: D1(角色一致性) / D3(参考图质量) / D5(text_overlay) / D8(对话匹配) / S1(角色数量) / N6(道具检测)
+**9 项平台级发现**: P-R1(T5降级逻辑P1) + P-R2(ShotValidator零日志P1) + P-R3(场景名称P2) + P-R4(关系校验P2) + P-R5(NB2漂移P2) + P-R6~P-R9(P3)
+**Founder 7 项观察**: 全部确认
+**T23-T28 验证**: T23✅ T24✅ T25✅ T26✅ T27✅ T28❓
+
+---
+
+### 2026-03-12 — R6 E2E 派发
+
+**派发给**: @Tester (TASK-E2E-REGRESSION-R6)
+**规格**: 1 故事 × 10 shots（成本考量，R5 Story B ink/2人质量已高无需复测）
+**参数**: illustration / 4 角色 / 10 shots / **全新题材**（与历史 9 个测试故事完全不同）
+**维度**: 27 项 (D1-D16 + S1-S5 + N1-N6)
+**R6 新增**: N1 角色称谓正确性 / N2 对话自然度 / N3 背景多样性 / N4 室内纵深 / N5 参考图模型 / N6 道具检测
+**验收标准**: ≥ 24/27 PASS + 0 FAIL
+
+---
+
+### 2026-03-12 — Phase 2 Code Review T23-T28 + Bug 修复
+
+**审查**: 4 PASS / 1 FAIL / 1 PARTIAL → PM 直接修复 2 个 Bug
+**Bug #1 (T24 Critical)**: `_build_scene_prompt()` 字段名不匹配 Stage 1 输出（`id`/`name`/`age_group` → 应为 `name_suggestion`/`age_range`/`family_role`），CHARACTER RELATIONSHIPS 块永远为空。PM 修复: 正确字段名 + 新增 `family_relationships` 全链路传递。
+**Bug #2 (T28)**: `shot.get("key_props", [])` 永远空列表。PM 修复: 改从 `shot["composition"]` 提取。
+**Import**: 6/6 ✅
+
+---
+
+### 2026-03-12 — T23-T28 正式派发
+
+**任务**: 6 tasks (T23-T28), 涉及 6 文件
+**执行者**: @Backend (T23+T24+T28) + @AI-ML (T25+T26+T27)
+**计划**: Phase 1 全并行 → Phase 2 PM Code Review → Phase 3 R6 E2E
+**前置**: 安全评估 PASS + 模型检查 PASS + Founder 批准
+
+---
+
+### 2026-03-12 — 安全影响评估 + 模型能力检查 + 成本分析
+
+**安全评估**: P-S1~P-S5 全部 prompt 追加型，风险极低，不触碰核心架构
+**模型检查**: Sonnet 4.6 / Haiku 4.5 / Flash / NB2 全部胜任
+**关键发现**: Stage 4 没拿到 outline.characters_overview（P-S1 技术根因）
+**成本分析**: 参考图切 NB2 增加不到 $1/故事，Founder 批准
+**ShotValidator**: 缺少道具存在性检测，纳入 T28
+
+---
+
+### 2026-03-12 — PM 独立深度审查 R5 完成
+
+**方法**: 20 shots + 12 角色参考图 + 7 场景参考图逐张查看 + JSON 逐字审核 + 代码追踪
+**判定**: R5 验收通过。发现 6 项平台系统性问题 (P-S1~P-S6)
+**Founder 确认**: P-S1~P-S5 改进方向同意，P-S6 暂不修复
+
+---
+
+### 2026-03-11 — Phase 3 R5 E2E 正式派发
+
+**派发给**: @Tester
+**规格**: 2 故事 × 10 shots，21 维度（D1-D16 + S1-S5）
+**与 R4 相同参数**: illustration/4人 + ink/2人
+
+---
+
+### 2026-03-11 — Phase 2 Code Review 全部 PASS + T17-FIX 完成
+
+**审查范围**: 6 文件（shot_validator.py 新建, pipeline_orchestrator.py, storyboard_director.py, reference_image_manager.py, scene_reference_manager.py）
+**结果**: T17-T22 全部 PASS
+**T17-FIX**: `shot_validator.py` 同步→异步（`Anthropic` → `AsyncAnthropic`），import 验证 ✅
+**Founder 决策**: T17 异步已改 / T18 双重注入保守留着（位置 B 为死代码）
+
+---
+
+### 2026-03-11 — T17-T22 平台级改进任务派发
+
+**任务**: 6 tasks (T17-T22), 6 files, 1 new — 覆盖 S1-S6 全部改进方向
+**执行者**: @Backend (T17+T20+T21+T22) + @AI-ML (T18+T19)
+**计划**: Phase 1 全并行 → Phase 2 PM Code Review → Phase 3 R5 E2E
+
+---
+
+### 2026-03-11 — Step 10 PM 独立深度审查完成
+
+**审查范围**: 60+ 张图片逐张查看 + storyboard/outline/characters JSON 逐字阅读 + 代码追踪
+
+**结果**: 同意 Tester 14/16 PASS + 2 PARTIAL。R4 验收通过。
+
+**输出**:
+- 7 项平台系统性问题 (S1-S7) 分级报告
+- 风险评估：全部改进无"修东墙补西墙"风险
+- Founder 确认 6 项改进方向
+
+**附加发现**:
+- with_text_images/ 在 use_native_text=True 下冗余（与 raw 完全相同）
+- refs/ 文件夹为空，属遗留空目录
+- Story B (2角色) 4.7/5 远超 Story A (4角色) 3.8/5 — 角色数量是核心变量
+
+---
+
 ### 2026-03-10 14:25 — PRO_MODEL 命名确认 PASS + CLAUDE.md 同步 + Step 9 派发
 
 **Backend 代码确认**: `image_generator.py` PRO_MODEL 零残留，NB2_MODEL 定义+8引用+docstring 清理正确，`test_nb2_switch.py` 4 处同步 ✅

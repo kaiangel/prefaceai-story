@@ -1,94 +1,114 @@
 # AI-ML Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 AI-ML 的工作状态和 Prompt 约束
-> **最后更新**: 2026-03-10
+> **最后更新**: 2026-03-13
 
 ---
 
 ## 当前状态速览
 
 ```
-状态: TASK-STYLE-THUMBNAILS 完成（Founder 审图通过）+ Step 7 全部 PASS
-下一步: @Frontend 集成缩略图到 create 页面
+状态: Phase 1 + Phase 3 T-H-AIML 全部完成
+下一步: PM Phase 4 Code Review → Phase 5 T-H-Backend
 ```
 
 ---
 
-## TASK-STYLE-THUMBNAILS 完成 (2026-03-10) @Frontend
+## Phase 3 T-H-AIML (2026-03-13) @PM @Backend
 
-**15/15 风格缩略图已就绪**，Founder 审图通过（"图片质量非常好"）。
+### T-H-AIML [P2] 画面自然度 Haiku Prompt 设计
 
-**图片位置**: `test_output/manualtest/style_thumbnails/{中文名}.png`
-- 1024×1024 PNG，15 张
-- 风格: pixar_3d, ghibli, illustration, ink, slam_dunk, korean_webtoon, oil_painting, cyberpunk, realistic, cartoon, anime, watercolor, children_book, manga, pixel
-- 中文文件名: 皮克斯3D.png, 吉卜力.png, 数字插画.png, 中国水墨.png, 井上雄彦.png, 韩漫.png, 油画.png, 赛博朋克.png, 写实摄影.png, 卡通动画.png, 日式动画.png, 水彩.png, 儿童绘本.png, 日漫.png, 像素艺术.png
+**交付物**: TEAM_CHAT 2026-03-13 18:30 中的 prompt 设计文档
+**消费者**: @Backend T-H-Backend（将 prompt 集成到 shot_validator.py VALIDATION_PROMPT_BASE）
 
-**Prompt 文件**: `test_output/manualtest/style_thumbnails/prompts/{中文名}.txt`
-
-**@Frontend**: 可直接用于 create 页面替换渐变色块。
-
----
-
-## Step 7 修复 (2026-03-10) @PM @Backend @Tester
-
-### T13 [P1] 条漫模式叙事自足 prompt — storyboard_prompts.py
-
-**问题**: 条漫模式下 narration_segment 不渲染，叙事衔接仅靠 dialogue+thought，场景切换时读者感到断裂
-**修复**: 新增 `COMIC_MODE_NARRATIVE_RULES` 常量（与 `NARRATION_TO_VISUAL_EXTRACTION_RULES` 同模式）:
-- Rule 1: 每个 shot 的 dialogue/thought 必须自含足够叙事上下文
-- Rule 2: 场景切换时首个 shot 必须用 thought/dialogue 建立转场上下文
-- Rule 3: 关键剧情信息不能只存在于 narration_segment
-- ✅ Backend 已完成集成（T13-INT，PM 复核 PASS）
-
-### T14 [P1] 角色参考图跨年龄风格统一 — reference_image_manager.py
-
-**问题**: 老年角色偏写实、年轻角色偏动漫的风格分裂
-**修复**: `_build_portrait_prompt()` 和 `_build_reference_prompt()` 各追加:
-> "Maintain IDENTICAL illustration style for ALL characters regardless of age, gender, or body type."
-
-### T15 [P2] NB2 气泡重复抑制 — image_generator.py
-
-**问题**: NB2 偶尔将同一行对话渲染两次（模型行为）
-**修复**: `build_dialogue_scene_embed()` 返回值追加:
-> "Render each speech bubble EXACTLY ONCE at its designated position."
+**设计要点**:
+- 3 子维度: D1 ANATOMICAL + D2 PHYSICS + D3 SPATIAL
+- 风格无关: 区分"生成失败"(flag) vs "艺术风格"(不flag)
+- 可合并到现有 VALIDATION_PROMPT_BASE Q3 位置（零额外 API 调用）
+- JSON 新增: `has_visual_unnaturalness` + `unnaturalness_details`
+- max_tokens 建议 256→384
+- ⚠️ Phase 1 仅日志不触发 FAIL; Phase 2 需 Haiku 准确率 > 90% 后启用
 
 ---
 
-## Step 3 修复 (2026-03-09) @PM @Backend @Tester
+## Phase 1 T-E+T-F+T-G+T-C-AIML (2026-03-13) ✅ PM Code Review PASS — @PM @Backend
 
-### T10 [P3] Stage 3 thought 比例强化 — screenplay_writer.py
+### T-E [P1] 背面/高角度角色一致性 — storyboard_director.py
 
-**问题**: 原约束"每 scene 至少 1 个 thought"在大 scene（6+ beats）时 thought 比例不足 20%
-**修复**: 按 beat 数量分档：5 beats 场景 ≥1 个 thought（20%），6+ beats 场景 ≥2 个 thought（≥20%）
+**问题** (Shot_08): 背面拍摄角色服装颜色偏差（鼠尾草绿 T 恤偏白）
+**修复**: Rule #10 BACK-VIEW/HIGH-ANGLE CHARACTER CONSISTENCY
+- back-view/over-shoulder/bird's-eye/high-angle → REINFORCE 服装精确色名+类型 + 发色+发型
+- 显式注明 "Even viewed from behind/above, must remain identifiable"
+- 两处规则区（详细版 + 精简版）同步
+
+### T-F [P1] off-screen 肢体接触规则 — storyboard_director.py
+
+**问题** (Shot_03): "pulled by Xiaohe's grip off-screen left" 导致悬空手
+**修复**: Rule #11 OFF-SCREEN CHARACTER PHYSICAL CONTACT (CRITICAL)
+- FORBIDDEN: 可见角色与画外角色直接物理接触
+- REQUIRED: 独立肢体语言暗示互动
+- 不影响环境交互（开门、拿物品等）
+
+### T-G [P1] 空间方向矛盾检测 — storyboard_director.py
+
+**问题** (Shot_04): "trailing at the rear" 但镜头面向正面
+**修复**: Rule #12 SPATIAL DIRECTION SELF-CONSISTENCY CHECK
+- 镜头角度 + 动作 + 空间描述自洽验证
+- 含 ❌ CONTRADICTORY / ✅ CONSISTENT 正反例
+
+### T-C-AIML [P1] signage_text 字段 — story_outline_generator.py
+
+**问题**: display_name 开发标签泄漏到场景参考图招牌
+**修复**: unique_locations schema 新增 `signage_text` 字段 + 创作要点 #7
+- signage_text = 店铺招牌真实文字（"李记桂花糕"），display_name = 开发标签（"李记桂花糕铺·外景"）
+- Backend T-C-Backend 将改用 signage_text 作为招牌数据源
 
 ---
 
-## Step 1 修复 (2026-03-09) @PM @Backend @Tester
+## Phase 1b T34+T37 (2026-03-12) @PM @Backend @Tester
 
-### T1 [P0] Stage 3 dialogue_beats type 字段 — screenplay_writer.py
+### T34 [P1] shot_size/angle 完整性 — storyboard_director.py
 
-**问题**: Stage 3 dialogue_beats 没有区分 dialogue/thought，覆盖率仅 52-63%
+**问题** (P-R6): 早期 shot image_prompt 缺镜头信息（无 shot_size/angle 关键词）
 **修复**:
-- dialogue_beats schema 新增 `type` 字段: `"dialogue"` 或 `"thought"`
-- 每个 action_beat 强制至少 1 个 dialogue_beat（不允许裸奔）
-- thought 示例: `{"beat_id": "1b_thought", "type": "thought", "speaker": "char_001", "line": "（内心独白）"}`
-- 分布目标: dialogue 60-70%, thought 20-30%
-- 每 scene 至少 1 个 thought beat
+- **Plan A**: CAMERA_INFORMATION_COMPLETENESS_RULE 常量 (3 条)，注入 `_build_scene_prompt()` SHOT TRANSITION 后
+  - shot size in prompt + camera angle in prompt + natural integration
+- **Plan B**: `_validate_storyboard()` 后验证
+  - 检测 image_prompt 是否含 shot_size/angle 关键词（映射表匹配）
+  - 缺失: 从 shot.camera 元数据构建 "low angle medium shot" 等自然短语，注入 prompt 开头
+  - eye_level 不强制（最常见角度，省略合理）
+  - 在 T29 off_screen_speaker 逻辑之后独立运行，不覆盖 T29
 
-### T2 [P0] Stage 4 MAPPING RULES 增强 — storyboard_director.py (×2)
+### T37 [P2] 称谓歧义消除规则 — screenplay_writer.py
 
-**问题**: narration 超标 40%/30% + thought 不足 0%/8.7% + speaker 错位 20%
-**修复** (两处 MAPPING RULES 均已更新):
-1. **THOUGHT GENERATION RULE**: 无 dialogue_beat 时检查 emotional_note → prefer thought over narration
-2. **SPEAKER VISIBILITY RULE (COMIC MEDIUM)**: dialogue speaker 必须在 characters_visible 中，禁止反应镜头配别人台词
-3. **SELF-CHECK**: 输出前自查分布，narration>15% 转 thought，thought<10% 创造 thought
+**问题** (P-R9): "妈" 在多代际故事中可指代祖母/母亲/婶婶等多人
+**修复**:
+- T26 DIALOGUE NATURALNESS RULES 新增 Rule 5: KINSHIP ADDRESS CLARITY
+- 多代际家庭: 角色间称谓从说话者视角明确无歧义
+- 旁白同样需消歧（"林秀梅" 而非 "妈妈"，当多个女性长辈在场时）
+- 引用 T32 CHARACTER RELATIONSHIPS 数据
+- SHOULD 措辞，含 ❌/✅ 正反例
 
-### T3 [P0] Stage 3 plot_points 1:1 — screenplay_writer.py
+---
 
-**问题**: Story B crisis 场景被 Stage 3 静默丢弃
-**修复**: PLOT POINT COVERAGE 硬约束:
-- "Every plot_point from the outline MUST map to exactly one scene"
-- "Do NOT merge, skip, or omit any plot_point"
+## Phase 1a T33+T35+T36 (2026-03-12) ✅ PM 审查 PASS
+
+### T33 [P2] family_relationships 三角关系校验 — story_outline_generator.py
+### T35 [P2] 多人空间锚定+比例 — storyboard_director.py
+### T36 [P3] color_palette 英文化 — story_outline_generator.py
+
+---
+
+## Phase 1 T25+T26+T27 (2026-03-12) ✅ PM Code Review PASS
+## Phase 1 T18+T19 (2026-03-11) ✅ PM PASS + R5 PASS
+
+---
+
+## 历史修复 (供参考)
+
+### Step 7 T13+T14+T15 (2026-03-10) ✅ PM PASS
+### Step 3 T10 (2026-03-09) ✅ PM PASS
+### Step 1 T1+T2+T3 (2026-03-09) ✅ PM PASS
 
 ---
 
@@ -108,8 +128,24 @@
 ### 12. Stage 3 每个 plot_point 必须 1:1 对应 scene
 ### 13. Stage 3 thought 占比 ≥20%（5 beats ≥1，6+ beats ≥2）
 ### 14. 条漫模式: dialogue/thought 必须叙事自足，不依赖 narration
-### 15. 参考图跨年龄风格统一（同线宽、同渲染技法、同风格化程度）
+### 15. 参考图跨年龄风格统一 — 强化版: 显式引用 style_name + age-specific anchor (T19)
 ### 16. NB2 气泡 EXACTLY ONCE 去重指令
+### 17. 同场景道具连续性: SHOULD maintain props across shots (T18)
+### 18. Stage 1 标题校验: 标题角色称谓/性别匹配 characters_overview (T25)
+### 19. Stage 3 对话自然度: 逻辑常识 + 主语明确 + 年龄匹配 + 口语化 (T26)
+### 20. Stage 4 角色关系映射: text_overlay 使用正确称谓 (T27, 配合 T24 数据)
+### 21. Stage 4 背景多样性: 同场景 3+ shots 变换背景焦点 (T27)
+### 22. Stage 4 室内纵深: medium_shot + interior 必含前中后景纵深 (T27)
+### 23. Stage 1 关系三角校验: family_relationships 代际一致性 + 配偶传递 (T33)
+### 24. Stage 4 多人空间锚定: 3+角色人数声明+家具比例+环境交互+多层分布 (T35)
+### 25. Stage 1 color_palette 英文: 色名必须英文 (T36)
+### 26. Stage 4 镜头信息完整: image_prompt 含 shot_size/angle + 后验证注入 (T34)
+### 27. Stage 3 称谓消歧: 多代际家庭称谓从说话者视角明确无歧义 (T37)
+### 28. Stage 4 背面/高角度角色一致性: back-view/high-angle → REINFORCE 服装精确色名+发色 + 可识别性注明 (T-E)
+### 29. Stage 4 off-screen 肢体接触禁止: 可见角色不描述与画外角色的直接物理接触, 改用独立肢体语言 (T-F)
+### 30. Stage 4 空间方向自洽: camera_angle + 角色动作 + 空间描述需逻辑一致 (T-G)
+### 31. Stage 1 signage_text 字段: unique_locations 招牌文字与 display_name 分离 (T-C-AIML)
+### 32. ShotValidator 画面自然度: 3 子维度 (ANATOMICAL+PHYSICS+SPATIAL), 风格无关, Phase 1 仅日志 (T-H-AIML)
 
 ---
 
@@ -117,5 +153,3 @@
 
 15 种风格全部已升级场域式 + 缩略图已生成:
 realistic, cartoon, pixar_3d, anime, ghibli, illustration, watercolor, children_book, manga, slam_dunk, korean_webtoon, oil_painting, cyberpunk, ink, pixel
-
-**缩略图位置**: `test_output/manualtest/style_thumbnails/{中文名}.png`

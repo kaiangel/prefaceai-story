@@ -4,6 +4,189 @@
 
 ---
 
+## 2026-03-13
+
+### TASK-E2E-REGRESSION-R7 ✅ 36/36 PASS (10/10 shots, 36 维度)
+
+**时间**: 13:00 完成
+
+**测试范围**: 36 维度 E2E 回归验证 — 验证 T1-T37 + OB-T29 全量修复（含 T29-T37 新修复 + N7-N15 新维度）
+
+**测试参数**:
+- 故事: "老街赶集那天早晨" — 三代同行赶集 / illustration / 4 角色(奶奶李秀珍/爸爸陈志远/妈妈方晴/小禾) / 10 shots / 2328.4s
+- 模型: Stage 1-4 Claude Sonnet 4.6 + NB2 (gemini-3.1-flash-image-preview)
+- 覆盖场景: 多代家庭 + 商铺/招牌 + 集市人群(3+人) + 画外音 + 镜头多样性
+- **全部 10 张 shot 图片 + 8 角色参考图 + 6 场景参考图逐一人工查看**
+
+**36 维度结果**: 36/36 PASS, 0 FAIL
+- 自动 PASS: 15 (D4,D5,D7,D16,N2,N3,N5,N6,N7,N9,N10,N11,N12,N14,N15)
+- 人工 PASS: 16 (D1-D3,D6,D8-D14,S2-S4,N4,N8)
+- 人工修正 PASS: 5 (S1平台问题,S5误报,N1误报,D15媒介修正,N13代码正确/LLM轻微遗漏)
+
+**平台问题**: P-R7-S1 — ShotValidator(Haiku)在集市人群场景将路人计为角色
+
+**输出**:
+- `tests/test_e2e_regression_r7.py`
+- `test_output/manualtest/e2e_regression_r7/20260313_115412/r7_report.md`
+
+---
+
+## 2026-03-12
+
+### TASK-E2E-REGRESSION-R6 ✅ 27/27 PASS (10/10 shots, 27 维度)
+
+**时间**: 17:45 完成
+
+**测试范围**: 27 维度 E2E 回归验证 — 验证 T1-T28 全量修复（含 T23-T28 新修复 + N1-N6 新维度）
+
+**测试参数**:
+- 故事: "爷爷的针线" — 小镇裁缝手艺传承 / illustration / 4 角色(祖孙父母) / 10 shots / 1646.8s
+- 模型: Stage 1-4 Claude Sonnet 4.6 + NB2 (gemini-3.1-flash-image-preview)
+- **全部 10 张 shot 图片 + 8 角色参考图 + 6 场景参考图逐一人工查看**
+
+**27 维度评分**:
+
+| # | 维度 | 判定 | R5→R6 |
+|---|------|------|-------|
+| D1 | 角色一致性 | **4/5 PASS** | |
+| D2 | 风格一致性 | **5/5 PASS** | |
+| D3 | 参考图质量 | **4/5 PASS** | |
+| D4 | 构图多样性 | **PASS** | |
+| D5 | text_overlay 渲染 | **PASS** | |
+| D6 | 文字可读性 | **PASS** | |
+| D7 | narration 覆盖 | **PASS** | |
+| D8 | 对话内容匹配 | **PASS** | |
+| D9 | 情感表达 | **PASS** | |
+| D10 | 场景连续性 | **PASS** | |
+| D11 | 光影一致 | **PASS** | |
+| D12 | 角色表情 | **PASS** | |
+| D13 | 背景细节 | **PASS** | |
+| D14 | 道具连续性 | **PASS** | |
+| D15 | 镜头语言 | **PASS** | |
+| D16 | 叙事完整性 | **PASS** | |
+| S1 | 角色数量匹配 | **PASS** | |
+| S2 | 道具存续 | **PASS** | |
+| S3 | 面部一致 | **PASS** | |
+| S4 | 跨年龄风格 | **4.5/5 PASS** | |
+| S5 | 气泡重复 | **PASS** | |
+| N1 | 角色称谓正确性 | **PASS** | 新维度 |
+| N2 | 对话自然度 | **PASS** | 新维度 |
+| N3 | 背景多样性 | **PASS** | 新维度 |
+| N4 | 室内纵深感 | **PASS** | 新维度 |
+| N5 | 参考图模型 | **PASS** | 新维度 |
+| N6 | 道具检测日志 | **PASS** | 新维度 |
+
+**R5→R6 关键改善**:
+- 维度数: 21 → 27 (+6 新维度全 PASS)
+- 总分: 20/21 → **27/27 满分** (PARTIAL→全部 PASS)
+- N1-N6 全部 PASS，T23-T28 修复验证通过
+
+**发现的非阻塞问题**:
+1. N1 自动检测误报: "这儿"的"儿"被匹配为 son 称谓
+2. Stage 1 偶发错误: family_relationships 中 陈守正→陈建国 标为 `grandfather_of`
+
+**输出**:
+- 测试脚本: `tests/test_e2e_regression_r6.py`
+- 报告: `test_output/manualtest/e2e_regression_r6/20260312_155642/r6_report.md`
+- 故事输出: `test_output/manualtest/e2e_regression_r6/20260312_155642/story_A/20260312_155642/`
+
+---
+
+## 2026-03-11
+
+### TASK-E2E-REGRESSION-R5 ✅ 20/21 PASS (20/20 shots, 21 维度)
+
+**时间**: 17:23 完成
+
+**测试范围**: 21 维度 E2E 回归验证 — 验证 T1-T22 全量修复（含 T17-T22 新修复 + S1-S5 新维度）
+
+**测试参数**:
+- Story A: 退休教师+孙女代际理解 / illustration / 4 角色 / 10 shots / 1418s
+- Story B: 深夜便利店两陌生人 / ink / 2 角色 / 10 shots / 1096s
+- 模型: Stage 1-4 Claude Sonnet 4.6 + NB2 (gemini-3.1-flash-image-preview)
+- **全部 20 张 shot 图片 + 参考图逐一人工查看**
+
+**21 维度评分**:
+
+| # | 维度 | Story A | Story B | 综合 | R4→R5 |
+|---|------|---------|---------|------|-------|
+| D1 | 生成成功率 | 10/10 ✅ | 10/10 ✅ | **PASS** | |
+| D2 | text_overlay 完整性 | 100% ✅ | 100% ✅ | **PASS** | |
+| D3 | text_type 分布 | d=50% ⚠️ | d=50% ⚠️ | **PARTIAL** | R4:PASS→PARTIAL |
+| D4 | thought 出现率 | S3=36% S4=70% ✅ | S3=49% S4=80% ✅ | **PASS** | |
+| D5 | 无 speaker 错位 | 0/9 ✅ | 0/6 ✅ | **PASS** | |
+| D6 | plot_points 覆盖 | 6/6 ✅ | 6/6 ✅ | **PASS** | |
+| D7 | 无气泡重复+T22 | T22✅ | T22✅ | **PASS** | |
+| D8 | 无标签泄露 | ✅ | ✅ | **PASS** | |
+| D9 | 无 NB2 乱码 | ✅ | ✅ | **PASS** | |
+| D10 | 角色/风格一致性 | 3.8/5 | 4.7/5 | **PASS** | |
+| D11 | 无双重渲染+T22 | 0 ✅ | 0 ✅ | **PASS** | T22 验证 |
+| D12 | 叙事自足 | ✅ | ✅ | **PASS** | |
+| D13 | 跨年龄风格 (T14+T19) | 4.2/5 ✅ | ✅ | **PASS** | R4:PARTIAL→PASS |
+| D14 | 气泡去重 | ✅ | ✅ | **PASS** | R4:PARTIAL→PASS |
+| D15 | NB2_MODEL 命名 | ✅ | ✅ | **PASS** | |
+| D16 | OB-6 降级 | ✅ | ✅ | **PASS** | |
+| S1 | 角色数量 (T17) ≥90% | 隐式通过 | 隐式通过 | **PASS** | 新维度 |
+| S2 | 道具连续性 (T18) | ✅ | ✅ | **PASS** | 新维度 |
+| S3 | 跨景别面部 (T20) | ✅ | ✅ | **PASS** | 新维度 |
+| S4 | 跨年龄风格 (T19) | 4.2/5 | 4.5/5 | **PASS** | 新维度 |
+| S5 | 气泡重复率 (T17) <2% | 0% ✅ | 0% ✅ | **PASS** | 新维度 |
+
+**R4→R5 关键改善**:
+- D13: PARTIAL → **PASS** (Story A 3.5→4.2/5, T19 强化有效)
+- D14: PARTIAL → **PASS** (0/20 重复, R4 为 1/20)
+- S1-S5 新维度全部 PASS
+- T22: with_text_images/ + refs/ 目录成功清理
+
+**测试产出**: `tests/test_e2e_regression_r5.py` + `test_output/manualtest/e2e_regression_r5/`
+
+---
+
+## 2026-03-10
+
+### TASK-E2E-REGRESSION-R4 ✅ 14/16 PASS (20/20 shots, 16 维度)
+
+**时间**: 18:30 完成
+
+**测试范围**: 16 维度 E2E 回归验证 — 验证 T1-T16 全量修复（含 T11-T16 新修复重点验证）
+
+**测试参数**:
+- Story A: 除夕家庭晚餐争吵 / illustration / 4 角色 / 10 shots / 1442s
+- Story B: 山间书法师徒 / ink / 2 角色 / 10 shots / 1420s
+- 模型: Stage 1-4 Claude Sonnet 4.6 + NB2 (gemini-3.1-flash-image-preview)
+- **全部 60+ 张图片逐一人工查看**（角色参考 12 + 场景参考 10 + raw 20 + with_text 20）
+
+**16 维度评分**:
+
+| # | 维度 | Story A | Story B | 综合 | R3→R4 |
+|---|------|---------|---------|------|-------|
+| 1 | 生成成功率 | 10/10 ✅ | 10/10 ✅ | **PASS** | |
+| 2 | text_overlay 输出完整性 | PASS ✅ | PASS ✅ | **PASS** | |
+| 3 | text_type 分布 | d=60% t=20% ✅ | d=70% t=30% ✅ | **PASS** | |
+| 4 | thought 出现率 (T1+T10) | S3=31.7% S4=70% ✅ | S3=40.4% S4=60% ✅ | **PASS** | |
+| 5 | 无 speaker 错位 (T2+T5+T6) | 0/12 ✅ | 0/11 ✅ | **PASS** | |
+| 6 | plot_points 1:1 覆盖 (T3) | 6/6 ✅ | 6/6 ✅ | **PASS** | R3:PARTIAL→PASS |
+| 7 | 无气泡重复 (T4+T8+T12) | 0 ✅ | 0 ✅ | **PASS** | |
+| 8 | 无标签泄露 (T11) ⭐ | 0/10 ✅ | 0/10 ✅ | **PASS** | R3:FAIL→PASS |
+| 9 | 无 NB2 乱码文字 | PASS ✅ | PASS ✅ | **PASS** | |
+| 10 | 角色/风格一致性 | 4.3/5 ✅ | 4.8/5 ✅ | **PASS** | |
+| 11 | 无双重渲染 (T12) ⭐ | 0 ✅ | 0 ✅ | **PASS** | R3:Bug→PASS |
+| 12 | 条漫叙事自足 (T13) | 10/10 ✅ | 10/10 ✅ | **PASS** | 新维度 |
+| 13 | 跨年龄风格统一 (T14) | 3.5/5 ⚠️ | 4.5/5 ✅ | **PARTIAL** | 新维度 |
+| 14 | 气泡去重 (T15) | PASS ✅ | 1/10 ⚠️ | **PARTIAL** | 新维度 |
+| 15 | NB2_MODEL 命名 | PASS ✅ | PASS ✅ | **PASS** | 新维度 |
+| 16 | OB-6 降级分支 (T16) | PASS ✅ | PASS ✅ | **PASS** | 新维度 |
+
+**R3→R4 关键改进**: D6 PARTIAL→PASS, D8 FAIL→PASS, D11 Bug→PASS
+
+**输出**:
+- 测试脚本: `tests/test_e2e_regression_r4.py`
+- 对比报告: `test_output/manualtest/e2e_regression_r4/20260310_155024/comparison_report.md`
+- Story A: `test_output/manualtest/e2e_regression_r4/20260310_155024/story_A/20260310_155024/`
+- Story B: `test_output/manualtest/e2e_regression_r4/20260310_155024/story_B/20260310_161426/`
+
+---
+
 ## 2026-03-09
 
 ### TASK-E2E-REGRESSION-R3 ✅ 7/10 PASS (20/20 shots, 10 维度)

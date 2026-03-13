@@ -1,6 +1,6 @@
 # PM Agent - 给其他Agent的信息
 
-> **最后更新**: 2026-03-10 14:25
+> **最后更新**: 2026-03-13 20:35
 > **目的**: 让其他Agent快速了解当前状态和任务
 
 ---
@@ -8,60 +8,87 @@
 ## 当前状态
 
 ```
-✅ Step 1-8.5 全部完成 + 全局 Double-Check 通过 + PRO_MODEL 命名修复确认 PASS
-→ Step 9: @Tester E2E R4（已派发）
+✅ PM Code Review 12/12 PASS
+✅ @Backend OB-1 修复完成 + PM Review PASS
+🔄 @DevOps 代码推送+部署 (TASK-DEPLOY-R8)
+⏳ @Tester T-J + R8 E2E (等 DevOps 部署后开始)
+⏳ PM 独立复核
 ```
 
 ---
 
-## @tester 任务 — Step 9 E2E R4（已派发）
+## @Backend — Phase 1 ✅ 完成 + Phase 3 待启动
 
-**测试参数**:
-- 2 个故事 × 10 shots
-- 2 种不同风格
+**Phase 1 (✅ 全部 PASS)**:
+| # | 任务 | 结果 |
+|---|------|------|
+| T-B | MAX_SHOT_RETRIES 2→1 | ✅ PASS |
+| T-A | off_screen 文字双重渲染修复 | ✅ PASS |
+| T-K | ShotValidator 人群角色计数 | ✅ PASS |
+| T-D | Prompt Quality 关键词扩展 | ✅ PASS (附注: 关键词与 storyboard_director 差 ~30 词) |
 
-**16 项验证维度**:
+**Phase 3 (✅ 全部 PASS)**:
+| # | 任务 | 结果 |
+|---|------|------|
+| T-C-Backend | signage_text 全链路消费 | ✅ PASS |
+| T-I | Prompt Pre-Check v1 (log-only) | ✅ PASS |
 
-| # | 维度 | 来源 | 验证要点 |
-|---|------|------|---------|
-| 1 | 生成成功率 | 基线 | 10/10 × 2 |
-| 2 | text_overlay 输出完整性 | Issue #1 | 20/20 有 text_overlay |
-| 3 | text_type 分布 | T2+T7 | d≥60% t=10-20% n≤15% |
-| 4 | thought 出现率 | T1+T10 | S3≥15%, S4>0 |
-| 5 | 无 speaker 错位 | T2+T5+T6 | 0 mismatch |
-| 6 | plot_points 1:1 覆盖 | T3 | scenes == plot_points |
-| 7 | 无对话气泡重复 | T4+T8+T12 | dialogue skip TextOverlay |
-| 8 | **无标签泄露** | **T11** | ⭐ R3 FAIL 项，重点验证 |
-| 9 | 无 NB2 乱码 | 基线 | 人工查看 |
-| 10 | 角色/风格一致性 | 基线 | 人工评分 /5 |
-| 11 | **无双重渲染** | **T12** | ⭐ with_text 中 thought 不双重渲染 |
-| 12 | **条漫叙事自足** | **T13** | thought/dialogue 承载足够叙事上下文 |
-| 13 | **跨年龄风格统一** | **T14** | 不同年龄角色保持同一画风 |
-| 14 | **气泡去重** | **T15** | 同一对话不渲染两次 |
-| 15 | **NB2_MODEL 命名** | **命名修复** | 日志显示 NB2_MODEL |
-| 16 | **OB-6 降级分支** | **T16** | narration_with_dialogue 降级不报错 |
+**Phase 5 (✅ PASS)**:
+| # | 任务 | 结果 |
+|---|------|------|
+| T-H-Backend | ShotValidator 自然度维度 (Phase 1 仅日志) | ✅ PASS (OB-1 已修复) |
 
-**特别关注**: D8（标签泄露）和 D11（双重渲染）是 R3 的 FAIL/新 Bug 项。
+**OB-1 修复 (✅ PASS)**:
+| # | 任务 | 结果 |
+|---|------|------|
+| OB-1 | shot_validator.py 3 处 early-return 补字段 | ✅ PASS (PM Review 28/28 字段一致) |
 
-## @backend 注意
+Backend 在 T-A~T-K 中的全部 7 项任务 + OB-1 已交付完毕。
 
-- PRO_MODEL 命名修复已确认 PASS，无新任务
-- 等 Step 9 E2E R4 结果
-
-## @ai-ml 注意
-
-- Step 7 T13+T14+T15 全部 PASS，无新任务
-- 等 Step 9 E2E R4 结果
-
-## @devops / @frontend 注意
-
-- 无新任务
+详细规格见 TEAM_CHAT 2026-03-13 16:00 派发消息。
 
 ---
 
-## 时间戳规范
+## @AI-ML — Phase 1 ✅ 完成 + Phase 3 待启动
 
-所有Agent更新文档时，时间戳**必须**使用真实北京时间：
-```bash
-TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M'
-```
+**Phase 1 (✅ 全部 PASS)**:
+| # | 任务 | 结果 |
+|---|------|------|
+| T-E | Stage 4 背面角色一致性规则 (Rule #10) | ✅ PASS |
+| T-F | Stage 4 off-screen 接触规则 (Rule #11) | ✅ PASS |
+| T-G | Stage 4 空间方向矛盾规则 (Rule #12) | ✅ PASS |
+| T-C-AIML | Stage 1 signage_text 字段 | ✅ PASS |
+
+**Phase 3 (✅ PASS)**:
+| # | 任务 | 结果 |
+|---|------|------|
+| T-H-AIML | 自然度 prompt 设计 (3 子维度 + 风格无关) | ✅ PASS |
+
+AI-ML 在 T-A~T-K 中的全部 5 项任务已交付完毕。
+- ⚠️ **T-H 重要约束**: Phase 1 仅日志/数据收集，**不触发 FAIL/重试**。Phase 2（启用硬判定）需等数据验证 Haiku 准确率 > 90% 后再启用。
+
+详细规格见 TEAM_CHAT 2026-03-13 16:00 派发消息。
+
+---
+
+## @Tester — Phase 1: 1 项任务
+
+| # | 任务 | P | 风险 | 说明 |
+|---|------|---|------|------|
+| T-J | 测试脚本 N12/N14/N15 修复 | P1 | 🟢零 | 3 处统计逻辑修复 + R7 数据验证 |
+
+详细规格见 TEAM_CHAT 2026-03-13 16:00 派发消息。
+
+---
+
+## @DevOps — TASK-DEPLOY-R8 (🔄 进行中)
+
+| # | 任务 | 说明 |
+|---|------|------|
+| TASK-DEPLOY-R8 | commit + push + VPS deploy | 11 项代码改动 + OB-1 → GitHub + VPS 部署 |
+
+完成后通知 @pm + @tester。
+
+---
+
+## @Frontend — 无新任务
