@@ -16,6 +16,8 @@ from typing import Optional, Dict
 
 from app.prompts.prompt_safety_rewrite import (
     build_rewrite_prompt,
+    build_scene_ref_rewrite_prompt,
+    build_char_ref_rewrite_prompt,
     apply_simple_replacements,
     detect_sensitive_content,
     GENRE_SPECIFIC_RULES,
@@ -254,6 +256,82 @@ class PromptRewriter:
         # 2. 降级到简单规则替换
         print(f"[PromptRewriter] 智能改写未能完全清除敏感内容，降级到简单替换")
         return self.rewrite_simple(original_prompt, genre)
+
+    async def rewrite_scene_ref(self, prompt: str) -> Optional[str]:
+        """L3a: 场景参考图专用改写（使用 SCENE_REF_REWRITE_PROMPT）"""
+        if not self.client and not self.gemini_client:
+            print("[PromptRewriter] ❌ 无可用 LLM 客户端，场景参考改写失败")
+            return None
+        try:
+            print(f"[PromptRewriter] 🔄 场景参考图改写 (Sonnet 4.6)...")
+            rewrite_prompt = build_scene_ref_rewrite_prompt(prompt)
+            rewritten = None
+            if self.client:
+                try:
+                    response = await self.client.messages.create(
+                        model=self.SONNET_MODEL,
+                        max_tokens=self.MAX_TOKENS,
+                        messages=[{"role": "user", "content": rewrite_prompt}]
+                    )
+                    rewritten = response.content[0].text.strip()
+                except Exception as ce:
+                    print(f"[PromptRewriter] Claude失败: {ce}，尝试Gemini备用")
+            if rewritten is None and self.gemini_client:
+                try:
+                    response = await self.gemini_client.aio.models.generate_content(
+                        model="gemini-3-pro-preview",
+                        contents=rewrite_prompt,
+                        config={"max_output_tokens": self.MAX_TOKENS}
+                    )
+                    rewritten = response.text.strip()
+                except Exception as ge:
+                    print(f"[PromptRewriter] Gemini也失败: {ge}")
+                    return None
+            if rewritten and len(rewritten) >= 50:
+                print(f"[PromptRewriter] ✅ 场景参考图改写完成 ({len(rewritten)} 字符)")
+                return rewritten
+            return None
+        except Exception as e:
+            print(f"[PromptRewriter] ❌ 场景参考图改写失败: {e}")
+            return None
+
+    async def rewrite_char_ref(self, prompt: str) -> Optional[str]:
+        """L3b: 角色参考图专用改写（使用 CHAR_REF_REWRITE_PROMPT）"""
+        if not self.client and not self.gemini_client:
+            print("[PromptRewriter] ❌ 无可用 LLM 客户端，角色参考改写失败")
+            return None
+        try:
+            print(f"[PromptRewriter] 🔄 角色参考图改写 (Sonnet 4.6)...")
+            rewrite_prompt = build_char_ref_rewrite_prompt(prompt)
+            rewritten = None
+            if self.client:
+                try:
+                    response = await self.client.messages.create(
+                        model=self.SONNET_MODEL,
+                        max_tokens=self.MAX_TOKENS,
+                        messages=[{"role": "user", "content": rewrite_prompt}]
+                    )
+                    rewritten = response.content[0].text.strip()
+                except Exception as ce:
+                    print(f"[PromptRewriter] Claude失败: {ce}，尝试Gemini备用")
+            if rewritten is None and self.gemini_client:
+                try:
+                    response = await self.gemini_client.aio.models.generate_content(
+                        model="gemini-3-pro-preview",
+                        contents=rewrite_prompt,
+                        config={"max_output_tokens": self.MAX_TOKENS}
+                    )
+                    rewritten = response.text.strip()
+                except Exception as ge:
+                    print(f"[PromptRewriter] Gemini也失败: {ge}")
+                    return None
+            if rewritten and len(rewritten) >= 50:
+                print(f"[PromptRewriter] ✅ 角色参考图改写完成 ({len(rewritten)} 字符)")
+                return rewritten
+            return None
+        except Exception as e:
+            print(f"[PromptRewriter] ❌ 角色参考图改写失败: {e}")
+            return None
 
     @staticmethod
     def get_supported_genres() -> list:

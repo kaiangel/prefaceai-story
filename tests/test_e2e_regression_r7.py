@@ -1069,7 +1069,11 @@ def analyze_spatial_anchoring(shots: list) -> dict:
 
     for shot in shots:
         sid = shot.get("shot_id", "?")
-        chars = shot.get("characters_in_scene", [])
+        # T-J fix: characters_in_scene 在 storyboard 中通常为空，
+        # 实际可见角色在 character_direction.characters_visible
+        chars = shot.get("character_direction", {}).get("characters_visible", [])
+        if not chars:
+            chars = shot.get("characters_in_scene", [])
         char_count = len(chars)
 
         if char_count >= 3:
@@ -1211,9 +1215,11 @@ def analyze_color_palette_english(outline: dict) -> dict:
     - color_palette schema placeholders 改为英文
     - prompt 要求输出英文颜色名
     """
-    color_palette = outline.get("color_palette", {}) if outline else {}
+    # T-J fix: color_palette 实际路径是 visual_tone.color_palette（非根级或 visual_style）
+    color_palette = outline.get("visual_tone", {}).get("color_palette", {}) if outline else {}
     if not color_palette:
-        # 也可能在不同位置
+        color_palette = outline.get("color_palette", {}) if outline else {}
+    if not color_palette:
         color_palette = outline.get("visual_style", {}).get("color_palette", {}) if outline else {}
 
     has_chinese = False
@@ -1273,10 +1279,18 @@ def analyze_signage_injection(captured_log: str, project_dir: str) -> dict:
     - exterior: REQUIRED TEXT ON SIGNAGE: "{name}"
     - interior: plaque instruction
     """
-    # 日志检查: SIGNAGE / 招牌 相关
-    signage_log_lines = [line for line in captured_log.split('\n')
-                         if 'SIGNAGE' in line or '招牌' in line or 'signage' in line.lower()
-                         or 'REQUIRED TEXT' in line]
+    # T-J fix: scene_reference_manager 不单独打印 signage 日志，
+    # 但锚点图生成日志包含 location_id（含店/铺/shop 等关键词）
+    # 同时搜索 SIGNAGE/招牌 以兼容未来可能添加的显式日志
+    signage_keywords_in_anchor = {'铺', '店', '坊', '馆', '堂', '楼', '阁', '庄', 'shop', 'store', 'café', 'restaurant', 'inn', 'bakery', 'tea'}
+    signage_log_lines = []
+    for line in captured_log.split('\n'):
+        if 'SIGNAGE' in line or '招牌' in line or 'REQUIRED TEXT' in line:
+            signage_log_lines.append(line)
+        elif '锚点图' in line or 'anchor' in line.lower():
+            line_lower = line.lower()
+            if any(kw in line or kw in line_lower for kw in signage_keywords_in_anchor):
+                signage_log_lines.append(line)
 
     # 检查 scene_ref 图片是否存在
     scene_ref_images = []
@@ -1953,7 +1967,9 @@ def save_excerpts(results: list, output_dir: str):
             "title": outline.get("title"),
             "characters_overview": outline.get("characters_overview", []),
             "family_relationships": outline.get("family_relationships", []),
-            "color_palette": outline.get("color_palette", outline.get("visual_style", {}).get("color_palette", {})),
+            "color_palette": outline.get("visual_tone", {}).get("color_palette",
+                             outline.get("color_palette",
+                             outline.get("visual_style", {}).get("color_palette", {}))),
         }
         with open(os.path.join(excerpts_dir, "outline_excerpt.json"), "w", encoding="utf-8") as f:
             json.dump(excerpt, f, ensure_ascii=False, indent=2)

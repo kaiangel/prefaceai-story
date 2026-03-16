@@ -130,6 +130,24 @@ class ReferenceImageManager:
             reference_images=reference_images
         )
 
+        # L3b: CONTENT_SAFETY → PromptRewriter 角色参考图改写重试（1 次）
+        if not result.get('success') and result.get('error_type') == 'content_safety':
+            char_name = character.get('name', 'Unknown')
+            print(f"    ⚠️ {char_name} {ref_type} CONTENT_SAFETY → PromptRewriter 改写重试")
+            try:
+                from app.services.prompt_rewriter import get_rewriter
+                rewriter = get_rewriter()
+                rewritten = await rewriter.rewrite_char_ref(prompt)
+                if rewritten:
+                    result = await image_generator.generate_image(
+                        prompt=rewritten,
+                        negative_prompt=negative_prompt,
+                        aspect_ratio=aspect_ratio,
+                        reference_images=reference_images
+                    )
+            except Exception as rw_err:
+                print(f"    ⚠️ PromptRewriter 角色改写异常: {rw_err}")
+
         if result.get('success') and result.get('pil_image'):
             if char_id not in self.character_references:
                 self.character_references[char_id] = {}

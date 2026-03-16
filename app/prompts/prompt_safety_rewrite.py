@@ -26,6 +26,12 @@ class SensitiveCategory(Enum):
     WEAPON = "weapon"         # 武器伤害
     BODY = "body"             # 尸体/身体伤害
     EMOTION = "emotion"       # 极端负面情绪
+    # TASK-IMG-SAFETY-RETRY-AIML: 场景参考图+角色参考图新增类别
+    CROWD = "crowd"           # 人群/拥挤描述（集市/庙会/赶圩触发源）
+    ANIMAL = "animal"         # 活体动物（农村/集市动物）
+    FIRE_SMOKE = "fire_smoke" # 火/烟/燃烧（打铁铺/厨房/篝火）
+    CHILD_CONTEXT = "child_context"       # 儿童描述中可能的触发组合
+    REVEALING_CLOTHING = "revealing_clothing"  # 暴露服装/身体（武侠/幻想角色）
 
 
 # =============================================================================
@@ -152,6 +158,111 @@ SENSITIVE_WORD_REPLACEMENTS: Dict[str, Dict[str, List[str]]] = {
         "nightmare": ["dark vision", "troubled dream", "haunting memory"],
         "screaming": ["crying out", "calling", "voicing"],
         "scream": ["cry", "call", "voice"],
+    },
+
+    # ---------------------------------------------------------
+    # TASK-IMG-SAFETY-RETRY-AIML: 人群/拥挤（场景参考图触发源）
+    # ---------------------------------------------------------
+    SensitiveCategory.CROWD.value: {
+        "crowds of": ["a few visitors at", "scattered visitors along"],
+        "crowd of": ["a few visitors at", "scattered people near"],
+        "crowded": ["lively", "well-visited", "active"],
+        "crowds": ["visitors", "passersby", "a few figures"],
+        "crowd": ["visitors", "a few people", "onlookers"],
+        "dense rows of": ["rows of", "neatly arranged"],
+        "dense": ["neatly arranged", "well-spaced", "orderly"],
+        "packed": ["arranged", "lined up", "well-organized"],
+        "throng": ["small gathering", "a few visitors"],
+        "throngs": ["small groups", "scattered visitors"],
+        "mob": ["group", "gathering", "assembly"],
+        "bustling": ["quiet", "serene", "tranquil"],
+        "teeming": ["dotted with", "featuring occasional"],
+        "swarming": ["scattered", "sparsely arranged"],
+        "jostling": ["walking", "browsing", "strolling"],
+        "packed with people": ["with a few visitors strolling"],
+        "filled with people": ["with scattered visitors"],
+        "townspeople": ["architectural details", "environment"],
+        "villagers": ["local architecture", "rural details"],
+        "pedestrians": ["walkway details", "path elements"],
+    },
+
+    # ---------------------------------------------------------
+    # TASK-IMG-SAFETY-RETRY-AIML: 活体动物（场景参考图触发源）
+    # ---------------------------------------------------------
+    SensitiveCategory.ANIMAL.value: {
+        "clucking chickens": ["woven baskets with eggs"],
+        "chickens": ["woven baskets", "stacked crates"],
+        "chicken": ["woven basket", "wooden crate"],
+        "livestock": ["wooden crates and barrels"],
+        "live animals": ["stacked goods and supplies"],
+        "live poultry": ["woven baskets and crates"],
+        "pigs": ["wooden barrels"],
+        "goats": ["hay bales"],
+        "cattle": ["wooden carts"],
+        "slaughter": ["preparation area", "work station"],
+        "butcher": ["food preparation stall", "vendor stall"],
+        "caged birds": ["hanging lanterns"],
+        "roosters": ["woven baskets"],
+        "ducks": ["clay pots"],
+        "donkeys": ["wooden handcarts"],
+        "mules": ["wooden handcarts"],
+    },
+
+    # ---------------------------------------------------------
+    # TASK-IMG-SAFETY-RETRY-AIML: 火/烟/燃烧
+    # ---------------------------------------------------------
+    SensitiveCategory.FIRE_SMOKE.value: {
+        "fire": ["warm glow", "hearth light", "amber light"],
+        "fires": ["warm glows", "amber lights"],
+        "smoke rising": ["atmospheric haze", "soft mist rising"],
+        "smoke": ["atmospheric haze", "soft mist", "gentle steam"],
+        "smoking": ["steaming", "hazy", "misty"],
+        "flames": ["hearth light", "warm amber glow", "lantern light"],
+        "flame": ["warm glow", "amber light"],
+        "burning": ["glowing warmly", "lit", "radiating warmth"],
+        "bonfire": ["lantern cluster", "warm light source"],
+        "campfire": ["warm lantern light", "soft amber glow"],
+        "torch": ["lantern", "oil lamp"],
+        "torches": ["lanterns", "oil lamps"],
+        "blazing": ["brightly lit", "warmly glowing"],
+        "inferno": ["bright warm light"],
+        "embers": ["warm amber glow", "soft light"],
+        "sparks flying": ["light glinting", "ambient glow"],
+    },
+
+    # ---------------------------------------------------------
+    # TASK-IMG-SAFETY-RETRY-AIML: 儿童描述中的潜在触发组合
+    # ---------------------------------------------------------
+    SensitiveCategory.CHILD_CONTEXT.value: {
+        "in shorts": ["in comfortable clothing"],
+        "in underwear": ["in casual wear"],
+        "undressed": ["in loose clothing"],
+        "bathing": ["playing near water", "by the waterside"],
+        "naked": ["in light clothing"],
+        "bare-legged": ["in comfortable attire"],
+        "bare legs": ["in loose pants"],
+        "shirtless child": ["child in a light T-shirt"],
+        "shirtless boy": ["boy in a light T-shirt"],
+        "shirtless girl": ["girl in a light blouse"],
+    },
+
+    # ---------------------------------------------------------
+    # TASK-IMG-SAFETY-RETRY-AIML: 暴露服装/身体
+    # ---------------------------------------------------------
+    SensitiveCategory.REVEALING_CLOTHING.value: {
+        "revealing armor": ["layered armor with inner lining"],
+        "revealing outfit": ["practical outfit with full coverage"],
+        "revealing clothing": ["practical clothing with full coverage"],
+        "bare chest": ["chest covered by light inner garment"],
+        "bare-chested": ["wearing a fitted inner vest"],
+        "bare torso": ["torso covered by a fitted vest"],
+        "exposed midriff": ["midriff covered by a wrapped sash"],
+        "low-cut": ["modest neckline"],
+        "cleavage": ["layered neckline"],
+        "skimpy": ["practical", "functional"],
+        "scantily clad": ["lightly armored", "practically dressed"],
+        "bikini armor": ["light layered armor with coverage"],
+        "loincloth": ["wrapped lower garment"],
     },
 }
 
@@ -297,6 +408,116 @@ Return a JSON object with:
 
 
 # =============================================================================
+# TASK-IMG-SAFETY-RETRY-AIML: 场景参考图专用改写模板
+# =============================================================================
+
+SCENE_REF_REWRITE_PROMPT = """You are rewriting a SCENE REFERENCE IMAGE prompt that was rejected by Gemini's content safety filter.
+
+CRITICAL CONTEXT: This prompt generates a BACKGROUND/ENVIRONMENT image with NO PEOPLE. The image is used as a visual reference for a location in a story.
+
+## ORIGINAL PROMPT
+
+{original_prompt}
+
+## REWRITE RULES (MUST FOLLOW)
+
+### 1. PRESERVE These Elements (CRITICAL — these define the location's identity)
+- Architectural style, building materials, structural layout
+- Lighting conditions, color palette, time of day
+- Weather and atmospheric mood
+- Spatial composition (camera angle, framing)
+- Any SIGNAGE TEXT instructions (e.g., "sign MUST display: 李记桂花糕") — DO NOT alter signage requirements
+
+### 2. REMOVE Completely
+- ALL references to people, humans, townspeople, villagers, pedestrians, bystanders, crowds
+- ALL references to live animals (chickens, livestock, poultry, cattle, dogs, cats)
+- ALL human activities (selling, buying, bargaining, chatting, walking, cooking)
+- Phrases like "bustling with activity", "lively market scene", "vendors calling out"
+
+### 3. REPHRASE (atmosphere without humans)
+- "bustling market" → "market stalls along a stone-paved street"
+- "crowds of rural townspeople" → "rows of wooden vendor stalls"
+- "smoke rising from food stalls" → "atmospheric haze drifting between stalls"
+- "clucking chickens near stalls" → "woven baskets and wooden crates stacked near stalls"
+- "busy intersection" → "wide intersection with worn cobblestones"
+- "lively courtyard" → "open courtyard with potted plants and stone benches"
+
+### 4. ADD at the very start of the rewritten prompt
+"Architectural scene only. No people, no characters, no animals."
+
+### 5. DO NOT
+- Remove environmental/architectural details
+- Alter the visual style or mood
+- Change any signage text requirements
+- Add people or characters
+- Explain your changes
+
+## OUTPUT FORMAT
+
+Return ONLY the rewritten prompt. No explanation, no commentary.
+
+## REWRITTEN PROMPT:
+"""
+
+
+# =============================================================================
+# TASK-IMG-SAFETY-RETRY-AIML: 角色参考图专用改写模板
+# =============================================================================
+
+CHAR_REF_REWRITE_PROMPT = """You are rewriting a CHARACTER REFERENCE IMAGE prompt that was rejected by Gemini's content safety filter.
+
+CRITICAL CONTEXT: This prompt generates a SINGLE CHARACTER portrait or full-body reference image used for visual consistency across all story shots. The character's identity features (face, hair, clothing colors) MUST be preserved exactly.
+
+## ORIGINAL PROMPT
+
+{original_prompt}
+
+## REWRITE RULES (MUST FOLLOW)
+
+### 1. PRESERVE These Elements (CRITICAL — these are identity anchors)
+- Facial features: face shape, skin tone, eye color/shape, eyebrows, nose, lips
+- Hair: color, style, length, texture
+- Clothing: colors and general garment types (these are consistency anchors)
+- Accessories: glasses, earrings, watches, scarves (identity markers)
+- Age appearance and body build
+- Visual style enforcement (style prefix)
+
+### 2. MODIFY Weapons
+- "holding a sword" → "with an ornate metal implement at waist"
+- "wielding a blade" → "with a decorative scabbard at side"
+- "armed with daggers" → "with small ornamental accessories at belt"
+- "bow and arrows on back" → "with a long decorative case on back"
+- Keep weapon presence implied but not actively threatening
+
+### 3. MODIFY Revealing/Sensitive Clothing
+- "revealing armor" → "layered armor with fitted inner lining"
+- "bare chest" → "chest covered by a light inner garment"
+- "exposed midriff" → "midriff wrapped with a cloth sash"
+- Add coverage layers without changing the clothing's color scheme or style
+- Preserve the garment's COLOR (this is the consistency anchor)
+
+### 4. SIMPLIFY Child Character Descriptions
+- Focus on: face (features, expression) + hair (color, style) + clothing (color, type)
+- Remove: detailed body pose descriptions, activity descriptions
+- Change pose to: "standing naturally" or "neutral standing pose"
+- Keep age description factual: "a 9-year-old boy" → keep as is (age is identity)
+
+### 5. DO NOT
+- Change hair color, eye color, skin tone, or clothing colors (identity anchors)
+- Remove distinctive marks or accessories (identity markers)
+- Change the character's age or gender
+- Add content not in the original
+- Explain your changes
+
+## OUTPUT FORMAT
+
+Return ONLY the rewritten prompt. No explanation, no commentary.
+
+## REWRITTEN PROMPT:
+"""
+
+
+# =============================================================================
 # 辅助函数
 # =============================================================================
 
@@ -378,6 +599,16 @@ def build_rewrite_prompt(original_prompt: str, debug_mode: bool = False) -> str:
     """
     template = SAFETY_REWRITE_PROMPT_DEBUG if debug_mode else SAFETY_REWRITE_PROMPT
     return template.format(original_prompt=original_prompt)
+
+
+def build_scene_ref_rewrite_prompt(original_prompt: str) -> str:
+    """构建场景参考图专用改写 Prompt"""
+    return SCENE_REF_REWRITE_PROMPT.format(original_prompt=original_prompt)
+
+
+def build_char_ref_rewrite_prompt(original_prompt: str) -> str:
+    """构建角色参考图专用改写 Prompt"""
+    return CHAR_REF_REWRITE_PROMPT.format(original_prompt=original_prompt)
 
 
 def detect_sensitive_content(text: str) -> Dict:

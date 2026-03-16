@@ -125,6 +125,23 @@ class Phase2PipelineOrchestrator:
             )
 
             self.stage_results["outline"] = outline
+
+            # N13-FIX: 自动补全 spouse_of 对称关系
+            family_rels = outline.get("family_relationships", [])
+            for rel in list(family_rels):  # 遍历副本，避免修改遍历中的列表
+                if rel.get("relationship") == "spouse_of":
+                    reverse_exists = any(
+                        r.get("from") == rel["to"] and r.get("to") == rel["from"]
+                        for r in family_rels
+                    )
+                    if not reverse_exists:
+                        family_rels.append({
+                            "from": rel["to"],
+                            "to": rel["from"],
+                            "relationship": "spouse_of"
+                        })
+                        print(f"  [N13-FIX] 补全 spouse_of: {rel['to']} → {rel['from']}")
+
             self._save_json(project_dir, "1_outline.json", outline)
 
             print(f"✅ Stage 1 完成: {outline.get('title', 'N/A')}")

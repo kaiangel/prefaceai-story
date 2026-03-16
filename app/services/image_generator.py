@@ -750,7 +750,7 @@ class ImageGenerator:
 
         return {
             "success": False,
-            "error": f"Image generation failed after {self.MAX_RETRIES} attempts: {last_error}",
+            "error": f"Image generation failed after {attempt + 1} attempts: {last_error}",
             "error_type": last_error_type.value,  # 返回错误类型供上层处理
             "model_used": model,
             "generation_time_seconds": round(time.time() - start_time, 2)
@@ -1122,7 +1122,7 @@ class ImageGenerator:
 
         return {
             "success": False,
-            "error": f"Image generation failed after {self.MAX_RETRIES} attempts: {last_error}",
+            "error": f"Image generation failed after {attempt + 1} attempts: {last_error}",
             "error_type": last_error_type.value,  # 返回错误类型供上层处理
             "model_used": self.NB2_MODEL,
             "generation_time_seconds": round(time.time() - start_time, 2),

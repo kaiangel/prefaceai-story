@@ -490,6 +490,34 @@ class SceneReferenceManager:
             # 不传use_pro_model，默认使用Flash
         )
 
+        # L2: CONTENT_SAFETY 简化重试
+        if not result.get('success') and result.get('error_type') == 'content_safety':
+            print(f"    ⚠️ {anchor_key} CONTENT_SAFETY → 简化 prompt 重试")
+            simplified_prompt = self._simplify_anchor_prompt(prompt)
+            result = await image_generator.generate_image(
+                prompt=simplified_prompt,
+                negative_prompt=negative_prompt,
+                aspect_ratio="2:3",
+                reference_images=reference_images
+            )
+
+        # L3a: 简化重试仍失败 → PromptRewriter 改写重试
+        if not result.get('success') and result.get('error_type') == 'content_safety':
+            print(f"    ⚠️ {anchor_key} 简化仍失败 → PromptRewriter 改写重试")
+            try:
+                from app.services.prompt_rewriter import get_rewriter
+                rewriter = get_rewriter()
+                rewritten = await rewriter.rewrite_scene_ref(prompt)
+                if rewritten:
+                    result = await image_generator.generate_image(
+                        prompt=rewritten,
+                        negative_prompt=negative_prompt,
+                        aspect_ratio="2:3",
+                        reference_images=reference_images
+                    )
+            except Exception as rw_err:
+                print(f"    ⚠️ PromptRewriter 改写异常: {rw_err}")
+
         pil_image = None
 
         if result.get('success') and result.get('pil_image'):
@@ -687,6 +715,18 @@ class SceneReferenceManager:
         'tailor', 'workshop', 'mill', 'forge', 'smithy'
     }
 
+    def _simplify_anchor_prompt(self, prompt: str) -> str:
+        """L2: 简化场景参考图 prompt — 去掉人群/动物/活动描述，保留建筑/环境"""
+        from app.prompts.prompt_safety_rewrite import apply_simple_replacements
+        simplified = apply_simple_replacements(prompt)
+        # 正则去除残留人物描述（apply_simple_replacements 可能漏掉的自由文本）
+        simplified = re.sub(r'\b(people|persons|humans|men|women|children)\s+(are\s+)?\w+ing\b', '', simplified)
+        # 确保 "No people" 在最前面（Gemini 可能在读到触发词时就过滤）
+        prefix = "Architectural scene only. No people, no characters, no animals. "
+        if not simplified.startswith(prefix):
+            simplified = prefix + simplified
+        return simplified
+
     def _detect_signage_name(self, location_name: str, location_desc: str,
                               signage_text: str = '') -> Optional[str]:
         """T31+T-C: 检测场景是否含招牌，返回招牌文字（中文名）或 None
@@ -784,6 +824,8 @@ The storefront/building sign MUST display: "{signage_name}"
 Do NOT invent or substitute any other name. The sign text must match EXACTLY."""
 
             core_prompt = f"""MASTER ANCHOR IMAGE - EXTERIOR
+STRICT: No people, no characters, no animals, no moving objects.
+This is a PURE ARCHITECTURAL/ENVIRONMENTAL scene.
 
 This is the DEFINITIVE VISUAL REFERENCE for this location's exterior.
 ALL subsequent shots will use this image as the visual foundation.
@@ -805,9 +847,7 @@ COMPOSITION:
 - Main subject should fill 60-70% of frame
 - Include surrounding context for depth
 
-QUALITY: Highest detail, sharp focus, professional photography
-
-STRICT: No people, no characters, no moving objects"""
+QUALITY: Highest detail, sharp focus, professional photography"""
 
         else:  # interior
             # T31: 检测招牌名称（室内也可能有墙面招牌/匾额）
@@ -820,6 +860,8 @@ If any wall sign, plaque, or banner is visible inside, it MUST display: "{signag
 Do NOT invent or substitute any other name."""
 
             core_prompt = f"""MASTER ANCHOR IMAGE - INTERIOR
+STRICT: No people, no characters, no animals.
+This is a PURE ARCHITECTURAL/ENVIRONMENTAL scene.
 
 This is the DEFINITIVE VISUAL REFERENCE for this location's interior.
 ALL subsequent shots will use this image as the visual foundation.
@@ -841,9 +883,7 @@ COMPOSITION:
 - Interior should fill 80-90% of frame
 - Show depth through the space
 
-QUALITY: Highest detail, sharp focus, professional interior photography
-
-STRICT: No people, no characters"""
+QUALITY: Highest detail, sharp focus, professional interior photography"""
 
         # 应用风格强制
         enforced_prompt = StyleEnforcer.enforce_prompt(
