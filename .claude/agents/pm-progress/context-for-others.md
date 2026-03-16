@@ -1,6 +1,6 @@
 # PM Agent - 给其他Agent的信息
 
-> **最后更新**: 2026-03-13 20:35
+> **最后更新**: 2026-03-16 21:30
 > **目的**: 让其他Agent快速了解当前状态和任务
 
 ---
@@ -8,11 +8,14 @@
 ## 当前状态
 
 ```
-✅ PM Code Review 12/12 PASS
-✅ @Backend OB-1 修复完成 + PM Review PASS
-🔄 @DevOps 代码推送+部署 (TASK-DEPLOY-R8)
-⏳ @Tester T-J + R8 E2E (等 DevOps 部署后开始)
-⏳ PM 独立复核
+主线:
+  ✅ AI-ML + Backend + Tester 17/17 + PM 全部确认
+  🔄 @DevOps TASK-DEPLOY-R8B (push + deploy)
+  ⏳ Founder 终审 BRAND-MANIFESTO
+
+并行线 (BRAND-MANIFESTO + LOGO):
+  ✅ Frontend 完成 + PM 审查 PASS
+  ⏳ Founder 终审 → DevOps 部署
 ```
 
 ---
@@ -81,14 +84,53 @@ AI-ML 在 T-A~T-K 中的全部 5 项任务已交付完毕。
 
 ---
 
-## @DevOps — TASK-DEPLOY-R8 (🔄 进行中)
+## @DevOps — ✅ TASK-DEPLOY-R8 完成
 
-| # | 任务 | 说明 |
+| # | 任务 | 结果 |
 |---|------|------|
-| TASK-DEPLOY-R8 | commit + push + VPS deploy | 11 项代码改动 + OB-1 → GitHub + VPS 部署 |
+| TASK-DEPLOY-R8 | commit + push + VPS deploy | ✅ PM 复核 PASS (7 维度) |
 
-完成后通知 @pm + @tester。
+Git: 3 commits → `73f8a78` (main). VPS: api 容器重建, 3 容器全部 Up.
 
 ---
 
-## @Frontend — 无新任务
+## @AI-ML — ✅ 全部完成 (5 交付物 + 2 小补充, PM Review PASS)
+
+---
+
+## @Backend — ✅ N13-FIX + IMG-SAFETY 全部完成 (PM Review PASS)
+
+5 文件全部通过: pipeline_orchestrator.py + image_generator.py + scene_reference_manager.py + reference_image_manager.py + prompt_rewriter.py
+
+---
+
+## @Tester — ✅ IMG-SAFETY-VERIFY 完成 (17/17 PASS, PM 确认)
+
+---
+
+## @DevOps — TASK-DEPLOY-R8B (🔄 已派发)
+
+13 代码文件 + brand 资源 → commit + push + VPS deploy (api + frontend 容器重建)
+
+---
+
+## @Frontend — TASK-BRAND-MANIFESTO + TASK-LOGO-REPLACE (✅ 完成, PM 审查 PASS)
+
+Founder 已确认，PM 已派发详细文案指引 (群聊 03-16 12:00)：
+
+**Pipeline.tsx** (5 处改动):
+- P1: badge "AI Story Engine" → "Story Engine"
+- P2: slogan → "每个人脑子里都在放电影"
+- P3: core message → "你说出来。所有人看见。"
+- P4: 技术标签整块删除
+- P5: tagline → "你脑海里的画面，不该只有你看得见"
+
+**AboutContent.tsx** (5 段改动):
+- A1: PageHero subtitle → "致每一个脑子里装满画面的人"
+- A2: 使命段 → V2 完整宣言 (§6 原文)
+- A3: 理念段 → "想象力，不该被困住" + 新文案
+- A4: 三卡片 → V2 精神重写 (标题+描述)
+- A5: 新增"技术基座"段 (4 标签从 Pipeline 迁移)
+- 核心团队: 原封不动
+
+参考文档: `docs/BRAND_MANIFESTO_EXPLORATION.md` (V2 §6)

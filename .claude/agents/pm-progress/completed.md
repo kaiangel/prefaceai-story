@@ -4,6 +4,86 @@
 
 ---
 
+### 2026-03-16 — Tester 17/17 确认 + DevOps TASK-DEPLOY-R8B 派发
+
+**Tester 审查**: 17/17 PASS (单元5 + 审计6 + API 3 + 模板3), PM 与 Tester 全部一致
+**关键发现**: "No people"前置优化使 API 测试首次即通过 — L2/L3 恢复链路是"保险"非"常态"
+**DevOps 派发**: 13 代码文件 + brand 资源 → commit + push + VPS deploy
+
+---
+
+### 2026-03-16 — AI-ML 小补充审查 PASS
+
+**正则** `re.sub` (L722-723): 模式正确，import re L13 已有 ✅
+**"No people" 前置**: exterior L827 + interior L863，末尾无残留 (grep 确认仅 2 处) ✅
+
+---
+
+### 2026-03-16 — N13-FIX + IMG-SAFETY Code Review PASS + 派发
+
+**AI-ML 审查**: 5 类 75 词条 + SCENE_REF/CHAR_REF 改写模板 + 辅助函数 — ✅ PASS
+**Backend 审查**: N13-FIX + L1 (2处) + L2 简化重试 + L3a 场景改写 + L3b 角色改写 — ✅ PASS (5 文件)
+**2 项小补充派发 @AI-ML**: 正则残留清理 + "No people" 前置
+**4 项验证测试派发 @Tester**: N13 + 日志 + 场景恢复 + 角色恢复
+
+---
+
+### 2026-03-16 — TASK-IMG-SAFETY-RETRY 分工修正 (AI-ML + Backend)
+
+**初版错误**: 全部派给 Backend，忽略了 prompt 工程是 AI-ML 专长
+**深入分析**: 现有 PromptRewriter 6 类关键词 (DEATH/VIOLENCE/BLOOD/WEAPON/BODY/EMOTION) 只覆盖 Shot 叙事，R8 `rural_market_entrance` 触发词 (crowds/chickens/smoke) 一个都不匹配
+**修正派发**:
+- @AI-ML: 5 项交付物 (新关键词+场景改写模板+角色改写模板+简化策略+结构建议)
+- @Backend: N13-FIX + L1 (可立即) + L2/L3 基础设施 (等 AI-ML)
+- @Tester: 3 项小型验证 (等 AI-ML + Backend)
+
+---
+
+### 2026-03-16 — TASK-BRAND-MANIFESTO + TASK-LOGO-REPLACE PM 审查: 全部 PASS
+
+**Pipeline.tsx**: 6/6 改动逐字一致 (P1-P5 文案 + 技术标签删除)
+**AboutContent.tsx**: V2 宣言 17 句逐字核验 17/17 一致 + 理念段/三卡片/技术基座/PageHero 全部 PASS
+**Logo 替换**: 4/4 文件 (Header/SubPageHeader/CreateHeader/Footer) + Sparkles 零残留 + favicon 已更新
+**Frontend 自主优化**: 核心团队位置从 Mission 后调到 Values 后，信息架构更合理
+**构建**: 18/18 路由通过
+**可提交 Founder 终审**
+
+---
+
+### 2026-03-16 — R8 E2E PM 独立复核: 有条件通过
+
+**复核范围**: 1_outline.json + storyboard excerpt + r8_report.md + 8 角色参考 + 7 场景参考(抽4) + 10 shot + pipeline_log + 代码路径
+**44 维度**: 42 PASS + 1 PARTIAL (D15) + 1 FAIL (N13) — 与 Tester 44/44 完全一致
+**Founder 3 关注**: "圩日"文化正确 + shot_06/08 远景偏差属 NB2 局限 + N13 同意 Tester 修复方向
+**后续**: N13-FIX 派发 @Backend (spouse_of 对称补全, pipeline_orchestrator.py)
+
+---
+
+### 2026-03-16 — TASK-BRAND-MANIFESTO 全流程完成（方案→确认→派发）
+
+**任务来源**: Coordinator 代 Founder 指令 (03-16 11:00)
+**阅读范围**: `BRAND_MANIFESTO_EXPLORATION.md` (540 行) + `Pipeline.tsx` (159 行) + `AboutContent.tsx` (228 行)
+**11:30 方案制定**: Pipeline 方案 B + About V2 + 技术标签迁 About 页
+**12:00 Founder 确认**: 3 决策点全部通过
+**12:00 派发 Frontend**: 详细文案指引 — Pipeline 5 处改动 (P1-P5) + About 5 段改动 (A1-A5)
+**关键文案**:
+- Pipeline slogan: "每个人脑子里都在放电影"
+- Pipeline core: "你说出来。所有人看见。"
+- About 使命段: V2 完整宣言原文
+- About 理念段: "想象力，不该被困住"
+- About 三卡片: "你的画面，任何风格" / "说出来就够了" / "每个人天生会讲故事"
+
+---
+
+### 2026-03-16 — TASK-DEPLOY-R8 PM 独立复核 PASS
+
+**复核范围**: DevOps 3 commits (4926a9a + b98a6df + 73f8a78) + VPS 部署
+**7 维度**: commit 覆盖 (12/12+OB-1) + 逐任务核验 + VPS 验证 (6/6) + rsync 排除 (9 项) + 问题处理 (3/3) + 三端一致 (73f8a78) + 额外文件 (T29-T37 合并)
+**1 非阻塞**: commit message 未包含 T29-T37 范围
+**结论**: ✅ PASS，Tester 可以开始 R8 E2E
+
+---
+
 ### 2026-03-13 — OB-1 Code Review PASS + DevOps 部署派发
 
 **OB-1 审查**: shot_validator.py 4 处返回路径 × 7 字段 = 28/28 完全一致 ✅

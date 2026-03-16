@@ -31,9 +31,31 @@
 | **Phase 5** | ✅ Backend T-H-Backend (19:45) 完成 |
 | **Phase 6 Code Review** | ✅ 1/1 PASS (03-13 20:00)，1 非阻塞观察 (OB-1) |
 | **OB-1 修复** | ✅ @Backend 完成 + PM Review PASS (03-13 20:20/20:35) |
-| **DevOps 部署** | 🔄 @DevOps commit + push + VPS deploy (03-13 20:30 派发) |
-| **R8 E2E** | ⏳ @Tester 等 DevOps 部署后 → T-J 修复 → R8 E2E (44 维度, ≥39/44 PASS + 0 FAIL) |
-| **执行计划** | ~~全部 Phase~~ → ~~Code Review 12/12~~ → ~~OB-1~~ → **DevOps 部署** → T-J + R8 E2E → PM 独立复核 |
+| **DevOps 部署** | ✅ @DevOps 完成 + PM 复核 PASS (03-14 10:30 / 03-16 10:00) |
+| **R8 E2E** | ✅ @Tester 完成 (42/44) + PM 复核有条件通过 (03-16 17:00) |
+| **N13-FIX** | 🔄 @Backend spouse_of 对称补全 (已派发 03-16 17:00) |
+| **IMG-SAFETY AI-ML** | ✅ 全部完成 + PM Review PASS |
+| **IMG-SAFETY Backend** | ✅ PM Review PASS (03-16 20:00) |
+| **Tester 验证** | ✅ 17/17 PASS + PM 确认 |
+| **DevOps 部署** | 🔄 @DevOps push + deploy (已派发) |
+| **执行计划** | ~~全部 Phase~~ → ~~Code Review 12/12~~ → ~~OB-1~~ → ~~部署~~ → ~~R8~~ → ~~PM 复核~~ → ~~AI-ML+Backend~~ → ~~PM Review~~ → ~~Tester 17/17~~ → **DevOps 部署** |
+
+---
+
+### TASK-BRAND-MANIFESTO — 🔄 已派发 @Frontend (P1, 并行线)
+
+| 字段 | 内容 |
+|------|------|
+| **优先级** | P1（与 R8 E2E 并行，不互相阻塞） |
+| **来源** | Coordinator 代 Founder 指令 (03-16 11:00) |
+| **核心文档** | `docs/BRAND_MANIFESTO_EXPLORATION.md` (V2 宣言) |
+| **PM 阅读+规划** | ✅ 完成 (03-16 11:30) |
+| **PM 方案** | Pipeline 方案 B (精选核心) + About V2 完整版 + 技术标签→About 页 |
+| **Founder 确认** | ✅ 3 个决策点全部确认 (03-16 12:00) |
+| **PM 文案指引** | ✅ 已派发 @Frontend (03-16 12:00) — Pipeline 5 处改动 + About 5 段改动 |
+| **Frontend 实现** | ✅ @Frontend 完成 (03-16 13:00) |
+| **PM 审查** | ✅ 全部 PASS (03-16 17:30) |
+| **执行计划** | ~~PM 规划~~ → ~~Founder 确认~~ → ~~文案指引~~ → ~~Frontend 实现~~ → ~~PM 审查~~ → **Founder 终审** |
 
 ---
 
@@ -522,6 +544,33 @@ Step 10: PM 独立深度审查                                       ✅ 同意 
 | T14 | 角色风格统一 (reference_image_manager.py) | @AI-ML | P1 | ✅ PASS |
 | T15 | NB2 气泡重复抑制 | @AI-ML | P2 | ✅ PASS |
 | T16 | OB-6 降级分支补充 | @Backend | P3 | ✅ PASS |
+
+### TASK-LOGO-REPLACE — ⏳ @Frontend 全站 Logo 替换 (P0)
+
+| 字段 | 内容 |
+|------|------|
+| **优先级** | P0 |
+| **来源** | Founder 直接派发 → Coordinator 转达 (2026-03-16) |
+| **负责人** | @Frontend |
+| **前置** | 无（资源文件已就绪 `frontend/public/brand/`） |
+| **说明** | 4 个组件 Sparkles→新 logo。双版本体系：Header 用 D_v1 加粗版(线条)，Favicon 用 D_v2 圆形(实心) |
+| **修改范围** | Header.tsx, SubPageHeader.tsx, CreateHeader.tsx, Footer.tsx |
+| **资源更新** | ⚠️ 2026-03-16 16:00 资源已优化（加粗+二值化+圆形favicon），用最新文件 |
+| **验收** | 全页面走查，所有 logo 位置显示新图标 + favicon 为圆形 |
+| **状态** | ⏳ 待 @Frontend 执行（资源已就绪 v2） |
+
+### TASK-BRAND-MANIFESTO — 📋 @PM 品牌宣言前端整合 (P1)
+
+| 字段 | 内容 |
+|------|------|
+| **优先级** | P1 |
+| **来源** | Founder 指令 → Coordinator 派发 (2026-03-16) |
+| **负责人** | @PM（规划+文案审核）→ @Frontend（实现） |
+| **前置** | PM 完整阅读 `docs/BRAND_MANIFESTO_EXPLORATION.md` |
+| **说明** | 品牌宣言 V2 整合到首页 Pipeline 模块（主战场）+ About 页重写（保留核心团队）+ 技术标签迁移 |
+| **Founder 指示** | ① Pipeline 需考虑认知负荷（全量 vs 精选） ② About 页除团队外可全面重写 ③ 技术标签找新位置 |
+| **关键文档** | `docs/BRAND_MANIFESTO_EXPLORATION.md`（V2 宣言 + 深度分析） |
+| **状态** | 📋 待 @PM 阅读文档 + 制定实施计划 |
 
 ### TASK-STYLE-THUMBNAILS — ⏳ @AI-ML 15 种风格缩略图生成 (P0)
 

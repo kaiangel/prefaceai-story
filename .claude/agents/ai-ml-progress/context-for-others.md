@@ -1,20 +1,41 @@
 # AI-ML Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 AI-ML 的工作状态和 Prompt 约束
-> **最后更新**: 2026-03-13
+> **最后更新**: 2026-03-16
 
 ---
 
 ## 当前状态速览
 
 ```
-状态: Phase 1 + Phase 3 T-H-AIML 全部完成
-下一步: PM Phase 4 Code Review → Phase 5 T-H-Backend
+状态: TASK-IMG-SAFETY-RETRY-AIML + 2 项补充全部完成
+下一步: Tester TASK-IMG-SAFETY-VERIFY (4 项验证)
 ```
 
 ---
 
-## Phase 3 T-H-AIML (2026-03-13) @PM @Backend
+## TASK-IMG-SAFETY-RETRY-AIML (2026-03-16) @PM @Backend
+
+### 参考图安全改写 Prompt 工程 — 5 项交付物
+
+**文件**: `app/prompts/prompt_safety_rewrite.py`
+
+**交付物概览**:
+1. **5 类新关键词** (74 词条): CROWD/ANIMAL/FIRE_SMOKE/CHILD_CONTEXT/REVEALING_CLOTHING
+2. **SCENE_REF_REWRITE_PROMPT**: 场景参考图专用 LLM 改写模板
+3. **CHAR_REF_REWRITE_PROMPT**: 角色参考图专用 LLM 改写模板
+4. **_simplify_anchor_prompt() spec**: Backend 实现指引
+5. **_build_anchor_prompt() 结构优化**: 建议 "No people" 前置
+
+**@Backend 关键接口**:
+- `from app.prompts.prompt_safety_rewrite import build_scene_ref_rewrite_prompt, build_char_ref_rewrite_prompt, apply_simple_replacements`
+- L2 简化重试: `apply_simple_replacements(prompt)` 处理 CROWD/ANIMAL/FIRE_SMOKE + 前置 "No people"
+- L3a 场景改写: `build_scene_ref_rewrite_prompt(prompt)` → 传给 PromptRewriter LLM
+- L3b 角色改写: `build_char_ref_rewrite_prompt(prompt)` → 传给 PromptRewriter LLM
+
+---
+
+## Phase 3 T-H-AIML (2026-03-13) ✅ — @PM @Backend
 
 ### T-H-AIML [P2] 画面自然度 Haiku Prompt 设计
 
@@ -146,6 +167,7 @@
 ### 30. Stage 4 空间方向自洽: camera_angle + 角色动作 + 空间描述需逻辑一致 (T-G)
 ### 31. Stage 1 signage_text 字段: unique_locations 招牌文字与 display_name 分离 (T-C-AIML)
 ### 32. ShotValidator 画面自然度: 3 子维度 (ANATOMICAL+PHYSICS+SPATIAL), 风格无关, Phase 1 仅日志 (T-H-AIML)
+### 33. 参考图安全改写: CROWD/ANIMAL/FIRE_SMOKE/CHILD/REVEALING 5 类新关键词 + 场景/角色专用改写模板 (TASK-IMG-SAFETY-RETRY-AIML)
 
 ---
 

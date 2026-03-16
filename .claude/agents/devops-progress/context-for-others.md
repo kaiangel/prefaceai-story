@@ -1,13 +1,13 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-03-10
+> **最后更新**: 2026-03-14
 
 ---
 
 ## 当前状态速览
 
-状态: ✅ **VPS 已更新部署** — 最新代码已推送 + 部署
+状态: ✅ **VPS 已更新部署 (TASK-DEPLOY-R8)** — T-A~T-K + OB-1 全部代码已推送 + 部署
 域名: `https://prefaceai.mov` 已上线（前端 + API + 静态资源全部正常）
 服务器: 107.148.1.199 (8C/16GB/200GB, Ubuntu 20.04)
 容器: 3 个运行中 — api (healthy) + frontend (up) + redis (healthy)
@@ -15,25 +15,20 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 
 ---
 
-## 最近部署 (2026-03-10)
+## 最近部署 (2026-03-14)
 
-### TASK-DEPLOY-UPDATE
+### TASK-DEPLOY-R8
 
 **部署内容**:
-1. E2E R2/R3 pipeline fixes (T1-T16 + backup model Flash + NB2 rename)
-2. TASK-GCLOUD-OPT (Google Cloud 申请优化)
-3. Contact 页面更新 (微信/地址)
-4. TASK-STYLE-THUMBNAILS 集成 (15 种风格缩略图)
-5. 团队照片 + 产品 Demo 视频
+1. T-A~T-K (11 项平台级修复) 全部代码
+2. OB-1 shot_validator.py early-return 字段修复
+3. ShotValidator 自然度维度 (Phase 1 仅日志)
+4. Prompt Pre-Check v1 (仅日志)
+5. E2E 测试脚本 R4-R7
 6. Agent progress + team docs 同步
 
-**Git**: 3 commits pushed → `232f2f0` (main)
-**Docker**: frontend + api 容器重建 + 重启
-
-**新增静态资源**:
-- `/styles/*.jpg` — 15 张风格缩略图 (400×400 JPEG, ~1MB)
-- `/team/*.jpg` — 3 张团队照片
-- `/demo.mp4` — 产品 Demo 视频
+**Git**: 3 commits pushed → `73f8a78` (main)
+**Docker**: api 容器重建 + 重启（frontend/redis 保持运行）
 
 ---
 
@@ -69,6 +64,7 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 - **API 已可访问**: `https://prefaceai.mov/api/health` 返回 healthy
 - **CORS 仍为全开放**: `allow_origins=["*"]`，后续需限制为 prefaceai.mov
 - **代码通过 rsync 部署**: 非 git clone（私有仓库认证问题），后续可配置 deploy key
+- **SSH 端口 58913**: 非默认 22，连接时需指定 `-p 58913`
 
 ---
 
@@ -77,7 +73,7 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 ```
 远程仓库: https://github.com/kaiangel/prefaceai-story (private)
 分支: main (tracked → origin/main)
-最新 commit: 232f2f0 docs: agent progress + team-brain sync + E2E R2/R3 test scripts
+最新 commit: 73f8a78 docs: agent progress + team-brain sync + R7 E2E + T-A~T-K tracking
 ```
 
 ---
@@ -86,6 +82,6 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 
 | 环境 | 状态 | 最近更新 |
 |------|------|----------|
-| dev | 🟢 运行中（本地开发） | 2026-03-10 |
+| dev | 🟢 运行中（本地开发） | 2026-03-14 |
 | staging | ⚪ 未部署 | - |
-| prod | ✅ **已部署**（等待 API Key） | 2026-03-10 |
+| prod | ✅ **已部署**（等待 API Key） | 2026-03-14 |

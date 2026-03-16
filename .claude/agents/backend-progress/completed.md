@@ -4,6 +4,26 @@
 
 ---
 
+## 2026-03-16
+
+### N13-FIX + TASK-IMG-SAFETY-RETRY Backend 完成 ✅ (19:00)
+
+**N13-FIX**: `pipeline_orchestrator.py` — Stage 1 后自动补全 spouse_of 反向关系
+
+**L1**: `image_generator.py` 2 处日志 `MAX_RETRIES` → `attempt + 1`
+
+**L2**: `scene_reference_manager.py` — `_simplify_anchor_prompt()` + CONTENT_SAFETY 简化重试
+
+**L3a**: `scene_reference_manager.py` + `prompt_rewriter.py` — 场景参考 PromptRewriter 改写重试
+
+**L3b**: `reference_image_manager.py` + `prompt_rewriter.py` — 角色参考 PromptRewriter 改写重试
+
+**PromptRewriter**: 新增 `rewrite_scene_ref()` + `rewrite_char_ref()` 方法
+
+**验证**: 5/5 import ✅ + 逻辑测试 ✅
+
+---
+
 ## 2026-03-13
 
 ### OB-1 修复完成 ✅ (20:20)

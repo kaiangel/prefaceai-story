@@ -4,6 +4,41 @@
 
 ---
 
+## 2026-03-16
+
+### TASK-IMG-SAFETY-RETRY-AIML — 参考图安全改写 Prompt 工程 ✅
+
+**完成时间**: 2026-03-16
+**修改文件**: `app/prompts/prompt_safety_rewrite.py`
+
+| # | 交付物 | 内容 |
+|---|--------|------|
+| 1 | 新增关键词类别 | 5 类 74 词条: CROWD(19)+ANIMAL(16)+FIRE_SMOKE(16)+CHILD_CONTEXT(10)+REVEALING_CLOTHING(13) |
+| 2 | SCENE_REF_REWRITE_PROMPT | 场景参考图专用 LLM 改写模板 |
+| 3 | CHAR_REF_REWRITE_PROMPT | 角色参考图专用 LLM 改写模板 |
+| 4 | _simplify_anchor_prompt() spec | Backend 实现指引（前置 No people + apply_simple_replacements + 正则清理） |
+| 5 | _build_anchor_prompt() 结构优化 | 建议 "No people" 从 prompt 末尾前置到标题之后 |
+
+**设计要点**:
+- **CROWD 策略**: 人群活动→静态环境元素（crowds→visitors, bustling→serene, townspeople→architectural details）
+- **ANIMAL 策略**: 活体动物→容器道具（chickens→woven baskets with eggs, livestock→wooden crates）
+- **FIRE_SMOKE 策略**: 明火浓烟→温暖光晕雾气（fire→warm glow, smoke→atmospheric haze）
+- **场景改写模板**: PRESERVE 建筑/招牌 + REMOVE 人群/动物 + REPHRASE 氛围词 + ADD "No people" 开头
+- **角色改写模板**: PRESERVE 身份锚点(面部/发色/服装颜色) + MODIFY 武器(→ornate implement) + MODIFY 暴露(增加覆盖但不改颜色) + SIMPLIFY 儿童(聚焦面部服装)
+- **结构优化**: "No people" 从 prompt 末尾前置到标题后，降低 Gemini 安全过滤误触发
+
+**R8 触发案例**: `rural_market_entrance` 被 "crowds of rural townspeople" + "clucking chickens" + "smoke rising" 触发，现有 6 类关键词一个都匹配不到 → 新增 CROWD/ANIMAL/FIRE_SMOKE 三类完整覆盖
+
+### PM Code Review 后 2 项小补充 ✅
+
+**完成时间**: 2026-03-16
+**修改文件**: `app/services/scene_reference_manager.py`
+
+1. **`_simplify_anchor_prompt()` 正则补充**: `re.sub(r'\b(people|persons|humans|men|women|children)\s+(are\s+)?\w+ing\b', '', simplified)` — 清理 `apply_simple_replacements()` 可能漏掉的自由文本人物描述
+2. **`_build_anchor_prompt()` "No people" 前置**: exterior + interior 两个分支，将 "STRICT: No people..." 从 prompt 末尾移到标题之后，新增 "This is a PURE ARCHITECTURAL/ENVIRONMENTAL scene."，末尾原 STRICT 行删除
+
+---
+
 ## 2026-03-13
 
 ### Phase 3 — T-H-AIML (画面自然度 Haiku Prompt 设计) ✅

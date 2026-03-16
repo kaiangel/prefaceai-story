@@ -4,6 +4,69 @@
 
 ---
 
+## 2026-03-16: TASK-IMG-SAFETY-VERIFY — 4 项验证测试
+
+**结果**: 17/17 PASS
+**范围**: N13-FIX + L1 日志修复 + L2/L3a 场景恢复 + L3b 角色恢复
+
+**Test 1: N13-FIX (5/5 PASS)**
+- 1a: 单向 spouse_of → 自动补全反向 ✅
+- 1b: 已双向 → 不重复添加 ✅
+- 1c: 无 spouse_of → 无报错 ✅
+- 1d: 多对 spouse → 全部补全 ✅
+- 1e: 代码审计 pipeline_orchestrator.py — [N13-FIX] + list()副本 + spouse_of 检查 ✅
+
+**Test 2: L1 日志修复 (2/2 PASS)**
+- 2a: 代码审计 — `attempt + 1` 正确，旧模式零残留 ✅
+- 2b: API 集成 — 正常路径零额外开销 ✅
+
+**Test 3: L2+L3a 场景恢复 (4/4 PASS)**
+- 3a: `_simplify_anchor_prompt()` — crowds→visitors, chickens→baskets, smoke→haze, 正则去人, signage 保留 ✅
+- 3b: `_build_anchor_prompt()` — "No people" 前置 (exterior+interior, 无末尾残留) ✅
+- 3c: 代码审计 L2+L3a 链路 — L2 日志+L3a 日志+simplify 调用+rewrite 调用 ✅
+- 3d: API 集成 — 场景首次即成功 (CONTENT_SAFETY 未触发 → "No people"前置可能已生效) ✅
+
+**Test 4: L3b 角色恢复 (6/6 PASS)**
+- 4a: 代码审计 L3b 链路 — rewrite_char_ref + get_rewriter ✅
+- 4b: build_char_ref_rewrite_prompt — 模板完整 (PRESERVE/MODIFY) ✅
+- 4c: build_scene_ref_rewrite_prompt — 模板完整 (REMOVE/SIGNAGE保护) ✅
+- 4d: apply_simple_replacements — 5 类新关键词替换正确 ✅
+- 4e: prompt_rewriter 新方法 — rewrite_scene_ref + rewrite_char_ref + get_rewriter ✅
+- 4f: API 集成 — 角色首次即成功 ✅
+
+**输出**:
+- `tests/test_img_safety_verify.py`
+- `test_output/manualtest/img_safety_verify/20260316_194243/verify_report.md`
+
+---
+
+## 2026-03-16: TASK-E2E-REGRESSION-R8 — 44 维度 E2E 回归验证
+
+**结果**: 42/44 PASS + 1 PARTIAL (D15) + 1 FAIL (N13)
+**故事**: "外公的秋梨膏" (山村赶圩三代同行) / illustration / 4 角色 / 10 shots / 1967.8s
+
+**前置 T-J 修复**: N12/N14/N15 测试脚本 bug 修复 ✅
+
+**R8 新增维度 (N16-N23): 全部 PASS**
+- N16 off_screen 去重 (T-A) ✅
+- N17 重试上限 (T-B) ✅
+- N18 signage_text 流 (T-C) ✅ — "周记百草堂" 正确传递
+- N19 Quality Report (T-D) ✅ — 3 维度 0 质量问题
+- N20 Stage 4 Rules (T-E/F/G) ✅ — Rules #10-12 存在
+- N21 Pre-Check (T-I) ✅ — P1/P2/P4 检查代码存在
+- N22 自然度 (T-H) ✅ — 3 子维度 Phase 1 仅日志
+- N23 人群计数 (T-K) ✅ — NAMED/FEATURED vs crowd
+
+**FAIL**: N13 spouse_of 不对称 — 系统缺防御性处理
+**PARTIAL**: D15 camera movement 全 static — 已知限制
+**覆写**: N1 "外婆" 不在场人物误报 → PASS
+
+**输出**:
+- `tests/test_e2e_regression_r8.py`
+- `test_output/manualtest/e2e_regression_r8/20260316_145613/r8_report.md`
+
+---
+
 ## 2026-03-13
 
 ### TASK-E2E-REGRESSION-R7 ✅ 36/36 PASS (10/10 shots, 36 维度)

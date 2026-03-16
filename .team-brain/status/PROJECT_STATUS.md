@@ -1,6 +1,6 @@
 # 序话Story 项目状态看板
 
-> 最后更新: 2026-03-13
+> 最后更新: 2026-03-16
 > 更新者: PM
 
 ---
@@ -11,7 +11,7 @@
 项目名称: 序话Story - AI条漫/短视频生成系统
 目标: 用户输入创意 → 自动生成可发布的条漫或短视频
 当前版本: v0.6.6
-当前主线: 🔄 **12/12 Code Review PASS + OB-1 PASS → DevOps 部署中 → T-J + R8 E2E (44 维度)**
+当前主线: **DevOps 部署** (N13+IMG-SAFETY+BRAND+LOGO) | 并行: BRAND 等 Founder 终审
 核心内容: 都市情感短剧 (DEC-005)
 产品形态: 条漫优先 → 短视频保留
 Pipeline品牌: FrameSpark™

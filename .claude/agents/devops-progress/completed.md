@@ -4,6 +4,46 @@
 
 ---
 
+### TASK-DEPLOY-R8: T-A~T-K 代码推送 + VPS 部署更新 ✅
+
+**完成时间**: 2026-03-14
+**验收状态**: 全部验证通过
+**任务类型**: 版本控制 + 部署更新
+
+**背景**: T-A~T-K (11 项平台级修复) + OB-1 修复全部完成，代码已 Code Review 12/12 PASS。Tester 即将执行 R8 E2E 回归验证，需要最新代码部署到 VPS。
+
+**完成内容**:
+- [x] 读取 TEAM_CHAT 最新消息，理解部署上下文
+- [x] 排除敏感文件（.env, team-members, .claude）
+- [x] Git 提交 3 批:
+  - `4926a9a` feat: T-A~T-K platform fixes + ShotValidator naturalness (Phase 1 log-only) (9 files)
+  - `b98a6df` test: add E2E regression test scripts R4-R7 (4 files)
+  - `73f8a78` docs: agent progress + team-brain sync + R7 E2E + T-A~T-K tracking (23 files)
+- [x] Push to GitHub: `a33fb32..73f8a78` → `origin/main`
+- [x] rsync 代码同步到 VPS `/opt/xuhua-story/`（排除 .env, .git, node_modules, test_output, __pycache__, ssl, team-members, .claude, .team-brain）
+- [x] 修复文件权限（UID 501 → trader:trader，通过 root SSH chown -R）
+- [x] Docker rebuild api 容器
+- [x] docker compose up -d 重启服务（api 重建，frontend/redis 保持运行）
+- [x] 外部验证全部通过
+
+**问题处理**:
+| # | 问题 | 解决方式 |
+|---|------|----------|
+| 1 | SSH 默认端口 22 连不上 | 从 completed.md 找到正确端口 58913 |
+| 2 | rsync Permission denied (UID 501) | root SSH chown -R trader:trader |
+| 3 | --no-cache build SSH 超时 | 重连后利用已缓存层秒级完成 |
+
+**验证结果**:
+| 验证项 | 结果 |
+|--------|------|
+| `https://prefaceai.mov` | ✅ HTTP 200 |
+| `https://prefaceai.mov/api/health` | ✅ `{"status":"healthy"}` |
+| Docker api 容器 | ✅ Up (healthy) |
+| Docker frontend 容器 | ✅ Up |
+| Docker redis 容器 | ✅ Up (healthy) |
+
+---
+
 ### TASK-DEPLOY-UPDATE: 代码推送 + VPS 部署更新 ✅
 
 **完成时间**: 2026-03-10

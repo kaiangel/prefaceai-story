@@ -1,81 +1,45 @@
 # Tester Agent - 当前任务
 
-> **最后更新**: 2026-03-13 13:00
-> **状态**: ✅ TASK-E2E-REGRESSION-R7 完成 — **36/36 PASS (满分)** → 等 PM 独立复核
+> **最后更新**: 2026-03-16 19:45
+> **状态**: ✅ TASK-IMG-SAFETY-VERIFY 完成 — **17/17 PASS** → 等 PM 确认
 
 ---
 
 ## 刚完成
 
-### TASK-E2E-REGRESSION-R7 — 36 维度 E2E 回归验证 ✅ (36 PASS / 0 FAIL)
+### TASK-IMG-SAFETY-VERIFY — 4 项验证测试 ✅ (17/17 PASS)
 
-**测试概况**:
-- 故事: "老街赶集那天早晨" — 三代同行赶集 / illustration / 4 角色(祖孙父母) / 10 shots / 2328.4s
-- 角色: 奶奶李秀珍(grandmother) / 爸爸陈志远(father) / 妈妈方晴(mother) / 小禾(granddaughter)
-- **全部 10 张 shot 图片 + 8 角色参考图 + 6 场景参考图逐一人工查看**
-- 验证范围: T1-T37 + OB-T29 全量回归 + N7-N15 新维度
-- 覆盖场景: 多代家庭 + 商铺/招牌 + 集市人群(3+人) + 镜头多样性 + 画外音
+**测试范围**: N13-FIX + L1 日志 + L2/L3a 场景恢复 + L3b 角色恢复
 
-**36 维度评分**:
+**17 项测试全部 PASS**:
 
-| # | 维度 | 判定 | 备注 |
-|---|------|------|------|
-| D1 | 角色一致性 | **4.5/5 PASS** | 4角色10shots始终可辨(奶奶粉衫竹篮/爸爸白衬衣/妈妈绿衫/小禾黄衫双马尾) |
-| D2 | 风格一致性 | **5/5 PASS** | illustration统一，暖色调晨光贯穿 |
-| D3 | 参考图质量 | **5/5 PASS** | 4×2角色参考图+6场景参考图高质 |
-| D4 | 构图多样性 | **PASS** | 3 shot_types, 4 angles |
-| D5 | text_overlay | **PASS** | 10/10 100% |
-| D6 | 文字可读性 | **PASS** | 气泡/旁白/思想均清晰 |
-| D7 | narration 覆盖 | **PASS** | 6/6 plot_points 1:1 |
-| D8 | 对话内容匹配 | **PASS** | 画面与对话语境吻合 |
-| D9 | 情感表达 | **PASS** | 奶奶兴奋/爸爸担忧/小禾好奇 |
-| D10 | 场景连续性 | **PASS** | 巷道→集市环境连贯 |
-| D11 | 光影一致 | **PASS** | 暖色调晨光统一 |
-| D12 | 角色表情 | **PASS** | 表情匹配情绪 |
-| D13 | 背景细节 | **PASS** | 糖葫芦/泥人/灯笼/布棚丰富 |
-| D14 | 道具连续性 | **PASS** | 竹篮/斜挎包/粉包跨shot保持 |
-| D15 | 镜头语言 | **PASS** | illustration媒介修正(static固有) |
-| D16 | 叙事完整性 | **PASS** | 1620字旁白 |
-| S1 | 角色数量 | **PASS** | 平台问题P-R7-S1(集市人群误计) |
-| S2 | 道具存续 | **PASS** | |
-| S3 | 面部一致 | **PASS** | |
-| S4 | 跨年龄风格 | **4.5/5 PASS** | elderly/child同一画风 |
-| S5 | 气泡重复 | **PASS** | 日志误报，人工确认0重复 |
-| N1 | 角色称谓 | **PASS** | 3处误报已排除(泛指爷爷+儿化音) |
-| N2 | 对话自然度 | **PASS** | 0过长 0书面化 |
-| N3 | 背景多样性 | **PASS** | 2场景各5种背景 |
-| N4 | 室内纵深感 | **PASS** | 巷道/集市3层纵深 |
-| N5 | 参考图模型 | **PASS** | NB2×37, FAST=0 |
-| N6 | 道具检测日志 | **PASS** | 10/10 composition |
-| N7 | off_screen标记 | **PASS** | T29代码存在+1处off_screen标记 |
-| N8 | off_screen渲染 | **PASS** | Shot8底部voiceover bar正确 |
-| N9 | family_rels传递 | **PASS** | 5条关系+Pipeline/Screenplay代码确认 |
-| N10 | 亲属称谓清晰度 | **PASS** | 0歧义+T37规则存在 |
-| N11 | 镜头信息完整性 | **PASS** | 10/10 size+angle+Plan A/B代码确认 |
-| N12 | 多人空间锚定 | **PASS** | T35规则存在 |
-| N13 | 关系逻辑一致性 | **PASS** | T33规则存在,spouse单向为LLM轻微遗漏 |
-| N14 | color_palette英文 | **PASS** | 无中文+T36代码确认 |
-| N15 | 招牌注入 | **PASS** | T31代码存在(检测+注入) |
+| 测试 | 子项 | 结果 | 说明 |
+|------|------|------|------|
+| **Test 1: N13-FIX** | 5 | 5/5 PASS | 单向补全、已双向不重复、无spouse无报错、多对全补全、代码审计 |
+| **Test 2: L1 日志** | 2 | 2/2 PASS | `attempt+1` 代码正确、API 正常路径零开销 |
+| **Test 3: L2+L3a 场景恢复** | 4 | 4/4 PASS | simplify 替换正确、No-people 前置正确、链路完整、API 首次即成功 |
+| **Test 4: L3b 角色恢复** | 6 | 6/6 PASS | 链路完整、模板正确、替换正确、新方法存在、API 首次即成功 |
 
 **关键发现**:
-1. T29-T37 + OB-T29 全部修复在端到端流水线中正常工作
-2. 平台问题 P-R7-S1: ShotValidator(Haiku)在集市人群场景将路人计为角色
-3. N1 自动检测3处误报: "那个爷爷"(泛指陌生老人) + "待会儿"(儿化音)
-4. N13 spouse_of 单向: LLM 仅定义 陈志远→方晴 未添加反向，T33规则存在但LLM未完全遵守
-5. R6→R7: 27/27 → **36/36 满分**
+1. N13-FIX spouse_of 补全逻辑正确，4 种边界情况全通过
+2. L1 日志修复正确 — `attempt + 1` 替代 `MAX_RETRIES`，旧模式零残留
+3. `_simplify_anchor_prompt()` 替换验证: crowds→visitors, chickens→baskets, smoke→haze, 正则清除 people walking, signage 保留
+4. `_build_anchor_prompt()` "No people" 已前置到标题后 (exterior+interior 各 1 处，总共 2 处无残留)
+5. 3 个 API 集成测试均未触发 CONTENT_SAFETY — **AI-ML "No people" 前置改动可能已有效预防触发**
 
 **输出**:
-- 测试脚本: `tests/test_e2e_regression_r7.py`
-- 报告: `test_output/manualtest/e2e_regression_r7/20260313_115412/r7_report.md`
-- 输出: `test_output/manualtest/e2e_regression_r7/20260313_115412/story_A/20260313_115412/`
+- 测试脚本: `tests/test_img_safety_verify.py`
+- 报告: `test_output/manualtest/img_safety_verify/20260316_194243/verify_report.md`
 
 ---
 
 ## 历史完成
 
+### TASK-E2E-REGRESSION-R8 ✅ 42/44 PASS (10/10 shots, 44 维度)
+### TASK-E2E-REGRESSION-R7 ✅ 36/36 PASS (10/10 shots, 36 维度)
 ### TASK-E2E-REGRESSION-R6 ✅ 27/27 PASS (10/10 shots, 27 维度)
 ### TASK-E2E-REGRESSION-R5 ✅ 20/21 PASS (20/20 shots, 21 维度)
-### TASK-E2E-REGRESSION-R4 ✅ 14/16 PASS + 2 PARTIAL (20/20 shots, 16 维度)
+### TASK-E2E-REGRESSION-R4 ✅ 14/16 PASS (20/20 shots, 16 维度)
 ### TASK-E2E-REGRESSION-R3 ✅ 7/10 PASS (20/20 shots, 10 维度)
 ### TASK-E2E-REGRESSION-R2 ✅ PASS (4.65/5)
 ### TASK-E2E-REGRESSION ✅ PASS (4.63/5)

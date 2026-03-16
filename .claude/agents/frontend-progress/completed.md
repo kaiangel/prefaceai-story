@@ -4,6 +4,62 @@
 
 ---
 
+## 2026-03-16
+
+### TASK-BRAND-MANIFESTO 品牌宣言整合 ✅
+
+**完成时间**: 2026-03-16
+**验收状态**: 待 PM 文案审查 + Founder 终审
+**任务来源**: Coordinator 代 Founder 指令 → PM 方案确认 → PM 文案指引派发
+
+**完成内容（2 文件修改）**:
+
+#### Pipeline.tsx (5 处改动)
+- [x] P1: badge `AI Story Engine` → `Story Engine`
+- [x] P2: slogan → `每个人脑子里都在放电影`（V2 概念锚点）
+- [x] P3: core message → `你说出来。所有人看见。`（V2 结尾提炼）
+- [x] P4: 技术标签整块删除（4 个标签迁移到 About 页）
+- [x] P5: tagline → `你脑海里的画面，不该只有你看得见`（V2 精神收尾）
+
+#### AboutContent.tsx (5 段改动)
+- [x] A1: PageHero subtitle → `致每一个脑子里装满画面的人`
+- [x] A2: 使命段 → V2 完整宣言原文（4 段落块，`max-w-2xl` 聚焦，`space-y-8` 呼吸间距，视觉重音）
+- [x] A3: 理念段 → `想象力，不该被困住` + 鸿沟跨越文案
+- [x] A4: 三卡片 → V2 精神重写（你的画面任何风格 / 说出来就够了 / 每个人天生会讲故事）
+- [x] A5: 新增"技术基座"段（4 技术标签 pill 从 Pipeline 迁入）
+- [x] 核心团队原封不动，位置调整到三卡片下方、技术基座上方
+
+**验收指标**:
+- 2/2 文件修改: ✅
+- Pipeline 5 处文案替换 + 1 处删除: ✅
+- About 5 段改动 + 核心团队不动: ✅
+- `npm run build` 18 路由通过: ✅
+
+---
+
+### TASK-LOGO-REPLACE 全站 Logo 替换 ✅
+
+**完成时间**: 2026-03-16
+**验收状态**: 待确认
+**任务来源**: Founder 直接派发（via Coordinator）
+
+**完成内容（4 文件修改）**:
+
+- [x] `Header.tsx` — `<Sparkles>` → `<Image src="/brand/logo-48.png">` (28×28)，hover 从 rotate-12 → scale-110
+- [x] `SubPageHeader.tsx` — `<Sparkles>` → `<Image src="/brand/logo-40.png">` (24×24)
+- [x] `CreateHeader.tsx` — `<Sparkles>` → `<Image src="/brand/logo-40.png">` (24×24)
+- [x] `Footer.tsx` — `<Sparkles>` → `<Image src="/brand/logo-48.png">` (28×28)
+
+**验收指标**:
+- 4/4 layout 文件 logo 替换: ✅
+- layout 目录 Sparkles 零残留: ✅
+- 其他页面装饰性 Sparkles 不受影响: ✅
+- favicon.ico 已由 Coordinator 替换: ✅
+- 资源 v2 优化（加粗+精确色值+favicon 圆形裁切）已原地覆盖，代码无需改动: ✅
+- `npm run build` 18 路由通过: ✅
+
+---
+
 ## 2026-03-10
 
 ### Contact 页面更新 + 风格缩略图集成 ✅

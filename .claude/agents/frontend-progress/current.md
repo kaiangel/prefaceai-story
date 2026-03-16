@@ -1,57 +1,46 @@
 # Frontend 当前任务进度
 
-> 更新时间: 2026-03-10
-> 状态: Contact 更新 + 风格缩略图集成完成，待 DevOps 部署
+> 更新时间: 2026-03-16
+> 状态: TASK-BRAND-MANIFESTO + TASK-LOGO-REPLACE 完成，待 PM 文案审查 + DevOps 部署
 
 ---
 
-## 最新完成: Contact 页面更新 + TASK-STYLE-THUMBNAILS 集成
+## 最新完成: TASK-BRAND-MANIFESTO + TASK-LOGO-REPLACE (2026-03-16)
 
 ### 状态: 完成，`npm run build` 18 路由通过
 
-#### 1. Contact 页面更新 (`ContactContent.tsx`)
-- 微信客服: XuhuaStory → `Andrea@PrefaceAI`（微信号 `xingxiwh016`）
-- 地址: 中国 · 深圳 → `中国 · 上海`（黄浦区黄陂南路838号中海国际）
+#### TASK-BRAND-MANIFESTO（品牌宣言整合）
 
-#### 2. 风格缩略图集成（接 @AI-ML TASK-STYLE-THUMBNAILS）
-- 15 张 AI 生成风格缩略图从 `test_output/` 压缩移动到 `public/styles/`
-  - 1024×1024 PNG → 400×400 JPEG (quality 75)，~27MB → ~1MB
-  - 中文文件名 → 英文 key（如 `吉卜力.png` → `ghibli.jpg`）
-- `types/create.ts`: `StylePreset` 接口新增 `thumbnail` 字段
-- `StyleSelector.tsx`: 风格卡片从 CSS 渐变色块替换为真实缩略图
+**Pipeline.tsx** (5 处):
+- badge: `AI Story Engine` → `Story Engine`
+- slogan: → `每个人脑子里都在放电影`
+- core message: → `你说出来。所有人看见。`
+- 技术标签整块删除（迁移到 About 页）
+- tagline: → `你脑海里的画面，不该只有你看得见`
 
-#### 修改文件
+**AboutContent.tsx** (5 段):
+- PageHero subtitle → `致每一个脑子里装满画面的人`
+- 使命段 → V2 完整宣言原文（4 段落块）
+- 理念段 → `想象力，不该被困住`
+- 三卡片 → V2 精神重写
+- 新增"技术基座"段（4 技术标签从 Pipeline 迁来）
+- 核心团队位置调整到三卡片下方、技术基座上方
 
-| 文件 | 变更 |
-|------|------|
-| `ContactContent.tsx` | 微信+地址更新 |
-| `types/create.ts` | StylePreset +thumbnail，15 个预设添加图片路径 |
-| `StyleSelector.tsx` | 渐变色块 → `<img>` 缩略图 |
-| `public/styles/*.jpg` × 15 | 新增压缩后的风格缩略图 |
+#### TASK-LOGO-REPLACE（全站 Logo 替换）
+
+4 个文件 `<Sparkles>` → `<Image>` logo:
+- `Header.tsx`: logo-48.png + hover scale-110
+- `SubPageHeader.tsx`: logo-40.png
+- `CreateHeader.tsx`: logo-40.png
+- `Footer.tsx`: logo-48.png
 
 ### 构建验证: `npm run build` 18 路由通过，0 错误
-
----
-
-## 此前完成: TASK-GCLOUD-OPT Google for Startups Cloud 申请网站优化
-
-### 状态: 完成，待 Founder 确认 + DevOps 部署
-
-8 文件修改 + 4 新增静态资源（About 团队信息、邮箱域名替换、AI-first 定位、Gemini 标识+Demo 视频、Traction 指标）
-
-详见 `completed.md` 2026-03-10 条目。
 
 ---
 
 ## 待做（Founder 确认记录）
 
 ### 视频预览器组件（等后端 Phase 4.5 视频合成就绪后再做）
-
-用户故事完成后的"检查站"——对应用户旅程 Stage D（预览）：
-- 播放器区域：播放/暂停合成视频
-- 镜头缩略图条：点击跳转到对应镜头
-- 单镜头操作：重新生成、编辑旁白文案
-- BGM 切换
 
 当前 Phase 4.5（视频合成）进度 5%，暂无真实视频可播放。Founder 确认先记录，后续做。
 
@@ -61,6 +50,8 @@
 
 | 任务 | 评分 | 完成时间 |
 |------|------|----------|
+| TASK-BRAND-MANIFESTO | 待 PM 审查 + Founder 终审 | 2026-03-16 |
+| TASK-LOGO-REPLACE | 待确认 | 2026-03-16 |
 | Contact 更新 + 缩略图集成 | 待确认 | 2026-03-10 |
 | TASK-GCLOUD-OPT | 待 Founder 确认 | 2026-03-10 |
 | TASK-RESPONSIVE-OPT | PM 复验 4.5/5 | 2026-03-06 |
