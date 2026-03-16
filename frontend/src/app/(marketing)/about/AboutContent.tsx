@@ -8,21 +8,21 @@ import PageHero from "@/components/ui/PageHero";
 const values = [
   {
     icon: Sparkles,
-    title: "创意无界",
+    title: "你的画面，任何风格",
     description:
-      "支持任何类型的故事——都市情感、古装武侠、科幻冒险、童话寓言。80+种画风，从写实摄影到中国水墨，任你选择。",
+      "都市黄昏、古镇晨雾、星际远航——你脑子里的画面是什么风格，它就是什么风格。80+ 种视觉风格，从写实摄影到中国水墨。",
   },
   {
     icon: Zap,
-    title: "一键成片",
+    title: "说出来就够了",
     description:
-      "输入一句话创意，AI 自动完成故事构思、角色设计、分镜编排和画面生成。几分钟内交付可发布的完整作品。",
+      "你不需要学剪辑，不需要画分镜。说出你看见的画面，剩下的——故事构思、角色设计、分镜编排、画面生成——系统全部完成。",
   },
   {
     icon: Users,
-    title: "人人可用",
+    title: "每个人天生会讲故事",
     description:
-      "不需要美术基础，不需要专业软件。无论你是自媒体运营者、内容创作者还是故事爱好者，都能轻松上手。",
+      "三岁的孩子就会讲故事。你需要的不是美术基础或专业软件，是一个让脑海里的画面走出来的出口。",
   },
 ];
 
@@ -71,95 +71,46 @@ const team = [
 export default function AboutContent() {
   return (
     <div className="container-lg section-padding">
-      <PageHero title="关于序话Story" subtitle="AI-native story creation platform — 让每个人都能讲出精彩的故事" />
+      <PageHero title="关于序话Story" subtitle="致每一个脑子里装满画面的人" />
 
-      {/* Mission */}
+      {/* Mission — V2 Brand Manifesto */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="max-w-3xl mx-auto mb-16"
+        className="max-w-2xl mx-auto mb-16"
       >
         <h2 className="text-2xl font-bold mb-1">我们的使命</h2>
-        <p className="text-sm text-text-muted mb-4">Our Mission</p>
-        <div className="text-text-secondary leading-relaxed space-y-4">
-          <p>
-            在AI时代，创作不应该有门槛。序话Story
-            诞生于一个简单的信念：每个人心中都有一个好故事，只是缺少把它呈现出来的工具。
-          </p>
-          <p>
-            我们将专业影视制作的完整流程——从故事构思、角色设计、分镜脚本到画面生成——封装成一句话的体验。你负责想象，我们负责实现。
-          </p>
-          <p className="text-text-muted text-sm italic">
-            PrefaceAI transforms a single sentence into a complete, publish-ready story — powered by LLM narrative generation, AI image synthesis (Google Gemini), and an end-to-end automated production pipeline.
-          </p>
-        </div>
-      </motion.div>
+        <p className="text-sm text-text-muted mb-8">Our Mission</p>
+        <div className="text-text-secondary leading-relaxed space-y-8">
+          <div className="space-y-3">
+            <p>你脑海里有一个画面。</p>
+            <p>也许是很久以前的一个下午。也许是你编出来的一个故事。也许只是一个模糊的感觉——一种光线，一个表情，一句没说出口的话。</p>
+            <p className="text-text-primary font-medium">你看得见它。</p>
+            <p className="text-text-primary font-medium">很清楚。</p>
+            <p>但你没办法让别人也看见。</p>
+          </div>
 
-      {/* Team */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25 }}
-        className="max-w-4xl mx-auto mb-16"
-      >
-        <h2 className="text-2xl font-bold mb-1">核心团队</h2>
-        <p className="text-sm text-text-muted mb-2">Our Team</p>
-        <p className="text-text-tertiary text-sm mb-8">
-          一支兼具 AI 技术深度和产品商业化经验的创始团队
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {team.map((member, i) => (
-            <motion.div
-              key={member.name}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 + i * 0.1 }}
-              className="bg-bg-secondary rounded-xl p-6 border border-white/5"
-            >
-              {/* Avatar */}
-              <img
-                src={member.photo}
-                alt={member.name}
-                className="w-20 h-20 rounded-full object-cover mb-4 border-2 border-white/10"
-              />
+          <div className="space-y-3">
+            <p>你试过。</p>
+            <p>你试过用文字描述它——但文字太慢了，等你写完，那个画面已经凉了。</p>
+            <p>你试过画出来——但手跟不上脑子。</p>
+            <p>你试过拍出来——但现实里找不到那个光线、那个角度、那个恰到好处的表情。</p>
+            <p>于是那个画面，就留在了你脑子里。</p>
+            <p>和你之前的一千个画面一样。</p>
+          </div>
 
-              {/* Name & Role */}
-              <div className="mb-3">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-semibold">{member.name}</h3>
-                  {member.github && (
-                    <a
-                      href={member.github}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-text-muted hover:text-brand-primary transition-colors"
-                      aria-label={`${member.name} GitHub`}
-                    >
-                      <Github className="w-4 h-4" />
-                    </a>
-                  )}
-                </div>
-                {member.nameCn && (
-                  <p className="text-sm text-text-muted">{member.nameCn}</p>
-                )}
-                <p className="text-sm text-brand-primary mt-1">{member.roleCn}</p>
-              </div>
+          <div className="space-y-3">
+            <p>我们脑子里装满了没人看过的电影。</p>
+            <p>不是因为它们不够好。</p>
+            <p>是因为它们没有出口。</p>
+          </div>
 
-              {/* Bio */}
-              <ul className="space-y-2">
-                {member.bio.map((line, j) => (
-                  <li
-                    key={j}
-                    className="text-sm text-text-secondary leading-relaxed flex gap-2"
-                  >
-                    <span className="text-text-muted mt-1.5 flex-shrink-0">·</span>
-                    <span>{line}</span>
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
-          ))}
+          <div className="space-y-3">
+            <p>序话Story 做的事情很简单。</p>
+            <p>你说出来。</p>
+            <p>它让所有人看见。</p>
+          </div>
         </div>
       </motion.div>
 
@@ -171,16 +122,20 @@ export default function AboutContent() {
         className="max-w-3xl mx-auto mb-16"
       >
         <h2 className="text-2xl font-bold mb-4">
-          AI时代，每个人都会讲故事
+          想象力，不该被困住
         </h2>
         <div className="text-text-secondary leading-relaxed space-y-4">
           <p>
-            传统的漫画创作需要美术功底，视频制作需要专业设备和剪辑技能。序话Story
-            用 AI
-            消除了这些壁垒，但我们没有简化专业流程——我们让 AI 代替人完成每一个专业环节。
+            从想象到可见，中间隔着一道鸿沟。
           </p>
           <p>
-            从故事大纲到角色设计，从分镜脚本到画面渲染，每一步都遵循影视制作的最佳实践。你得到的不是&ldquo;AI感&rdquo;的草稿，而是可以直接发布的专业级作品。
+            画家用画笔跨越它，导演用摄影机跨越它，作家用文字跨越它——但这些跨越方式，都需要几年到几十年的训练。
+          </p>
+          <p>
+            序话Story 做的，是第一次让这个跨越不需要任何训练。
+          </p>
+          <p>
+            你只需要会讲故事。而你天生就会。
           </p>
         </div>
       </motion.div>
@@ -206,6 +161,92 @@ export default function AboutContent() {
             </p>
           </div>
         ))}
+      </motion.div>
+
+      {/* Team */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.42 }}
+        className="max-w-4xl mx-auto mb-16"
+      >
+        <h2 className="text-2xl font-bold mb-1">核心团队</h2>
+        <p className="text-sm text-text-muted mb-2">Our Team</p>
+        <p className="text-text-tertiary text-sm mb-8">
+          一支兼具 AI 技术深度和产品商业化经验的创始团队
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {team.map((member, i) => (
+            <motion.div
+              key={member.name}
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.45 + i * 0.1 }}
+              className="bg-bg-secondary rounded-xl p-6 border border-white/5"
+            >
+              <img
+                src={member.photo}
+                alt={member.name}
+                className="w-20 h-20 rounded-full object-cover mb-4 border-2 border-white/10"
+              />
+              <div className="mb-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold">{member.name}</h3>
+                  {member.github && (
+                    <a
+                      href={member.github}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-text-muted hover:text-brand-primary transition-colors"
+                      aria-label={`${member.name} GitHub`}
+                    >
+                      <Github className="w-4 h-4" />
+                    </a>
+                  )}
+                </div>
+                {member.nameCn && (
+                  <p className="text-sm text-text-muted">{member.nameCn}</p>
+                )}
+                <p className="text-sm text-brand-primary mt-1">{member.roleCn}</p>
+              </div>
+              <ul className="space-y-2">
+                {member.bio.map((line, j) => (
+                  <li
+                    key={j}
+                    className="text-sm text-text-secondary leading-relaxed flex gap-2"
+                  >
+                    <span className="text-text-muted mt-1.5 flex-shrink-0">·</span>
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+          ))}
+        </div>
+      </motion.div>
+
+      {/* Tech Foundation */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.45 }}
+        className="text-center mb-16"
+      >
+        <h2 className="text-xl font-bold mb-1">技术基座</h2>
+        <p className="text-sm text-text-muted mb-6">Powered By</p>
+        <p className="text-text-tertiary text-sm mb-6">
+          基于前沿 AI 技术，让想象力真正落地
+        </p>
+        <div className="flex flex-wrap justify-center gap-3">
+          {["Powered by Google Gemini", "LLM Narrative Generation", "AI Image Synthesis", "Multi-modal AI Pipeline"].map((tag) => (
+            <span
+              key={tag}
+              className="px-3 py-1.5 rounded-full text-xs border border-white/10 text-text-muted bg-white/[0.03]"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
       </motion.div>
 
       {/* Links */}

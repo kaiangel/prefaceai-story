@@ -1,4 +1,4 @@
-import { Sparkles } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 const footerLinks = {
@@ -49,7 +49,7 @@ export default function Footer({ openSubPagesInNewTab = false }: FooterProps) {
           {/* Logo & Description */}
           <div className="col-span-2 md:col-span-4 lg:col-span-1 mb-8 lg:mb-0">
             <Link href="/" className="flex items-center gap-2 mb-4">
-              <Sparkles className="w-6 h-6 text-brand-primary" />
+              <Image src="/brand/logo-48.png" alt="序话Story" width={28} height={28} />
               <span className="text-xl font-bold text-text-primary">
                 序话<span className="text-brand-primary">Story</span>
               </span>

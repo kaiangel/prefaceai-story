@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
+import Image from "next/image";
 
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -47,7 +48,7 @@ export default function Header() {
       <div className="container-lg h-full flex items-center justify-between">
         {/* Logo */}
         <a href="/" className="flex items-center gap-2 group">
-          <Sparkles className="w-6 h-6 text-brand-primary transition-transform duration-fast group-hover:rotate-12" />
+          <Image src="/brand/logo-48.png" alt="序话Story" width={28} height={28} className="transition-transform duration-fast group-hover:scale-110" />
           <span className="text-xl font-bold text-text-primary">
             序话<span className="text-brand-primary">Story</span>
           </span>

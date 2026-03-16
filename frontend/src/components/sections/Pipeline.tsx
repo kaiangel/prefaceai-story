@@ -54,7 +54,7 @@ export default function Pipeline() {
         >
           <span className="inline-flex items-center gap-2 px-4 py-2 bg-bg-secondary rounded-full text-brand-primary font-medium">
             <Sparkles className="w-4 h-4" />
-            AI Story Engine
+            Story Engine
           </span>
         </motion.div>
 
@@ -78,7 +78,7 @@ export default function Pipeline() {
           transition={{ duration: 0.6, delay: 0.3 }}
           className="text-xl md:text-2xl lg:text-3xl text-text-secondary text-center mb-10 font-serif"
         >
-          每个人都有自己的故事
+          每个人脑子里都在放电影
         </motion.p>
 
         {/* Horizontal light sweep line */}
@@ -99,28 +99,10 @@ export default function Pipeline() {
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8, delay: 0.7 }}
-          className="text-center text-text-tertiary max-w-lg mx-auto text-lg leading-relaxed mb-6"
+          className="text-center text-text-tertiary max-w-lg mx-auto text-lg leading-relaxed mb-12"
         >
-          一句话变成完整故事，不需要任何技术技能
+          你说出来。所有人看见。
         </motion.p>
-
-        {/* Tech Stack Tags */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.9 }}
-          className="flex flex-wrap justify-center gap-3 mb-10"
-        >
-          {["Powered by Google Gemini", "LLM Narrative Generation", "AI Image Synthesis", "Multi-modal AI"].map((tag) => (
-            <span
-              key={tag}
-              className="px-3 py-1.5 rounded-full text-xs border border-white/10 text-text-muted bg-white/[0.03]"
-            >
-              {tag}
-            </span>
-          ))}
-        </motion.div>
 
         {/* Demo Video */}
         <motion.div
@@ -151,7 +133,7 @@ export default function Pipeline() {
           transition={{ delay: 1.2 }}
           className="text-center text-text-muted font-serif italic"
         >
-          &ldquo;专业能力平民化，让每个人都能做电影&rdquo;
+          &ldquo;你脑海里的画面，不该只有你看得见&rdquo;
         </motion.p>
       </div>
     </section>
