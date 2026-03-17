@@ -1,6 +1,6 @@
 # PM Agent - 给其他Agent的信息
 
-> **最后更新**: 2026-03-16 21:30
+> **最后更新**: 2026-03-17 15:30
 > **目的**: 让其他Agent快速了解当前状态和任务
 
 ---
@@ -9,8 +9,9 @@
 
 ```
 主线:
-  ✅ AI-ML + Backend + Tester 17/17 + PM 全部确认
-  🔄 @DevOps TASK-DEPLOY-R8B (push + deploy)
+  ✅ TASK-REWRITER-CLEANUP + OB-1/2/3/4 全部完成 + PM Review PASS
+  ✅ TASK-SAFE-DRYRUN 7/7 PASS + PM 确认
+  ⏳ @DevOps 部署 (代码 commit + push + VPS deploy)
   ⏳ Founder 终审 BRAND-MANIFESTO
 
 并行线 (BRAND-MANIFESTO + LOGO):
@@ -108,9 +109,34 @@ Git: 3 commits → `73f8a78` (main). VPS: api 容器重建, 3 容器全部 Up.
 
 ---
 
-## @DevOps — TASK-DEPLOY-R8B (🔄 已派发)
+## @Backend — ✅ 全部完成 (REWRITER-CLEANUP + OB2/3/4, PM Review PASS)
 
-13 代码文件 + brand 资源 → commit + push + VPS deploy (api + frontend 容器重建)
+无待办。等 DevOps 部署。
+
+---
+
+## @AI-ML — ✅ 全部完成 (OB1-CLEANUP, PM Review PASS)
+
+无待办。等 DevOps 部署。
+
+---
+
+## @Tester — ✅ TASK-SAFE-DRYRUN 完成 (7/7 PASS, PM 确认)
+
+无待办。等 DevOps 部署。
+
+---
+
+## @DevOps — ⏳ 待部署 (REWRITER-CLEANUP + OB-1/2/3/4 代码)
+
+待 PM/Founder 确认后，commit + push + VPS deploy。涉及文件:
+- `pipeline_orchestrator.py` (phase2_safe)
+- `prompt_rewriter.py` (Haiku→Sonnet + 备用模型)
+- `image_generator.py` (注释清理)
+- `prompt_safety_rewrite.py` (Haiku→Sonnet 11 处)
+- `story_generator.py` (Haiku→Sonnet + gemini-3-pro→3.1-flash)
+- `alignment_service.py` (gemini-3-pro→3.1-flash + docstring)
+- `tests/test_safe_dryrun.py` (新增测试脚本)
 
 ---
 

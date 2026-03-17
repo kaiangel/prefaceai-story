@@ -4,6 +4,66 @@
 
 ---
 
+### 2026-03-17 — PM 全量审查闭环 (OB-1/2/3/4 + SAFE-DRYRUN)
+
+**AI-ML TASK-OB1-CLEANUP**: ✅ PASS
+- prompt_safety_rewrite.py 11 处 "Haiku" → "Sonnet 4.6"
+- grep "Haiku" 零匹配 ✅
+- 文档 5/5 更新 ✅
+
+**Backend TASK-OB2-MODEL-SYNC + OB-3 + OB-4**: ✅ PASS
+- story_generator.py L18 Haiku→Sonnet 4.6 (DEC-012 合规)
+- story_generator.py L21 + alignment_service.py L44/46 gemini-3-pro→3.1-flash
+- alignment_service.py L28/L34 docstring 统一 "Gemini 3.1 Flash"
+- `app/` 目录 gemini-3-pro-preview 零残留 ✅
+- 文档 5/5 更新 ✅
+
+**Tester TASK-SAFE-DRYRUN**: ✅ PASS
+- 7/7 验证项通过 (代码验证 + 3 链路 + 3 日志完整性)
+- PM 非阻塞观察 (L304) 已修复
+- 安全链路全覆盖: phase2_safe (本次) + 角色/场景参考图 (IMG-SAFETY-VERIFY 17/17)
+- 文档 5/5 更新 ✅
+
+---
+
+### 2026-03-17 — TASK-REWRITER-CLEANUP PM Code Review 3/3 PASS
+
+**审查范围**: 3 文件 (pipeline_orchestrator.py + prompt_rewriter.py + image_generator.py)
+**审查方法**: 逐行核验 + 全 `app/` 目录 "Haiku" / "gemini-3-pro-preview" 残留扫描
+**结果**: 修复 1 ✅ + 修复 2 (7处) ✅ + 修复 3 (6处) ✅ — 零残留
+**OB-1**: prompt_safety_rewrite.py (AI-ML) 仍有 Haiku 字符串常量 — 后续 AI-ML 清理
+**OB-2**: story_generator.py + alignment_service.py 仍有 gemini-3-pro-preview — 范围外，后续统一排查
+**OB-3**: shot_validator / character_position_detection 用 Haiku — 产品运行时 OK
+**通知**: @Tester TASK-SAFE-DRYRUN 可启动
+
+---
+
+### 2026-03-17 — Founder 反馈 + TASK-REWRITER-CLEANUP 派发 (3 项修复)
+
+**Founder 反馈**:
+1. prompt_rewriter.py 注释残留 "Haiku" → 需改为 "Sonnet 4.6" (技术债)
+2. 备用模型换 `gemini-3.1-flash-preview` (Founder 决策，Flash 同级成本，最新版)
+
+**PM 发现**: `gemini-3-pro-preview` 可能已于 03-09 下线，备用链路已失效 — 修复 3 升级为紧急
+
+**任务扩展**: 原 TASK-SAFE-INTEGRATION (1 行) → TASK-REWRITER-CLEANUP (3 项, ~13 行, 3 文件)
+- 修复 1: pipeline_orchestrator.py L375 接入 phase2_safe
+- 修复 2: prompt_rewriter.py + image_generator.py 注释清理
+- 修复 3: prompt_rewriter.py 备用模型 → gemini-3.1-flash-preview
+
+**派发**: @Backend (群聊 03-17 11:00)，Tester dry-run 不变
+
+---
+
+### 2026-03-17 — DevOps R8B 审查 PASS + phase2_safe 集成修复派发
+
+**DevOps**: 3 commits (935f0b0→ec3b4fd) + VPS 5/5 + 代码零未提交 — ✅ PASS
+**phase2_safe 分析**: pipeline L375 调用非 safe 版本 → Shot CONTENT_SAFETY 无 PromptRewriter 恢复 — 集成遗漏确认
+**修复**: Backend 1 行 (`phase2` → `phase2_safe`)，签名兼容无需改参数
+**验证**: Tester dry-run — R8 数据 + mock generate_image + 3 条链路 (正常/改写成功/改写失败)
+
+---
+
 ### 2026-03-16 — Tester 17/17 确认 + DevOps TASK-DEPLOY-R8B 派发
 
 **Tester 审查**: 17/17 PASS (单元5 + 审计6 + API 3 + 模板3), PM 与 Tester 全部一致

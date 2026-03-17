@@ -4,6 +4,28 @@
 
 ---
 
+## 2026-03-17
+
+### TASK-OB2-MODEL-SYNC + OB-3 修正 完成 ✅
+
+| # | 修复 | 文件 |
+|---|------|------|
+| OB-3 | CLAUDE_MODEL `claude-haiku-4-5-20251001` → `claude-sonnet-4-6` | `story_generator.py` L18 |
+| OB2-1 | GEMINI_MODELS[0] → `gemini-3.1-flash-preview` | `story_generator.py` L21 |
+| OB2-2 | 注释 "Gemini 3 Pro" → "Gemini 3.1 Flash" | `alignment_service.py` L44 |
+| OB2-3 | gemini_model → `gemini-3.1-flash-preview` | `alignment_service.py` L46 |
+| 额外 | docstring "Gemini 3 Pro" → "Gemini 3.1 Flash" | `alignment_service.py` L34 |
+
+验证: Python import ✅ + `app/` 目录 `gemini-3-pro-preview` 零残留 ✅
+
+### TASK-REWRITER-CLEANUP 完成 ✅ (11:30)
+
+1. `pipeline_orchestrator.py` L375: `generate_shot_image_phase2` → `generate_shot_image_phase2_safe`
+2. `prompt_rewriter.py` + `image_generator.py`: 7 处 "Haiku" → "Sonnet 4.6" 注释清理
+3. `prompt_rewriter.py`: 6 处 `gemini-3-pro-preview` → `gemini-3.1-flash-preview`
+
+---
+
 ## 2026-03-16
 
 ### N13-FIX + TASK-IMG-SAFETY-RETRY Backend 完成 ✅ (19:00)

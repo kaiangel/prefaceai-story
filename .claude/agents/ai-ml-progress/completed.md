@@ -4,6 +4,25 @@
 
 ---
 
+## 2026-03-17
+
+### TASK-OB1-CLEANUP — prompt_safety_rewrite.py "Haiku" 引用清理 ✅
+
+**完成时间**: 2026-03-17
+**修改文件**: `app/prompts/prompt_safety_rewrite.py`
+
+11 处 "Haiku" → "Sonnet 4.6":
+- L3 docstring, L312 section 注释, L598 docstring
+- L646-648 示例函数名+注释: `rewrite_prompt_with_haiku` → `rewrite_prompt_with_sonnet`
+- L656 model ID: `claude-haiku-4-5-20251001` → `claude-sonnet-4-6`
+- L689 调用处同步
+- L714/L728 设计说明
+- L752 成本估算: `~$0.001/次` → `~$0.005/次`
+
+验证: "Haiku" grep 零匹配 ✅
+
+---
+
 ## 2026-03-16
 
 ### TASK-IMG-SAFETY-RETRY-AIML — 参考图安全改写 Prompt 工程 ✅

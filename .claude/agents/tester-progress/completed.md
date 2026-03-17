@@ -4,6 +4,52 @@
 
 ---
 
+## 2026-03-17: TASK-SAFE-DRYRUN — 3 条 Prompt 安全改写链路 Dry-run 验证
+
+**结果**: 7/7 PASS（代码验证 + 3 条链路 + 3 项日志完整性）
+
+**方法**: Mock `generate_shot_image_phase2()` + Mock `PromptRewriter`，零 API 成本
+
+**数据源**: R8 E2E (story_A, 28 shots, 4 角色)
+
+**3 条链路**:
+- 链路 1: 正常路径 — Shot 1, 首次成功, 零额外开销 ✅
+- 链路 2: CONTENT_SAFETY → Sonnet 改写 → 成功 — Shot 9, phase2 调用=2, 方法=sonnet ✅
+- 链路 3: CONTENT_SAFETY → Sonnet+Simple 均失败 — Shot 10, phase2 调用=3, 优雅失败 ✅
+
+**代码验证 (REWRITER-CLEANUP 落地)**:
+- `pipeline_orchestrator.py:376` → `phase2_safe` ✅
+- `prompt_rewriter.py` Haiku 零残留 ✅
+- `image_generator.py:1227` rewrite_method = "sonnet" ✅
+- 备用模型 `gemini-3.1-flash-preview` ✅
+- 无 non-safe 实际调用 ✅
+
+**PM 非阻塞观察修复**: L304 检查逻辑改为排除注释行后验证
+
+**测试脚本**: `tests/test_safe_dryrun.py`
+**报告**: `test_output/manualtest/safe_dryrun_20260317_145035/dryrun_report.md`
+
+---
+
+## 2026-03-17: R8 全流程 Prompt 检测/改写审计
+
+**结论**: R8 全程 **零 prompt 安全检测/改写活动**
+
+**审计范围**: R8 pipeline 全部 27 次 Gemini 调用 (8 角色参考 + 9 场景参考 + 10 shot)
+
+**逐节点**:
+- StyleEnforcer 前缀注入: 27 次（标准组装，零额外成本）
+- T34 shot_size 注入: 1 次 Shot 15（Stage 4 后处理，非 API 调用）
+- T5/T29 off-screen 检测: 1 次 Shot 24（标记，非改写）
+- 对话气泡嵌入: 7 次 + 原生文字渲染: 6 次（标准组装）
+- **rural_market CONTENT_SAFETY**: 1 次失败调用，无恢复机制（L2/L3a 代码不存在）
+- ShotValidator 重试: 0 次（10/10 PASS）
+- PromptRewriter: **未被调用**（phase2_safe() 存在但 pipeline 未集成）
+
+**⚠️ 重要发现**: `generate_shot_image_phase2_safe()` 存在于 image_generator.py（TASK-RESILIENCE-001），但 pipeline_orchestrator.py L375 调用的是非 safe 版本 → Shot CONTENT_SAFETY 无改写恢复 → **潜在集成遗漏**
+
+---
+
 ## 2026-03-16: TASK-IMG-SAFETY-VERIFY — 4 项验证测试
 
 **结果**: 17/17 PASS

@@ -37,8 +37,11 @@
 | **IMG-SAFETY AI-ML** | ✅ 全部完成 + PM Review PASS |
 | **IMG-SAFETY Backend** | ✅ PM Review PASS (03-16 20:00) |
 | **Tester 验证** | ✅ 17/17 PASS + PM 确认 |
-| **DevOps 部署** | 🔄 @DevOps push + deploy (已派发) |
-| **执行计划** | ~~全部 Phase~~ → ~~Code Review 12/12~~ → ~~OB-1~~ → ~~部署~~ → ~~R8~~ → ~~PM 复核~~ → ~~AI-ML+Backend~~ → ~~PM Review~~ → ~~Tester 17/17~~ → **DevOps 部署** |
+| **DevOps 部署** | ✅ TASK-DEPLOY-R8B 完成 + PM 审查 PASS |
+| **TASK-REWRITER-CLEANUP** | ✅ @Backend 完成 + PM Review 3/3 PASS (03-17 12:00) |
+| **OB 修复** | ✅ OB-1 @AI-ML + OB-2/3/4 @Backend — PM Review 全部 PASS (03-17 15:30) |
+| **Dry-run 验证** | ✅ @Tester 7/7 PASS + PM 确认 (03-17 15:30) |
+| **执行计划** | ~~全部 Phase~~ → ~~R8~~ → ~~IMG-SAFETY~~ → ~~Tester 17/17~~ → ~~DevOps R8B~~ → ~~Backend REWRITER-CLEANUP~~ → ~~Tester dry-run ✅~~ → **DevOps 部署** |
 
 ---
 

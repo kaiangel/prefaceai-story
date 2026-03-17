@@ -1,11 +1,20 @@
 # AI-ML Agent - 当前任务
 
-> **最后更新**: 2026-03-16
-> **状态**: ✅ TASK-IMG-SAFETY-RETRY-AIML + 2 项小补充全部完成，等 Tester 验证
+> **最后更新**: 2026-03-17
+> **状态**: ✅ TASK-OB1-CLEANUP 完成，等 PM 审查
 
 ---
 
 ## 刚完成
+
+### TASK-OB1-CLEANUP — prompt_safety_rewrite.py "Haiku" 引用清理 ✅
+
+**完成时间**: 2026-03-17
+**修改文件**: `app/prompts/prompt_safety_rewrite.py`
+**改动**: 11 处 "Haiku" → "Sonnet 4.6"（docstring + 注释 + 函数名 + model ID + 成本估算）
+**验证**: Python syntax ✅ + "Haiku" grep 零匹配 ✅
+
+---
 
 ### TASK-IMG-SAFETY-RETRY-AIML — 参考图安全改写 Prompt 工程 ✅
 
@@ -34,7 +43,7 @@
 
 | 任务 | 优先级 | 状态 |
 |------|--------|------|
-| Tester TASK-IMG-SAFETY-VERIFY (4 项) | — | 等 Tester |
+| PM 审查 TASK-OB1-CLEANUP | — | 等 PM |
 | TASK-STYLE-EXPANSION (80→25-35 风格精选) | P1 | 暂缓 |
 | 6人场景一致性 90%->95% | P2 | 暂缓 |
 
@@ -44,6 +53,7 @@
 
 | 时间 | 更新内容 |
 |------|----------|
+| 2026-03-17 | TASK-OB1-CLEANUP: prompt_safety_rewrite.py 11 处 "Haiku"→"Sonnet 4.6" |
 | 2026-03-16 | TASK-IMG-SAFETY-RETRY-AIML: 5 类新关键词 + 2 个改写模板 + 简化 spec + 结构优化建议 |
 | 2026-03-13 | Phase 3: T-H-AIML 画面自然度 Haiku prompt 设计 |
 | 2026-03-13 | Phase 1: T-E Rule#10 + T-F Rule#11 + T-G Rule#12 + T-C-AIML signage_text |

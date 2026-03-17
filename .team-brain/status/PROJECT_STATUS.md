@@ -1,6 +1,6 @@
 # 序话Story 项目状态看板
 
-> 最后更新: 2026-03-16
+> 最后更新: 2026-03-17
 > 更新者: PM
 
 ---
@@ -11,7 +11,7 @@
 项目名称: 序话Story - AI条漫/短视频生成系统
 目标: 用户输入创意 → 自动生成可发布的条漫或短视频
 当前版本: v0.6.6
-当前主线: **DevOps 部署** (N13+IMG-SAFETY+BRAND+LOGO) | 并行: BRAND 等 Founder 终审
+当前主线: **✅ 全部审查通过** → DevOps 部署 | 并行: BRAND 等 Founder 终审
 核心内容: 都市情感短剧 (DEC-005)
 产品形态: 条漫优先 → 短视频保留
 Pipeline品牌: FrameSpark™
@@ -263,11 +263,11 @@ Pipeline品牌: FrameSpark™
 
 ### Backend (后端)
 ```
-状态: ✅ Step 3 T4+T5+T6+T7+T8+T9 全部完成 — PM Code Review 22/22 PASS
-更新时间: 2026-03-09
-当前任务: 无（等 Step 5 E2E 结果）
+状态: ✅ TASK-REWRITER-CLEANUP + OB-2/3/4 全部完成 — PM Review PASS
+更新时间: 2026-03-17
+当前任务: 无（等 DevOps 部署）
 阻塞: 无
-已完成: Step 1 T4 ✅ + Step 3 T5-T9 ✅ + TASK-BACKUP-MODEL-FLASH ✅ + E2E Issue #2 修复 ✅ + TASK-BUBBLE-SPEAKER-FORMAT-DEPLOY ✅ + TASK-SHOT10-REGEN ✅ + TASK-ROBUSTNESS-FIX ✅ + TASK-NB2-NATIVE-TEXT ✅ + TASK-NB2-SWITCH ✅ + TASK-DIALOGUE-SYSTEM L1 ✅ + TASK-TEAM-UNIFORM ✅ + TASK-SPEAKER-PREFIX ✅ + TASK-MODEL-UPGRADE ✅ + TASK-STYLE-DEFAULT-FIX ✅
+已完成: TASK-REWRITER-CLEANUP ✅ + TASK-OB2-MODEL-SYNC+OB-3+OB-4 ✅ + N13-FIX ✅ + IMG-SAFETY-RETRY ✅ + Step 1-3 T4-T9 ✅ + TASK-BACKUP-MODEL-FLASH ✅ + 全历史任务
 待解决: FFmpeg 集成方案选型（Phase 4.5）
 ```
 
@@ -292,19 +292,19 @@ Pipeline品牌: FrameSpark™
 
 ### Tester (测试)
 ```
-状态: 🔄 TASK-E2E-REGRESSION-R7 执行中 (36 维度, T29-T37 验证)
-更新时间: 2026-03-13
-当前任务: R7 E2E (1 故事 × 10 shots × 36 维度)
-已完成: R6 ✅ (27/27 PASS) + R4 ✅ (14/16 PASS) + R3 ✅ + R2 ✅ + 回归验证 ✅ + Step 7 A/B ✅ + DIALOGUE-DENSE-TEST ✅ + CROSS-STYLE-TEST ✅ + AB-STYLE-DESC ✅ + E2E-TEST-2 ✅ + NB2-TEXT-TEST ✅ + E2E-VALIDATE ✅
+状态: ✅ TASK-SAFE-DRYRUN 7/7 PASS + PM 确认
+更新时间: 2026-03-17
+当前任务: 无（等 DevOps 部署）
+已完成: TASK-SAFE-DRYRUN ✅ (7/7) + IMG-SAFETY-VERIFY ✅ (17/17) + R8 ✅ (42/44) + R7 ✅ (36/36) + R6 ✅ (27/27) + 全历史任务
 阻塞: 无
 ```
 
 ### AI_ML (AI/ML)
 ```
-状态: ✅ Step 1 T1+T2+T3 + Step 3 T10 全部完成 — PM Code Review 22/22 PASS
-更新时间: 2026-03-09
-当前任务: 无（等 Step 5 E2E 结果）
-已完成: Step 1 T1+T2+T3 ✅ + Step 3 T10 ✅ + E2E Issues #1/#3/#4/#5 修复 ✅ + TASK-PROMPT-BUBBLE-FOLLOWUP-R2 ✅ + TASK-PROMPT-BUBBLE-FOLLOWUP ✅ + TASK-PROMPT-BUBBLE ✅ + TASK-STYLE-DESC-REWRITE ✅ + TASK-SLAMDUNK-COLOR ✅ + TASK-DIALOGUE-SYSTEM L2+3 ✅ + TASK-STYLE-SLAMDUNK ✅ + TASK-TEXT-TYPE-OPT ✅ + TASK-IDENTITY-DESIGN ✅
+状态: ✅ TASK-OB1-CLEANUP 完成 — PM Review PASS
+更新时间: 2026-03-17
+当前任务: 无（等 DevOps 部署）
+已完成: TASK-OB1-CLEANUP ✅ + IMG-SAFETY-RETRY-AIML ✅ + Step 1-3 T1-T3+T10 ✅ + 全历史任务
 阻塞: 无
 ```
 
@@ -403,6 +403,22 @@ Pipeline品牌: FrameSpark™
 ---
 
 ## 更新日志
+
+### 2026-03-17 15:30
+- **[PM] 全量审查闭环 — OB-1/2/3/4 + SAFE-DRYRUN 全部 PASS** 📋
+  - AI-ML TASK-OB1-CLEANUP: ✅ PASS (11 处 Haiku→Sonnet 4.6, 零残留)
+  - Backend TASK-OB2-MODEL-SYNC + OB-3 + OB-4: ✅ PASS (5+1 处, 零残留)
+  - Tester TASK-SAFE-DRYRUN: ✅ 7/7 PASS (3 链路 + 代码验证 + 日志完整性)
+  - 安全链路全覆盖: phase2_safe (本次) + 角色/场景参考图 (IMG-SAFETY-VERIFY 17/17)
+  - 主线可部署，等 DevOps commit + push + VPS deploy
+  - 全文档同步更新 (TEAM_CHAT + pm-progress×3 + PENDING + TODAY_FOCUS + PROJECT_STATUS + daily-sync)
+
+### 2026-03-17 11:00
+- **[PM] Founder 反馈 → TASK-REWRITER-CLEANUP 派发 @Backend** 📋
+  - Founder: prompt_rewriter.py "Haiku" 注释技术债需修复 + 备用模型换 `gemini-3.1-flash-preview`
+  - PM 发现: `gemini-3-pro-preview` 可能已于 03-09 下线，备用链路已失效
+  - 原 TASK-SAFE-INTEGRATION 扩展为 TASK-REWRITER-CLEANUP (3 项: phase2_safe + 注释清理 + 备用模型, ~13 行, 3 文件)
+  - 全文档同步更新 (TEAM_CHAT + pm-progress×3 + PENDING + TODAY_FOCUS + daily-sync + PROJECT_STATUS)
 
 ### 2026-03-13 10:05
 - **[PM] Founder 确认 Phase 2 Code Review + R7 E2E 派发** 📋

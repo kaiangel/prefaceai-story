@@ -4,6 +4,34 @@
 
 ---
 
+### TASK-DEPLOY-R8B: N13-FIX + IMG-SAFETY + BRAND + LOGO 推送 + VPS 部署 ✅
+
+**完成时间**: 2026-03-16
+**验收状态**: 全部验证通过
+**任务类型**: 版本控制 + 部署更新
+
+**背景**: R8 E2E 完成后的修复任务 (N13-FIX + IMG-SAFETY-RETRY) + 品牌升级 (BRAND-MANIFESTO + LOGO-REPLACE)，全部 PM Review + Tester 验证 PASS。
+
+**完成内容**:
+- [x] Git 提交 3 批:
+  - `935f0b0` feat: N13-FIX + IMG-SAFETY-RETRY (7 files)
+  - `34fbcc4` feat(frontend): BRAND-MANIFESTO + LOGO-REPLACE (28 files, 19 brand PNGs)
+  - `ec3b4fd` docs: agent progress + test scripts (26 files)
+- [x] Push to GitHub: `73f8a78..ec3b4fd` → `origin/main`
+- [x] rsync 57 文件同步到 VPS
+- [x] Docker rebuild api + frontend 容器
+- [x] docker compose up -d 重启服务
+- [x] 外部验证全部通过
+
+**验证结果**:
+| 验证项 | 结果 |
+|--------|------|
+| `https://prefaceai.mov` | ✅ HTTP 200 |
+| `https://prefaceai.mov/api/health` | ✅ `{"status":"healthy"}` |
+| Docker 3 容器 | ✅ 全部 Up (api healthy, frontend up, redis healthy) |
+
+---
+
 ### TASK-DEPLOY-R8: T-A~T-K 代码推送 + VPS 部署更新 ✅
 
 **完成时间**: 2026-03-14
