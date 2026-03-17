@@ -1,6 +1,6 @@
 """
 Prompt 安全改写服务
-使用 Claude 4.5 Haiku 智能改写被 Gemini 内容安全过滤拒绝的 prompt
+使用 Claude Sonnet 4.6 智能改写被 Gemini 内容安全过滤拒绝的 prompt
 
 TASK-RESILIENCE-001-B 交付物
 Created: 2026-01-28
@@ -29,7 +29,7 @@ class PromptRewriter:
     Prompt 安全改写服务
 
     提供两层改写策略：
-    1. Haiku 智能改写 - 保持语义连贯、保留艺术风格（推荐）
+    1. Sonnet 4.6 智能改写 - 保持语义连贯、保留艺术风格（推荐）
     2. 简单规则替换 - 零成本、即时响应（降级方案）
 
     使用示例:
@@ -55,7 +55,7 @@ class PromptRewriter:
         self._init_client()
 
     def _init_client(self):
-        """初始化 LLM 客户端（主: Claude Sonnet 4.6, 备: Gemini 3 Pro）"""
+        """初始化 LLM 客户端（主: Claude Sonnet 4.6, 备: Gemini 3.1 Flash）"""
         # 主模型: Claude Sonnet 4.6
         try:
             import anthropic
@@ -70,13 +70,13 @@ class PromptRewriter:
         except Exception as e:
             print(f"[PromptRewriter] ⚠️ Anthropic 客户端初始化失败: {e}")
 
-        # 备用模型: Gemini 3 Pro
+        # 备用模型: Gemini 3.1 Flash
         try:
             from google import genai
             gemini_key = os.getenv("GEMINI_API_KEY")
             if gemini_key:
                 self.gemini_client = genai.Client(api_key=gemini_key)
-                print("[PromptRewriter] ✅ Gemini 备用客户端初始化成功")
+                print("[PromptRewriter] ✅ Gemini 3.1 Flash 备用客户端初始化成功")
         except Exception:
             pass
 
@@ -110,7 +110,7 @@ class PromptRewriter:
 
     async def rewrite(self, prompt: str, debug: bool = False) -> Optional[str]:
         """
-        使用 Haiku 智能改写 prompt
+        使用 Sonnet 4.6 智能改写 prompt
 
         保持艺术风格和情感，同时替换敏感内容。
         推荐方案，成本约 $0.001/次。
@@ -147,11 +147,11 @@ class PromptRewriter:
                 except Exception as ce:
                     print(f"[PromptRewriter] Claude失败: {ce}，尝试Gemini备用")
 
-            # Fallback到Gemini 3 Pro
+            # Fallback到Gemini 3.1 Flash
             if rewritten is None and self.gemini_client:
                 try:
                     response = await self.gemini_client.aio.models.generate_content(
-                        model="gemini-3-pro-preview",
+                        model="gemini-3.1-flash-preview",
                         contents=rewrite_prompt,
                         config={"max_output_tokens": self.MAX_TOKENS}
                     )
@@ -279,7 +279,7 @@ class PromptRewriter:
             if rewritten is None and self.gemini_client:
                 try:
                     response = await self.gemini_client.aio.models.generate_content(
-                        model="gemini-3-pro-preview",
+                        model="gemini-3.1-flash-preview",
                         contents=rewrite_prompt,
                         config={"max_output_tokens": self.MAX_TOKENS}
                     )
@@ -317,7 +317,7 @@ class PromptRewriter:
             if rewritten is None and self.gemini_client:
                 try:
                     response = await self.gemini_client.aio.models.generate_content(
-                        model="gemini-3-pro-preview",
+                        model="gemini-3.1-flash-preview",
                         contents=rewrite_prompt,
                         config={"max_output_tokens": self.MAX_TOKENS}
                     )

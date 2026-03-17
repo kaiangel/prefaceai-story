@@ -1,6 +1,6 @@
 """
 Prompt 安全改写模板和规则
-用于 Claude 4.5 Haiku 智能改写被 Gemini 内容安全过滤拒绝的 prompt
+用于 Claude Sonnet 4.6 智能改写被 Gemini 内容安全过滤拒绝的 prompt
 
 TASK-RESILIENCE-001-B 交付物
 Created: 2026-01-28
@@ -309,7 +309,7 @@ GENRE_SPECIFIC_RULES: Dict[str, Dict[str, str]] = {
 
 
 # =============================================================================
-# Haiku 智能改写 Prompt 模板
+# Sonnet 4.6 智能改写 Prompt 模板
 # =============================================================================
 
 SAFETY_REWRITE_PROMPT = """You are an expert at rewriting image generation prompts to avoid content safety filters while preserving artistic intent.
@@ -595,7 +595,7 @@ def build_rewrite_prompt(original_prompt: str, debug_mode: bool = False) -> str:
         debug_mode: 是否返回包含改写说明的版本
 
     Returns:
-        用于 Haiku 的完整 prompt
+        用于 Sonnet 4.6 的完整 prompt
     """
     template = SAFETY_REWRITE_PROMPT_DEBUG if debug_mode else SAFETY_REWRITE_PROMPT
     return template.format(original_prompt=original_prompt)
@@ -643,9 +643,9 @@ def detect_sensitive_content(text: str) -> Dict:
 # =============================================================================
 
 EXAMPLE_USAGE = '''
-# 方法1: 使用 Haiku 智能改写（推荐）
-async def rewrite_prompt_with_haiku(original_prompt: str) -> str:
-    """用 Claude Haiku 智能改写被拒绝的 prompt"""
+# 方法1: 使用 Sonnet 4.6 智能改写（推荐）
+async def rewrite_prompt_with_sonnet(original_prompt: str) -> str:
+    """用 Claude Sonnet 4.6 智能改写被拒绝的 prompt"""
     import anthropic
 
     client = anthropic.AsyncAnthropic()
@@ -653,7 +653,7 @@ async def rewrite_prompt_with_haiku(original_prompt: str) -> str:
     rewrite_prompt = build_rewrite_prompt(original_prompt)
 
     response = await client.messages.create(
-        model="claude-haiku-4-5-20251001",
+        model="claude-sonnet-4-6",
         max_tokens=1000,
         messages=[{"role": "user", "content": rewrite_prompt}]
     )
@@ -686,7 +686,7 @@ async def safe_image_generation(prompt: str, genre: str = None):
         print(f"[SafeGen] 敏感词数量: {detection['count']}")
 
         # 2. 智能改写
-        rewritten = await rewrite_prompt_with_haiku(prompt)
+        rewritten = await rewrite_prompt_with_sonnet(prompt)
         print(f"[SafeGen] ✅ Prompt 已改写")
 
         prompt = rewritten
@@ -711,7 +711,7 @@ DESIGN_NOTES = """
    - 缺点: 可能破坏句子流畅性
    - 适用: 轻度敏感内容、紧急降级
 
-2. **Haiku 智能改写** (build_rewrite_prompt)
+2. **Sonnet 4.6 智能改写** (build_rewrite_prompt)
    - 优点: 保持语义连贯、保留艺术风格
    - 缺点: 需要额外 API 调用 (~$0.001)
    - 适用: 复杂场景、重要内容
@@ -725,7 +725,7 @@ Gemini 生成
     ↓
 失败 (CONTENT_SAFETY)
     ↓
-用 Haiku 智能改写
+用 Sonnet 4.6 智能改写
     ↓
 重试 Gemini
     ↓
@@ -749,7 +749,7 @@ Gemini 生成
 
 ### 成本估算
 
-- Haiku 改写: ~$0.001/次
+- Sonnet 4.6 改写: ~$0.005/次
 - 假设 5% prompt 需要改写
 - 15 shot 故事: 约 1 次改写 = $0.001
 - 成本可忽略不计

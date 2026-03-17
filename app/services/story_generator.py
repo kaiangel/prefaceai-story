@@ -15,10 +15,10 @@ class StoryGenerator:
     """Service for generating stories using Claude (primary) with Gemini fallback"""
 
     # Model priority: Claude first, then Gemini
-    CLAUDE_MODEL = "claude-haiku-4-5-20251001"  # Claude Haiku 4.5 as primary
+    CLAUDE_MODEL = "claude-sonnet-4-6"  # Claude Sonnet 4.6 as primary (DEC-012)
 
     GEMINI_MODELS = [
-        "gemini-3-pro-preview",  # Best quality Gemini
+        "gemini-3.1-flash-preview",  # Gemini 3.1 Flash
         "gemini-2.5-flash",      # Fast and reliable Gemini fallback
     ]
 

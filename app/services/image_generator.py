@@ -1153,7 +1153,7 @@ class ImageGenerator:
         1. 调用 generate_shot_image_phase2 生成图像
         2. 如果成功，直接返回
         3. 如果失败且错误类型是 CONTENT_SAFETY：
-           a. 使用 Haiku 智能改写 prompt
+           a. 使用 Sonnet 4.6 智能改写 prompt
            b. 重试生成
            c. 如果仍失败，降级到简单规则替换再试一次
 
@@ -1217,14 +1217,14 @@ class ImageGenerator:
             "rewrites": []
         }
 
-        # 4a. 第一次改写：使用 Haiku 智能改写
+        # 4a. 第一次改写：使用 Sonnet 4.6 智能改写
         for rewrite_attempt in range(self.MAX_REWRITE_ATTEMPTS):
             print(f"[ImageGenerator] 🔄 改写尝试 {rewrite_attempt + 1}/{self.MAX_REWRITE_ATTEMPTS}")
 
             if rewrite_attempt == 0:
-                # 第一次：使用 Haiku 智能改写
+                # 第一次：使用 Sonnet 4.6 智能改写
                 rewritten_prompt = await rewriter.rewrite(original_prompt)
-                rewrite_method = "haiku"
+                rewrite_method = "sonnet"
             else:
                 # 后续：使用简单规则替换
                 rewritten_prompt = rewriter.rewrite_simple(original_prompt, genre)

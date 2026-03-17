@@ -372,7 +372,8 @@ class Phase2PipelineOrchestrator:
                             print(f"    [T17] Retry {attempt}/{MAX_SHOT_RETRIES} Shot {shot_id}...")
 
                         # 使用Phase 2.0增强生成 (DEC-014: previous_shot removed)
-                        result = await self.image_generator.generate_shot_image_phase2(
+                        # TASK-SAFE-INTEGRATION: 使用 safe 版本（含 PromptRewriter CONTENT_SAFETY 恢复）
+                        result = await self.image_generator.generate_shot_image_phase2_safe(
                             shot=shot,
                             storyboard=storyboard,
                             characters=characters,

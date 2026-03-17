@@ -25,13 +25,13 @@ class AlignmentService:
 
     核心逻辑：
     1. 接收Whisper的时间戳数据和所有场景图片
-    2. 调用Gemini 3 Flash分析图片内容与文本语义
+    2. 调用Gemini 3.1 Flash分析图片内容与文本语义
     3. 智能匹配每张图片应该对应哪个时间段
     4. 输出精确的时间轴映射
 
     对齐误差目标：≤ 80ms
 
-    模型优先级: Claude Sonnet 4.6 (主) → Gemini 3 Pro (备用)
+    模型优先级: Claude Sonnet 4.6 (主) → Gemini 3.1 Flash (备用)
     """
 
     def __init__(self):
@@ -41,9 +41,9 @@ class AlignmentService:
         if settings.ANTHROPIC_API_KEY:
             self.claude_client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 
-        # 备用模型: Gemini 3 Pro
+        # 备用模型: Gemini 3.1 Flash
         self.gemini_client = None
-        self.gemini_model = "gemini-3-pro-preview"
+        self.gemini_model = "gemini-3.1-flash-preview"
         if settings.GEMINI_API_KEY:
             self.gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
