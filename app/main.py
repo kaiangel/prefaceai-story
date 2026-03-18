@@ -10,6 +10,10 @@ from app.api import api_router
 from app.api.images import router as images_router
 from app.api.audio import router as audio_router
 from app.config import settings
+from app.middleware.log_sanitizer import install as install_log_sanitizer
+
+# 日志脱敏：在任何输出之前安装
+install_log_sanitizer()
 
 
 @asynccontextmanager
@@ -37,7 +41,10 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # MVP: allow all origins
+    allow_origins=[
+        "https://prefaceai.mov",
+        "http://localhost:3000",  # 本地前端开发
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
