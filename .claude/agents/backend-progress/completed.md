@@ -4,6 +4,22 @@
 
 ---
 
+## 2026-03-18
+
+### TASK-CORS-RESTRICT 完成 ✅
+
+- `app/main.py` L40: `allow_origins=["*"]` → `["https://prefaceai.mov", "http://localhost:3000"]`
+
+### TASK-LOG-SANITIZE 完成 ✅
+
+- 新建 `app/middleware/log_sanitizer.py`: patch `builtins.print`，正则脱敏
+- 新建 `app/middleware/__init__.py`
+- `app/main.py` +3 行注册
+- 覆盖: ANTHROPIC/GEMINI/OPENAI/VOLCENGINE API Key + sk-ant/sk-/AIzaSy/AKLT 格式
+- 验证: 4 项脱敏测试 PASS + CORS 白名单确认 + print patch 确认
+
+---
+
 ## 2026-03-17
 
 ### TASK-OB2-MODEL-SYNC + OB-3 修正 完成 ✅

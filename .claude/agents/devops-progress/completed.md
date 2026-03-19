@@ -4,6 +4,56 @@
 
 ---
 
+### 安全加固部署: CORS restrict + log sanitizer ✅
+
+**完成时间**: 2026-03-18
+**验收状态**: 全部验证通过
+**任务类型**: 安全加固 + 部署
+
+**背景**: Founder 填 API Key 的前置安全条件。CORS 全开放 + 日志无脱敏 → 必须在填 Key 前修复。
+
+**完成内容**:
+- [x] Git 提交: `f76ac1e` (3 files)
+- [x] Push to GitHub: `c6d697a..f76ac1e` → `origin/main`
+- [x] rsync 3 files (main.py + middleware/) 到 VPS
+- [x] Docker rebuild api + force-recreate
+- [x] CORS 验证: prefaceai.mov ✅ 允许 / evil.com ✅ 拒绝
+- [x] API health + 3 容器 Up
+
+**风险清单更新**: R2 (CORS) + R6 (日志脱敏) 标记为 ✅ 已解决
+
+---
+
+### TASK-DEPLOY-CLEANUP: REWRITER-CLEANUP + OB-1/2/3/4 推送 + VPS 部署 ✅
+
+**完成时间**: 2026-03-17
+**验收状态**: 全部验证通过
+**任务类型**: 版本控制 + 部署更新
+
+**背景**: TASK-REWRITER-CLEANUP (phase2_safe 接入 + 注释清理 + 备用模型) + OB-1~4 (Haiku→Sonnet + gemini-3-pro→3.1-flash) + TASK-SAFE-DRYRUN 验证，全部 PM Review PASS。
+
+**完成内容**:
+- [x] 部署前验证: Python syntax 6/6 ✅ + Haiku 零残留 ✅ + gemini-3-pro-preview 零残留 ✅
+- [x] Git 提交 2 批:
+  - `1814193` feat: REWRITER-CLEANUP + OB-1/2/3/4 (7 files)
+  - `c6d697a` docs: agent progress + team-brain sync (21 files)
+- [x] Push to GitHub: `ec3b4fd..c6d697a` → `origin/main`
+- [x] rsync app/ (6 files) + tests/ (1 file) 同步到 VPS
+- [x] Docker rebuild api 容器
+- [x] docker compose up -d --force-recreate api 重启服务
+- [x] 外部验证全部通过
+
+**验证结果**:
+| 验证项 | 结果 |
+|--------|------|
+| `https://prefaceai.mov` | ✅ HTTP 200 |
+| `https://prefaceai.mov/api/health` | ✅ `{"status":"healthy"}` |
+| Docker api 容器 | ✅ Up (healthy) |
+| Docker frontend 容器 | ✅ Up |
+| Docker redis 容器 | ✅ Up (healthy) |
+
+---
+
 ### TASK-DEPLOY-R8B: N13-FIX + IMG-SAFETY + BRAND + LOGO 推送 + VPS 部署 ✅
 
 **完成时间**: 2026-03-16

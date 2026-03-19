@@ -1,6 +1,6 @@
 # 序话Story 项目状态看板
 
-> 最后更新: 2026-03-17
+> 最后更新: 2026-03-19
 > 更新者: PM
 
 ---
@@ -11,10 +11,11 @@
 项目名称: 序话Story - AI条漫/短视频生成系统
 目标: 用户输入创意 → 自动生成可发布的条漫或短视频
 当前版本: v0.6.6
-当前主线: **✅ 全部审查通过** → DevOps 部署 | 并行: BRAND 等 Founder 终审
+当前主线: **双团队协作启动** — Ben 团队加入 + 安全加固已部署 (f76ac1e)
 核心内容: 都市情感短剧 (DEC-005)
 产品形态: 条漫优先 → 短视频保留
 Pipeline品牌: FrameSpark™
+团队: Founder 团队 (7 Claude Code Agent) + Ben 团队 (3 Codex Agent)
 ```
 
 ---
@@ -310,12 +311,15 @@ Pipeline品牌: FrameSpark™
 
 ### DevOps (运维)
 ```
-状态: ✅ TASK-DEPLOY-UPDATE 完成 — 最新代码已推送 + VPS 部署更新
-更新时间: 2026-03-10
+状态: ✅ TASK-DEPLOY-CLEANUP 完成 — REWRITER-CLEANUP + OB-1/2/3/4 推送 + VPS api rebuild
+更新时间: 2026-03-17
 当前任务: 等待 Founder 填入 API Key
 阻塞: 无
 
 已完成:
+  - ✅ TASK-DEPLOY-CLEANUP (2 commits push + VPS api rebuild, 2026-03-17)
+  - ✅ TASK-DEPLOY-R8B (3 commits push + VPS api+frontend rebuild, 2026-03-16)
+  - ✅ TASK-DEPLOY-R8 (3 commits push + VPS api rebuild, 2026-03-14)
   - ✅ TASK-DEPLOY-UPDATE (3 commits push + VPS frontend/api rebuild, 2026-03-10)
   - ✅ TASK-DEPLOY-EXEC Step 1-4 (VPS 部署, https://prefaceai.mov 上线)
   - ✅ Docker 配置文件 commit + push (702361d)
@@ -329,12 +333,38 @@ Pipeline品牌: FrameSpark™
   - 容器: api (healthy) + frontend (up) + redis (healthy)
   - SSL: Cloudflare Full Strict + Origin Certificate
   - 域名: https://prefaceai.mov
-  - 最新 commit: 232f2f0 (2026-03-10)
+  - 最新 commit: c6d697a (2026-03-17)
 
 待做:
   1️⃣ Founder 填入 API Key → 重启 api 容器
   2️⃣ CI/CD 基础流水线
   3️⃣ 监控告警系统
+```
+
+---
+
+## Ben 团队 (2026-03-19 加入)
+
+### backend_Ben (后端+数据库)
+```
+状态: 🟢 准备就绪
+更新时间: 2026-03-19
+当前任务: 等 git pull 后开始（建议首任务：用户数据库层搭建）
+阻塞: TASK-GIT-BRANCH-PROTECTION 需先完成
+```
+
+### frontend_Ben (前端联动)
+```
+状态: 🟢 待命
+更新时间: 2026-03-19
+当前任务: 无（等 backend_Ben 有 API 可联调）
+```
+
+### pm_Ben (协调+文档)
+```
+状态: 🟢 初始化完成
+更新时间: 2026-03-19
+当前任务: 等首次与 Founder PM 同步
 ```
 
 ---
@@ -403,6 +433,27 @@ Pipeline品牌: FrameSpark™
 ---
 
 ## 更新日志
+
+### 2026-03-19
+- **[Coordinator] 双团队协作系统启动** — Ben 团队加入 (3 Codex Agent)
+  - 新建 42 文件: CODEX.md + codex-agents/ + shared-memory/ + 全 Agent 双团队感知更新
+  - TEAM_PROTOCOL.md 更新: 互相只读规则 + Git 分支策略 + Ben 团队文件分类
+  - CLAUDE.md 更新: Ben 团队 Agent 表 + 双团队协作模式章节
+- **[PM] 文档更新 + DevOps 派发**
+  - TODAY_FOCUS/PROJECT_STATUS/PENDING 更新
+  - TASK-GIT-PUSH-DUAL-TEAM + TASK-GIT-BRANCH-PROTECTION 派发 @DevOps
+
+### 2026-03-18
+- **[PM] 安全加固 PM Code Review PASS + DevOps 部署审查 PASS**
+  - CORS 限制 + 日志脱敏 → `f76ac1e` 已上线
+  - Founder 可安全填 API Key
+
+### 2026-03-17 16:00
+- **[DevOps] TASK-DEPLOY-CLEANUP 完成** ✅
+  - Git: 2 commits (1814193 + c6d697a) pushed → `origin/main`
+  - VPS: rsync 7 files + Docker rebuild api + force-recreate
+  - 验证: HTTPS 200 + API healthy + 3 容器 Up (healthy)
+  - 部署前检查: Python syntax 6/6 + Haiku 零残留 + gemini-3-pro-preview 零残留
 
 ### 2026-03-17 15:30
 - **[PM] 全量审查闭环 — OB-1/2/3/4 + SAFE-DRYRUN 全部 PASS** 📋

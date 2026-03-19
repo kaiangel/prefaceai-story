@@ -1,6 +1,6 @@
 # 团队协作系统 - 快速启动指南
 
-> 最后更新: 2026-02-03
+> 最后更新: 2026-03-19
 
 ---
 
@@ -55,6 +55,25 @@ claude
 │   └── DECISIONS.md             # 重要决策
 └── daily-sync/                  # 每日同步
     └── YYYY-MM-DD.md            # 日报
+```
+
+### Ben 团队文件结构
+
+```
+/codex-agents/                        # Ben团队 Agent 定义和进度
+├── backend_Ben.md                    # 后端+数据库 Agent 定义
+├── frontend_Ben.md                   # 前端联动 Agent 定义
+├── pm_Ben.md                         # 协调 Agent 定义
+├── backend_Ben-progress/             # 后端 Agent 进度
+│   ├── current.md
+│   ├── context-for-others.md
+│   └── completed.md
+├── frontend_Ben-progress/            # 前端 Agent 进度
+└── pm_Ben-progress/                  # PM Agent 进度
+
+/.team-brain/
+├── TEAM_CHAT_Ben.md                  # Ben团队群聊（Founder只读）
+└── shared-memory/                    # 双团队共享记忆
 ```
 
 ---
@@ -170,6 +189,18 @@ claude
 # /hookify:list            - 查看已有规则
 # /hookify:configure       - 配置规则
 ```
+
+### Ben 团队（Codex CLI）
+
+Ben 团队使用 OpenAI Codex CLI，独立于 Founder 团队的 Claude Code 环境运行。
+
+| Agent | 启动方式 | 说明 |
+|-------|---------|------|
+| backend_Ben | Ben 在 Codex 中加载 `codex-agents/backend_Ben.md` | 数据库+API架构 |
+| frontend_Ben | Ben 在 Codex 中加载 `codex-agents/frontend_Ben.md` | 前端联动 |
+| pm_Ben | Ben 在 Codex 中加载 `codex-agents/pm_Ben.md` | 协调+文档 |
+
+> Ben 团队的启动和管理由 Ben 自行负责。Founder 团队不启动 Ben 的 Agent。
 
 ---
 

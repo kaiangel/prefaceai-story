@@ -1,13 +1,13 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-03-16
+> **最后更新**: 2026-03-18
 
 ---
 
 ## 当前状态速览
 
-状态: ✅ **VPS 已更新部署 (TASK-DEPLOY-R8B)** — N13-FIX + IMG-SAFETY + BRAND + LOGO 全部推送 + 部署
+状态: ✅ **安全加固已部署** — CORS 限制 + 日志脱敏上线，等 Founder 填 API Key
 域名: `https://prefaceai.mov` 已上线（前端 + API + 新 logo + V2 品牌宣言）
 服务器: 107.148.1.199 (8C/16GB/200GB, Ubuntu 20.04)
 容器: 3 个运行中 — api (healthy) + frontend (up) + redis (healthy)
@@ -15,20 +15,18 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 
 ---
 
-## 最近部署 (2026-03-16)
+## 最近部署 (2026-03-18)
 
-### TASK-DEPLOY-R8B
+### 安全加固: CORS + 日志脱敏
 
 **部署内容**:
-1. N13-FIX: spouse_of 对称关系自动补全
-2. IMG-SAFETY-RETRY: 场景/角色参考图 CONTENT_SAFETY 恢复机制 (L1+L2+L3a+L3b)
-3. AI-ML: 5 类 75 词条安全替换 + 场景/角色改写模板 + "No people" 前置
-4. T-J: 测试脚本 N12/N14/N15 bug 修复
-5. BRAND-MANIFESTO: Pipeline V2 slogan + About V2 宣言 + 技术基座段
-6. LOGO-REPLACE: 全站 Sparkles→Image logo + favicon 更新 + 19 brand PNGs
+1. app/main.py: CORS `["*"]` → `["https://prefaceai.mov", "http://localhost:3000"]`
+2. app/middleware/log_sanitizer.py: 新建，patch print 正则脱敏 API Key
+3. app/middleware/__init__.py: 新建
 
-**Git**: 3 commits pushed → `ec3b4fd` (main)
-**Docker**: api + frontend 容器重建 + 重启
+**Git**: `f76ac1e` pushed → `origin/main`
+**Docker**: api 容器重建 + 重启
+**CORS 验证**: prefaceai.mov ✅ 允许 / evil.com ✅ 拒绝
 
 ---
 
@@ -61,7 +59,7 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 - **API Key 未填入**: `.env.production` 使用占位符，API 服务能启动但无法调用 AI 模型
 - **前端已可访问**: `https://prefaceai.mov` 返回 Landing Page（V2 品牌宣言 + 新 logo + 风格缩略图）
 - **API 已可访问**: `https://prefaceai.mov/api/health` 返回 healthy
-- **CORS 仍为全开放**: `allow_origins=["*"]`，后续需限制为 prefaceai.mov
+- **CORS 已限制**: `allow_origins=["https://prefaceai.mov", "http://localhost:3000"]` ✅
 - **代码通过 rsync 部署**: 非 git clone，后续可配置 deploy key
 - **SSH 端口 58913**: 非默认 22
 
@@ -70,11 +68,11 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 | 风险 | 级别 | 关键时间点 |
 |------|------|-----------|
 | API Key 未填入 | 🔴 P0 | Founder 决定时 |
-| CORS 全开放 | 🟡 P1 | API Key 填入前必须修 |
+| ~~CORS 全开放~~ | ✅ 已解决 | 03-18 部署 |
 | 无 CI/CD | 🟡 P1 | 部署稳定后 |
 | 无监控告警 | 🟡 P1 | 第一个用户前 |
 | 无数据备份 | 🟡 P2 | 有生产数据后 |
-| 无日志脱敏 | 🟡 P2 | API Key 填入前必须修 |
+| ~~无日志脱敏~~ | ✅ 已解决 | 03-18 部署 |
 
 ---
 
@@ -83,7 +81,7 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 ```
 远程仓库: https://github.com/kaiangel/prefaceai-story (private)
 分支: main (tracked → origin/main)
-最新 commit: ec3b4fd docs: agent progress + team-brain sync + R8 E2E + IMG-SAFETY-VERIFY test scripts
+最新 commit: f76ac1e feat: security hardening — CORS restrict + log sanitizer (pre-API-Key)
 ```
 
 ---
@@ -92,6 +90,6 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 
 | 环境 | 状态 | 最近更新 |
 |------|------|----------|
-| dev | 🟢 运行中（本地开发） | 2026-03-16 |
+| dev | 🟢 运行中（本地开发） | 2026-03-18 |
 | staging | ⚪ 未部署 | - |
-| prod | ✅ **已部署**（等待 API Key） | 2026-03-16 |
+| prod | ✅ **安全加固已部署**（等待 API Key） | 2026-03-18 |

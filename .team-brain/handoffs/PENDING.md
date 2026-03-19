@@ -7,6 +7,21 @@
 
 ## 📋 当前待处理
 
+### TASK-GIT-PUSH-DUAL-TEAM + TASK-GIT-BRANCH-PROTECTION — 🔄 @DevOps (P0)
+
+| 字段 | 内容 |
+|------|------|
+| **优先级** | P0 |
+| **来源** | Coordinator 指令 (2026-03-19) → PM 派发 |
+| **负责人** | @DevOps |
+| **TASK-GIT-PUSH-DUAL-TEAM** | commit 42 文件 + push to GitHub（不部署 VPS）|
+| **TASK-GIT-BRANCH-PROTECTION** | main 分支保护: require PR, 禁止直接 push |
+| **前置** | PUSH 先完成，PROTECTION 后执行 |
+| **说明** | Ben 动代码前的安全前置。push 完后 Ben 可 git pull 看到所有协作文件 |
+| **状态** | 🔄 PM 已派发 |
+
+---
+
 ### T29-T37 — ✅ Founder 确认 → R7 E2E 已派发 @Tester (R6 平台级修复)
 
 | 字段 | 内容 |
@@ -41,11 +56,12 @@
 | **TASK-REWRITER-CLEANUP** | ✅ @Backend 完成 + PM Review 3/3 PASS (03-17 12:00) |
 | **OB 修复** | ✅ OB-1 @AI-ML + OB-2/3/4 @Backend — PM Review 全部 PASS (03-17 15:30) |
 | **Dry-run 验证** | ✅ @Tester 7/7 PASS + PM 确认 (03-17 15:30) |
-| **执行计划** | ~~全部 Phase~~ → ~~R8~~ → ~~IMG-SAFETY~~ → ~~Tester 17/17~~ → ~~DevOps R8B~~ → ~~Backend REWRITER-CLEANUP~~ → ~~Tester dry-run ✅~~ → **DevOps 部署** |
+| **DevOps 部署** | ✅ TASK-DEPLOY-CLEANUP 完成 (03-17 16:00) — 2 commits push + VPS api rebuild |
+| **执行计划** | ~~全部 Phase~~ → ~~R8~~ → ~~IMG-SAFETY~~ → ~~Tester 17/17~~ → ~~DevOps R8B~~ → ~~Backend REWRITER-CLEANUP~~ → ~~Tester dry-run ✅~~ → ~~DevOps 部署 ✅~~ |
 
 ---
 
-### TASK-BRAND-MANIFESTO — 🔄 已派发 @Frontend (P1, 并行线)
+### TASK-BRAND-MANIFESTO — ✅ Founder 终审通过 (P1, 并行线)
 
 | 字段 | 内容 |
 |------|------|
@@ -58,7 +74,8 @@
 | **PM 文案指引** | ✅ 已派发 @Frontend (03-16 12:00) — Pipeline 5 处改动 + About 5 段改动 |
 | **Frontend 实现** | ✅ @Frontend 完成 (03-16 13:00) |
 | **PM 审查** | ✅ 全部 PASS (03-16 17:30) |
-| **执行计划** | ~~PM 规划~~ → ~~Founder 确认~~ → ~~文案指引~~ → ~~Frontend 实现~~ → ~~PM 审查~~ → **Founder 终审** |
+| **Founder 终审** | ✅ 通过 (03-17) |
+| **执行计划** | ~~PM 规划~~ → ~~Founder 确认~~ → ~~文案指引~~ → ~~Frontend 实现~~ → ~~PM 审查~~ → ~~Founder 终审 ✅~~ |
 
 ---
 
@@ -435,21 +452,17 @@ TASK-SHOT-QUALITY-BUGFIX: ✅ 4 Bug 修复完成 + PM Code Review 4/4 PASS
 | **PM Code Review** | ✅ (2026-03-06 15:26): 12 维度零问题 PASS |
 | **状态** | ✅ **闭环** — speaker_format 全链路完成 |
 
-### TASK-DEPLOY-PREP — ✅ Founder 批准 → TASK-DEPLOY-EXEC 实际部署中
+### TASK-DEPLOY-PREP — ✅ 全部完成（VPS 已上线 prefaceai.mov）
 
 | 字段 | 内容 |
 |------|------|
 | **优先级** | P1 |
 | **来源** | PM + Founder |
 | **负责人** | @DevOps |
-| **Step 1** | ✅ VPS 环境检查 (10 维度 PASS) |
-| **Step 2** | ✅ Docker Compose 方案 (PM 审查 PASS, 6 项修改建议) |
-| **SSL** | ✅ Cloudflare Full (Strict) + Origin Certificate (到期 2041) |
-| **Step 3** | ✅ 更新完成 + PM 二次审核 PASS (4/4 落实 + Nginx HTTPS 8 维度验证) |
-| **Founder 批准** | ✅ (2026-03-06 16:15) |
-| **TASK-DEPLOY-EXEC** | ⏳ @DevOps 执行 VPS 实际部署 (Step 1-4) |
-| **前置 D1** | Frontend `next.config.mjs` output: 'standalone' — DevOps 遇到时通知 PM |
-| **状态** | ⏳ @DevOps 执行中 |
+| **Step 1-3** | ✅ 全部完成 (VPS + Docker + SSL + Nginx) |
+| **TASK-DEPLOY-EXEC** | ✅ 完成 (2026-03-06) |
+| **后续部署** | ✅ R8 (03-14) + R8B (03-16) + CLEANUP (03-17) |
+| **状态** | ✅ 已完成 |
 
 ### TASK-E2E-REGRESSION — ✅ 分析完成 → 修复完成 → PM Code Review PASS → 待 Tester E2E 验证
 
@@ -548,19 +561,17 @@ Step 10: PM 独立深度审查                                       ✅ 同意 
 | T15 | NB2 气泡重复抑制 | @AI-ML | P2 | ✅ PASS |
 | T16 | OB-6 降级分支补充 | @Backend | P3 | ✅ PASS |
 
-### TASK-LOGO-REPLACE — ⏳ @Frontend 全站 Logo 替换 (P0)
+### TASK-LOGO-REPLACE — ✅ 完成 + 已部署 (P0)
 
 | 字段 | 内容 |
 |------|------|
 | **优先级** | P0 |
 | **来源** | Founder 直接派发 → Coordinator 转达 (2026-03-16) |
 | **负责人** | @Frontend |
-| **前置** | 无（资源文件已就绪 `frontend/public/brand/`） |
-| **说明** | 4 个组件 Sparkles→新 logo。双版本体系：Header 用 D_v1 加粗版(线条)，Favicon 用 D_v2 圆形(实心) |
-| **修改范围** | Header.tsx, SubPageHeader.tsx, CreateHeader.tsx, Footer.tsx |
-| **资源更新** | ⚠️ 2026-03-16 16:00 资源已优化（加粗+二值化+圆形favicon），用最新文件 |
-| **验收** | 全页面走查，所有 logo 位置显示新图标 + favicon 为圆形 |
-| **状态** | ⏳ 待 @Frontend 执行（资源已就绪 v2） |
+| **Frontend 完成** | ✅ 4 组件 Sparkles→新 logo (Header/SubPageHeader/CreateHeader/Footer) |
+| **PM 审查** | ✅ PASS (03-16 17:30) |
+| **DevOps 部署** | ✅ TASK-DEPLOY-R8B (03-16) |
+| **状态** | ✅ 已完成并部署 |
 
 ### TASK-BRAND-MANIFESTO — 📋 @PM 品牌宣言前端整合 (P1)
 
@@ -575,18 +586,16 @@ Step 10: PM 独立深度审查                                       ✅ 同意 
 | **关键文档** | `docs/BRAND_MANIFESTO_EXPLORATION.md`（V2 宣言 + 深度分析） |
 | **状态** | 📋 待 @PM 阅读文档 + 制定实施计划 |
 
-### TASK-STYLE-THUMBNAILS — ⏳ @AI-ML 15 种风格缩略图生成 (P0)
+### TASK-STYLE-THUMBNAILS — ✅ 完成 (P0)
 
 | 字段 | 内容 |
 |------|------|
 | **优先级** | P0 |
 | **来源** | Founder 指令 → Coordinator 派发 (2026-03-10) |
-| **负责人** | @AI-ML |
-| **前置** | 无（与 E2E R4 并行，不阻塞主线） |
-| **说明** | 为 create 页面 15 种视觉风格生成 NB2 缩略图。统一场景（城市街头年轻女生），只变风格。1:1 宽高比，中文命名，prompt 保存 |
-| **交付物** | `test_output/manualtest/style_thumbnails/` — 15 张 PNG + 15 份 prompt |
-| **验收** | Founder 人工审图 → 通过后 @Frontend 集成到 create 页面 |
-| **状态** | ⏳ 待 @AI-ML 执行 |
+| **负责人** | @AI-ML (生成) → @Frontend (压缩集成) |
+| **AI-ML 完成** | ✅ 15 张 PNG + 15 份 prompt (`test_output/manualtest/style_thumbnails/`) |
+| **Frontend 集成** | ✅ 15 张压缩 (1024×1024 PNG → 400×400 JPEG, 27MB→1MB) → `frontend/public/styles/` |
+| **状态** | ✅ 已完成并部署 |
 
 ### TASK-STYLE-EXPANSION — 📝 暂缓 (P1，备忘)
 

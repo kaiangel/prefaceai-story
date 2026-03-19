@@ -1,6 +1,6 @@
 # Agent 进度追踪协议
 
-> 本协议定义了 6 个 Agent 之间通过进度文件同步信息的机制
+> 本协议定义了 Founder 团队 6 个 Agent（+ Ben 团队 3 个 Codex Agent）之间通过进度文件同步信息的机制
 
 ---
 
@@ -22,7 +22,7 @@
 ## 目录结构
 
 ```
-/.claude/agents/
+/.claude/agents/                  # Founder 团队（Claude Code）
 ├── backend.md                    # 角色配置
 ├── backend-progress/             # 进度追踪 ← 新增
 │   ├── current.md                # 当前任务
@@ -48,7 +48,24 @@
 ├── pm.md
 └── pm-progress/
     └── ...
+
+/codex-agents/                    # Ben 团队（OpenAI Codex CLI）
+├── backend_Ben.md                # 角色配置
+├── backend_Ben-progress/         # 进度追踪（相同的三文件结构）
+│   ├── current.md
+│   ├── completed.md
+│   └── context-for-others.md
+│
+├── frontend_Ben.md
+├── frontend_Ben-progress/
+│   └── ...
+│
+├── pm_Ben.md
+└── pm_Ben-progress/
+    └── ...
 ```
+
+> **注意**: Ben 团队的 `codex-agents/` 进度文件结构与 Founder 团队的 `.claude/agents/` 完全相同（current.md、completed.md、context-for-others.md 三文件规范）。两团队通过 `.team-brain/shared-memory/` 进行跨团队信息同步。
 
 ---
 

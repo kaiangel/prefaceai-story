@@ -4,6 +4,25 @@
 
 ---
 
+### 2026-03-18 — 安全加固 PM Code Review PASS + 文档清理
+
+**PM Code Review**: TASK-CORS-RESTRICT ✅ + TASK-LOG-SANITIZE ✅ (OB-5 非阻塞)
+- CORS: `allow_origins=["*"]` → `["https://prefaceai.mov", "http://localhost:3000"]`
+- 脱敏: 5 正则模式覆盖全部 API Key 格式，patch `builtins.print`，正常日志无误触发
+
+**DevOps 部署审查**: ✅ PASS — `f76ac1e` 3 文件，CORS 实测（允许+拒绝），OB-5 修复确认，3 容器 healthy
+
+**文档清理**: PENDING 3 条过期归档 (LOGO-REPLACE ✅ / DEPLOY-PREP ✅ / STYLE-THUMBNAILS ✅) + TODAY_FOCUS 更新到 03-18
+
+---
+
+### 2026-03-17 — TASK-BRAND-MANIFESTO Founder 终审通过
+
+Founder 确认首页 Pipeline 模块 + About 页 V2 品牌宣言整合，文案和排版满意。
+并行线全部闭环：PM 规划 → Founder 确认 → 文案指引 → Frontend 实现 → PM 审查 → Founder 终审 ✅
+
+---
+
 ### 2026-03-17 — PM 全量审查闭环 (OB-1/2/3/4 + SAFE-DRYRUN)
 
 **AI-ML TASK-OB1-CLEANUP**: ✅ PASS

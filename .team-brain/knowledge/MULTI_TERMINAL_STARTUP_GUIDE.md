@@ -337,8 +337,45 @@ claude
 
 ---
 
+## Ben 团队（Codex Agent）说明
+
+> **重要**: Ben 的 Codex Agent 不由本启动脚本管理，运行在独立的终端环境中。
+
+### 运行环境差异
+
+| 维度 | Founder 团队 | Ben 团队 |
+|------|------------|---------|
+| 工具 | Claude Code (`claude` CLI) | OpenAI Codex CLI |
+| 启动方式 | 本指南的 7 终端方案 | Ben 自行管理 |
+| Agent 配置 | `.claude/agents/` | `codex-agents/` |
+| 进度文件 | `.claude/agents/*-progress/` | `codex-agents/*-progress/` |
+| 管理者 | Founder（本文档） | Ben（独立） |
+
+### 跨团队协作方式
+
+Ben 团队不通过 Founder 的终端启动流程接入，但两团队共享以下机制：
+
+- **共享记忆**: `.team-brain/shared-memory/` — 双方可读可写
+- **Ben 群聊**: `.team-brain/TEAM_CHAT_Ben.md` — Founder 只读
+- **Git PR**: 跨团队代码变更通过 Pull Request 合并（Founder 分支: `founder/xxx`，Ben 分支: `ben/xxx`）
+- **微信**: Founder 和 Ben 实时讨论（线下）
+
+### 如何了解 Ben 团队状态
+
+```bash
+# 读取 Ben 团队进度文件
+cat codex-agents/backend_Ben-progress/current.md
+cat codex-agents/pm_Ben-progress/context-for-others.md
+
+# 读取共享记忆
+ls .team-brain/shared-memory/
+```
+
+---
+
 ## 更新记录
 
 | 日期 | 更新内容 |
 |------|----------|
 | 2025-01-06 | 初始版本 |
+| 2026-03-19 | 新增 Ben 团队（Codex Agent）说明 |

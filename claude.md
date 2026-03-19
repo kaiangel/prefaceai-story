@@ -18,7 +18,7 @@
 | Phase 5 | ✅ **Landing Page完成** | LP主页5.0/5 + 10个子页面4.8/5（TASK-LP-PAGES + TASK-LP-PAGES-FIX） |
 | Phase 6 | 🟡 **已启动** (5%) | Git仓库已初始化（DEC-007），等待后续部署工作 |
 
-### 你的团队（6个专业Agent）
+### Founder 团队（7个 Claude Code Agent）
 
 | Agent | 状态 | 当前任务 |
 |-------|------|----------|
@@ -28,6 +28,16 @@
 | AI-ML | 🟢 | 空闲（TASK-REF-PREPROCESS Step1 指定测试shot完成） |
 | DevOps | 🟢 | 空闲（TASK-GIT-COMMIT-2 三批提交完成） |
 | PM | 🟢 | Coordinator 6项任务完成，等待Founder下一阶段决策 |
+
+### Ben 团队（3个 Codex Agent）
+
+Ben 是项目的人类合伙人兼技术联合创始人（CTO 级别）。使用 OpenAI Codex CLI。
+
+| Agent | 职责 | 定义文件 |
+|-------|------|---------|
+| backend_Ben | 后端+数据库+API架构 | `codex-agents/backend_Ben.md` |
+| frontend_Ben | 前端联动（Ben侧） | `codex-agents/frontend_Ben.md` |
+| pm_Ben | 协调+文档+与Founder PM对齐 | `codex-agents/pm_Ben.md` |
 
 ### 关键决策
 | 决策 | 内容 | 日期 |
@@ -47,6 +57,9 @@
 | `.team-brain/handoffs/PENDING.md` | 待处理交接 |
 | `.team-brain/decisions/DECISIONS.md` | 决策记录 |
 | `.claude/agents/{agent}-progress/` | 各Agent进度 |
+| `.team-brain/TEAM_CHAT_Ben.md` | Ben 团队群聊（只读） |
+| `codex-agents/` | Ben 团队 Agent 文件（只读） |
+| `.team-brain/shared-memory/` | 双团队共享记忆文件 |
 
 ---
 
@@ -462,6 +475,47 @@ final.mp4
 
 ---
 
+## 双团队协作模式（2026-03-19 启动）
+
+### 团队分工
+
+| 领域 | 负责人 | Agent 团队 |
+|------|--------|-----------|
+| Pipeline (Stage 1-5) | Founder | Claude Code agents |
+| Prompt 工程 | Founder | AI-ML agent |
+| 前端产品 | Founder | Frontend agent |
+| 产品方向/决策 | Founder | PM agent |
+| 数据库/用户系统 | Ben | Codex agents |
+| API 架构/计费 | Ben | Codex agents |
+| 运营/市场技术 | Ben | Codex agents |
+| 基础设施/DevOps | 共同 | 各自的 DevOps/DevOps-B |
+
+### 互相只读规则（强约定）
+
+- Founder 团队 **不可修改** `codex-agents/` 下的任何文件
+- Founder 团队 **不可修改** `.team-brain/TEAM_CHAT_Ben.md`
+- Ben 团队 **不可修改** `.claude/agents/` 下的任何文件
+- Ben 团队 **不可修改** `.team-brain/TEAM_CHAT.md`
+- 跨团队代码变更通过 **Git PR** 合并
+
+### Git 工作流
+
+- `main` 分支受保护，不允许直接 push
+- Founder 团队分支: `founder/xxx`
+- Ben 团队分支: `ben/xxx`
+- **Push 节奏**: 每次工作 session（阶段性）结束后 push
+
+### 沟通渠道
+
+| 渠道 | 文件 | 说明 |
+|------|------|------|
+| Founder 群聊 | `.team-brain/TEAM_CHAT.md` | Founder 团队内部 |
+| Ben 群聊 | `.team-brain/TEAM_CHAT_Ben.md` | Ben 团队内部 |
+| 共享记忆 | `.team-brain/shared-memory/` | 双方可读 |
+| 微信 | 线下 | Founder 和 Ben 实时讨论 |
+
+---
+
 ## 🚨 核心原则（不可妥协）
 
 ### 角色一致性是产品的生命线
@@ -599,7 +653,7 @@ python tests/test_character_consistency_regression.py
 
 ---
 
-## 子代理模型规则（Founder 强制要求）
+## 子代理模型规则（Founder 团队强制要求）
 
 ```
 🚨 全员强制：禁止使用 Haiku 模型（包括 Task 工具的子代理）
@@ -611,6 +665,8 @@ python tests/test_character_consistency_regression.py
 - 产品运行时调用 Haiku API 做轻量任务（如图像分析、分类标注等）属于独立场景，不受此限制
 - 区分标准：开发时的 Agent 质量 ≠ 产品运行时的 API 成本优化
 ```
+
+**注意**: 此规则仅适用于 Founder 团队的 Claude Code Agent。Ben 团队使用 OpenAI Codex CLI，模型规则由 Ben 自行管理。
 
 ---
 
