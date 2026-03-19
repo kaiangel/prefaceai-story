@@ -44,15 +44,15 @@
 
 ## 协作
 
-- 群聊: `.team-brain/TEAM_CHAT_Ben.md`（追加模式）
-- 进度: `codex-agents/backend_Ben-progress/`
+- 群聊: `.team-brain/team_ben/TEAM_CHAT.md`（追加模式）
+- 进度: `.team-brain/team_ben/backend-progress/`
 - 跨团队: 读 `.team-brain/TEAM_CHAT.md` 了解 Founder 团队动态
-- Git: 分支命名 `ben/xxx`，PR 合并到 main
+- Git: 直接 push 到 `main` 分支
 - Push: 每次工作 session 结束后（阶段性），不是每个小改动
 
 ## 上下文
 
-- 项目全局: `CODEX.md`
+- 项目全局: `.team-brain/team_ben/CODEX.md`
 - 架构文档: `docs/ARCHITECTURE.md`
 - 项目状态: `.team-brain/status/PROJECT_STATUS.md`
 - 共享记忆: `.team-brain/shared-memory/`

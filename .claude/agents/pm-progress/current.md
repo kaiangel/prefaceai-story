@@ -1,7 +1,7 @@
 # PM Agent - 当前任务
 
-> **最后更新**: 2026-03-19 15:30
-> **状态**: 双团队文档更新完成 + DevOps 任务已派发
+> **最后更新**: 2026-03-19 18:00
+> **状态**: Ben 团队文件重组完成 + Git 简化 → 等 DevOps push
 
 ---
 
@@ -30,9 +30,8 @@
 
 | # | 事项 | 等谁 |
 |---|------|------|
-| 1 | TASK-GIT-PUSH-DUAL-TEAM (commit + push 42 文件) | @DevOps |
-| 2 | TASK-GIT-BRANCH-PROTECTION (main 分支保护) | @DevOps (push 后) |
-| 3 | Founder 填 API Key | Founder |
+| 1 | push 文件重组改动 | @DevOps |
+| 2 | Founder 填 API Key | Founder |
 
 ---
 
@@ -84,7 +83,8 @@ Founder 终审:                                                  ⏳
 
 | 时间 | 更新内容 |
 |------|----------|
-| 2026-03-19 15:30 | 双团队文档更新 (TODAY_FOCUS/PROJECT_STATUS/PENDING) + DevOps 派发 (GIT-PUSH + BRANCH-PROTECTION) + CREATE_UX_EVOLUTION_PLAN 补充 |
+| 2026-03-19 18:00 | Ben 团队文件重组 (codex-agents/ → .team-brain/team_ben/) + Git 工作流简化 (分支保护移除) + 30+ 文件路径引用更新 |
+| 2026-03-19 15:30 | 双团队文档更新 (TODAY_FOCUS/PROJECT_STATUS/PENDING) + DevOps 派发 + CREATE_UX_EVOLUTION_PLAN 补充 |
 | 2026-03-18 11:45 | DevOps 部署审查 PASS (f76ac1e, CORS 实测通过, OB-5 修复确认) — Founder 可填 API Key |
 | 2026-03-18 11:00 | 安全加固 PM Review PASS (CORS ✅ + 脱敏 ✅ OB-5 非阻塞) → DevOps 可部署 |
 | 2026-03-18 10:30 | 文档清理 (TODAY_FOCUS/PENDING 3 条过期) + 安全加固派发 (CORS + 日志脱敏 @Backend) |

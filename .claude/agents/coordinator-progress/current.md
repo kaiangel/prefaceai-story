@@ -9,10 +9,10 @@
 **双团队协作系统搭建** (2026-03-19 14:00)
 
 1. **新建文件 (23 个)**:
-   - `CODEX.md` — Ben 的 Codex 上下文文件
-   - `.team-brain/TEAM_CHAT_Ben.md` — Ben 团队群聊
-   - `codex-agents/` — 3 Agent 定义 (backend_Ben, frontend_Ben, pm_Ben)
-   - `codex-agents/*-progress/` — 9 个 progress 文件 (3 Agent × 3 文件)
+   - `.team-brain/team_ben/CODEX.md` — Ben 的 Codex 上下文文件
+   - `.team-brain/team_ben/TEAM_CHAT.md` — Ben 团队群聊
+   - `.team-brain/team_ben/` — 3 Agent 定义 (backend_Ben, frontend_Ben, pm_Ben)
+   - `.team-brain/team_ben/*-progress/` — 9 个 progress 文件 (3 Agent × 3 文件)
    - `.team-brain/shared-memory/` — 7 个记忆文件副本
 
 2. **更新现有文件 (进行中)**:
@@ -29,7 +29,7 @@
 | CORS + 日志脱敏 | @Backend |
 | Founder 填 API Key | Founder |
 | Ben onboarding | Ben |
-| Git branch protection | @DevOps |
+| ~~Git branch protection~~ 已取消 | - |
 
 ---
 
@@ -38,7 +38,7 @@
 ### 2026-03-19 14:00
 - 双团队协作系统全面搭建（23 新文件 + 23 文件更新）
 - Ben 团队 3 Agent 定义和 progress 文件创建
-- CODEX.md 创建，TEAM_CHAT_Ben.md 初始化
+- codex.md 创建，team_chat.md 初始化
 - shared-memory 记忆文件同步
 
 ### 2026-03-18 10:00

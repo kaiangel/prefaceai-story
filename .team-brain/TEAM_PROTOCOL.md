@@ -10,9 +10,9 @@
 | Tester | 测试工程师 | 单元测试、E2E、回归 | /tests/CLAUDE.md |
 | AI_ML | AI/ML专家 | Prompt、模型优化、一致性 | /app/prompts/CLAUDE.md |
 | DevOps | 运维工程师 | 部署、CI/CD、监控 | /deploy/CLAUDE.md |
-| frontend_Ben | Ben团队前端 | Ben侧前端联动 | `codex-agents/frontend_Ben.md` |
-| backend_Ben | Ben团队后端 | 数据库+API架构+计费 | `codex-agents/backend_Ben.md` |
-| pm_Ben | Ben团队PM | 协调+文档+对齐Founder PM | `codex-agents/pm_Ben.md` |
+| frontend_Ben | Ben团队前端 | Ben侧前端联动 | `.team-brain/team_ben/frontend.md` |
+| backend_Ben | Ben团队后端 | 数据库+API架构+计费 | `.team-brain/team_ben/backend.md` |
+| pm_Ben | Ben团队PM | 协调+文档+对齐Founder PM | `.team-brain/team_ben/pm.md` |
 
 ---
 
@@ -204,12 +204,12 @@
 
 | 文件 | 所有权 | Founder 团队权限 |
 |------|--------|----------------|
-| `codex-agents/*.md` | Ben 团队 | 只读 |
-| `codex-agents/*-progress/*.md` | Ben 团队 | 只读 |
-| `.team-brain/TEAM_CHAT_Ben.md` | Ben 团队 | 只读 |
+| `.team-brain/team_ben/*.md` | Ben 团队 | 只读 |
+| `.team-brain/team_ben/*-progress/*.md` | Ben 团队 | 只读 |
+| `.team-brain/team_ben/TEAM_CHAT.md` | Ben 团队 | 只读 |
 | `.team-brain/shared-memory/*.md` | 创建者 | 双方可读 |
 
-**强约定**: Founder 团队不修改上述 Ben 团队文件。Ben 团队不修改 `.claude/agents/`、`.team-brain/TEAM_CHAT.md`。
+**强约定**: Founder 团队不修改 `.team-brain/team_ben/` 下的任何文件。Ben 团队不修改 `.claude/agents/`、`.team-brain/TEAM_CHAT.md`。
 
 #### 五、特殊处理
 
@@ -432,13 +432,12 @@ Edit(
 
 ### 互相只读原则
 - 双方均可读取对方的所有文件
-- 双方**不修改**对方的 TEAM_CHAT、Agent 定义文件、progress 文件
-- 跨团队代码变更通过 **Git PR** 合并
+- Founder 团队 **不修改** `.team-brain/team_ben/` 下的任何文件
+- Ben 团队 **不修改** `.claude/agents/` 下的任何文件和 `.team-brain/TEAM_CHAT.md`
 
-### Git 分支策略
-- `main` 分支受保护，不允许直接 push
-- Founder 团队分支命名: `founder/xxx`
-- Ben 团队分支命名: `ben/xxx`
+### Git 工作流
+- 两人（Founder + Ben）都直接 push 到 `main` 分支
+- 分工不同，代码冲突概率极低；如有冲突，两人沟通解决后再 push
 
 ### Push 协议
 - 每次工作会话（阶段性）结束后 push
@@ -449,6 +448,6 @@ Edit(
 | 渠道 | 文件/方式 | 参与者 |
 |------|----------|--------|
 | Founder 群聊 | `.team-brain/TEAM_CHAT.md` | Founder 团队 Agent |
-| Ben 群聊 | `.team-brain/TEAM_CHAT_Ben.md` | Ben 团队 Agent |
+| Ben 群聊 | `.team-brain/team_ben/TEAM_CHAT.md` | Ben 团队 Agent |
 | 共享记忆 | `.team-brain/shared-memory/` | 双方可读 |
 | 微信 | 线下 | Founder + Ben（人对人） |

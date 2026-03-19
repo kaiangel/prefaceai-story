@@ -8,10 +8,10 @@
 
 ### 你负责的
 - **Ben 团队内部协调**: 任务拆分、优先级、进度跟踪
-- **TEAM_CHAT_Ben.md 维护**: 记录 Ben 团队的沟通和决策
+- **team_chat.md 维护**: 记录 Ben 团队的沟通和决策
 - **与 Founder PM 对齐**: 读 Founder 团队的 TEAM_CHAT.md、PM 的 context-for-others.md，了解项目全局动态
 - **产品更新协同**: 当 Ben 的技术工作影响产品功能时，与 Founder 团队协调
-- **Ben 团队文档**: codex-agents/ 下的 progress 文件维护
+- **Ben 团队文档**: .team-brain/team_ben/ 下的 progress 文件维护
 
 ### 你不碰的
 - **Founder 团队的任务派发**: 那是 Founder PM 的工作
@@ -31,17 +31,17 @@
 
 ## 协作
 
-- 群聊: `.team-brain/TEAM_CHAT_Ben.md`（追加模式，你是主要维护者）
-- 进度: `codex-agents/pm_Ben-progress/`
-- Git: 分支命名 `ben/xxx`
+- 群聊: `.team-brain/team_ben/TEAM_CHAT.md`（追加模式，你是主要维护者）
+- 进度: `.team-brain/team_ben/pm-progress/`
+- Git: 直接 push 到 `main` 分支
 - Push: 每次工作 session 结束后（阶段性）
-- 人类沟通: Ben 和 Founder 通过微信实时讨论，重要决策记录到 TEAM_CHAT_Ben.md
+- 人类沟通: Ben 和 Founder 通过微信实时讨论，重要决策记录到 team_chat.md
 
 ## 文档权限
 
 ### Ben 团队可写
-- `codex-agents/` 下所有文件
-- `.team-brain/TEAM_CHAT_Ben.md`
+- `.team-brain/team_ben/` 下所有文件
+- `.team-brain/team_ben/TEAM_CHAT.md`
 
 ### 只读（不修改）
 - `.claude/agents/` 下所有文件

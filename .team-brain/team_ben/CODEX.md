@@ -77,14 +77,14 @@ idea → Stage 1 (故事大纲) → Stage 2 (角色设计) → Stage 3 (剧本) 
 | 团队 | 成员 | 工具 | 文件位置 |
 |------|------|------|---------|
 | Founder 团队 | Coordinator + PM + Backend + AI-ML + Frontend + Tester + DevOps (7个) | Claude Code (Opus 4.6) | `.claude/agents/` |
-| Ben 团队 | frontend_Ben + backend_Ben + pm_Ben (3个) | Codex CLI (GPT-5.3-codex) | `codex-agents/` |
+| Ben 团队 | frontend_Ben + backend_Ben + pm_Ben (3个) | Codex CLI (GPT-5.3-codex) | `.team-brain/team_ben/` |
 
 ### 沟通渠道
 
 | 渠道 | 用途 | 文件 |
 |------|------|------|
 | Founder 团队群聊 | Founder 团队内部沟通 | `.team-brain/TEAM_CHAT.md`（Ben 只读） |
-| Ben 团队群聊 | Ben 团队内部沟通 | `.team-brain/TEAM_CHAT_Ben.md`（Founder 只读） |
+| Ben 团队群聊 | Ben 团队内部沟通 | `.team-brain/team_ben/TEAM_CHAT.md`（Founder 只读） |
 | 微信 | Founder 和 Ben 实时讨论 | 线下 |
 | shared-memory | 共享记忆文件 | `.team-brain/shared-memory/` |
 
@@ -92,19 +92,16 @@ idea → Stage 1 (故事大纲) → Stage 2 (角色设计) → Stage 3 (剧本) 
 
 - Ben 团队 **不修改** `.claude/agents/` 下的任何文件
 - Ben 团队 **不修改** `.team-brain/TEAM_CHAT.md`
-- Founder 团队 **不修改** `codex-agents/` 下的任何文件
-- Founder 团队 **不修改** `.team-brain/TEAM_CHAT_Ben.md`
-- 跨团队代码变更通过 **Git PR** 合并
+- Founder 团队 **不修改** `.team-brain/team_ben/` 下的任何文件
+- Founder 团队 **不修改** `.team-brain/team_ben/TEAM_CHAT.md`
 
 ### Git 工作流
 
-- `main` 分支受保护，不允许直接 push
-- Founder 团队分支: `founder/xxx`
-- Ben 团队分支: `ben/xxx`
-- PR 合并需要对方知晓或 review
+- 两人（Founder + Ben）都直接 push 到 `main` 分支
+- 分工不同，代码冲突概率极低；如有冲突，两人沟通解决后再 push
 - **Push 节奏**: 每次工作 session（阶段性）结束后 push，不是每个小改动都 push
 
-### TEAM_CHAT_Ben.md 格式
+### team_chat.md 格式
 
 ```markdown
 ### YYYY-MM-DD HH:MM
@@ -167,7 +164,7 @@ REDIS_URL=redis://localhost:6379   # 已有
 ## 推荐阅读清单
 
 ### 必读（开工前）
-1. 本文件 (`CODEX.md`)
+1. 本文件 (`codex.md`)
 2. `CLAUDE.md` 前半部分（项目状态 + 产品定位 + 技术架构）
 3. `.team-brain/status/PROJECT_STATUS.md`
 4. `.team-brain/decisions/DECISIONS.md`
@@ -189,9 +186,9 @@ REDIS_URL=redis://localhost:6379   # 已有
 
 | Agent | 文件 | 职责 |
 |-------|------|------|
-| backend_Ben | `codex-agents/backend_Ben.md` | 后端 + 数据库 + API 架构 |
-| frontend_Ben | `codex-agents/frontend_Ben.md` | 前端联动（Ben 侧需要时） |
-| pm_Ben | `codex-agents/pm_Ben.md` | 协调 + 文档 + 与 Founder PM 对齐 |
+| backend_Ben | `.team-brain/team_ben/backend.md` | 后端 + 数据库 + API 架构 |
+| frontend_Ben | `.team-brain/team_ben/frontend.md` | 前端联动（Ben 侧需要时） |
+| pm_Ben | `.team-brain/team_ben/pm.md` | 协调 + 文档 + 与 Founder PM 对齐 |
 
 ### Progress 文件
 

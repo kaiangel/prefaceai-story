@@ -7,18 +7,12 @@
 
 ## 📋 当前待处理
 
-### TASK-GIT-PUSH-DUAL-TEAM + TASK-GIT-BRANCH-PROTECTION — 🔄 @DevOps (P0)
+### ~~TASK-GIT-PUSH-DUAL-TEAM + TASK-GIT-BRANCH-PROTECTION~~ — ✅ 已完成/已取消
 
 | 字段 | 内容 |
 |------|------|
-| **优先级** | P0 |
-| **来源** | Coordinator 指令 (2026-03-19) → PM 派发 |
-| **负责人** | @DevOps |
-| **TASK-GIT-PUSH-DUAL-TEAM** | commit 42 文件 + push to GitHub（不部署 VPS）|
-| **TASK-GIT-BRANCH-PROTECTION** | main 分支保护: require PR, 禁止直接 push |
-| **前置** | PUSH 先完成，PROTECTION 后执行 |
-| **说明** | Ben 动代码前的安全前置。push 完后 Ben 可 git pull 看到所有协作文件 |
-| **状态** | 🔄 PM 已派发 |
+| **TASK-GIT-PUSH-DUAL-TEAM** | ✅ 已完成 (commit 33eaac6, 59 files pushed) |
+| **TASK-GIT-BRANCH-PROTECTION** | ✅ 已取消 — Git 工作流变更：两人都直接 push 到 main，无分支保护 |
 
 ---
 

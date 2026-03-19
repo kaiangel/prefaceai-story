@@ -49,23 +49,23 @@
 └── pm-progress/
     └── ...
 
-/codex-agents/                    # Ben 团队（OpenAI Codex CLI）
-├── backend_Ben.md                # 角色配置
-├── backend_Ben-progress/         # 进度追踪（相同的三文件结构）
+/.team-brain/team_ben/            # Ben 团队（OpenAI Codex CLI）
+├── backend.md                    # 角色配置
+├── backend-progress/             # 进度追踪（相同的三文件结构）
 │   ├── current.md
 │   ├── completed.md
 │   └── context-for-others.md
 │
-├── frontend_Ben.md
-├── frontend_Ben-progress/
+├── frontend.md
+├── frontend-progress/
 │   └── ...
 │
-├── pm_Ben.md
-└── pm_Ben-progress/
+├── pm.md
+└── pm-progress/
     └── ...
 ```
 
-> **注意**: Ben 团队的 `codex-agents/` 进度文件结构与 Founder 团队的 `.claude/agents/` 完全相同（current.md、completed.md、context-for-others.md 三文件规范）。两团队通过 `.team-brain/shared-memory/` 进行跨团队信息同步。
+> **注意**: Ben 团队的 `.team-brain/team_ben/` 进度文件结构与 Founder 团队的 `.claude/agents/` 完全相同（current.md、completed.md、context-for-others.md 三文件规范）。两团队通过 `.team-brain/shared-memory/` 进行跨团队信息同步。
 
 ---
 

@@ -12,6 +12,6 @@
 - 项目文档阅读中
 
 ### 下一步
-- 阅读 CODEX.md + 推荐阅读清单
+- 阅读 .team-brain/team_ben/CODEX.md + 推荐阅读清单
 - 熟悉现有 FastAPI 架构 (app/main.py)
 - 设计数据库 Schema v1

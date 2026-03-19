@@ -1,7 +1,7 @@
 # DevOps Agent - 当前任务
 
 > **最后更新**: 2026-03-19
-> **状态**: ✅ TASK-GIT-PUSH-DUAL-TEAM + TASK-GIT-BRANCH-PROTECTION 全部完成
+> **状态**: ✅ TASK-GIT-PUSH-DUAL-TEAM 完成 / BRANCH-PROTECTION 已取消（改为直接 push main）
 
 ---
 
@@ -16,23 +16,12 @@
 3. **不需要 VPS 部署**（开发协作文档）
 4. **跳过的文件**: 118MB .mov 视频 + 简历 PDF + 新照片（不属于协作文件）
 
-### ✅ TASK-GIT-BRANCH-PROTECTION: 完成
+### ~~TASK-GIT-BRANCH-PROTECTION~~: 已取消
 
-**Founder 升级 GitHub Pro ($4/月)**，分支保护已启用。
-
-**保护规则**:
-- 必须通过 PR 合并，禁止直接 push main ✅
-- 审批人数: 0（可自己合并，但必须走 PR）
-- 管理员也受约束 (enforce_admins: true) ✅
-- 禁止 force push ✅
-- 禁止删除 main ✅
-
-**验证**:
-- 直接 push → `GH006: Protected branch update failed` ✅ 被拒绝
-- PR 合并 → PR #1 成功合并 ✅
-- 测试分支已清理 ✅
-
-**新工作流**: 所有改动走 `founder/xxx` 或 `ben/xxx` 分支 → PR → 合并 main
+**Git 工作流变更**: 分支保护已移除，两人（Founder + Ben）都直接 push 到 `main` 分支。
+- 分工不同，代码冲突概率极低
+- 不再需要 `founder/xxx` 或 `ben/xxx` 分支
+- 不再需要 PR
 
 ---
 

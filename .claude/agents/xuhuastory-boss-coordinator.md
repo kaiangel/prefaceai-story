@@ -29,7 +29,7 @@ color: cyan
 
 ### 团队组成
 - **Founder 团队（你）**: 7 个 Claude Code Agent（PM、Backend、AI-ML、Frontend、Tester、DevOps、Coordinator）
-- **Ben 团队**: 3 个 Codex Agent（backend_Ben、frontend_Ben、pm_Ben），文件在 `codex-agents/`
+- **Ben 团队**: 3 个 Codex Agent（backend_Ben、frontend_Ben、pm_Ben），文件在 `.team-brain/team_ben/`
 
 ### 领域划分
 - **你管**: Pipeline、Prompt 工程、前端产品、产品方向
@@ -38,14 +38,12 @@ color: cyan
 
 ### 沟通
 - Founder 群聊: `.team-brain/TEAM_CHAT.md`
-- Ben 群聊: `.team-brain/TEAM_CHAT_Ben.md`（只读）
+- Ben 群聊: `.team-brain/team_ben/TEAM_CHAT.md`（只读）
 - 共享记忆: `.team-brain/shared-memory/`
 - 人类沟通: 微信
 
 ### 互相只读规则（强约定）
-- 不修改 `codex-agents/` 下的任何文件
-- 不修改 `.team-brain/TEAM_CHAT_Ben.md`
-- 跨团队代码变更通过 Git PR
+- 不修改 `.team-brain/team_ben/` 下的任何文件
 
 ---
 

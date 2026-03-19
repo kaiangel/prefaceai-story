@@ -35,9 +35,9 @@ Ben 是项目的人类合伙人兼技术联合创始人（CTO 级别）。使用
 
 | Agent | 职责 | 定义文件 |
 |-------|------|---------|
-| backend_Ben | 后端+数据库+API架构 | `codex-agents/backend_Ben.md` |
-| frontend_Ben | 前端联动（Ben侧） | `codex-agents/frontend_Ben.md` |
-| pm_Ben | 协调+文档+与Founder PM对齐 | `codex-agents/pm_Ben.md` |
+| backend_Ben | 后端+数据库+API架构 | `.team-brain/team_ben/backend.md` |
+| frontend_Ben | 前端联动（Ben侧） | `.team-brain/team_ben/frontend.md` |
+| pm_Ben | 协调+文档+与Founder PM对齐 | `.team-brain/team_ben/pm.md` |
 
 ### 关键决策
 | 决策 | 内容 | 日期 |
@@ -57,8 +57,8 @@ Ben 是项目的人类合伙人兼技术联合创始人（CTO 级别）。使用
 | `.team-brain/handoffs/PENDING.md` | 待处理交接 |
 | `.team-brain/decisions/DECISIONS.md` | 决策记录 |
 | `.claude/agents/{agent}-progress/` | 各Agent进度 |
-| `.team-brain/TEAM_CHAT_Ben.md` | Ben 团队群聊（只读） |
-| `codex-agents/` | Ben 团队 Agent 文件（只读） |
+| `.team-brain/team_ben/TEAM_CHAT.md` | Ben 团队群聊（只读） |
+| `.team-brain/team_ben/` | Ben 团队 Agent 文件（只读） |
 | `.team-brain/shared-memory/` | 双团队共享记忆文件 |
 
 ---
@@ -492,17 +492,14 @@ final.mp4
 
 ### 互相只读规则（强约定）
 
-- Founder 团队 **不可修改** `codex-agents/` 下的任何文件
-- Founder 团队 **不可修改** `.team-brain/TEAM_CHAT_Ben.md`
+- Founder 团队 **不可修改** `.team-brain/team_ben/` 下的任何文件
 - Ben 团队 **不可修改** `.claude/agents/` 下的任何文件
 - Ben 团队 **不可修改** `.team-brain/TEAM_CHAT.md`
-- 跨团队代码变更通过 **Git PR** 合并
 
 ### Git 工作流
 
-- `main` 分支受保护，不允许直接 push
-- Founder 团队分支: `founder/xxx`
-- Ben 团队分支: `ben/xxx`
+- 两人（Founder + Ben）都直接 push 到 `main` 分支
+- 分工不同，代码冲突概率极低；如有冲突，两人沟通解决后再 push
 - **Push 节奏**: 每次工作 session（阶段性）结束后 push
 
 ### 沟通渠道
@@ -510,7 +507,7 @@ final.mp4
 | 渠道 | 文件 | 说明 |
 |------|------|------|
 | Founder 群聊 | `.team-brain/TEAM_CHAT.md` | Founder 团队内部 |
-| Ben 群聊 | `.team-brain/TEAM_CHAT_Ben.md` | Ben 团队内部 |
+| Ben 群聊 | `.team-brain/team_ben/TEAM_CHAT.md` | Ben 团队内部 |
 | 共享记忆 | `.team-brain/shared-memory/` | 双方可读 |
 | 微信 | 线下 | Founder 和 Ben 实时讨论 |
 

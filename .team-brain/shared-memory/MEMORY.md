@@ -67,13 +67,13 @@ Frontend 可更新的文档：
 ## 合伙人 Ben（人类，2026-03-18 加入讨论）
 
 - [Ben 画像](user_ben_cofounder.md)：CTO 级别，安居客/车轮技术总监/CTO，后端+数据库+架构，用 Codex（地理因素无法用 Claude）
-- [远程协作方案](project_ben_collaboration_plan.md)：双团队独立 + Git PR 桥接，领域划分，Agent 团队设计，Onboarding，执行清单（完整方案）
+- [远程协作方案](project_ben_collaboration_plan.md)：双团队独立 + 直接 push main，领域划分，Agent 团队设计，Onboarding，执行清单（完整方案）
 - [Codex 兼容性分析](project_codex_compatibility.md)：OpenAI Codex CLI vs Claude Code 技术差异和解决方案
 
 **关键决策**：
-- Ben 用 Codex（地理因素无法用 Claude），不需要做完整兼容层，只需创建 `CODEX.md`
+- Ben 用 Codex（地理因素无法用 Claude），不需要做完整兼容层，只需创建 `.team-brain/team_ben/CODEX.md`
 - 双团队独立运作：Founder 管 Pipeline/Prompt/前端/产品，Ben 管 数据库/API架构/运营技术
-- Git 必须升级分支保护（P0，Ben 动代码前完成）
+- Git 工作流：两人都直接 push 到 main，无分支保护
 - Ben 的第一个任务建议：从零搭建用户数据库层（`app/database/`，自包含零冲突）
 - Ben 不碰 Prompt 和 Pipeline（明确说明暂时不会动）
 

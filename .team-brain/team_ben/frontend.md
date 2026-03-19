@@ -26,14 +26,14 @@
 
 ## 协作
 
-- 群聊: `.team-brain/TEAM_CHAT_Ben.md`（追加模式）
-- 进度: `codex-agents/frontend_Ben-progress/`
+- 群聊: `.team-brain/team_ben/TEAM_CHAT.md`（追加模式）
+- 进度: `.team-brain/team_ben/frontend-progress/`
 - 跨团队: 读 Founder Frontend 的 `context-for-others.md` 了解前端现状
-- Git: 分支命名 `ben/xxx`
+- Git: 直接 push 到 `main` 分支
 - Push: 每次工作 session 结束后（阶段性）
 
 ## 注意
 
 - Founder 团队的 Frontend agent 已完成大量工作（LP 5.0/5, Create P0-P2 全部通过）
 - 修改前端代码前，先读 Founder Frontend 的 `context-for-others.md` 避免冲突
-- 有疑问时在 TEAM_CHAT_Ben.md 提出，由 pm_Ben 与 Founder 团队协调
+- 有疑问时在 team_chat.md 提出，由 pm_Ben 与 Founder 团队协调

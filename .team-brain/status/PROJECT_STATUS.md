@@ -350,7 +350,7 @@ Pipeline品牌: FrameSpark™
 状态: 🟢 准备就绪
 更新时间: 2026-03-19
 当前任务: 等 git pull 后开始（建议首任务：用户数据库层搭建）
-阻塞: TASK-GIT-BRANCH-PROTECTION 需先完成
+阻塞: 无
 ```
 
 ### frontend_Ben (前端联动)
@@ -436,7 +436,7 @@ Pipeline品牌: FrameSpark™
 
 ### 2026-03-19
 - **[Coordinator] 双团队协作系统启动** — Ben 团队加入 (3 Codex Agent)
-  - 新建 42 文件: CODEX.md + codex-agents/ + shared-memory/ + 全 Agent 双团队感知更新
+  - 新建 42 文件: codex.md + .team-brain/team_ben/ + shared-memory/ + 全 Agent 双团队感知更新
   - TEAM_PROTOCOL.md 更新: 互相只读规则 + Git 分支策略 + Ben 团队文件分类
   - CLAUDE.md 更新: Ben 团队 Agent 表 + 双团队协作模式章节
 - **[PM] 文档更新 + DevOps 派发**

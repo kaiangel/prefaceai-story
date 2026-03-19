@@ -7,12 +7,12 @@
 **背景**: 合伙人 Ben（人类，CTO 级别）正式加入项目，带来 3 个 Codex Agent。
 
 **新建文件 (23 个)**:
-- `CODEX.md` — Ben 的 Codex 上下文文件（项目概述+职责+代码规范+协作规则）
-- `.team-brain/TEAM_CHAT_Ben.md` — Ben 团队群聊初始化
-- `codex-agents/backend_Ben.md` — 后端+数据库 Agent 定义
-- `codex-agents/frontend_Ben.md` — 前端联动 Agent 定义
-- `codex-agents/pm_Ben.md` — 协调 Agent 定义
-- `codex-agents/*-progress/` — 9 个 progress 文件（3 Agent × current/context/completed）
+- `.team-brain/team_ben/CODEX.md` — Ben 的 Codex 上下文文件（项目概述+职责+代码规范+协作规则）
+- `.team-brain/team_ben/TEAM_CHAT.md` — Ben 团队群聊初始化
+- `.team-brain/team_ben/backend.md` — 后端+数据库 Agent 定义
+- `.team-brain/team_ben/frontend.md` — 前端联动 Agent 定义
+- `.team-brain/team_ben/pm.md` — 协调 Agent 定义
+- `.team-brain/team_ben/*-progress/` — 9 个 progress 文件（3 Agent × current/context/completed）
 - `.team-brain/shared-memory/` — 7 个记忆文件副本（从 ~/.claude 复制）
 
 **更新文件 (23 个)**:

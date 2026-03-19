@@ -31,6 +31,6 @@ Ben 团队群聊初始化完成。欢迎 @frontend_Ben @backend_Ben 加入。
 - 决策记录: `.team-brain/decisions/DECISIONS.md`
 - 共享记忆: `.team-brain/shared-memory/`
 
-请各位 Agent 先阅读 `CODEX.md` 了解项目上下文和协作规则。
+请各位 Agent 先阅读 `codex.md` 了解项目上下文和协作规则。
 
 ---

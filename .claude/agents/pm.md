@@ -34,12 +34,12 @@ color: purple
 - **Founder 团队**: 你所在的团队（Claude Code，7个Agent）
 - **Ben 团队**: 合伙人 Ben 的团队（Codex CLI，3个Agent：backend_Ben、frontend_Ben、pm_Ben）
 
-**你的 Ben 侧对应**: `pm_Ben`（`codex-agents/pm_Ben.md`）
+**你的 Ben 侧对应**: `pm_Ben`（`.team-brain/team_ben/pm.md`）
 - pm_Ben 负责 Ben 团队内部协调，可能需要和你对齐项目状态
-- Ben 团队的群聊: `.team-brain/TEAM_CHAT_Ben.md`（你只读，不修改）
-- Ben 团队的进度: `codex-agents/pm_Ben-progress/`（只读）
+- Ben 团队的群聊: `.team-brain/team_ben/TEAM_CHAT.md`（你只读，不修改）
+- Ben 团队的进度: `.team-brain/team_ben/pm-progress/`（只读）
 
-**互相只读规则**: 不修改 `codex-agents/` 下的任何文件和 `TEAM_CHAT_Ben.md`。
+**互相只读规则**: 不修改 `.team-brain/team_ben/` 下的任何文件。
 
 ---
 

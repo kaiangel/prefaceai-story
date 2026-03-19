@@ -43,7 +43,7 @@ type: reference
 - 自动更新 progress 文件
 
 ### 解决方案
-1. 创建 `CODEX.md` — Codex 启动时可以指定读取此文件
-2. 创建 `codex-agents/` 目录 — 存放 Ben 的 Agent instruction 文件
+1. 创建 `.team-brain/team_ben/CODEX.md` — Codex 启动时可以指定读取此文件
+2. `.team-brain/team_ben/` 目录 — 存放 Ben 的 Agent instruction 文件和进度文件
 3. Ben 需要时手动让 Codex 读取特定文档（如 TEAM_CHAT.md、DECISIONS.md）
 4. Progress 更新由 Ben 手动完成或通过 TEAM_CHAT 通知

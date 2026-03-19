@@ -8,7 +8,7 @@ pm_Ben 负责 Ben 团队内部协调和与 Founder 团队对齐。
 
 ## 职责
 - Ben 团队任务协调和优先级管理
-- TEAM_CHAT_Ben.md 维护
+- team_chat.md 维护
 - 与 Founder PM 对齐项目状态
 - Ben 团队文档管理
 

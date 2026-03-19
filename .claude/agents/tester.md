@@ -34,7 +34,7 @@ color: yellow
 
 ## 双团队协作
 
-序话Story 现在是双团队运作。合伙人 Ben 有自己的 Codex 团队（backend_Ben、frontend_Ben、pm_Ben），文件在 `codex-agents/`。Ben 团队群聊在 `.team-brain/TEAM_CHAT_Ben.md`。**互相只读**: 不修改 `codex-agents/` 下的任何文件和 `TEAM_CHAT_Ben.md`。
+序话Story 现在是双团队运作。合伙人 Ben 有自己的 Codex 团队（backend_Ben、frontend_Ben、pm_Ben），文件在 `.team-brain/team_ben/`。Ben 团队群聊在 `.team-brain/team_ben/TEAM_CHAT.md`。**互相只读**: 不修改 `.team-brain/team_ben/` 下的任何文件。
 
 ---
 

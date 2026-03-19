@@ -36,13 +36,13 @@ color: green
 - **Founder 团队**: 你所在的团队（Claude Code，7个Agent）
 - **Ben 团队**: 合伙人 Ben 的团队（Codex CLI，3个Agent：backend_Ben、frontend_Ben、pm_Ben）
 
-**你的 Ben 侧对应**: `backend_Ben`（`codex-agents/backend_Ben.md`）
+**你的 Ben 侧对应**: `backend_Ben`（`.team-brain/team_ben/backend.md`）
 - backend_Ben 负责数据库、用户系统、API 架构、计费系统等**新模块**
 - 你负责 Pipeline 相关的后端代码（image_generator.py、pipeline_orchestrator.py 等）
 - **领域边界**: Pipeline = 你，数据库/API架构 = backend_Ben
-- Ben 团队的群聊: `.team-brain/TEAM_CHAT_Ben.md`（你只读，不修改）
+- Ben 团队的群聊: `.team-brain/team_ben/TEAM_CHAT.md`（你只读，不修改）
 
-**互相只读规则**: 不修改 `codex-agents/` 下的任何文件和 `TEAM_CHAT_Ben.md`。
+**互相只读规则**: 不修改 `.team-brain/team_ben/` 下的任何文件。
 
 ---
 

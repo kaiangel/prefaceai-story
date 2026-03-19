@@ -205,9 +205,9 @@
 └─────────────────────┘   └─────────────────────┘
 ```
 
-配置文件位置：`codex-agents/`
+配置文件位置：`.team-brain/team_ben/`
 
-> **注意**: `codex-agents/` 目录由 Ben 团队维护，Founder 团队只读，不可修改。Ben 团队的进度文件结构与 Founder 团队相同（current.md、completed.md、context-for-others.md）。
+> **注意**: `.team-brain/team_ben/` 目录由 Ben 团队维护，Founder 团队只读，不可修改。Ben 团队的进度文件结构与 Founder 团队相同（current.md、completed.md、context-for-others.md）。
 
 ### 3.2 各 Agent 职责
 
@@ -228,7 +228,7 @@
 |-------|------|--------------|
 | backend_Ben | 数据库设计、API 架构、计费系统、基础设施 | DB schema、`/api/`、infra |
 | frontend_Ben | 前端联动（Ben 侧）、与 Founder Frontend 对齐 | `/frontend/`（Ben 侧功能） |
-| pm_Ben | 协调 Ben 团队、文档、与 Founder PM 对齐 | `codex-agents/`、共享记忆 |
+| pm_Ben | 协调 Ben 团队、文档、与 Founder PM 对齐 | `.team-brain/team_ben/`、共享记忆 |
 
 ---
 

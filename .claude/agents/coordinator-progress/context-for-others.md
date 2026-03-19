@@ -18,15 +18,13 @@
 ### 新增文件（所有 Agent 需知）
 | 文件 | 说明 | 权限 |
 |------|------|------|
-| `CODEX.md` | Ben 的 Codex 上下文 | 我们只读 |
-| `.team-brain/TEAM_CHAT_Ben.md` | Ben 团队群聊 | 我们只读 |
-| `codex-agents/` | Ben 的 Agent 文件 | 我们只读 |
+| `.team-brain/team_ben/CODEX.md` | Ben 的 Codex 上下文 | 我们只读 |
+| `.team-brain/team_ben/TEAM_CHAT.md` | Ben 团队群聊 | 我们只读 |
+| `.team-brain/team_ben/` | Ben 的 Agent 文件 | 我们只读 |
 | `.team-brain/shared-memory/` | 双团队共享记忆 | 双方可读 |
 
 ### 互相只读规则
-- **不修改** `codex-agents/` 下的任何文件
-- **不修改** `.team-brain/TEAM_CHAT_Ben.md`
-- 跨团队代码变更通过 Git PR
+- **不修改** `.team-brain/team_ben/` 下的任何文件
 
 ## @PM 当前任务
 - 更新 TEAM_PROTOCOL.md 加入双团队协作规则
@@ -35,6 +33,6 @@
 
 ## 各 Agent 无需改变工作方式
 Ben 团队的加入不影响 Founder 团队的日常工作流。你只需要知道:
-1. Ben 团队存在，文件在 `codex-agents/`
-2. 他们有自己的群聊 `TEAM_CHAT_Ben.md`
+1. Ben 团队存在，文件在 `.team-brain/team_ben/`
+2. 他们有自己的群聊 `.team-brain/team_ben/TEAM_CHAT.md`
 3. 互相只读，不要动对方的文件

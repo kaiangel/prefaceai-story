@@ -7,7 +7,7 @@
 
 ## 当前状态速览
 
-状态: ✅ **双团队协作文件已推送 + main 分支保护已启用**
+状态: ✅ **双团队协作文件已推送**（两人直接 push main，无分支保护）
 域名: `https://prefaceai.mov` 已上线（前端 + API + 新 logo + V2 品牌宣言）
 服务器: 107.148.1.199 (8C/16GB/200GB, Ubuntu 20.04)
 容器: 3 个运行中 — api (healthy) + frontend (up) + redis (healthy)
@@ -23,15 +23,9 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 **VPS**: 不需要部署（开发协作文档）
 **Ben 可 git pull 获取全部内容**
 
-### ✅ TASK-GIT-BRANCH-PROTECTION 完成
+### ~~TASK-GIT-BRANCH-PROTECTION~~: 已取消
 
-Founder 升级 GitHub Pro → main 分支保护已启用:
-- 必须通过 PR 合并，禁止直接 push ✅
-- 管理员也受约束 ✅
-- 禁止 force push + 禁止删除 ✅
-- PR #1 验证通过 ✅
-
-**新工作流**: `founder/xxx` 或 `ben/xxx` 分支 → PR → 合并 main
+**Git 工作流变更**: 分支保护已移除，两人都直接 push 到 `main` 分支。不再需要 PR 或分支命名。
 
 ---
 
@@ -98,4 +92,4 @@ Founder 升级 GitHub Pro → main 分支保护已启用:
 | dev | 🟢 运行中（本地开发） | 2026-03-19 |
 | staging | ⚪ 未部署 | - |
 | prod | ✅ **安全加固已部署**（等待 API Key） | 2026-03-18 |
-| git | ✅ 双团队文件已推送 + main 分支保护已启用 | 2026-03-19 |
+| git | ✅ 双团队文件已推送（两人直接 push main） | 2026-03-19 |
