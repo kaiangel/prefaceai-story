@@ -2,20 +2,23 @@
 
 > 最后更新: 2026-03-19
 
-## 状态: 准备就绪
+## 状态: contact_us 后端链路已完成并可联调
 
-backend_Ben 尚未开始编码。正在熟悉项目。
+## 本次关键事实
+- 官网联系表单后端入口是 `/api/contact-us/`
+- 数据表固定是 `contact_us`
+- 当前表结构里 `id` 是自增主键
+- 历史 UUID 数据保存在 `legacy_id`
+- 本次没有把其他历史表主键一起改成自增
 
-## 职责范围
-- 数据库设计与实现（PostgreSQL + SQLAlchemy/SQLModel + Alembic）
-- API 架构（FastAPI endpoints）
-- 用户系统、计费系统
-- 运营技术支撑
+## 已完成
+- `contact_us` model / schema / API 已实现
+- MySQL 真实写入已验证
+- 本地 CORS 已支持 `127.0.0.1:3000`
 
-## 工作目录（预计）
-- `app/database/` — 新建
-- `app/api/` — 新建或扩展
-- `tests/test_database/` — 新建
+## 当前注意事项
+- 提交范围要聚焦 `contact_us`，避免混入无关改动
+- 如果再改数据库主键策略，需要单独开任务，不在这次范围内
 
 ## 不碰的领域
 - Pipeline (Stage 1-5)

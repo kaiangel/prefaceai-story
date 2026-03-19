@@ -37,3 +37,16 @@
 - Founder 团队的 Frontend agent 已完成大量工作（LP 5.0/5, Create P0-P2 全部通过）
 - 修改前端代码前，先读 Founder Frontend 的 `context-for-others.md` 避免冲突
 - 有疑问时在 team_chat.md 提出，由 pm_Ben 与 Founder 团队协调
+
+## 当前前端规则
+
+### Contact Us 规则
+- 官网 `/contact` 表单不能继续使用 mock 提交
+- 必须调用真实后端接口 `/api/contact-us/`
+- 成功态必须严格依赖后端 2xx 响应
+- 后端失败时必须展示明确错误提示
+
+### 联调规则
+- 本地开发默认对接 `NEXT_PUBLIC_API_URL`
+- 本地手工联调地址为 `http://127.0.0.1:3000`
+- 出现浏览器跨域问题时，先核对后端 CORS 是否允许 `127.0.0.1:3000`

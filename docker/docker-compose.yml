@@ -71,10 +71,25 @@ services:
     networks:
       - xuhua_net
 
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: prefacestory
+      MYSQL_ROOT_PASSWORD: change_me
+    ports:
+      - "127.0.0.1:3306:3306"
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - xuhua_net
+
 volumes:
   redis_data:
   storage_data:     # Generated images + audio
   sqlite_data:      # SQLite database files
+  mysql_data:
 
 networks:
   xuhua_net:

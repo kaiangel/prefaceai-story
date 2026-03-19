@@ -1,7 +1,8 @@
 """Application configuration"""
 
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+from urllib.parse import quote_plus
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -12,7 +13,12 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
 
     # Database
-    DATABASE_URL: str = "sqlite+aiosqlite:///./xuhua_story.db"
+    DATABASE_URL: str = ""
+    MYSQL_HOST: str = ""
+    MYSQL_PORT: int = 3306
+    MYSQL_USER: str = ""
+    MYSQL_PASSWORD: str = ""
+    MYSQL_DATABASE: str = ""
 
     # Server
     HOST: str = "0.0.0.0"
@@ -56,3 +62,19 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
+
+if not settings.DATABASE_URL:
+    if all([
+        settings.MYSQL_HOST,
+        settings.MYSQL_USER,
+        settings.MYSQL_DATABASE,
+    ]):
+        settings.DATABASE_URL = (
+            "mysql+asyncmy://"
+            f"{quote_plus(settings.MYSQL_USER)}:{quote_plus(settings.MYSQL_PASSWORD)}"
+            f"@{settings.MYSQL_HOST}:{settings.MYSQL_PORT}/{settings.MYSQL_DATABASE}"
+            "?charset=utf8mb4"
+        )
+    else:
+        settings.DATABASE_URL = "sqlite+aiosqlite:///./xuhua_story.db"

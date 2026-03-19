@@ -31,7 +31,11 @@ interface FormErrors {
   name?: string;
   email?: string;
   message?: string;
+  submit?: string;
 }
+
+const CONTACT_API_BASE =
+  (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api").replace(/\/$/, "");
 
 export default function ContactContent() {
   const [form, setForm] = useState({
@@ -70,9 +74,42 @@ export default function ContactContent() {
     if (!validate()) return;
 
     setSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setSubmitting(false);
-    setSubmitted(true);
+    setErrors((prev) => ({ ...prev, submit: undefined }));
+
+    try {
+      const response = await fetch(`${CONTACT_API_BASE}/contact-us/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          email: form.email.trim(),
+          subject: form.subject.trim() || null,
+          message: form.message.trim(),
+          source_page: "contact",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("submit_failed");
+      }
+
+      setSubmitted(true);
+      setForm({
+        name: "",
+        email: "",
+        subject: "",
+        message: "",
+      });
+    } catch {
+      setErrors((prev) => ({
+        ...prev,
+        submit: "提交失败，请稍后重试或直接发送邮件到 kai@prefaceai.mov",
+      }));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleChange = (field: string, value: string) => {
@@ -213,6 +250,10 @@ export default function ContactContent() {
                     "发送消息"
                   )}
                 </button>
+
+                {errors.submit && (
+                  <p className="text-error text-sm">{errors.submit}</p>
+                )}
               </form>
             )}
           </div>

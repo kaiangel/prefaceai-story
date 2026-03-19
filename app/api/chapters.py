@@ -682,7 +682,6 @@ async def regenerate_single_image_task(
                     chapter_id=chapter_id,
                     scene_id=scene_id
                 )
-
                 scene_image = SceneImage(
                     id=scene_image_id,
                     chapter_id=chapter_id,

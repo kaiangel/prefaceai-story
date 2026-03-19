@@ -9,6 +9,7 @@ from app.database import init_db, close_db
 from app.api import api_router
 from app.api.images import router as images_router
 from app.api.audio import router as audio_router
+import app.models  # noqa: F401
 from app.config import settings
 from app.middleware.log_sanitizer import install as install_log_sanitizer
 
@@ -44,6 +45,7 @@ app.add_middleware(
     allow_origins=[
         "https://prefaceai.mov",
         "http://localhost:3000",  # 本地前端开发
+        "http://127.0.0.1:3000",  # 本地前端开发
     ],
     allow_credentials=True,
     allow_methods=["*"],

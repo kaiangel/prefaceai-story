@@ -2,18 +2,22 @@
 
 > 最后更新: 2026-03-19
 
-## 状态: 初始化完成
+## 状态: contact_us 任务已推进，等待收尾整理
 
 ### 已完成
-- team_chat.md 初始化
-- Ben 团队 3 个 Agent 的 progress 文件创建
+- 将官网 contact 表单需求收口为真实 MySQL 落库需求
+- 明确产品规则：表名固定使用 `contact_us`
+- 明确范围控制：本次仅要求 `contact_us.id` 自增，其他表不扩散改造
+- 前后端任务已经实际落地并联调
+- 本地运行环境已拉起前端和后端用于手工测试
 
 ### 当前任务
-- 确保 Ben 团队所有 Agent 了解项目上下文（.team-brain/team_ben/CODEX.md 阅读）
-- 与 Founder PM 对齐当前项目状态
-- 准备 backend_Ben 的第一个任务（用户数据库层搭建）
+- 清理本次工作区差异，区分必须提交与可回退项
+- 继续支持手工测试 `/contact` 链路
+- 确认最终提交范围聚焦在 `contact_us`
 
 ### 跨团队信息
-- Founder 团队最新状态: 主线 + 并行线全部完成已部署 (commit c6d697a)
-- 安全加固: CORS 限制 + 日志脱敏 已完成
-- 等待 Founder 填 API Key
+- 当前本地前端: `http://127.0.0.1:3000`
+- 当前本地后端: `http://127.0.0.1:8000`
+- MySQL 表 `prefacestory.contact_us` 已存在，且 `id` 已改为自增主键
+- 旧 UUID 数据被保留在 `legacy_id`
