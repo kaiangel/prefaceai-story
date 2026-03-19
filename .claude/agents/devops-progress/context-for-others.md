@@ -80,7 +80,7 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 ```
 远程仓库: https://github.com/kaiangel/prefaceai-story (private)
 分支: main (tracked → origin/main)
-最新 commit: 33eaac6 feat: dual-team collaboration system — Ben team onboarding
+最新 commit: be6c37b refactor: reorganize Ben team files to .team-brain/team_ben/ + simplify Git workflow
 ```
 
 ---
