@@ -7,7 +7,7 @@
 
 ## 当前状态速览
 
-状态: ✅ **双团队协作文件已推送**（两人直接 push main，无分支保护）
+状态: ✅ **Frontend Batch 1A-4 全部 push 完成**（两人直接 push main，无分支保护）
 域名: `https://prefaceai.mov` 已上线（前端 + API + 新 logo + V2 品牌宣言）
 服务器: 107.148.1.199 (8C/16GB/200GB, Ubuntu 20.04)
 容器: 3 个运行中 — api (healthy) + frontend (up) + redis (healthy)
@@ -15,17 +15,29 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 
 ---
 
-## 最近操作 (2026-03-19)
+## 最近操作 (2026-03-22)
 
-### TASK-GIT-PUSH-DUAL-TEAM ✅
+### Frontend Batch 3+4 push ✅
 
-**Git**: `33eaac6` pushed → `origin/main` (59 files, Ben onboarding)
-**VPS**: 不需要部署（开发协作文档）
-**Ben 可 git pull 获取全部内容**
+3 commits pushed → `origin/main` (8d51108 → 8ab7057):
 
-### ~~TASK-GIT-BRANCH-PROTECTION~~: 已取消
+| Commit | 内容 | 文件数 |
+|--------|------|--------|
+| `5f55e57` | feat(frontend): Batch 3 — story input (OCR, voice, templates) + skeleton | 2 |
+| `d37b4e5` | feat(frontend): Batch 4 — membership tiers + aspect ratio + pricing | 4 |
+| `8ab7057` | docs: agent progress + team-brain sync | 9 |
 
-**Git 工作流变更**: 分支保护已移除，两人都直接 push 到 `main` 分支。不再需要 PR 或分支命名。
+**VPS**: 不需要部署（纯前端改动）
+
+### Frontend Batch 1A+1B+2 push ✅ (earlier today)
+
+3 commits pushed → `origin/main` (20641ac → 9c29aa6):
+
+| Commit | 内容 | 文件数 |
+|--------|------|--------|
+| `336a646` | feat(frontend): Batch 1A+1B — Create preview + MVP auth + settings | 10 |
+| `955f45d` | feat(frontend): Batch 2 — Dashboard enhancements | 11 |
+| `9c29aa6` | docs: agent progress + team-brain sync | 13 |
 
 ---
 
@@ -80,7 +92,7 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 ```
 远程仓库: https://github.com/kaiangel/prefaceai-story (private)
 分支: main (tracked → origin/main)
-最新 commit: 9c29aa6 docs: agent progress + team-brain sync (Batch 1A+1B+2 review + DevOps push)
+最新 commit: 8ab7057 docs: agent progress + team-brain sync (Batch 3+4 review pass + DevOps push status)
 ```
 
 ---

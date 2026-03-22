@@ -4,6 +4,27 @@
 
 ---
 
+### Frontend Batch 1A-4 全部 push ✅
+
+**完成时间**: 2026-03-22
+**任务类型**: 版本控制（纯前端代码 + 文档）
+
+**第一轮 push (Batch 1A+1B+2)**:
+- [x] `336a646` feat(frontend): Batch 1A+1B — Create preview + MVP auth + settings (10 files)
+- [x] `955f45d` feat(frontend): Batch 2 — Dashboard enhancements (11 files)
+- [x] `9c29aa6` docs: agent progress + team-brain sync (13 files)
+- [x] Push: `origin/main` 20641ac → 9c29aa6
+
+**第二轮 push (Batch 3+4)**:
+- [x] `5f55e57` feat(frontend): Batch 3 — story input (OCR, voice, templates) + skeleton (2 files)
+- [x] `d37b4e5` feat(frontend): Batch 4 — membership tiers + aspect ratio + pricing (4 files)
+- [x] `8ab7057` docs: agent progress + team-brain sync (9 files)
+- [x] Push: `origin/main` 8d51108 → 8ab7057
+
+**不需要 VPS 部署**（纯前端改动，VPS 前端容器未重建）
+
+---
+
 ### Ben 团队文件重组 push + Git 工作流简化 ✅
 
 **完成时间**: 2026-03-19
