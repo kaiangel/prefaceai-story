@@ -1,7 +1,7 @@
 # 今日重点 (2026-03-22)
 
 > 每天更新，所有 Agent 开工前必读
-> **当前状态**: **✅ Batch 1A-4 全部 Review PASS → DevOps push → Batch 5 等后端**
+> **当前状态**: **✅ Batch 1A-4 全部完成并 push — Batch 5 等 Ben 后端 + Founder Pipeline API**
 > **⚠️ 文档更新协议**: 共享文档由PM统一更新，详见 `.team-brain/TEAM_PROTOCOL.md`
 
 ---
@@ -22,7 +22,7 @@ PM Review Batch 3:                                            ✅ PASS
 Batch 4 派发 @Frontend (会员等级+比例+Pricing):              ✅ 已派发
 Frontend 执行 Batch 4:                                        ✅ 完成 (3/3)
 PM Review Batch 4:                                             ✅ PASS
-DevOps push Batch 3+4:                                         🔄 已派发
+DevOps push Batch 3+4:                                         ✅ 完成 (d735e95)
 ```
 
 ---
@@ -33,12 +33,12 @@ DevOps push Batch 3+4:                                         🔄 已派发
 
 | Agent | 状态 | 说明 |
 |-------|------|------|
-| @pm | ✅ Batch 1A-4 全部 PASS | 等 DevOps push |
+| @pm | ✅ 全部完成 | 等 Batch 5 (后端就绪) |
 | @backend | ✅ 空闲 | 无新任务 |
 | @ai-ml | ✅ 空闲 | 无新任务 |
 | @tester | ✅ 空闲 | 无新任务 |
 | @frontend | ✅ Batch 1A-4 全部完成 | 等 Batch 5 (API 对接) |
-| @devops | ⏳ push Batch 3+4 | 已派发 |
+| @devops | ✅ push 完成 (d735e95) | 空闲 |
 
 ### Ben 团队
 
@@ -52,4 +52,4 @@ DevOps push Batch 3+4:                                         🔄 已派发
 
 ## 下一步
 
-~~Batch 1A+1B~~ → ~~Batch 2~~ → ~~Batch 3~~ → ~~Batch 4~~ → ~~PM Review ✅~~ → **DevOps push** → Batch 5 对接 (等 Ben 后端 + Founder Pipeline API)
+~~Batch 1A+1B~~ → ~~Batch 2~~ → ~~Batch 3~~ → ~~Batch 4~~ → ~~PM Review~~ → ~~DevOps push ✅~~ → **Batch 5 对接** (等 Ben 后端 + Founder Pipeline API)

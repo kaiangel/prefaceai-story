@@ -21,9 +21,9 @@
 
 ---
 
-## @DevOps — ⏳ push Batch 3+4
+## @DevOps — ✅ push 完成 (d735e95)
 
-commit + push 到 GitHub（不部署 VPS）。详见 TEAM_CHAT。
+Batch 1A-4 全部 8 commits 已在 GitHub。空闲。
 
 ---
 

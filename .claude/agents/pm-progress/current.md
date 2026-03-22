@@ -1,7 +1,7 @@
 # PM Agent - 当前任务
 
 > **最后更新**: 2026-03-22
-> **状态**: ✅ Batch 1A-4 全部 Review PASS → 等 DevOps push → Batch 5 等后端就绪
+> **状态**: ✅ Batch 1A-4 全部完成并 push — Batch 5 等 Ben 后端 + Founder Pipeline API
 
 ---
 
@@ -30,10 +30,9 @@
 
 | # | 事项 | 等谁 |
 |---|------|------|
-| 1 | DevOps push Batch 3+4 | @DevOps |
-| 2 | Batch 5 API 对接: Ben 后端 | @Ben（进行中） |
-| 3 | Batch 5 API 对接: Founder Pipeline | @Backend |
-| 4 | Founder 填 API Key | Founder |
+| 1 | Batch 5 API 对接: Ben 后端 (注册/登录/资料) | @Ben（进行中） |
+| 2 | Batch 5 API 对接: Founder Pipeline (生成流程) | @Backend |
+| 3 | Founder 填 API Key | Founder |
 
 ---
 
@@ -85,6 +84,7 @@ Founder 终审:                                                  ⏳
 
 | 时间 | 更新内容 |
 |------|----------|
+| 2026-03-22 | DevOps push 审查 PASS (8 commits 全部在 GitHub) — Batch 1A-4 全部闭环 |
 | 2026-03-22 | Batch 4 Review PASS (3/3) — Batch 1A-4 前端 mock 全部完成 + DevOps push 派发 |
 | 2026-03-22 | Batch 3 Review PASS (4/4) + Batch 4 派发 (会员等级UI + 比例选择器 + Pricing页) |
 | 2026-03-22 | Batch 3 派发 @Frontend (图片OCR + 语音输入 + 故事模板 + 骨架屏) |
