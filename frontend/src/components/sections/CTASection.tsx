@@ -53,10 +53,10 @@ export default function CTASection() {
 
           {/* Subtitle */}
           <p className="text-text-secondary mb-2">
-            申请内测资格，成为第一批体验者
+            输入邮箱申请内测，邀请码将发送到你的邮箱
           </p>
           <p className="text-brand-primary text-sm mb-8">
-            注册即送 2 个完整故事创作额度
+            内测用户免费享受 Pro 会员权益
           </p>
 
           {/* Form */}
@@ -107,10 +107,10 @@ export default function CTASection() {
                 <Check className="w-6 h-6 text-success" />
               </div>
               <h3 className="text-xl font-semibold text-text-primary mb-2">
-                申请已提交
+                申请成功
               </h3>
               <p className="text-text-secondary">
-                我们会在 24 小时内审核并发送邀请码到你的邮箱
+                邀请码将发送到你的邮箱，请留意查收
               </p>
             </motion.div>
           )}
@@ -135,8 +135,13 @@ export default function CTASection() {
             className="text-text-tertiary text-sm mt-4"
           >
             已有邀请码？
-            <a href="/login" target="_blank" rel="noopener noreferrer" className="text-brand-primary hover:underline ml-1">
-              直接登录
+            <a href="/register" className="text-brand-primary hover:underline ml-1">
+              直接注册
+            </a>
+            <span className="mx-2 text-text-muted">|</span>
+            已有账户？
+            <a href="/login" className="text-brand-primary hover:underline ml-1">
+              登录
             </a>
           </motion.p>
         </motion.div>

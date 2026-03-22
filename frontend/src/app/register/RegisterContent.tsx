@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, CheckCircle, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, Ticket } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,11 +12,12 @@ export default function RegisterContent() {
   const { register, isLoggedIn } = useAuth();
   const router = useRouter();
 
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState<{ name?: string; email?: string; password?: string }>({});
+  const [agreedTerms, setAgreedTerms] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string; inviteCode?: string; terms?: string }>({});
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -32,7 +34,6 @@ export default function RegisterContent() {
     return () => clearTimers();
   }, [clearTimers]);
 
-  // Redirect if already logged in
   useEffect(() => {
     if (isLoggedIn && !success) {
       router.replace("/dashboard");
@@ -41,7 +42,6 @@ export default function RegisterContent() {
 
   const validate = (): boolean => {
     const newErrors: typeof errors = {};
-    if (!name.trim()) newErrors.name = "请输入用户名";
     if (!email.trim()) {
       newErrors.email = "请输入邮箱";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -52,6 +52,12 @@ export default function RegisterContent() {
     } else if (password.length < 6) {
       newErrors.password = "密码至少 6 位";
     }
+    if (!inviteCode.trim()) {
+      newErrors.inviteCode = "请输入邀请码";
+    }
+    if (!agreedTerms) {
+      newErrors.terms = "请阅读并同意服务条款";
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -61,15 +67,12 @@ export default function RegisterContent() {
     if (!validate()) return;
 
     setLoading(true);
-    const ok = await register({ name: name.trim(), email: email.trim(), password });
+    const ok = await register({ email: email.trim(), password, inviteCode: inviteCode.trim() });
     if (ok) {
       setSuccess(true);
-      redirectTimerRef.current = setTimeout(() => {
-        router.push("/dashboard");
-      }, 1500);
     } else {
       setLoading(false);
-      setErrors({ email: "注册失败，请稍后重试" });
+      setErrors({ inviteCode: "邀请码无效，请检查后重试" });
     }
   };
 
@@ -82,11 +85,13 @@ export default function RegisterContent() {
           className="text-center"
         >
           <div className="w-20 h-20 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-10 h-10 text-success" />
+            <Mail className="w-10 h-10 text-success" />
           </div>
-          <h1 className="text-2xl font-bold mb-2">注册成功！</h1>
-          <p className="text-text-secondary mb-2">欢迎加入序话Story</p>
-          <p className="text-text-tertiary text-sm">正在跳转到工作台...</p>
+          <h1 className="text-2xl font-bold mb-2">验证邮件已发送</h1>
+          <p className="text-text-secondary mb-2">
+            请查收 <span className="text-brand-primary">{email}</span> 的验证邮件
+          </p>
+          <p className="text-text-tertiary text-sm">点击邮件中的链接完成注册</p>
         </motion.div>
       </div>
     );
@@ -102,50 +107,34 @@ export default function RegisterContent() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-4">
-            <Sparkles className="w-8 h-8 text-brand-primary" />
+            <Image src="/brand/logo-48.png" alt="序话Story" width={32} height={32} />
             <span className="text-2xl font-bold">序话Story</span>
           </div>
           <h1 className="text-xl font-semibold mb-1">创建账户</h1>
-          <p className="text-text-tertiary text-sm">开始你的 AI 创作之旅</p>
+          <p className="text-text-tertiary text-sm">使用邀请码注册，开始 AI 创作之旅</p>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Name */}
-          <div>
-            <label className="block text-sm text-text-secondary mb-1.5">用户名</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (errors.name) setErrors((prev) => ({ ...prev, name: undefined }));
-              }}
-              placeholder="你的名字"
-              className={`w-full px-3.5 py-2.5 rounded-lg bg-bg-secondary border text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all ${
-                errors.name ? "border-error" : "border-white/10"
-              }`}
-              disabled={loading}
-            />
-            {errors.name && <p className="text-error text-xs mt-1">{errors.name}</p>}
-          </div>
-
           {/* Email */}
           <div>
             <label className="block text-sm text-text-secondary mb-1.5">邮箱</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
-              }}
-              placeholder="your@email.com"
-              className={`w-full px-3.5 py-2.5 rounded-lg bg-bg-secondary border text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all ${
-                errors.email ? "border-error" : "border-white/10"
-              }`}
-              disabled={loading}
-            />
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
+                }}
+                placeholder="your@email.com"
+                className={`w-full pl-10 pr-3.5 py-2.5 rounded-lg bg-bg-secondary border text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all ${
+                  errors.email ? "border-error" : "border-white/10"
+                }`}
+                disabled={loading}
+              />
+            </div>
             {errors.email && <p className="text-error text-xs mt-1">{errors.email}</p>}
           </div>
 
@@ -153,6 +142,7 @@ export default function RegisterContent() {
           <div>
             <label className="block text-sm text-text-secondary mb-1.5">密码</label>
             <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
@@ -161,7 +151,7 @@ export default function RegisterContent() {
                   if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
                 }}
                 placeholder="至少 6 位"
-                className={`w-full px-3.5 py-2.5 pr-10 rounded-lg bg-bg-secondary border text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all ${
+                className={`w-full pl-10 pr-10 py-2.5 rounded-lg bg-bg-secondary border text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all ${
                   errors.password ? "border-error" : "border-white/10"
                 }`}
                 disabled={loading}
@@ -176,6 +166,51 @@ export default function RegisterContent() {
               </button>
             </div>
             {errors.password && <p className="text-error text-xs mt-1">{errors.password}</p>}
+          </div>
+
+          {/* Invite Code */}
+          <div>
+            <label className="block text-sm text-text-secondary mb-1.5">邀请码</label>
+            <div className="relative">
+              <Ticket className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
+              <input
+                type="text"
+                value={inviteCode}
+                onChange={(e) => {
+                  setInviteCode(e.target.value.toUpperCase());
+                  if (errors.inviteCode) setErrors((prev) => ({ ...prev, inviteCode: undefined }));
+                }}
+                placeholder="输入你收到的邀请码"
+                className={`w-full pl-10 pr-3.5 py-2.5 rounded-lg bg-bg-secondary border text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all uppercase tracking-wider ${
+                  errors.inviteCode ? "border-error" : "border-white/10"
+                }`}
+                disabled={loading}
+              />
+            </div>
+            {errors.inviteCode && <p className="text-error text-xs mt-1">{errors.inviteCode}</p>}
+          </div>
+
+          {/* Terms */}
+          <div>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={agreedTerms}
+                onChange={(e) => {
+                  setAgreedTerms(e.target.checked);
+                  if (errors.terms) setErrors((prev) => ({ ...prev, terms: undefined }));
+                }}
+                className="mt-0.5 w-4 h-4 rounded border-white/20 bg-bg-tertiary text-brand-primary focus:ring-brand-primary/50 cursor-pointer"
+                disabled={loading}
+              />
+              <span className="text-xs text-text-tertiary leading-relaxed">
+                我已阅读并同意{" "}
+                <Link href="/terms" className="text-brand-primary hover:underline">服务条款</Link>
+                {" "}和{" "}
+                <Link href="/privacy" className="text-brand-primary hover:underline">隐私政策</Link>
+              </span>
+            </label>
+            {errors.terms && <p className="text-error text-xs mt-1">{errors.terms}</p>}
           </div>
 
           <button

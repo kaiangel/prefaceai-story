@@ -126,9 +126,9 @@ export interface User {
 }
 
 export interface RegisterForm {
-  name: string;
   email: string;
   password: string;
+  inviteCode: string;
 }
 
 // ============ Dashboard: Story Detail ============
@@ -139,6 +139,25 @@ export interface StoryDetail extends StoryCard {
   shots: Shot[];
   mood: string;
   aspectRatio: AspectRatio;
+}
+
+// ============ Stage C: Character/Scene Preview Checkpoints ============
+
+export type GenerationSubPhase = "text-gen" | "char-preview" | "scene-preview" | "shot-gen";
+
+export interface PreviewCharacter {
+  id: string;
+  name: string;
+  description: string;
+  fullbodyUrl: string;
+  adjustments: string[];
+}
+
+export interface PreviewScene {
+  id: string;
+  name: string;
+  description: string;
+  userEdit: string;
 }
 
 // ============ Stage Navigation ============
@@ -167,11 +186,16 @@ export interface CreateState {
   outline: StoryOutline | null;
   outlineConfirmed: boolean;
 
-  // Stage C-D: Generation
+  // Stage C: Generation + Checkpoints
   generationStatus: "idle" | "generating" | "complete" | "error";
   generationProgress: number;
   generationMessage: string;
   generationLog: GenerationLogEntry[];
+  generationSubPhase: GenerationSubPhase;
+  previewCharacters: PreviewCharacter[];
+  previewScenes: PreviewScene[];
+  charactersConfirmed: boolean;
+  scenesConfirmed: boolean;
   shots: Shot[];
 
   // Stage D: Preview
@@ -211,6 +235,13 @@ export type CreateAction =
   | { type: "DELETE_PLOT_POINT"; payload: string }
   | { type: "SELECT_ENDING"; payload: string }
   | { type: "SET_MOOD"; payload: string }
+  | { type: "SET_GENERATION_SUB_PHASE"; payload: GenerationSubPhase }
+  | { type: "SET_PREVIEW_CHARACTERS"; payload: PreviewCharacter[] }
+  | { type: "SET_PREVIEW_SCENES"; payload: PreviewScene[] }
+  | { type: "UPDATE_PREVIEW_CHARACTER"; payload: { id: string; updates: Partial<PreviewCharacter> } }
+  | { type: "UPDATE_PREVIEW_SCENE"; payload: { id: string; userEdit: string } }
+  | { type: "CONFIRM_CHARACTERS" }
+  | { type: "CONFIRM_SCENES" }
   | { type: "START_GENERATION" }
   | { type: "UPDATE_GENERATION_PROGRESS"; payload: { progress: number; message: string } }
   | { type: "GENERATION_COMPLETE"; payload: Shot[] }

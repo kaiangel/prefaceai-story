@@ -12,6 +12,7 @@ interface AuthContextValue {
   register: (form: RegisterForm) => Promise<boolean>;
   logout: () => void;
   deleteStory: (storyId: string) => void;
+  updateUser: (updates: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -36,12 +37,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const register = useCallback(async (form: RegisterForm): Promise<boolean> => {
-    // Mock register
+    // Mock register — validate invite code
     await new Promise((r) => setTimeout(r, 1000));
+    // Mock: any non-empty invite code is accepted
+    if (!form.inviteCode.trim()) return false;
     setUser({
       id: `user_${Date.now()}`,
       email: form.email,
-      name: form.name,
+      name: form.email.split("@")[0],
       avatarUrl: null,
       createdAt: new Date().toISOString(),
     });
@@ -58,8 +61,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStories((prev) => prev.filter((s) => s.id !== storyId));
   }, []);
 
+  const updateUser = useCallback((updates: Partial<User>) => {
+    setUser((prev) => prev ? { ...prev, ...updates } : prev);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, isLoggedIn: !!user, stories, login, register, logout, deleteStory }}>
+    <AuthContext.Provider value={{ user, isLoggedIn: !!user, stories, login, register, logout, deleteStory, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -20,11 +20,16 @@ const initialState: CreateState = {
   // Stage B
   outline: null,
   outlineConfirmed: false,
-  // Stage C-D
+  // Stage C: Generation + Checkpoints
   generationStatus: "idle",
   generationProgress: 0,
   generationMessage: "",
   generationLog: [],
+  generationSubPhase: "text-gen",
+  previewCharacters: [],
+  previewScenes: [],
+  charactersConfirmed: false,
+  scenesConfirmed: false,
   shots: [],
   // Stage D
   bgm: null,
@@ -167,6 +172,37 @@ function createReducer(state: CreateState, action: CreateAction): CreateState {
     case "SET_MOOD":
       if (!state.outline) return state;
       return { ...state, outline: { ...state.outline, mood: action.payload } };
+
+    case "SET_GENERATION_SUB_PHASE":
+      return { ...state, generationSubPhase: action.payload };
+
+    case "SET_PREVIEW_CHARACTERS":
+      return { ...state, previewCharacters: action.payload };
+
+    case "SET_PREVIEW_SCENES":
+      return { ...state, previewScenes: action.payload };
+
+    case "UPDATE_PREVIEW_CHARACTER":
+      return {
+        ...state,
+        previewCharacters: state.previewCharacters.map((c) =>
+          c.id === action.payload.id ? { ...c, ...action.payload.updates } : c
+        ),
+      };
+
+    case "UPDATE_PREVIEW_SCENE":
+      return {
+        ...state,
+        previewScenes: state.previewScenes.map((s) =>
+          s.id === action.payload.id ? { ...s, userEdit: action.payload.userEdit } : s
+        ),
+      };
+
+    case "CONFIRM_CHARACTERS":
+      return { ...state, charactersConfirmed: true };
+
+    case "CONFIRM_SCENES":
+      return { ...state, scenesConfirmed: true };
 
     case "START_GENERATION":
       return { ...state, generationStatus: "generating", generationProgress: 0, generationMessage: "", generationLog: [] };
