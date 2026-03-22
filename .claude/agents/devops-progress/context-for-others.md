@@ -80,7 +80,7 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 ```
 远程仓库: https://github.com/kaiangel/prefaceai-story (private)
 分支: main (tracked → origin/main)
-最新 commit: 20641ac Add contact_us MySQL flow and sync team_ben docs (Ben 首次 push)
+最新 commit: 9c29aa6 docs: agent progress + team-brain sync (Batch 1A+1B+2 review + DevOps push)
 ```
 
 ---
