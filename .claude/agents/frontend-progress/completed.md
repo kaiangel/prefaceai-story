@@ -6,6 +6,42 @@
 
 ## 2026-03-22
 
+### Batch 4: 商业化 UI + 比例 ✅
+
+**完成时间**: 2026-03-22
+**验收状态**: 待 PM Review
+**任务来源**: PM 派发 Batch 4 (TEAM_CHAT 03-22)
+
+**完成内容**:
+
+修改 4 文件:
+- [x] SettingsContent.tsx — 会员区增强: Pro 金色卡片+功能列表, Max 升级入口, Free 说明
+- [x] AspectRatioSelector.tsx — 重写: 4 选项网格 (2:3默认/3:4小红书/1:1方形/16:9横屏)
+- [x] PricingContent.tsx — 完全重写: 三栏卡片 + 功能对比表(8维度) + FAQ
+- [x] types/create.ts — AspectRatio 新增 "3:4" | "1:1"
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
+### Batch 3: 创意输入方式 + 骨架屏 ✅
+
+**完成时间**: 2026-03-22
+**验收状态**: 待 PM Review
+**任务来源**: PM 派发 Batch 3 (TEAM_CHAT 03-22)
+
+**完成内容**:
+
+修改 1 文件:
+- [x] StoryIdeaInput.tsx — 重写：图片 OCR（上传→预览→mock识别→填入）+ 语音输入（麦克风→录音动画→mock转写→填入）+ 5 个故事模板标签
+
+新建 1 文件:
+- [x] Skeleton.tsx — 骨架屏组件集（SkeletonBlock + StoryCard/Grid/Detail/Settings/Stats 5 种业务骨架屏）
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
 ### Batch 2: Dashboard 补全 ✅
 
 **完成时间**: 2026-03-22

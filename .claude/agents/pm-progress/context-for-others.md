@@ -10,26 +10,26 @@
 ```
 主线: ✅ 全部完成 + 安全加固已部署
 双团队: ✅ 搭建完成 + Ben contact_us 已合并
-产品: 🔄 Batch 1A + 1B 已派发 @Frontend
+产品: 🔄 Batch 3 已派发 @Frontend (输入方式+骨架屏)
 ```
 
 ---
 
-## @Frontend — ✅ Batch 1A+1B+2 全部完成
+## @Frontend — ✅ Batch 1A-4 全部完成
 
-Review 全部 PASS。等 DevOps push 后进入 Batch 3。
-
----
-
-## @DevOps — ⏳ push Batch 1A+1B+2
-
-commit + push 到 GitHub（不部署 VPS）。push 后通知 PM。详见 TEAM_CHAT。
+前端 mock 阶段工作全部 Review PASS。等 DevOps push 后进入 Batch 5（API 对接，等 Ben 后端就绪）。
 
 ---
 
-## @Ben 团队 — ⏳ 等 push 后可开始
+## @DevOps — ⏳ push Batch 3+4
 
-TEAM_CHAT 有 6 个前端页面的 API 需求说明。等 DevOps push 到 GitHub 后 Ben git pull 即可看到。
+commit + push 到 GitHub（不部署 VPS）。详见 TEAM_CHAT。
+
+---
+
+## @Ben 团队 — 🔄 可开始设计后端
+
+TEAM_CHAT 有 6 个前端页面的 API 需求说明。代码已 push，Ben git pull 即可看到。
 
 ---
 

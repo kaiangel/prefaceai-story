@@ -4,6 +4,23 @@
 
 ---
 
+### 2026-03-22 — Batch 4 Review PASS (3/3) — 前端 mock 全部完成
+
+- 会员等级 UI: Free/Pro(金色)/Max(即将推出) 三级视觉 ✅
+- 比例选择器: 4 选项 (2:3 默认 + 3:4 小红书 + 1:1 方形 + 16:9 横屏) ✅
+- Pricing 页: 完全重写 3 栏 + 8 维度对比表 + FAQ ✅
+- **Batch 1A-4 前端 mock 阶段全部 Review PASS** — DevOps push 派发
+
+---
+
+### 2026-03-22 — Batch 3 Review PASS (4/4) + Batch 4 派发
+
+- OCR + 语音 + 模板三合一 (StoryIdeaInput 重写) ✅
+- 骨架屏 5 种业务预设 (Skeleton.tsx) ✅
+- Batch 4 派发: 会员等级 UI + 比例选择器 + Pricing 页
+
+---
+
 ### 2026-03-22 — Batch 2 Review PASS (16/16) + DevOps push 派发
 
 - Dashboard: 生成中 banner + Credits 卡 + StoryCard 进度条 + 排序 ✅

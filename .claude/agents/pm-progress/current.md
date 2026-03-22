@@ -1,7 +1,7 @@
 # PM Agent - 当前任务
 
 > **最后更新**: 2026-03-22
-> **状态**: Batch 1A+1B+2 全部 Review PASS → 等 DevOps push → 微信通知 Ben
+> **状态**: ✅ Batch 1A-4 全部 Review PASS → 等 DevOps push → Batch 5 等后端就绪
 
 ---
 
@@ -30,9 +30,9 @@
 
 | # | 事项 | 等谁 |
 |---|------|------|
-| 1 | DevOps push Batch 1A+1B+2 到 GitHub | @DevOps |
-| 2 | push 后微信通知 Ben | Founder |
-| 3 | Ben 设计后端 API | @Ben (等 push) |
+| 1 | DevOps push Batch 3+4 | @DevOps |
+| 2 | Batch 5 API 对接: Ben 后端 | @Ben（进行中） |
+| 3 | Batch 5 API 对接: Founder Pipeline | @Backend |
 | 4 | Founder 填 API Key | Founder |
 
 ---
@@ -85,7 +85,10 @@ Founder 终审:                                                  ⏳
 
 | 时间 | 更新内容 |
 |------|----------|
-| 2026-03-22 | Batch 2 Review PASS (16/16) + DevOps push 派发 |
+| 2026-03-22 | Batch 4 Review PASS (3/3) — Batch 1A-4 前端 mock 全部完成 + DevOps push 派发 |
+| 2026-03-22 | Batch 3 Review PASS (4/4) + Batch 4 派发 (会员等级UI + 比例选择器 + Pricing页) |
+| 2026-03-22 | Batch 3 派发 @Frontend (图片OCR + 语音输入 + 故事模板 + 骨架屏) |
+| 2026-03-22 | Batch 2 Review PASS (16/16) + DevOps push 完成 + Ben 已通知 |
 | 2026-03-22 | Batch 1A+1B Review PASS (27/30+3暂缓) + Ben 通知已写入 TEAM_CHAT + Batch 2 派发 (16项) |
 | 2026-03-22 | Founder 产品决策（MVP 邀请码流程+会员等级+故事模板+个人页规划）+ Batch 1A+1B 派发 @Frontend |
 | 2026-03-20 10:00 | Ben 首次 push 审查 (20641ac, 25 files) — contact_us MySQL 模块，未碰 Pipeline ✅ + DevOps pull 指令 |
