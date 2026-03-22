@@ -6,7 +6,58 @@ import type {
   CharacterRef,
   StoryCard,
   StoryDetail,
+  PreviewCharacter,
+  PreviewScene,
 } from "@/types/create";
+
+// ============ Stage C: Mock Character Preview ============
+
+export const mockPreviewCharacters: PreviewCharacter[] = [
+  {
+    id: "char_001",
+    name: "陈默",
+    description: "28岁程序员，内向沉稳，戴黑框眼镜",
+    fullbodyUrl: "/comics/story-a/shot_01.png",
+    adjustments: [],
+  },
+  {
+    id: "char_002",
+    name: "林小雨",
+    description: "25岁插画师，短发，开朗却此刻脆弱",
+    fullbodyUrl: "/comics/story-a/shot_02.png",
+    adjustments: [],
+  },
+  {
+    id: "char_003",
+    name: "老张",
+    description: "55岁出租车司机，热心肠，笑容憨厚",
+    fullbodyUrl: "/comics/story-a/shot_03.png",
+    adjustments: [],
+  },
+];
+
+// ============ Stage C: Mock Scene Preview ============
+
+export const mockPreviewScenes: PreviewScene[] = [
+  {
+    id: "scene_1",
+    name: "雨夜公交站",
+    description: "昏黄路灯下的积水路面，空无一人的站台，广告灯箱发出微弱的光",
+    userEdit: "",
+  },
+  {
+    id: "scene_2",
+    name: "24小时便利店",
+    description: "暖黄灯光透过落地玻璃窗洒出，货架整齐，收银台旁的热饮机冒着白烟",
+    userEdit: "",
+  },
+  {
+    id: "scene_3",
+    name: "出租车内",
+    description: "后视镜挂着平安符，仪表盘发出绿色微光，雨滴打在车窗上",
+    userEdit: "",
+  },
+];
 
 // ============ Stage B: Mock Outline ============
 
@@ -172,6 +223,18 @@ export async function mockCharacterExtract(
 // ============ Dashboard: Mock Story List ============
 
 export const mockUserStories: StoryCard[] = [
+  {
+    id: "story_gen",
+    title: "深夜便利店的秘密",
+    coverImageUrl: "/mock-shots/shot_07.png",
+    style: "illustration",
+    length: "short",
+    shotCount: 18,
+    createdAt: "2026-03-22T08:00:00Z",
+    updatedAt: "2026-03-22T08:12:00Z",
+    status: "generating",
+    canContinue: false,
+  },
   {
     id: "story_001",
     title: "雨夜公交站",

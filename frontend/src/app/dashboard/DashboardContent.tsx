@@ -2,7 +2,8 @@
 
 import { useEffect } from "react";
 import { motion } from "framer-motion";
-import { Plus, Sparkles, Layers, Clock } from "lucide-react";
+import { Plus, Layers, Clock, CheckCircle, Coins, Loader2 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,10 +24,10 @@ export default function DashboardContent() {
 
   const completedCount = stories.filter((s) => s.status === "complete").length;
   const totalShots = stories.reduce((sum, s) => sum + s.shotCount, 0);
+  const generatingStory = stories.find((s) => s.status === "generating");
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleContinue = (_storyId: string) => {
-    // Mock: navigate to create page (real implementation would load story state)
     router.push("/create");
   };
 
@@ -35,8 +36,8 @@ export default function DashboardContent() {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-bg-primary/80 backdrop-blur-lg border-b border-white/5">
         <div className="container-lg flex items-center justify-between h-14">
-          <Link href="/" className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors">
-            <Sparkles className="w-5 h-5 text-brand-primary" />
+          <Link href="/" className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors group">
+            <Image src="/brand/logo-40.png" alt="序话Story" width={22} height={22} className="transition-transform duration-fast group-hover:scale-110" />
             <span className="text-sm font-semibold">序话Story</span>
           </Link>
           <div className="flex items-center gap-3">
@@ -53,7 +54,27 @@ export default function DashboardContent() {
       </header>
 
       <main className="container-lg py-8">
-        {/* Welcome + Stats */}
+        {/* Generating Banner */}
+        {generatingStory && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <Link
+              href={`/dashboard/${generatingStory.id}`}
+              className="flex items-center gap-3 px-4 py-3 rounded-xl bg-warning/10 border border-warning/20 hover:bg-warning/15 transition-colors"
+            >
+              <Loader2 className="w-4 h-4 text-warning animate-spin flex-shrink-0" />
+              <span className="text-sm text-text-primary flex-1">
+                《{generatingStory.title}》正在生成中... <span className="text-warning font-medium">67%</span>
+              </span>
+              <span className="text-xs text-text-muted">点击查看</span>
+            </Link>
+          </motion.div>
+        )}
+
+        {/* Welcome */}
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
@@ -71,7 +92,7 @@ export default function DashboardContent() {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 }}
-            className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-8"
+            className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8"
           >
             <div className="bg-bg-secondary rounded-xl border border-white/5 p-4">
               <div className="flex items-center gap-2 mb-2">
@@ -82,7 +103,7 @@ export default function DashboardContent() {
             </div>
             <div className="bg-bg-secondary rounded-xl border border-white/5 p-4">
               <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="w-4 h-4 text-success" />
+                <CheckCircle className="w-4 h-4 text-success" />
                 <span className="text-xs text-text-muted">已完成</span>
               </div>
               <p className="text-2xl font-bold text-text-primary">{completedCount}</p>
@@ -93,6 +114,13 @@ export default function DashboardContent() {
                 <span className="text-xs text-text-muted">总画面数</span>
               </div>
               <p className="text-2xl font-bold text-text-primary">{totalShots}</p>
+            </div>
+            <div className="bg-bg-secondary rounded-xl border border-white/5 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Coins className="w-4 h-4 text-accent-gold" />
+                <span className="text-xs text-text-muted">Credits</span>
+              </div>
+              <p className="text-2xl font-bold text-text-primary">87</p>
             </div>
           </motion.div>
         )}

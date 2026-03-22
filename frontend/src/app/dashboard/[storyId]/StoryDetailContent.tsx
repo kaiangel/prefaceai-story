@@ -1,17 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
-  Sparkles,
   Download,
   Play,
+  Pause,
   Users,
   Palette,
   Clock,
   ChevronLeft,
   ChevronRight,
+  Heart,
+  Share2,
+  Copy,
+  Trash2,
+  Film,
+  ImageIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -19,33 +25,54 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getMockStoryDetail } from "@/lib/mock-data";
 import { STYLE_PRESETS } from "@/types/create";
 import type { StoryDetail } from "@/types/create";
+import ShareModal from "@/components/ui/ShareModal";
+import ExportModal from "@/components/ui/ExportModal";
+import VideoSynthesisModal from "@/components/ui/VideoSynthesisModal";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 
 export default function StoryDetailContent() {
   const { storyId } = useParams<{ storyId: string }>();
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, deleteStory } = useAuth();
   const router = useRouter();
   const [story, setStory] = useState<StoryDetail | null>(null);
   const [selectedShot, setSelectedShot] = useState(0);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playSpeed, setPlaySpeed] = useState(3);
+  const [showShare, setShowShare] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const playTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearPlayTimer = useCallback(() => {
+    if (playTimerRef.current) { clearInterval(playTimerRef.current); playTimerRef.current = null; }
+  }, []);
 
   useEffect(() => {
-    if (!isLoggedIn) {
-      router.replace("/login");
-      return;
-    }
-    const detail = getMockStoryDetail(storyId);
-    setStory(detail);
+    if (!isLoggedIn) { router.replace("/login"); return; }
+    setStory(getMockStoryDetail(storyId));
   }, [isLoggedIn, storyId, router]);
 
-  if (!isLoggedIn) return null;
+  // Auto-play
+  useEffect(() => {
+    if (!isPlaying || !story) { clearPlayTimer(); return; }
+    playTimerRef.current = setInterval(() => {
+      setSelectedShot((prev) => {
+        if (prev >= story.shots.length - 1) { setIsPlaying(false); return prev; }
+        return prev + 1;
+      });
+    }, playSpeed * 1000);
+    return () => clearPlayTimer();
+  }, [isPlaying, playSpeed, story, clearPlayTimer]);
 
+  if (!isLoggedIn) return null;
   if (!story) {
     return (
       <div className="min-h-screen bg-bg-primary flex items-center justify-center">
         <div className="text-center">
           <p className="text-text-secondary mb-4">故事不存在</p>
-          <Link href="/dashboard" className="text-brand-primary hover:underline text-sm">
-            返回工作台
-          </Link>
+          <Link href="/dashboard" className="text-brand-primary hover:underline text-sm">返回工作台</Link>
         </div>
       </div>
     );
@@ -54,28 +81,44 @@ export default function StoryDetailContent() {
   const styleLabel = STYLE_PRESETS.find((s) => s.key === story.style)?.label ?? story.style;
   const currentShot = story.shots[selectedShot];
 
+  const handleMakeSimilar = () => {
+    router.push(`/create?style=${story.style}&length=${story.length}`);
+  };
+
+  const handleDelete = () => {
+    deleteStory(story.id);
+    router.push("/dashboard");
+  };
+
+  const togglePlay = () => {
+    if (isPlaying) { setIsPlaying(false); }
+    else { if (selectedShot >= story.shots.length - 1) setSelectedShot(0); setIsPlaying(true); }
+  };
+
   return (
     <div className="min-h-screen bg-bg-primary">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-bg-primary/80 backdrop-blur-lg border-b border-white/5">
         <div className="container-lg flex items-center justify-between h-14">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors"
-          >
+          <Link href="/dashboard" className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors">
             <ArrowLeft className="w-4 h-4" />
-            <span className="text-sm">返回工作台</span>
+            <span className="text-sm">返回</span>
           </Link>
           <div className="flex items-center gap-2">
-            {story.canContinue && (
-              <button className="text-xs py-1.5 px-3 rounded-lg bg-white/5 text-text-secondary hover:bg-white/10 flex items-center gap-1.5 transition-colors">
-                <Play className="w-3.5 h-3.5" />
-                续写
-              </button>
-            )}
-            <button className="text-xs py-1.5 px-3 rounded-lg bg-brand-primary text-white flex items-center gap-1.5 hover:bg-brand-primary/90 transition-colors">
-              <Download className="w-3.5 h-3.5" />
-              下载
+            <button onClick={() => setIsFavorite(!isFavorite)} className={`p-2 rounded-lg transition-colors ${isFavorite ? "text-error" : "text-text-muted hover:text-text-secondary"}`} title="收藏">
+              <Heart className={`w-4 h-4 ${isFavorite ? "fill-current" : ""}`} />
+            </button>
+            <button onClick={() => setShowShare(true)} className="p-2 rounded-lg text-text-muted hover:text-text-secondary transition-colors" title="分享">
+              <Share2 className="w-4 h-4" />
+            </button>
+            <button onClick={handleMakeSimilar} className="text-xs py-1.5 px-3 rounded-lg bg-white/5 text-text-secondary hover:bg-white/10 flex items-center gap-1.5 transition-colors">
+              <Copy className="w-3.5 h-3.5" />做同款
+            </button>
+            <button onClick={() => setShowExport(true)} className="text-xs py-1.5 px-3 rounded-lg bg-white/5 text-text-secondary hover:bg-white/10 flex items-center gap-1.5 transition-colors">
+              <Download className="w-3.5 h-3.5" />导出
+            </button>
+            <button onClick={() => setShowVideo(true)} className="text-xs py-1.5 px-3 rounded-lg bg-brand-primary text-white flex items-center gap-1.5 hover:bg-brand-primary/90 transition-colors">
+              <Film className="w-3.5 h-3.5" />合成视频
             </button>
           </div>
         </div>
@@ -85,76 +128,63 @@ export default function StoryDetailContent() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left: Shot Preview */}
           <div className="lg:col-span-2">
-            <motion.div
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
+            <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}>
               {/* Main Image */}
               <div className="relative rounded-xl overflow-hidden bg-bg-secondary border border-white/5 mb-4">
                 {currentShot?.imageUrl ? (
-                  <img
-                    src={currentShot.imageUrl}
-                    alt={`Shot ${selectedShot + 1}`}
-                    className="w-full max-w-sm mx-auto"
-                  />
+                  <img src={currentShot.imageUrl} alt={`Shot ${selectedShot + 1}`} className="w-full max-w-sm mx-auto" />
                 ) : (
                   <div className="aspect-[2/3] max-w-sm mx-auto flex items-center justify-center bg-bg-tertiary">
-                    <Sparkles className="w-8 h-8 text-text-muted/30" />
+                    <ImageIcon className="w-8 h-8 text-text-muted/30" />
                   </div>
                 )}
 
-                {/* Navigation arrows */}
                 {selectedShot > 0 && (
-                  <button
-                    onClick={() => setSelectedShot((p) => p - 1)}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 p-2.5 sm:p-2 rounded-full bg-bg-primary/80 backdrop-blur-sm text-text-secondary hover:text-text-primary transition-colors"
-                  >
+                  <button onClick={() => { setSelectedShot((p) => p - 1); setIsPlaying(false); }} className="absolute left-2 top-1/2 -translate-y-1/2 p-2.5 sm:p-2 rounded-full bg-bg-primary/80 backdrop-blur-sm text-text-secondary hover:text-text-primary transition-colors">
                     <ChevronLeft className="w-5 h-5" />
                   </button>
                 )}
                 {selectedShot < story.shots.length - 1 && (
-                  <button
-                    onClick={() => setSelectedShot((p) => p + 1)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 sm:p-2 rounded-full bg-bg-primary/80 backdrop-blur-sm text-text-secondary hover:text-text-primary transition-colors"
-                  >
+                  <button onClick={() => { setSelectedShot((p) => p + 1); setIsPlaying(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 sm:p-2 rounded-full bg-bg-primary/80 backdrop-blur-sm text-text-secondary hover:text-text-primary transition-colors">
                     <ChevronRight className="w-5 h-5" />
                   </button>
                 )}
 
-                {/* Shot counter */}
                 <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-bg-primary/80 backdrop-blur-sm text-xs text-text-secondary">
                   {selectedShot + 1} / {story.shots.length}
+                </div>
+              </div>
+
+              {/* Playback Controls */}
+              <div className="flex items-center justify-center gap-3 mb-4">
+                <button onClick={togglePlay} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-primary text-white text-sm font-medium hover:bg-brand-primary/90 transition-colors cursor-pointer">
+                  {isPlaying ? <><Pause className="w-4 h-4" />暂停</> : <><Play className="w-4 h-4" />播放</>}
+                </button>
+                <div className="flex items-center gap-1">
+                  {[2, 3, 5].map((s) => (
+                    <button key={s} onClick={() => setPlaySpeed(s)} className={`text-xs px-2 py-1 rounded-md transition-colors cursor-pointer ${playSpeed === s ? "bg-brand-primary/20 text-brand-primary" : "bg-white/5 text-text-muted"}`}>
+                      {s}s
+                    </button>
+                  ))}
                 </div>
               </div>
 
               {/* Thumbnails */}
               <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
                 {story.shots.map((shot, i) => (
-                  <button
-                    key={shot.shotId}
-                    onClick={() => setSelectedShot(i)}
-                    className={`flex-shrink-0 w-12 h-16 sm:w-14 sm:h-20 rounded-md overflow-hidden border-2 transition-all ${
-                      selectedShot === i
-                        ? "border-brand-primary"
-                        : "border-transparent opacity-60 hover:opacity-100"
-                    }`}
+                  <button key={shot.shotId} onClick={() => { setSelectedShot(i); setIsPlaying(false); }}
+                    className={`flex-shrink-0 w-12 h-16 sm:w-14 sm:h-20 rounded-md overflow-hidden border-2 transition-all ${selectedShot === i ? "border-brand-primary" : "border-transparent opacity-60 hover:opacity-100"}`}
                   >
-                    {shot.imageUrl ? (
-                      <img src={shot.imageUrl} alt={`Shot ${i + 1}`} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-bg-tertiary" />
-                    )}
+                    {shot.imageUrl ? <img src={shot.imageUrl} alt={`Shot ${i + 1}`} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-bg-tertiary" />}
                   </button>
                 ))}
               </div>
 
-              {/* Current shot narration */}
+              {/* Narration */}
               {currentShot?.narrationSegment && (
                 <div className="mt-4 p-3 rounded-lg bg-bg-secondary border border-white/5">
                   <p className="text-xs text-text-muted mb-1">旁白</p>
-                  <p className="text-sm text-text-secondary leading-relaxed">
-                    {currentShot.narrationSegment}
-                  </p>
+                  <p className="text-sm text-text-secondary leading-relaxed">{currentShot.narrationSegment}</p>
                 </div>
               )}
             </motion.div>
@@ -162,37 +192,27 @@ export default function StoryDetailContent() {
 
           {/* Right: Story Info */}
           <div>
-            <motion.div
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="space-y-6"
-            >
-              {/* Title & Summary */}
+            <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="space-y-6">
               <div>
                 <h1 className="text-lg sm:text-xl font-bold mb-2">{story.title}</h1>
                 <p className="text-sm text-text-tertiary leading-relaxed">{story.summary}</p>
               </div>
 
-              {/* Meta */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-sm">
                   <Palette className="w-4 h-4 text-text-muted" />
                   <span className="text-text-secondary">{styleLabel}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
-                  <Sparkles className="w-4 h-4 text-text-muted" />
+                  <ImageIcon className="w-4 h-4 text-text-muted" />
                   <span className="text-text-secondary">{story.shotCount} 张画面</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Clock className="w-4 h-4 text-text-muted" />
-                  <span className="text-text-secondary">
-                    创建于 {new Date(story.createdAt).toLocaleDateString("zh-CN")}
-                  </span>
+                  <span className="text-text-secondary">创建于 {new Date(story.createdAt).toLocaleDateString("zh-CN")}</span>
                 </div>
               </div>
 
-              {/* Characters */}
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <Users className="w-4 h-4 text-text-muted" />
@@ -200,10 +220,7 @@ export default function StoryDetailContent() {
                 </div>
                 <div className="space-y-2">
                   {story.characters.map((char) => (
-                    <div
-                      key={char.name}
-                      className="p-2.5 rounded-lg bg-bg-secondary border border-white/5"
-                    >
+                    <div key={char.name} className="p-2.5 rounded-lg bg-bg-secondary border border-white/5">
                       <p className="text-sm font-medium text-text-primary">{char.name}</p>
                       <p className="text-xs text-text-muted mt-0.5">{char.description}</p>
                     </div>
@@ -211,17 +228,33 @@ export default function StoryDetailContent() {
                 </div>
               </div>
 
-              {/* Mood */}
               <div className="flex items-center gap-2">
                 <span className="text-xs text-text-muted">情绪基调:</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary">
-                  {story.mood}
-                </span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary">{story.mood}</span>
               </div>
+
+              {/* Delete */}
+              <button onClick={() => setShowDeleteConfirm(true)} className="flex items-center gap-1.5 text-xs text-error hover:underline cursor-pointer">
+                <Trash2 className="w-3.5 h-3.5" />删除故事
+              </button>
             </motion.div>
           </div>
         </div>
       </main>
+
+      {/* Modals */}
+      <ShareModal open={showShare} storyTitle={story.title} onClose={() => setShowShare(false)} />
+      <ExportModal open={showExport} onClose={() => setShowExport(false)} onExport={() => {}} />
+      <VideoSynthesisModal open={showVideo} onClose={() => setShowVideo(false)} />
+      <ConfirmModal
+        open={showDeleteConfirm}
+        title="删除故事"
+        message={`确定删除《${story.title}》？此操作不可撤销。`}
+        confirmLabel="删除"
+        danger
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

@@ -78,6 +78,20 @@ export default function StoryCard({ story, index, onDelete, onContinue }: StoryC
               {story.shotCount} shots
             </span>
           </div>
+          {/* Generating progress overlay */}
+          {story.status === "generating" && (
+            <div className="absolute inset-x-0 bottom-0">
+              <div className="bg-bg-primary/80 backdrop-blur-sm px-2 py-1.5">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] text-warning">生成中...</span>
+                  <span className="text-[10px] text-text-muted">67%</span>
+                </div>
+                <div className="w-full h-1 bg-bg-tertiary rounded-full overflow-hidden">
+                  <div className="h-full bg-warning rounded-full animate-pulse" style={{ width: "67%" }} />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </Link>
 
