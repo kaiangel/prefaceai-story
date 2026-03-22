@@ -130,31 +130,52 @@ export default function SettingsContent() {
           </button>
         </motion.section>
 
-        {/* Membership */}
+        {/* Membership — Enhanced */}
         <motion.section
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
-          className="bg-bg-secondary rounded-xl border border-white/5 p-6"
+          className="bg-bg-secondary rounded-xl border border-brand-primary/20 p-6"
         >
           <h2 className="text-sm font-medium text-text-secondary mb-4">会员状态</h2>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Crown className="w-5 h-5 text-brand-primary" />
+
+          {/* Current level card */}
+          <div className="rounded-lg bg-gradient-to-r from-brand-primary/10 to-accent-gold/10 border border-brand-primary/20 p-4 mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Crown className="w-5 h-5 text-accent-gold" />
               <span className="text-lg font-bold text-text-primary">{membershipData.level}</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-brand-primary/15 text-brand-primary font-medium">
-                有效期至 {membershipData.expiresAt}
-              </span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-brand-primary/15 text-brand-primary font-medium">邀请码用户专享</span>
+            </div>
+            <p className="text-xs text-text-muted mb-3">有效期至 {membershipData.expiresAt}</p>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="flex items-center gap-1.5 text-text-secondary"><span className="w-1 h-1 rounded-full bg-success" />~30 故事/月</div>
+              <div className="flex items-center gap-1.5 text-text-secondary"><span className="w-1 h-1 rounded-full bg-success" />15 种风格</div>
+              <div className="flex items-center gap-1.5 text-text-secondary"><span className="w-1 h-1 rounded-full bg-success" />快闪 + 短篇</div>
+              <div className="flex items-center gap-1.5 text-text-secondary"><span className="w-1 h-1 rounded-full bg-success" />优先排队</div>
             </div>
           </div>
-          <div className="flex gap-3">
-            <button className="flex-1 py-2 rounded-lg border border-brand-primary/30 text-brand-primary text-sm hover:bg-brand-primary/10 transition-colors cursor-pointer">
+
+          {/* Max upgrade */}
+          <div className="rounded-lg border border-white/10 p-4 mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-sm font-bold text-text-primary">Max</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-purple/15 text-accent-purple font-medium">即将推出</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 text-xs text-text-muted mb-3">
+              <span>不限故事数</span>
+              <span>视频合成</span>
+              <span>全部篇幅（含中篇）</span>
+              <span>API 接口</span>
+            </div>
+            <button className="w-full py-2 rounded-lg border border-brand-primary/30 text-brand-primary text-sm hover:bg-brand-primary/10 transition-colors cursor-pointer">
               升级到 Max
             </button>
-            <button className="flex-1 py-2 rounded-lg border border-white/10 text-text-secondary text-sm hover:bg-white/5 transition-colors cursor-pointer">
-              续期
-            </button>
           </div>
+
+          {/* Free tier note */}
+          <p className="text-xs text-text-muted text-center">
+            Free 用户可免费体验 1-2 个故事（仅快闪篇幅，基础风格）
+          </p>
         </motion.section>
 
         {/* Credits */}

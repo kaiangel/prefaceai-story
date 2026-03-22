@@ -3,7 +3,7 @@
 // ============ Stage A: Input ============
 
 export type StoryLength = "flash" | "short" | "medium" | "epic";
-export type AspectRatio = "16:9" | "2:3";
+export type AspectRatio = "16:9" | "2:3" | "3:4" | "1:1";
 export type ContinuationMode = "auto" | "user-directed";
 
 export interface CharacterRef {
