@@ -4,6 +4,43 @@
 
 ---
 
+### 2026-03-22 — Batch 2 Review PASS (16/16) + DevOps push 派发
+
+- Dashboard: 生成中 banner + Credits 卡 + StoryCard 进度条 + 排序 ✅
+- 故事详情: 做同款 + 播放(2s/3s/5s) + 分享(ShareModal) + 收藏 + 导出(ExportModal) + 合成视频(VideoSynthesisModal) + 删除确认(ConfirmModal) ✅
+- 通知系统: Toast 全局 + 浏览器推送 ✅
+- 5 个新 UI 组件独立可复用，代码质量好
+- DevOps push 派发（Batch 1A+1B+2 一次性推送）
+
+---
+
+### 2026-03-22 — Batch 1A+1B Review PASS + Ben 通知 + Batch 2 派发
+
+**Batch 1A+1B PM Review**: 27/30 完成 ✅ + 3 项暂缓（手机号，MVP 只要邮箱）
+- 1A: StageC 4 阶段 + 角色/场景检查点 + CreateContext + mock-data ✅
+- 1B: 注册(邮箱+密码+邀请码) + 登录(邮箱+密码) + 验证页 + 设置页 + CTA + logo ✅
+
+**通知 Ben**: TEAM_CHAT 发送 6 个前端页面的数据格式说明，Ben 可开始设计后端 API
+
+**Batch 2 派发 @Frontend**: 16 项（Dashboard 生成中状态 + 做同款 + 播放 + 分享 + 收藏 + 导出 + 视频合成 + 删除确认 + Toast + 推送通知）
+
+---
+
+### 2026-03-22 — Founder 产品决策 + Batch 1A+1B 派发
+
+**Founder 产品决策记录**:
+- MVP 邀请码注册流程（Landing CTA→邮箱申请→邀请码→注册→邮箱验证→创作）
+- 会员等级: Free/Pro/Max（MVP 邀请码用户享 Pro）
+- Credits 定价暂搁（MVP 不涉及）
+- 个人主页: MVP 私人设置页，后续加公开展示页
+- 5 个故事模板（含 3 个高创意+惊喜结局）
+
+**CREATE_UX_EVOLUTION_PLAN.md 全面更新**: 新增第六章 Founder 决策 + 第七章实施策略重构
+
+**Batch 1A+1B 正式派发 @Frontend**: 82 项前端工作的前 30 项（Create 预览流 + MVP 注册体系 + 登录 + 设置页 + logo 更新）
+
+---
+
 ### 2026-03-19 — 双团队协作文档 + Ben 团队文件重组 + Git 工作流简化
 
 **Coordinator 指令执行**: TODAY_FOCUS/PROJECT_STATUS/PENDING 更新 + DevOps 派发

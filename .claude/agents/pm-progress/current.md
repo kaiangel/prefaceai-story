@@ -1,7 +1,7 @@
 # PM Agent - 当前任务
 
-> **最后更新**: 2026-03-19 18:00
-> **状态**: Ben 团队文件重组完成 + Git 简化 → 等 DevOps push
+> **最后更新**: 2026-03-22
+> **状态**: Batch 1A+1B+2 全部 Review PASS → 等 DevOps push → 微信通知 Ben
 
 ---
 
@@ -30,8 +30,10 @@
 
 | # | 事项 | 等谁 |
 |---|------|------|
-| 1 | push 文件重组改动 | @DevOps |
-| 2 | Founder 填 API Key | Founder |
+| 1 | DevOps push Batch 1A+1B+2 到 GitHub | @DevOps |
+| 2 | push 后微信通知 Ben | Founder |
+| 3 | Ben 设计后端 API | @Ben (等 push) |
+| 4 | Founder 填 API Key | Founder |
 
 ---
 
@@ -83,6 +85,10 @@ Founder 终审:                                                  ⏳
 
 | 时间 | 更新内容 |
 |------|----------|
+| 2026-03-22 | Batch 2 Review PASS (16/16) + DevOps push 派发 |
+| 2026-03-22 | Batch 1A+1B Review PASS (27/30+3暂缓) + Ben 通知已写入 TEAM_CHAT + Batch 2 派发 (16项) |
+| 2026-03-22 | Founder 产品决策（MVP 邀请码流程+会员等级+故事模板+个人页规划）+ Batch 1A+1B 派发 @Frontend |
+| 2026-03-20 10:00 | Ben 首次 push 审查 (20641ac, 25 files) — contact_us MySQL 模块，未碰 Pipeline ✅ + DevOps pull 指令 |
 | 2026-03-19 18:00 | Ben 团队文件重组 (codex-agents/ → .team-brain/team_ben/) + Git 工作流简化 (分支保护移除) + 30+ 文件路径引用更新 |
 | 2026-03-19 15:30 | 双团队文档更新 (TODAY_FOCUS/PROJECT_STATUS/PENDING) + DevOps 派发 + CREATE_UX_EVOLUTION_PLAN 补充 |
 | 2026-03-18 11:45 | DevOps 部署审查 PASS (f76ac1e, CORS 实测通过, OB-5 修复确认) — Founder 可填 API Key |

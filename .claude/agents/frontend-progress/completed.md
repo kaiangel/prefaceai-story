@@ -4,6 +4,95 @@
 
 ---
 
+## 2026-03-22
+
+### Batch 2: Dashboard 补全 ✅
+
+**完成时间**: 2026-03-22
+**验收状态**: 待 PM Review
+**任务来源**: PM 派发 Batch 2 (TEAM_CHAT 03-22)
+
+**完成内容 (16 项)**:
+
+新建 7 文件:
+- [x] Toast.tsx — 全局通知（ToastProvider + useToast）
+- [x] ConfirmModal.tsx — 通用确认弹窗
+- [x] ShareModal.tsx — 分享（链接+QR+社交）
+- [x] ExportModal.tsx — 导出素材（三选项）
+- [x] VideoSynthesisModal.tsx — 合成视频进度
+- [x] notifications.ts — 浏览器推送通知
+- [x] mock-data.ts 新增 generating 状态故事
+
+修改 4 文件:
+- [x] StoryCard.tsx — 生成中进度条覆盖层
+- [x] DashboardContent.tsx — 生成 banner + Credits 卡 + 4 列统计
+- [x] StoryDetailContent.tsx — 做同款/播放/分享/收藏/导出/合成视频/删除确认
+- [x] layout.tsx — ToastProvider 全局接入
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
+### Batch 1A: Create 预览流 — StageC 拆分 ✅
+
+**完成时间**: 2026-03-22
+**验收状态**: 待 PM Review
+**任务来源**: PM 派发 Batch 1A (TEAM_CHAT 03-22)
+
+**完成内容**:
+
+StageC.tsx 完全重写 — 从纯进度条拆分为 4 阶段:
+- [x] 文本生成进度（Stage 1-4 模拟）
+- [x] 角色预览检查点（fullbody 卡片 + 10s 倒计时 + 调整面板 + 重新生成 + 确认）
+- [x] 场景描述检查点（文字列表 + 10s 倒计时 + 修改输入 + 确认）
+- [x] Shot 生成进度 + "后台生成"按钮
+- [x] CreateContext 新增 5 state 字段 + 7 actions
+- [x] types/create.ts 新增 GenerationSubPhase、PreviewCharacter、PreviewScene
+- [x] mock-data.ts 新增 mockPreviewCharacters (3) + mockPreviewScenes (3)
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
+### Batch 1B: MVP 邀请码注册体系 ✅
+
+**完成时间**: 2026-03-22
+**验收状态**: 待 PM Review
+**任务来源**: PM 派发 Batch 1B (TEAM_CHAT 03-22)
+
+**完成内容 (8 文件修改/新建)**:
+
+| 文件 | 改动 |
+|------|------|
+| RegisterContent.tsx | 重写: 邮箱+密码+邀请码，新 logo，服务条款勾选，提交→验证邮件提示 |
+| LoginContent.tsx | 重写: 邮箱+密码，新 logo，忘记密码弹窗 |
+| verify-email/page.tsx | **新建**: 验证成功 + 5s 倒计时→/create |
+| settings/page.tsx + SettingsContent.tsx | **新建**: 头像/昵称/邮箱/会员Pro/Credits/订阅管理 |
+| DashboardContent.tsx | Sparkles→新 logo |
+| CTASection.tsx | 文案+"已有邀请码？直接注册"→/register |
+| types/create.ts | RegisterForm 去 name 加 inviteCode |
+| AuthContext.tsx | 适配新 RegisterForm + updateUser |
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
+## 2026-03-17
+
+### TASK-PHONE-LANDING 手机号收集演示页 ✅
+
+**完成时间**: 2026-03-17
+**验收状态**: 待确认
+**任务来源**: PM 派发 (TEAM_CHAT 03-17)
+
+**完成内容 (2 文件新建)**:
+- `frontend/src/app/demo/page.tsx` — /demo 手机号收集宣传页
+- `frontend/src/app/api/demo/phone/route.ts` — Next.js API Route (JSON 存储)
+
+**`npm run build` 通过 ✅**
+
+---
+
 ## 2026-03-16
 
 ### TASK-BRAND-MANIFESTO 品牌宣言整合 ✅

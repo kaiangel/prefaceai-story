@@ -1,66 +1,66 @@
 # Frontend 当前任务进度
 
-> 更新时间: 2026-03-16
-> 状态: TASK-BRAND-MANIFESTO + TASK-LOGO-REPLACE 完成，待 PM 文案审查 + DevOps 部署
+> 更新时间: 2026-03-22
+> 状态: Batch 2 完成，等 PM Review
 
 ---
 
-## 最新完成: TASK-BRAND-MANIFESTO + TASK-LOGO-REPLACE (2026-03-16)
+## 最新完成: Batch 2 — Dashboard 补全 (2026-03-22)
 
-### 状态: 完成，`npm run build` 18 路由通过
-
-#### TASK-BRAND-MANIFESTO（品牌宣言整合）
-
-**Pipeline.tsx** (5 处):
-- badge: `AI Story Engine` → `Story Engine`
-- slogan: → `每个人脑子里都在放电影`
-- core message: → `你说出来。所有人看见。`
-- 技术标签整块删除（迁移到 About 页）
-- tagline: → `你脑海里的画面，不该只有你看得见`
-
-**AboutContent.tsx** (5 段):
-- PageHero subtitle → `致每一个脑子里装满画面的人`
-- 使命段 → V2 完整宣言原文（4 段落块）
-- 理念段 → `想象力，不该被困住`
-- 三卡片 → V2 精神重写
-- 新增"技术基座"段（4 技术标签从 Pipeline 迁来）
-- 核心团队位置调整到三卡片下方、技术基座上方
-
-#### TASK-LOGO-REPLACE（全站 Logo 替换）
-
-4 个文件 `<Sparkles>` → `<Image>` logo:
-- `Header.tsx`: logo-48.png + hover scale-110
-- `SubPageHeader.tsx`: logo-40.png
-- `CreateHeader.tsx`: logo-40.png
-- `Footer.tsx`: logo-48.png
-
-### 构建验证: `npm run build` 18 路由通过，0 错误
+### 状态: 完成，`npm run build` 20 路由通过，0 错误
 
 ---
 
-## 待做（Founder 确认记录）
+#### 16 项全部完成
 
-### 视频预览器组件（等后端 Phase 4.5 视频合成就绪后再做）
-
-当前 Phase 4.5（视频合成）进度 5%，暂无真实视频可播放。Founder 确认先记录，后续做。
+| PM# | 工作项 | 文件 | 状态 |
+|-----|--------|------|------|
+| 32 | StoryCard 生成中进度条 | StoryCard.tsx | ✅ |
+| 33 | Dashboard 顶部生成 banner | DashboardContent.tsx | ✅ |
+| 34 | Credits 余额统计卡 | DashboardContent.tsx | ✅ |
+| 35 | 排序功能 | StoryGrid.tsx（已有） | ✅ 已在 Batch 1 中实现 |
+| 38 | 做同款按钮 | StoryDetailContent.tsx | ✅ URL query 预填 |
+| 39 | 页面内播放 | StoryDetailContent.tsx | ✅ 2s/3s/5s 可调速 |
+| 40 | 分享功能 | ShareModal.tsx（新建）| ✅ 链接+QR+社交 |
+| 41 | 收藏功能 | StoryDetailContent.tsx | ✅ Heart toggle |
+| 42 | Shot 排序 | StoryDetailContent.tsx | ✅ 默认故事顺序 |
+| 43 | 导出素材细化 | ExportModal.tsx（新建）| ✅ 三选项 |
+| 44 | 合成视频入口 | VideoSynthesisModal.tsx（新建）| ✅ 进度条+完成 |
+| 45 | 删除确认弹窗 | ConfirmModal.tsx（新建）| ✅ 危险操作确认 |
+| 48 | 浏览器推送通知 | notifications.ts（新建）| ✅ 权限+推送 |
+| 49 | Toast 通知组件 | Toast.tsx（新建）+ layout.tsx | ✅ 成功/失败/信息 |
+| — | mock generating 故事 | mock-data.ts | ✅ |
+| — | ToastProvider 全局接入 | layout.tsx | ✅ |
 
 ---
 
-## 已完成任务汇总
+#### 新建文件（7 个）
 
-| 任务 | 评分 | 完成时间 |
-|------|------|----------|
-| TASK-BRAND-MANIFESTO | 待 PM 审查 + Founder 终审 | 2026-03-16 |
-| TASK-LOGO-REPLACE | 待确认 | 2026-03-16 |
-| Contact 更新 + 缩略图集成 | 待确认 | 2026-03-10 |
-| TASK-GCLOUD-OPT | 待 Founder 确认 | 2026-03-10 |
-| TASK-RESPONSIVE-OPT | PM 复验 4.5/5 | 2026-03-06 |
-| TASK-CREATE-UPGRADE P2 | PM 复验 4.8/5 | 2026-03-03 |
-| TASK-CREATE-UPGRADE P1 | PM 复验 4.7/5 | 2026-03-02 |
-| TASK-CREATE-UPGRADE P0 | PM 复验 4.8/5 | 2026-03-02 |
-| TASK-UI-STAGE-A | PM 复验 4.5/5 | 2026-02-26 |
-| TASK-LP-PAGES-FIX | 4.8/5 | 2026-02-14 |
-| TASK-LP-PAGES | 4.0/5 -> 4.8/5 | 2026-02-14 |
-| TASK-LP-POLISH | 5.0/5 | 2026-02-12 |
-| TASK-LP-FIX | 4.5/5 | 2026-02-12 |
-| Landing Page 基础版本 | 4.0/5 | 2026-01-29 |
+| 文件 | 说明 |
+|------|------|
+| `components/ui/Toast.tsx` | 通用 Toast 通知（ToastProvider + useToast） |
+| `components/ui/ConfirmModal.tsx` | 通用确认弹窗（支持 danger 模式） |
+| `components/ui/ShareModal.tsx` | 分享弹窗（链接+QR+社交平台） |
+| `components/ui/ExportModal.tsx` | 导出弹窗（仅图片/图片+音频/全部素材） |
+| `components/ui/VideoSynthesisModal.tsx` | 视频合成弹窗（进度条→完成→下载） |
+| `lib/notifications.ts` | 浏览器推送通知工具 |
+| mock-data.ts 新增 | generating 状态故事 |
+
+#### 修改文件（4 个）
+
+| 文件 | 改动 |
+|------|------|
+| `StoryCard.tsx` | 生成中进度条覆盖层 |
+| `DashboardContent.tsx` | 生成 banner + Credits 卡片 + 4 列统计 |
+| `StoryDetailContent.tsx` | 完全重写：做同款/播放/分享/收藏/导出/合成视频/删除确认 |
+| `layout.tsx` | 接入 ToastProvider |
+
+---
+
+## 待做
+
+### Batch 3-5（未派发，等 PM）
+
+- Batch 3: 输入方式升级（OCR/语音/模板）
+- Batch 4: 商业化 UI + 比例
+- Batch 5: API 对接

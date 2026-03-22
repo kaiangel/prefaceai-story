@@ -1,56 +1,56 @@
 # Frontend 状态速览（供其他Agent参考）
 
-> 更新时间: 2026-03-16
+> 更新时间: 2026-03-22
 
 ---
 
-## 当前状态: TASK-BRAND-MANIFESTO + TASK-LOGO-REPLACE 完成，待 PM 审查 + DevOps 部署
+## 当前状态: Batch 1A + 1B + 2 全部完成，等 PM Review → DevOps push
 
 **可预览地址**: http://localhost:3000 (需要运行 `npm run dev`)
 
 ---
 
-## 最新完成 (2026-03-16)
+## Batch 2 完成内容 (2026-03-22)
 
-### TASK-BRAND-MANIFESTO（品牌宣言整合）
+### Dashboard 主页补全
+- StoryCard 生成中进度条覆盖层
+- Dashboard 顶部生成 banner（"《xxx》正在生成中...67%"）
+- Credits 余额统计卡（4 列布局）
+- 排序功能（已在 StoryGrid 中实现）
 
-| 文件 | 改动 |
-|------|------|
-| `Pipeline.tsx` | slogan → "每个人脑子里都在放电影"，core message → "你说出来。所有人看见。"，技术标签删除，tagline → V2 精神 |
-| `AboutContent.tsx` | 使命段 → V2 完整宣言，理念段重写，三卡片 V2 重写，新增"技术基座"段（技术标签迁入），核心团队不动（位置调到卡片下方） |
+### 故事详情页补全
+- **做同款**: 跳转 /create?style=xxx&length=xxx
+- **页面内播放**: Shot 序列自动切换（2s/3s/5s 可调速）+ 播放/暂停
+- **分享**: ShareModal（链接复制+QR+微信/微博/抖音）
+- **收藏**: Heart toggle
+- **导出素材**: ExportModal（仅图片/图片+音频/全部素材）
+- **合成视频**: VideoSynthesisModal（进度条→完成→下载）
+- **删除确认**: ConfirmModal（危险操作确认弹窗）
 
-### TASK-LOGO-REPLACE（全站 Logo 替换）
+### 通知系统
+- **Toast**: 全局 ToastProvider + useToast hook（成功/失败/信息）
+- **浏览器推送**: requestNotificationPermission + sendNotification
 
-| 文件 | 改动 |
-|------|------|
-| `Header.tsx` | `<Sparkles>` → `<Image src="/brand/logo-48.png">` |
-| `SubPageHeader.tsx` | `<Sparkles>` → `<Image src="/brand/logo-40.png">` |
-| `CreateHeader.tsx` | `<Sparkles>` → `<Image src="/brand/logo-40.png">` |
-| `Footer.tsx` | `<Sparkles>` → `<Image src="/brand/logo-48.png">` |
-
-favicon.ico 已由 Coordinator 预先替换。
-
-### 部署状态
-- 本地 build 通过（18/18 路由）
-- **需要 DevOps push + 部署到 prefaceai.mov**
-- **需要 PM 文案审查 → Founder 终审**
-
----
-
-## 静态资源汇总
-
-- `public/team/` — 团队照片 3 张
-- `public/demo.mp4` — 产品 Demo 视频
-- `public/styles/` — 15 张风格缩略图
-- `public/brand/` — 13 张 logo 图片（琥珀版 + 黑色版多尺寸）
+### 新建组件（7 个）
+Toast.tsx, ConfirmModal.tsx, ShareModal.tsx, ExportModal.tsx, VideoSynthesisModal.tsx, notifications.ts, mock generating story
 
 ---
 
-## 待做（记录）
+## 全部路由
 
-### 视频预览器组件（等后端 Phase 4.5 视频合成就绪后再做）
+| 路由 | 说明 | Batch |
+|------|------|-------|
+| `/` | Landing Page | 基础 |
+| `/create` | 创作页（含 StageC 4 阶段预览流） | 1A |
+| `/register` | 注册（邮箱+密码+邀请码） | 1B |
+| `/login` | 登录（邮箱+密码+忘记密码） | 1B |
+| `/verify-email` | 邮箱验证成功 | 1B |
+| `/settings` | 个人设置 | 1B |
+| `/dashboard` | 工作台（含生成 banner+Credits） | 2 |
+| `/dashboard/[storyId]` | 故事详情（播放/分享/收藏/导出/合成视频） | 2 |
+| `/demo` | 手机号收集演示 | 独立 |
 
-当前 Phase 4.5（视频合成）进度 5%，暂无真实视频可播放。
+**构建**: 20 路由，0 错误
 
 ---
 
@@ -61,5 +61,5 @@ favicon.ico 已由 Coordinator 预先替换。
 | Next.js | 14.2.35 |
 | TailwindCSS | 3.x |
 | TypeScript | 5.x |
-| Framer Motion | 最新（含 AnimatePresence） |
+| Framer Motion | 最新 |
 | Lucide Icons | 最新 |
