@@ -133,22 +133,24 @@ export default function StoryIdeaInput({
             onChange={handleImageSelect}
           />
 
-          {/* Voice */}
-          <button
-            type="button"
-            onClick={toggleRecording}
-            disabled={voiceLoading}
-            className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-              isRecording
-                ? "text-error bg-error/10 animate-pulse"
-                : voiceLoading
-                  ? "text-text-muted opacity-50"
-                  : "text-text-muted hover:text-brand-primary hover:bg-brand-primary/10"
-            }`}
-            title={isRecording ? "点击停止录音" : "语音输入"}
-          >
-            {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-          </button>
+          {/* Voice — hidden for MVP, code preserved */}
+          {false && (
+            <button
+              type="button"
+              onClick={toggleRecording}
+              disabled={voiceLoading}
+              className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                isRecording
+                  ? "text-error bg-error/10 animate-pulse"
+                  : voiceLoading
+                    ? "text-text-muted opacity-50"
+                    : "text-text-muted hover:text-brand-primary hover:bg-brand-primary/10"
+              }`}
+              title={isRecording ? "点击停止录音" : "语音输入"}
+            >
+              {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </button>
+          )}
         </div>
 
         {/* Status indicators */}

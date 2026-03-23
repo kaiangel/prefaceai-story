@@ -186,6 +186,40 @@ export function mockGenerationProgress(
   return () => clearInterval(interval);
 }
 
+// ============ Stage C: Mock Shot Generation Progress (shot-gen only) ============
+
+const SHOT_GEN_STEPS = [
+  "正在生成场景参考图...",
+  "正在绘制第 1 张画面...",
+  "正在绘制第 3 张画面...",
+  "正在绘制第 6 张画面...",
+  "正在绘制第 9 张画面...",
+  "正在绘制第 12 张画面...",
+  "正在绘制第 15 张画面...",
+  "正在绘制第 18 张画面...",
+  "正在渲染文字...",
+  "即将完成...",
+];
+
+export function mockShotGenProgress(
+  onProgress: (progress: number, message: string) => void,
+  onComplete: (shots: Shot[]) => void
+): () => void {
+  let step = 0;
+  const interval = setInterval(() => {
+    if (step < SHOT_GEN_STEPS.length) {
+      const progress = Math.round(((step + 1) / SHOT_GEN_STEPS.length) * 100);
+      onProgress(progress, SHOT_GEN_STEPS[step]);
+      step++;
+    } else {
+      clearInterval(interval);
+      onComplete(mockShots);
+    }
+  }, 1500);
+
+  return () => clearInterval(interval);
+}
+
 // ============ Custom Style: Mock AI Analysis ============
 
 export async function mockStyleAnalysis(): Promise<string[]> {

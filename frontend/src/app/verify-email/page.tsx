@@ -23,7 +23,7 @@ export default function VerifyEmailPage() {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearTimer();
-          router.push("/create");
+          router.push("/dashboard");
           return 0;
         }
         return prev - 1;
@@ -55,7 +55,7 @@ export default function VerifyEmailPage() {
 
         <h1 className="text-2xl font-bold text-text-primary mb-3">邮箱验证成功！</h1>
         <p className="text-text-secondary mb-6">
-          你的账户已激活，即将进入创作工作台...
+          你的账户已激活，即将进入工作台...
         </p>
 
         {/* Countdown */}
@@ -68,7 +68,7 @@ export default function VerifyEmailPage() {
 
         {/* Manual link */}
         <button
-          onClick={() => router.push("/create")}
+          onClick={() => router.push("/dashboard")}
           className="mt-6 text-brand-primary hover:underline text-sm cursor-pointer"
         >
           立即进入

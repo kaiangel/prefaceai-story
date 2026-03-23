@@ -4,13 +4,15 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, CheckCircle2, AlertCircle, User, MapPin, ChevronRight, RotateCcw, Pencil, Play } from "lucide-react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useCreate } from "@/contexts/CreateContext";
-import { mockGenerationProgress, mockPreviewCharacters, mockPreviewScenes } from "@/lib/mock-data";
+import { mockShotGenProgress, mockPreviewCharacters, mockPreviewScenes } from "@/lib/mock-data";
 
 const ADJUST_TAGS = ["换发色", "换服装", "更年轻", "更成熟", "换风格"];
 
 export default function StageC() {
   const { state, dispatch } = useCreate();
+  const router = useRouter();
   const cancelRef = useRef<(() => void) | null>(null);
 
   // Text generation phase (Stage 1-4) → then transition to char-preview
@@ -53,11 +55,14 @@ export default function StageC() {
     return () => { cancelled = true; };
   }, [state.generationSubPhase, dispatch]);
 
-  // Shot generation phase
+  // Shot generation phase — uses shot-only progress (no Stage 1-4 repeat)
   useEffect(() => {
     if (state.generationSubPhase !== "shot-gen") return;
 
-    const cancel = mockGenerationProgress(
+    // Reset progress for shot phase start
+    dispatch({ type: "START_GENERATION" });
+
+    const cancel = mockShotGenProgress(
       (progress, message) => {
         dispatch({ type: "UPDATE_GENERATION_PROGRESS", payload: { progress, message } });
       },
@@ -81,7 +86,7 @@ export default function StageC() {
   }, [dispatch]);
 
   const handleBackgroundGenerate = () => {
-    window.location.href = "/dashboard";
+    router.push("/dashboard");
   };
 
   const isError = state.generationStatus === "error";
@@ -166,6 +171,13 @@ export default function StageC() {
           >
             {state.generationMessage}
           </motion.p>
+        )}
+
+        {/* text-gen hint — only during text generation phase */}
+        {state.generationSubPhase === "text-gen" && !isError && (
+          <p className="text-text-tertiary text-xs mb-6">
+            正在创作中，稍后需要你确认角色和场景哦～可以先喝杯可可，保持页面打开就好
+          </p>
         )}
 
         {state.generationLog.length > 0 && (

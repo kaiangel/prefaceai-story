@@ -18,7 +18,7 @@ const FEATURES: PlanFeature[] = [
   { label: "风格", free: "基础 3 种", pro: "全部 15 种", max: "全部 + 未来新增 + 自定义" },
   { label: "生成排队", free: "标准", pro: "优先", max: "最优先" },
   { label: "导出素材", free: true, pro: true, max: true },
-  { label: "视频合成", free: false, pro: false, max: true },
+  { label: "视频合成", free: false, pro: true, max: true },
   { label: "API 接口", free: false, pro: false, max: true },
   { label: "专属客服", free: false, pro: false, max: true },
 ];

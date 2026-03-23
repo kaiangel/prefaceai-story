@@ -91,7 +91,14 @@ export default function RegisterContent() {
           <p className="text-text-secondary mb-2">
             请查收 <span className="text-brand-primary">{email}</span> 的验证邮件
           </p>
-          <p className="text-text-tertiary text-sm">点击邮件中的链接完成注册</p>
+          <p className="text-text-tertiary text-sm mb-4">点击邮件中的链接完成注册</p>
+          {/* Dev mode: simulate email verification */}
+          <Link
+            href="/verify-email"
+            className="text-xs text-text-muted hover:text-brand-primary transition-colors"
+          >
+            （开发模式）模拟验证 →
+          </Link>
         </motion.div>
       </div>
     );
