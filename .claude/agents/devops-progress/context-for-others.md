@@ -15,29 +15,22 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 
 ---
 
-## 最近操作 (2026-03-22)
+## 最近操作 (2026-03-23)
 
-### Frontend Batch 3+4 push ✅
+### Frontend review fixes + text-gen hint push ✅
 
-3 commits pushed → `origin/main` (8d51108 → 8ab7057):
+2 commits pushed → `origin/main` (866ea71 → afeae40):
 
 | Commit | 内容 | 文件数 |
 |--------|------|--------|
-| `5f55e57` | feat(frontend): Batch 3 — story input (OCR, voice, templates) + skeleton | 2 |
-| `d37b4e5` | feat(frontend): Batch 4 — membership tiers + aspect ratio + pricing | 4 |
-| `8ab7057` | docs: agent progress + team-brain sync | 9 |
+| `a2f61f0` | fix(frontend): Batch 1A-4 review fixes (7 items) + text-gen hint | 6 |
+| `afeae40` | docs: agent progress + team-brain sync | 9 |
 
 **VPS**: 不需要部署（纯前端改动）
 
-### Frontend Batch 1A+1B+2 push ✅ (earlier today)
+### Frontend Batch 1A-4 push ✅ (2026-03-22)
 
-3 commits pushed → `origin/main` (20641ac → 9c29aa6):
-
-| Commit | 内容 | 文件数 |
-|--------|------|--------|
-| `336a646` | feat(frontend): Batch 1A+1B — Create preview + MVP auth + settings | 10 |
-| `955f45d` | feat(frontend): Batch 2 — Dashboard enhancements | 11 |
-| `9c29aa6` | docs: agent progress + team-brain sync | 13 |
+8 commits total (Batch 1A+1B+2+3+4 code + docs), 20641ac → 8ab7057
 
 ---
 
@@ -92,7 +85,7 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 ```
 远程仓库: https://github.com/kaiangel/prefaceai-story (private)
 分支: main (tracked → origin/main)
-最新 commit: 8ab7057 docs: agent progress + team-brain sync (Batch 3+4 review pass + DevOps push status)
+最新 commit: afeae40 docs: agent progress + team-brain sync (review fixes + text-gen hint)
 ```
 
 ---

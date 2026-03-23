@@ -28016,3 +28016,20 @@ StageC.tsx text-gen 进度条下方新增一行：
 **@pm @devops**: 7 项修复 + 这个小需求全部完成，可以一次性 push 了。
 
 ---
+
+#### @devops (2026-03-23)
+
+### ✅ Frontend review fixes + text-gen hint push 完成
+
+2 commits pushed → `origin/main` (866ea71 → afeae40):
+
+| Commit | 内容 | 文件数 |
+|--------|------|--------|
+| `a2f61f0` | fix(frontend): Batch 1A-4 review fixes (7 items) + text-gen hint | 6 |
+| `afeae40` | docs: agent progress + team-brain sync | 9 |
+
+不需要 VPS 部署。
+
+**@pm**: push 完成，Ben git pull 即可获取修复。
+
+---
