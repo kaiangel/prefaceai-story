@@ -1,28 +1,26 @@
 # Frontend 当前任务进度
 
-> 更新时间: 2026-03-22
-> 状态: Batch 4 完成，等 PM Review
+> 更新时间: 2026-03-23
+> 状态: 7 项修复完成，等 PM Review
 
 ---
 
-## 最新完成: Batch 4 — 商业化 UI + 比例 (2026-03-22)
+## 最新完成: Batch 1A-4 Review 修复 (2026-03-23)
 
-### 状态: 完成，`npm run build` 20 路由通过，0 错误
+### 状态: 6 修 + 1 记录，`npm run build` 20 路由通过
 
-| PM# | 工作项 | 文件 | 状态 |
-|-----|--------|------|------|
-| 53 | 会员等级 UI | SettingsContent.tsx | ✅ Pro/Max 卡片 + Free 说明 + 功能列表 |
-| 55 | 比例选择器 3:4 + 1:1 | AspectRatioSelector.tsx + types | ✅ 4 选项（2:3默认/3:4小红书/1:1方形/16:9横屏）|
-| 57 | Pricing 页面更新 | PricingContent.tsx | ✅ 三栏卡片 + 功能对比表 + FAQ |
-
-### 修改文件
-- `SettingsContent.tsx` — 会员区增强（Pro 金色卡片+功能列表，Max 升级入口，Free 说明）
-- `AspectRatioSelector.tsx` — 重写为 4 选项网格，新增 3:4 + 1:1
-- `PricingContent.tsx` — 完全重写（Free/Pro/Max 三栏 + 功能对比表 + 占位价格）
-- `types/create.ts` — AspectRatio 类型新增 `"3:4" | "1:1"`
+| # | P | 修复 | 文件 | 状态 |
+|---|---|------|------|------|
+| 1 | P0 | shot-gen 进度重复 | StageC.tsx + mock-data.ts | ✅ 新建 mockShotGenProgress |
+| 2 | P1 | verify-email → /dashboard | verify-email/page.tsx | ✅ |
+| 3 | P1 | 语音输入 MVP 隐藏 | StoryIdeaInput.tsx | ✅ `{false && ...}` |
+| 4 | P1 | Pricing Pro 视频合成 | PricingContent.tsx | ✅ false→true |
+| 5 | P2 | 注册成功模拟验证链接 | RegisterContent.tsx | ✅ |
+| 6 | P2 | 后台生成 router.push | StageC.tsx | ✅ |
+| 7 | P3 | 做同款 URL 未解析 | — | 📝 记录 |
 
 ---
 
 ## 待做
 
-### Batch 5（未派发，等 PM）— API 对接
+### Batch 5（未派发）— API 对接（等 Ben 后端 + Founder Pipeline）

@@ -1,6 +1,6 @@
 # PM Agent - 给其他Agent的信息
 
-> **最后更新**: 2026-03-22
+> **最后更新**: 2026-03-23
 > **目的**: 让其他Agent快速了解当前状态和任务
 
 ---
@@ -15,15 +15,15 @@
 
 ---
 
-## @Frontend — ✅ Batch 1A-4 全部完成
+## @Frontend — ✅ 修复 6/6 完成
 
-前端 mock 阶段工作全部 Review PASS。等 DevOps push 后进入 Batch 5（API 对接，等 Ben 后端就绪）。
+Review PASS。等 DevOps push。
 
 ---
 
-## @DevOps — ✅ push 完成 (d735e95)
+## @DevOps — ⏳ push 修复改动
 
-Batch 1A-4 全部 8 commits 已在 GitHub。空闲。
+commit + push 修复 (不部署 VPS)。详见 TEAM_CHAT。
 
 ---
 

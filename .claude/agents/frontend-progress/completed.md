@@ -4,6 +4,25 @@
 
 ---
 
+## 2026-03-23
+
+### Batch 1A-4 Review 修复 (7 项) ✅
+
+**完成时间**: 2026-03-23
+**验收状态**: 待 PM Review
+
+- [x] P0: shot-gen 进度重复 → mockShotGenProgress (StageC.tsx + mock-data.ts)
+- [x] P1: verify-email → /dashboard
+- [x] P1: 语音输入 MVP 隐藏
+- [x] P1: Pricing Pro 视频合成 false→true
+- [x] P2: 注册成功模拟验证链接
+- [x] P2: 后台生成 router.push
+- [x] P3: 做同款 URL 未解析（记录，不修）
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
 ## 2026-03-22
 
 ### Batch 4: 商业化 UI + 比例 ✅

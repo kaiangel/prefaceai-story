@@ -4,6 +4,18 @@
 
 ---
 
+### 2026-03-23 — Founder 走查 + PM 审查: 7 项修复 Review PASS
+
+- P0: shot-gen 进度重复 bug (mockShotGenProgress 新建) ✅
+- P1: verify-email → /dashboard ✅
+- P1: 语音 UI 隐藏 ({false && ...}) ✅
+- P1: Pricing Pro 视频合成 true ✅
+- P2: 注册成功页"模拟验证"链接 ✅
+- P2: 后台生成 router.push ✅
+- P3: "做同款" URL query 记录待完善 📝
+
+---
+
 ### 2026-03-22 — Batch 4 Review PASS (3/3) — 前端 mock 全部完成
 
 - 会员等级 UI: Free/Pro(金色)/Max(即将推出) 三级视觉 ✅
