@@ -1,5 +1,6 @@
 """Database connection and session management"""
 
+from sqlalchemy import inspect, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from app.config import settings
@@ -38,8 +39,25 @@ async def init_db():
     """Initialize database tables"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_ensure_legacy_schema_compatibility)
 
 
 async def close_db():
     """Close database connections"""
     await engine.dispose()
+
+
+def _ensure_legacy_schema_compatibility(sync_conn):
+    """Patch a few old tables so new auth code can run on legacy dev databases."""
+    inspector = inspect(sync_conn)
+
+    if "u_users" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("u_users")}
+        if "email" not in columns:
+            sync_conn.execute(text("ALTER TABLE u_users ADD COLUMN email VARCHAR(255)"))
+        if "avatar_url" not in columns:
+            sync_conn.execute(text("ALTER TABLE u_users ADD COLUMN avatar_url VARCHAR(500)"))
+        if "plan" not in columns:
+            sync_conn.execute(text("ALTER TABLE u_users ADD COLUMN plan VARCHAR(32) DEFAULT 'pro'"))
+        if "credits" not in columns:
+            sync_conn.execute(text("ALTER TABLE u_users ADD COLUMN credits INTEGER DEFAULT 87"))

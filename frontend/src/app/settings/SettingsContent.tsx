@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function SettingsContent() {
-  const { user, isLoggedIn, updateUser } = useAuth();
+  const { user, isLoggedIn, updateUser, loadingUser } = useAuth();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -17,10 +17,10 @@ export default function SettingsContent() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    if (!isLoggedIn) {
+    if (!loadingUser && !isLoggedIn) {
       router.replace("/login");
     }
-  }, [isLoggedIn, router]);
+  }, [isLoggedIn, loadingUser, router]);
 
   useEffect(() => {
     if (user) {
@@ -29,6 +29,7 @@ export default function SettingsContent() {
     }
   }, [user]);
 
+  if (loadingUser) return null;
   if (!isLoggedIn || !user) return null;
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -39,17 +40,18 @@ export default function SettingsContent() {
     }
   };
 
-  const handleSave = () => {
-    updateUser({ name: nickname.trim() || user.name, avatarUrl: avatarPreview });
+  const handleSave = async () => {
+    const ok = await updateUser({ name: nickname.trim() || user.name, avatarUrl: avatarPreview });
+    if (!ok) return;
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
   // Mock data
   const membershipData = {
-    level: "Pro",
+    level: (user.plan || "pro").toUpperCase(),
     expiresAt: "2026-12-31",
-    credits: 87,
+    credits: user.credits ?? 0,
     history: [
       { id: "1", title: "雨夜公交站", credits: 5, date: "2026-03-20" },
       { id: "2", title: "深夜便利店", credits: 3, date: "2026-03-18" },

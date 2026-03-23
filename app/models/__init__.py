@@ -1,6 +1,9 @@
 """Database models and data types"""
 
 from app.models.user import User
+from app.models.invite_code import InviteCode
+from app.models.invite_relationship import InviteRelationship
+from app.models.beta_application import BetaApplication
 from app.models.contact_us import ContactUs
 from app.models.project import Project
 from app.models.chapter import Chapter
@@ -26,6 +29,9 @@ from app.models.style_config import (
 
 __all__ = [
     "User",
+    "InviteCode",
+    "InviteRelationship",
+    "BetaApplication",
     "ContactUs",
     "Project",
     "Chapter",

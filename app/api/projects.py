@@ -2,7 +2,7 @@
 
 import asyncio
 from uuid import uuid4
-from fastapi import APIRouter, HTTPException, Header, Depends
+from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db, async_session_maker
@@ -11,22 +11,21 @@ from app.models.chapter import Chapter
 from app.models.job import GenerationJob
 from app.schemas.project import ProjectCreate, ProjectResponse, ProjectDetail
 from app.services.job_manager import JobManager, run_story_generation_task
-from app.api.auth import DEMO_USERS
+from app.api.auth import get_current_user
+from app.models.user import User
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 
-def verify_user(x_user_id: str = Header(..., alias="X-User-ID")) -> str:
-    """Verify user from header"""
-    if x_user_id not in DEMO_USERS:
-        raise HTTPException(status_code=401, detail="无效的用户")
-    return x_user_id
+async def verify_user(user: User = Depends(get_current_user)) -> int:
+    """Return the authenticated internal user id."""
+    return user.id
 
 
 @router.post("/", response_model=ProjectResponse)
 async def create_project(
     project_data: ProjectCreate,
-    user_id: str = Depends(verify_user),
+    user_id: int = Depends(verify_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -129,7 +128,7 @@ async def _run_generation_in_background(
 
 @router.get("/", response_model=list[ProjectDetail])
 async def list_projects(
-    user_id: str = Depends(verify_user),
+    user_id: int = Depends(verify_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List all projects for current user"""
@@ -145,7 +144,7 @@ async def list_projects(
 @router.get("/{project_id}", response_model=ProjectDetail)
 async def get_project(
     project_id: str,
-    user_id: str = Depends(verify_user),
+    user_id: int = Depends(verify_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get project details"""
@@ -163,7 +162,7 @@ async def get_project(
 @router.delete("/{project_id}")
 async def delete_project(
     project_id: str,
-    user_id: str = Depends(verify_user),
+    user_id: int = Depends(verify_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a project and all its chapters"""

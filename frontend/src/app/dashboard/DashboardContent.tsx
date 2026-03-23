@@ -11,15 +11,16 @@ import UserMenu from "@/components/dashboard/UserMenu";
 import StoryGrid from "@/components/dashboard/StoryGrid";
 
 export default function DashboardContent() {
-  const { user, isLoggedIn, stories, deleteStory } = useAuth();
+  const { user, isLoggedIn, stories, deleteStory, loadingUser } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoggedIn) {
+    if (!loadingUser && !isLoggedIn) {
       router.replace("/login");
     }
-  }, [isLoggedIn, router]);
+  }, [isLoggedIn, loadingUser, router]);
 
+  if (loadingUser) return null;
   if (!isLoggedIn || !user) return null;
 
   const completedCount = stories.filter((s) => s.status === "complete").length;
@@ -120,7 +121,7 @@ export default function DashboardContent() {
                 <Coins className="w-4 h-4 text-accent-gold" />
                 <span className="text-xs text-text-muted">Credits</span>
               </div>
-              <p className="text-2xl font-bold text-text-primary">87</p>
+              <p className="text-2xl font-bold text-text-primary">{user.credits ?? 0}</p>
             </div>
           </motion.div>
         )}

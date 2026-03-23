@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Check, X, Crown, Zap, Sparkles } from "lucide-react";
 import Link from "next/link";
 import PageHero from "@/components/ui/PageHero";
+import { apiFetch } from "@/lib/api";
 
 interface PlanFeature {
   label: string;
@@ -23,7 +25,7 @@ const FEATURES: PlanFeature[] = [
   { label: "专属客服", free: false, pro: false, max: true },
 ];
 
-const PLANS = [
+const DEFAULT_PLANS = [
   {
     key: "free",
     name: "Free",
@@ -81,6 +83,25 @@ function FeatureCell({ value }: { value: boolean | string }) {
 }
 
 export default function PricingContent() {
+  const [plans, setPlans] = useState(DEFAULT_PLANS);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const response = await apiFetch<{ plans: Array<{ key: string; name: string; subtitle: string; price: string; period: string }> }>("/auth/pricing");
+        setPlans((current) =>
+          current.map((plan) => response.plans.find((item) => item.key === plan.key) ? {
+            ...plan,
+            ...response.plans.find((item) => item.key === plan.key),
+          } : plan)
+        );
+      } catch {
+        // Fallback to static pricing copy when API is unavailable.
+      }
+    };
+    void load();
+  }, []);
+
   return (
     <div className="container-lg section-padding">
       <PageHero
@@ -95,7 +116,7 @@ export default function PricingContent() {
         transition={{ delay: 0.2 }}
         className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto mb-16"
       >
-        {PLANS.map((plan, idx) => (
+        {plans.map((plan, idx) => (
           <motion.div
             key={plan.key}
             initial={{ opacity: 0, y: 20 }}

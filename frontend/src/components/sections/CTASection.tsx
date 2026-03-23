@@ -3,28 +3,35 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Send, Check, Gift } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 export default function CTASection() {
   const [email, setEmail] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || isSubmitting) return;
 
     setIsSubmitting(true);
+    setError("");
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    // Store in localStorage for demo
-    const submissions = JSON.parse(localStorage.getItem("xuhua_submissions") || "[]");
-    submissions.push({ email, timestamp: new Date().toISOString() });
-    localStorage.setItem("xuhua_submissions", JSON.stringify(submissions));
-
-    setIsSubmitted(true);
-    setIsSubmitting(false);
+    try {
+      await apiFetch("/beta-applications/", {
+        method: "POST",
+        body: JSON.stringify({
+          email: email.trim(),
+          source_page: "homepage_cta",
+        }),
+      });
+      setIsSubmitted(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "提交失败，请稍后重试");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -96,6 +103,9 @@ export default function CTASection() {
                   )}
                 </button>
               </div>
+              {error && (
+                <p className="text-sm text-error mt-3">{error}</p>
+              )}
             </motion.form>
           ) : (
             <motion.div

@@ -12,9 +12,30 @@ import {
   Check,
   Palette,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCreate } from "@/contexts/CreateContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch, getStoredToken } from "@/lib/api";
 import { MOOD_OPTIONS } from "@/types/create";
 import type { PlotPoint } from "@/types/create";
+
+const BACKEND_STYLE_MAP: Record<string, string> = {
+  pixar_3d: "illustration",
+  ghibli: "illustration",
+  illustration: "illustration",
+  ink: "ink",
+  slam_dunk: "manga",
+  korean_webtoon: "illustration",
+  oil_painting: "oil_painting",
+  cyberpunk: "cyberpunk",
+  realistic: "realistic",
+  cartoon: "cartoon",
+  anime: "manga",
+  watercolor: "watercolor",
+  children_book: "illustration",
+  manga: "manga",
+  pixel: "pixel",
+};
 
 function PlotPointItem({
   point,
@@ -59,12 +80,43 @@ function PlotPointItem({
 
 export default function StageB() {
   const { state, dispatch } = useCreate();
+  const { refreshStories } = useAuth();
+  const router = useRouter();
   const { outline } = state;
   const [editingCharId, setEditingCharId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   if (!outline) return null;
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    const token = getStoredToken();
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      await apiFetch("/projects/", {
+        method: "POST",
+        body: JSON.stringify({
+          original_idea: state.idea,
+          style_preset: BACKEND_STYLE_MAP[state.stylePreset || "illustration"] || "illustration",
+          total_chapters: state.length === "epic" ? 3 : 1,
+          chapter_duration_minutes: state.length === "flash" ? 1 : state.length === "medium" ? 5 : 3,
+          character_count: Math.max(1, outline.characters.length || state.characters.length || 1),
+          language: "zh-CN",
+        }),
+      }, token);
+      await refreshStories();
+    } catch (error) {
+      setSubmitting(false);
+      setSubmitError(error instanceof Error ? error.message : "创建故事失败");
+      return;
+    }
+
     dispatch({ type: "CONFIRM_OUTLINE" });
     dispatch({ type: "SET_STAGE", payload: "generate" });
   };
@@ -356,6 +408,10 @@ export default function StageB() {
             </div>
           </motion.section>
 
+          {submitError && (
+            <p className="text-center text-sm text-error">{submitError}</p>
+          )}
+
           {/* Confirm Button */}
           <motion.div
             initial={{ opacity: 0, y: 15 }}
@@ -365,10 +421,20 @@ export default function StageB() {
           >
             <button
               onClick={handleConfirm}
-              className="btn-primary w-full flex items-center justify-center gap-2 py-3.5 text-base"
+              disabled={submitting}
+              className="btn-primary w-full flex items-center justify-center gap-2 py-3.5 text-base disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <Sparkles className="w-4 h-4" />
-              确认并开始生成
+              {submitting ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  正在创建任务...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  确认并开始生成
+                </>
+              )}
             </button>
             <p className="text-center text-text-muted text-xs mt-3">
               不满意？可以直接修改上方内容，也可以返回重新输入

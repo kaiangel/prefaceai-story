@@ -22,17 +22,50 @@ import {
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { getMockStoryDetail } from "@/lib/mock-data";
+import { apiFetch, getStoredToken } from "@/lib/api";
 import { STYLE_PRESETS } from "@/types/create";
-import type { StoryDetail } from "@/types/create";
+import type { StoryDetail, Shot } from "@/types/create";
 import ShareModal from "@/components/ui/ShareModal";
 import ExportModal from "@/components/ui/ExportModal";
 import VideoSynthesisModal from "@/components/ui/VideoSynthesisModal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 
+interface ProjectDetailResponse {
+  id: string;
+  title: string;
+  original_idea: string;
+  style_preset: string;
+  created_at: string;
+}
+
+interface ChapterStoryResponse {
+  summary: string;
+  characters: { name: string; description: string }[];
+  scenes: {
+    scene_id: number;
+    narration?: string;
+    visual_description?: string;
+  }[];
+}
+
+function buildShots(scenes: ChapterStoryResponse["scenes"]): Shot[] {
+  return scenes.map((scene, index) => ({
+    shotId: index + 1,
+    sceneId: scene.scene_id || index + 1,
+    imagePrompt: scene.visual_description || "",
+    narrationSegment: scene.narration || "",
+    shotType: "auto",
+    cameraAngle: "eye level",
+    textType: "narration",
+    chineseText: [],
+    imageUrl: null,
+    charactersInScene: [],
+  }));
+}
+
 export default function StoryDetailContent() {
   const { storyId } = useParams<{ storyId: string }>();
-  const { isLoggedIn, deleteStory } = useAuth();
+  const { isLoggedIn, deleteStory, loadingUser } = useAuth();
   const router = useRouter();
   const [story, setStory] = useState<StoryDetail | null>(null);
   const [selectedShot, setSelectedShot] = useState(0);
@@ -50,9 +83,47 @@ export default function StoryDetailContent() {
   }, []);
 
   useEffect(() => {
+    if (loadingUser) return;
     if (!isLoggedIn) { router.replace("/login"); return; }
-    setStory(getMockStoryDetail(storyId));
-  }, [isLoggedIn, storyId, router]);
+
+    const token = getStoredToken();
+    if (!token) { router.replace("/login"); return; }
+
+    const load = async () => {
+      try {
+        const project = await apiFetch<ProjectDetailResponse>(`/projects/${storyId}`, {}, token);
+
+        let chapterStory: ChapterStoryResponse | null = null;
+        try {
+          chapterStory = await apiFetch<ChapterStoryResponse>(`/projects/${storyId}/chapters/1/story`, {}, token);
+        } catch {
+          chapterStory = null;
+        }
+
+        setStory({
+          id: project.id,
+          title: project.title || "未命名故事",
+          coverImageUrl: "/brand/logo-48.png",
+          style: project.style_preset,
+          length: "short",
+          shotCount: chapterStory?.scenes.length || 0,
+          createdAt: project.created_at,
+          updatedAt: project.created_at,
+          status: "draft",
+          canContinue: true,
+          summary: chapterStory?.summary || project.original_idea,
+          characters: chapterStory?.characters || [],
+          shots: buildShots(chapterStory?.scenes || []),
+          mood: "待生成",
+          aspectRatio: "2:3",
+        });
+      } catch {
+        setStory(null);
+      }
+    };
+
+    void load();
+  }, [isLoggedIn, loadingUser, storyId, router]);
 
   // Auto-play
   useEffect(() => {
@@ -66,6 +137,7 @@ export default function StoryDetailContent() {
     return () => clearPlayTimer();
   }, [isPlaying, playSpeed, story, clearPlayTimer]);
 
+  if (loadingUser) return null;
   if (!isLoggedIn) return null;
   if (!story) {
     return (
@@ -85,8 +157,8 @@ export default function StoryDetailContent() {
     router.push(`/create?style=${story.style}&length=${story.length}`);
   };
 
-  const handleDelete = () => {
-    deleteStory(story.id);
+  const handleDelete = async () => {
+    await deleteStory(story.id);
     router.push("/dashboard");
   };
 

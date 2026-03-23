@@ -45,7 +45,7 @@ class ProjectDetail(BaseModel):
     """Detailed project information"""
 
     id: str
-    user_id: str
+    user_id: int
     title: str
     original_idea: str
     style_preset: str

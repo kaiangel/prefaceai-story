@@ -122,6 +122,8 @@ export interface User {
   email: string;
   name: string;
   avatarUrl: string | null;
+  plan?: string;
+  credits?: number;
   createdAt: string;
 }
 

@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function RegisterContent() {
-  const { register, isLoggedIn } = useAuth();
+  const { register, isLoggedIn, loadingUser } = useAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -35,10 +35,10 @@ export default function RegisterContent() {
   }, [clearTimers]);
 
   useEffect(() => {
-    if (isLoggedIn && !success) {
+    if (!loadingUser && isLoggedIn && !success) {
       router.replace("/dashboard");
     }
-  }, [isLoggedIn, success, router]);
+  }, [isLoggedIn, loadingUser, success, router]);
 
   const validate = (): boolean => {
     const newErrors: typeof errors = {};

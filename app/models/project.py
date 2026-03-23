@@ -9,16 +9,16 @@ from app.database import Base
 class Project(Base):
     __tablename__ = "projects"
 
-    id = Column(String, primary_key=True)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
-    title = Column(String, nullable=False)
+    id = Column(String(36), primary_key=True)
+    user_id = Column(Integer, ForeignKey("u_users.id"), nullable=False)
+    title = Column(String(255), nullable=False)
     original_idea = Column(Text, nullable=False)
-    style_preset = Column(String, nullable=False)
+    style_preset = Column(String(64), nullable=False)
     total_chapters = Column(Integer, default=1)
     chapter_duration_minutes = Column(Integer, default=3)
     character_count = Column(Integer, default=2)
-    language = Column(String, default="zh-CN")
-    voice_preset = Column(String, nullable=True)
+    language = Column(String(32), default="zh-CN")
+    voice_preset = Column(String(128), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

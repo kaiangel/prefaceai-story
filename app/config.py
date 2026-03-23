@@ -77,4 +77,13 @@ if not settings.DATABASE_URL:
             "?charset=utf8mb4"
         )
     else:
-        settings.DATABASE_URL = "sqlite+aiosqlite:///./xuhua_story.db"
+        raise ValueError(
+            "DATABASE_URL or MYSQL_* must be configured. "
+            "SQLite/local file storage is not allowed for this backend."
+        )
+
+if not settings.DATABASE_URL.startswith(("mysql+asyncmy://", "mysql+aiomysql://")):
+    raise ValueError(
+        "Only MySQL is supported for backend storage. "
+        "Please configure DATABASE_URL with a mysql+asyncmy or mysql+aiomysql URL."
+    )

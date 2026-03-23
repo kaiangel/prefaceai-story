@@ -9,10 +9,10 @@ from app.database import Base
 class GenerationJob(Base):
     __tablename__ = "generation_jobs"
 
-    id = Column(String, primary_key=True)
-    chapter_id = Column(String, ForeignKey("chapters.id"), nullable=False)
-    status = Column(String, default="queued")  # queued/processing/completed/failed
-    current_stage = Column(String, nullable=True)  # story_generation/storyboard/image_generation/tts/whisper/composition
+    id = Column(String(36), primary_key=True)
+    chapter_id = Column(String(36), ForeignKey("chapters.id"), nullable=False)
+    status = Column(String(32), default="queued")  # queued/processing/completed/failed
+    current_stage = Column(String(64), nullable=True)  # story_generation/storyboard/image_generation/tts/whisper/composition
     progress = Column(Integer, default=0)  # 0-100
     estimated_seconds = Column(Integer, nullable=True)
     stage_message = Column(Text, nullable=True)
