@@ -33,7 +33,7 @@ class StoryOutlineGenerator:
         self.claude_client = None
         self.claude_model = "claude-sonnet-4-6"
         if settings.ANTHROPIC_API_KEY:
-            self.claude_client = anthropic.Anthropic(
+            self.claude_client = anthropic.AsyncAnthropic(
                 api_key=settings.ANTHROPIC_API_KEY
             )
 
@@ -86,16 +86,29 @@ class StoryOutlineGenerator:
         content = None
         provider = None
 
+        # System prompt (AI-ML 设计)
+        system_prompt = """You are a professional story planner and visual director for an AI-powered webtoon/short video generation system.
+
+Always respond with valid JSON only. No markdown code blocks, no explanation, no text before or after the JSON. Output a single JSON object starting with { and ending with }.
+
+Critical rules:
+- Chinese text for: title, logline, summary, character names, display_name, plot descriptions, mood, ending descriptions, signage_text, description, personality, emotional_journey
+- English text for: title_en, name_en, emotional_arc values, narrative_pace, visual_tone fields, color_palette, archetype, interior_description, exterior_description, key_visual_elements
+- All ending_options must have 3 distinct options with meaningful differences
+- All characters_overview entries must include description (20-30 Chinese chars, appearance) and personality (10-20 Chinese chars, traits)
+- mood must be exactly one of: 感人 / 治愈 / 热血 / 悬疑 / 浪漫 / 温馨"""
+
         # 优先使用 Claude Sonnet 4.6
         if self.claude_client:
             try:
                 print(f"  [尝试 Claude Sonnet 4.6]")
-                response = self.claude_client.messages.create(
+                response = await self.claude_client.messages.create(
                     model=self.claude_model,
-                    max_tokens=8631,
+                    max_tokens=16384,
                     messages=[
                         {"role": "user", "content": prompt}
-                    ]
+                    ],
+                    system=system_prompt,
                 )
                 content = response.content[0].text
                 provider = "claude"
@@ -133,6 +146,10 @@ class StoryOutlineGenerator:
             print(f"  locations: {len(outline.get('unique_locations', []))}个")
             return outline
         else:
+            print(f"[StoryOutlineGenerator] ❌ JSON提取失败")
+            print(f"  provider: {provider}")
+            print(f"  response length: {len(content)} chars")
+            print(f"  response preview: {content[:500]}")
             raise ValueError("无法从LLM响应中提取JSON")
 
     def _build_prompt(
