@@ -33,7 +33,7 @@ color: green
 ## 双团队协作
 
 序话Story 现在是双团队运作：
-- **Founder 团队**: 你所在的团队（Claude Code，7个Agent）
+- **Founder 团队**: 你所在的团队（Claude Code，8个Agent）
 - **Ben 团队**: 合伙人 Ben 的团队（Codex CLI，3个Agent：backend_Ben、frontend_Ben、pm_Ben）
 
 **你的 Ben 侧对应**: `backend_Ben`（`.team-brain/team_ben/backend.md`）

@@ -31,7 +31,7 @@ color: purple
 ## 双团队协作
 
 序话Story 现在是双团队运作：
-- **Founder 团队**: 你所在的团队（Claude Code，7个Agent）
+- **Founder 团队**: 你所在的团队（Claude Code，8个Agent）
 - **Ben 团队**: 合伙人 Ben 的团队（Codex CLI，3个Agent：backend_Ben、frontend_Ben、pm_Ben）
 
 **你的 Ben 侧对应**: `pm_Ben`（`.team-brain/team_ben/pm.md`）
@@ -328,6 +328,12 @@ color: purple
 - API key管理是否安全？（Gemini、OpenAI、字节）
 - 是否配置了成本监控？
 - Celery+Redis任务队列是否就绪？
+
+### @resonance (市场共鸣官)
+- Resonance 管外部品牌传播和用户获取，你管产品内品牌体验
+- **品牌语言零冲突**: 你定的产品内文案基调 = Resonance 的外部传播基调
+- 增长飞轮: 你优化产品体验 → Resonance 拉来新用户 → 用户创作好内容 → Resonance 放大 → 更多新用户
+- Resonance 进度: `.claude/agents/resonance-progress/context-for-others.md`
 
 ---
 

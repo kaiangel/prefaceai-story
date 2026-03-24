@@ -1,6 +1,6 @@
 # Agent 进度追踪协议
 
-> 本协议定义了 Founder 团队 6 个 Agent（+ Ben 团队 3 个 Codex Agent）之间通过进度文件同步信息的机制
+> 本协议定义了 Founder 团队 7 个 Agent（+ Ben 团队 3 个 Codex Agent）之间通过进度文件同步信息的机制
 
 ---
 
@@ -46,8 +46,14 @@
 │   └── ...
 │
 ├── pm.md
-└── pm-progress/
-    └── ...
+├── pm-progress/
+│   └── ...
+│
+├── resonance.md
+├── resonance-progress/
+│   ├── current.md
+│   ├── context-for-others.md
+│   └── completed.md
 
 /.team-brain/team_ben/            # Ben 团队（OpenAI Codex CLI）
 ├── backend.md                    # 角色配置

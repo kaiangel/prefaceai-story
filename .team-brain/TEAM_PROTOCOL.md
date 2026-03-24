@@ -10,6 +10,7 @@
 | Tester | 测试工程师 | 单元测试、E2E、回归 | /tests/CLAUDE.md |
 | AI_ML | AI/ML专家 | Prompt、模型优化、一致性 | /app/prompts/CLAUDE.md |
 | DevOps | 运维工程师 | 部署、CI/CD、监控 | /deploy/CLAUDE.md |
+| Resonance | 市场共鸣官 | 增长策略、内容营销、平台运营、品牌传播 | `.claude/agents/resonance.md` |
 | frontend_Ben | Ben团队前端 | Ben侧前端联动 | `.team-brain/team_ben/frontend.md` |
 | backend_Ben | Ben团队后端 | 数据库+API架构+计费 | `.team-brain/team_ben/backend.md` |
 | pm_Ben | Ben团队PM | 协调+文档+对齐Founder PM | `.team-brain/team_ben/pm.md` |
@@ -426,7 +427,7 @@ Edit(
 ## 双团队协作规则（2026-03-19 启动）
 
 ### 团队分工
-- **Founder 团队** (Claude Code): PM, Backend, Frontend, Tester, AI-ML, DevOps, Coordinator — 负责 Pipeline/Prompt/前端产品/产品方向
+- **Founder 团队** (Claude Code): PM, Backend, Frontend, Tester, AI-ML, DevOps, Coordinator, Resonance — 负责 Pipeline/Prompt/前端产品/产品方向
 - **Ben 团队** (Codex CLI): backend_Ben, frontend_Ben, pm_Ben — 负责数据库/API架构/计费/运营技术
 - **共管**: 基础设施/DevOps
 

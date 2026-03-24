@@ -1,30 +1,32 @@
 # Frontend 状态速览（供其他Agent参考）
 
-> 更新时间: 2026-03-23
+> 更新时间: 2026-03-24
 
 ---
 
-## 当前状态: Batch 1A-4 全部完成 + 7 项修复完成，等 PM Review 修复
+## 当前状态: Batch 1A-4 + 全部修复完成，等 PM Review 最新修复
 
 **可预览地址**: http://localhost:3000
 
 ---
 
-## 最新: 修复 7 项 (2026-03-23)
+## 最新: 注册成功态修复 (2026-03-24)
 
-- P0: shot-gen 进度不再重复 Stage 1-4 步骤
-- P1×3: verify-email→/dashboard, 语音隐藏, Pricing Pro 视频合成
-- P2×2: 模拟验证链接, router.push
-- P3: 做同款 URL 记录
+RegisterContent.tsx 成功态对齐 Ben 后端行为:
+- "验证邮件已发送" → "注册成功！" → 1.5s 跳转 /dashboard
+- /verify-email 保留但无入口
+
+**⚠️ 环境变更**: Ben 把 AuthContext 改为真实 API，本地开发 login/register 需后端+MySQL。
 
 ---
 
-## 全部 Batch 进度
+## 全部进度
 
-| Batch | 状态 |
-|-------|------|
-| 1A-4 | ✅ Review PASS + push 完成 |
-| 修复 | ✅ 等 Review |
-| 5 (API) | 未派发 |
+| 工作 | 状态 |
+|------|------|
+| Batch 1A-4 (mock 前端) | ✅ Review PASS + push |
+| 7 项修复 + text-gen 提示 | ✅ push 完成 |
+| 注册成功态修复 | ✅ 等 Review |
+| Batch 5 (API 对接) | 未派发 |
 
 **构建**: 20 路由，0 错误

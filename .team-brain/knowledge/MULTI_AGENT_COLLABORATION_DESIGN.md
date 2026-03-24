@@ -2,7 +2,7 @@
 
 > **日期**: 2025-01-05（2026-03-19 更新：新增 Ben 团队 3 个 Codex Agent）
 > **背景**: 讨论如何为序话Story项目建立多 Agent 协作机制
-> **结论**: 建立了完整的"团队大脑"系统，实现 6 + 3 = 9 Agent 双团队协作
+> **结论**: 建立了完整的"团队大脑"系统，实现 7 + 3 = 10 Agent 双团队协作
 
 ---
 
@@ -160,9 +160,9 @@
 
 ## 三、序话Story 项目 Agent 团队配置
 
-### 3.1 双团队 9 Agent 配置
+### 3.1 双团队 10 Agent 配置
 
-#### Founder 团队（Claude Code，6 个 Agent）
+#### Founder 团队（Claude Code，7 个 Agent）
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -221,6 +221,7 @@
 | Tester | 单元测试、E2E、回归测试 | `/tests/` |
 | AI_ML | Prompt 工程、模型优化、一致性 | `/app/prompts/` |
 | DevOps | 部署、CI/CD、监控 | `/deploy/` |
+| Resonance | 增长策略、内容营销、平台运营、品牌传播、用户获取 | resonance.md |
 
 #### Ben 团队
 
@@ -444,7 +445,7 @@ skills: code-review, feature-dev
 | `model` | 使用的模型 | `sonnet`, `opus`, `haiku` |
 | `skills` | 关联的技能/插件 | `code-review, feature-dev` |
 
-### 7.4 6 个 Agent 配置详情
+### 7.4 7 个 Agent 配置详情
 
 | Agent | 描述 | 工具 | 技能 |
 |-------|------|------|------|
@@ -454,6 +455,7 @@ skills: code-review, feature-dev
 | **tester** | 测试工程师：单元测试、E2E、回归测试 | Read, Edit, Write, Bash, Grep, Glob | code-review, pr-review-toolkit |
 | **ai-ml** | AI/ML专家：Prompt工程、模型优化、一致性 | Read, Edit, Write, Bash, Grep, Glob | code-review |
 | **devops** | 运维工程师：部署、CI/CD、监控 | Read, Edit, Write, Bash, Grep, Glob | hookify |
+| **resonance** | 市场共鸣官：增长策略、内容营销、平台运营、品牌传播、用户获取 | Read, Edit, Write, Bash, Grep, Glob | — |
 
 ### 7.5 使用方法
 

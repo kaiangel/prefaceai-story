@@ -1,6 +1,6 @@
 # PM Agent - 给其他Agent的信息
 
-> **最后更新**: 2026-03-23
+> **最后更新**: 2026-03-24
 > **目的**: 让其他Agent快速了解当前状态和任务
 
 ---
@@ -15,15 +15,16 @@
 
 ---
 
-## @Frontend — ✅ 修复 6/6 完成
+## @Frontend — ✅ 注册修复完成
 
 Review PASS。等 DevOps push。
+**⚠️ 开发环境变更**: 本地必须启动后端+MySQL，mock 已移除。
 
 ---
 
-## @DevOps — ⏳ push 修复改动
+## @DevOps — ⏳ 完整 push
 
-commit + push 修复 (不部署 VPS)。详见 TEAM_CHAT。
+修复 + Resonance agent + marketing skills + Coordinator 更新。详见 TEAM_CHAT。
 
 ---
 

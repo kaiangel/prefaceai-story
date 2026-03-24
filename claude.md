@@ -18,7 +18,7 @@
 | Phase 5 | ✅ **Landing Page完成** | LP主页5.0/5 + 10个子页面4.8/5（TASK-LP-PAGES + TASK-LP-PAGES-FIX） |
 | Phase 6 | 🟡 **已启动** (5%) | Git仓库已初始化（DEC-007），等待后续部署工作 |
 
-### Founder 团队（7个 Claude Code Agent）
+### Founder 团队（8个 Claude Code Agent）
 
 | Agent | 状态 | 当前任务 |
 |-------|------|----------|
@@ -28,6 +28,7 @@
 | AI-ML | 🟢 | 空闲（TASK-REF-PREPROCESS Step1 指定测试shot完成） |
 | DevOps | 🟢 | 空闲（TASK-GIT-COMMIT-2 三批提交完成） |
 | PM | 🟢 | Coordinator 6项任务完成，等待Founder下一阶段决策 |
+| Resonance | 🟢 | 刚创建，Phase 0 蓄水期 |
 
 ### Ben 团队（3个 Codex Agent）
 
@@ -485,6 +486,7 @@ final.mp4
 | Prompt 工程 | Founder | AI-ML agent |
 | 前端产品 | Founder | Frontend agent |
 | 产品方向/决策 | Founder | PM agent |
+| 外部品牌传播/用户增长 | Founder | Resonance agent |
 | 数据库/用户系统 | Ben | Codex agents |
 | API 架构/计费 | Ben | Codex agents |
 | 运营/市场技术 | Ben | Codex agents |

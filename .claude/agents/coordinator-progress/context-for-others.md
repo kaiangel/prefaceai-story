@@ -7,7 +7,7 @@
 **双团队协作模式已启动** (2026-03-19)
 
 ### 团队组成
-- **Founder 团队**: Coordinator + PM + Backend + AI-ML + Frontend + Tester + DevOps (7个 Claude Code Agent)
+- **Founder 团队**: Coordinator + PM + Backend + AI-ML + Frontend + Tester + DevOps + Resonance (8个 Claude Code Agent)
 - **Ben 团队**: backend_Ben + frontend_Ben + pm_Ben (3个 Codex Agent)
 
 ### 主线状态

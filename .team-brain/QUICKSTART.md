@@ -36,6 +36,7 @@ claude
 ├── tester.md                    # 测试工程师
 ├── ai-ml.md                     # AI/ML 专家
 ├── devops.md                    # 运维工程师
+├── resonance.md                 # 市场共鸣官
 └── {agent}-progress/            # 各 Agent 进度目录
     ├── current.md               # 当前任务
     ├── completed.md             # 已完成
@@ -190,6 +191,15 @@ claude
 # /hookify:list            - 查看已有规则
 # /hookify:configure       - 配置规则
 ```
+
+### 8. Resonance Agent (市场共鸣官)
+
+```bash
+cd /Users/kaisbabybook/AIFun/xuhuastory/xuhua_story
+claude --profile resonance
+```
+- 负责: 增长策略、内容营销、平台运营、品牌传播、用户获取
+- 首要任务: 阅读品牌/市场相关文档，制定 Phase 0 内容计划
 
 ### Ben 团队（Codex CLI）
 

@@ -1,26 +1,32 @@
 # Frontend 当前任务进度
 
-> 更新时间: 2026-03-23
-> 状态: 7 项修复完成，等 PM Review
+> 更新时间: 2026-03-24
+> 状态: 注册成功态修复完成，等 PM Review
 
 ---
 
-## 最新完成: Batch 1A-4 Review 修复 (2026-03-23)
+## 最新完成: 注册成功态对齐后端行为 (2026-03-24)
 
-### 状态: 6 修 + 1 记录，`npm run build` 20 路由通过
+### 状态: 完成，`npm run build` 20 路由通过
 
-| # | P | 修复 | 文件 | 状态 |
-|---|---|------|------|------|
-| 1 | P0 | shot-gen 进度重复 | StageC.tsx + mock-data.ts | ✅ 新建 mockShotGenProgress |
-| 2 | P1 | verify-email → /dashboard | verify-email/page.tsx | ✅ |
-| 3 | P1 | 语音输入 MVP 隐藏 | StoryIdeaInput.tsx | ✅ `{false && ...}` |
-| 4 | P1 | Pricing Pro 视频合成 | PricingContent.tsx | ✅ false→true |
-| 5 | P2 | 注册成功模拟验证链接 | RegisterContent.tsx | ✅ |
-| 6 | P2 | 后台生成 router.push | StageC.tsx | ✅ |
-| 7 | P3 | 做同款 URL 未解析 | — | 📝 记录 |
+**修复内容** (RegisterContent.tsx):
+- Mail 图标 → CheckCircle 图标
+- "验证邮件已发送" → "注册成功！" + "欢迎加入序话Story" + "正在跳转到工作台..."
+- 1.5s 后 router.push("/dashboard")
+- 去掉"（开发模式）模拟验证 →"链接
+- /verify-email 代码保留，无入口
+
+**原因**: Ben 后端注册直接成功返回 token，MVP 阶段邀请码流程替代邮箱验证。
+
+---
+
+## 环境变更提醒
+
+Ben 把 AuthContext 从 mock 改为真实 API。本地开发前端需要后端 + MySQL 同时运行。
+没有后端时 login/register 会报错（Create/Dashboard 等非 auth 页面不受影响）。
 
 ---
 
 ## 待做
 
-### Batch 5（未派发）— API 对接（等 Ben 后端 + Founder Pipeline）
+### Batch 5（等后端就绪）— API 对接

@@ -4,6 +4,20 @@
 
 ---
 
+## 2026-03-24
+
+### 注册成功态对齐后端 ✅
+
+**完成时间**: 2026-03-24
+**验收状态**: 待 PM Review
+
+- [x] RegisterContent.tsx: Mail→CheckCircle, "验证邮件已发送"→"注册成功！" + 1.5s→/dashboard
+- [x] 去掉"模拟验证"链接, /verify-email 保留但无入口
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
 ## 2026-03-23
 
 ### Batch 1A-4 Review 修复 (7 项) ✅

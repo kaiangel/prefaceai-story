@@ -15,7 +15,7 @@
 核心内容: 都市情感短剧 (DEC-005)
 产品形态: 条漫优先 → 短视频保留
 Pipeline品牌: FrameSpark™
-团队: Founder 团队 (7 Claude Code Agent) + Ben 团队 (3 Codex Agent)
+团队: Founder 团队 (8 Claude Code Agent) + Ben 团队 (3 Codex Agent)
 ```
 
 ---
@@ -339,6 +339,25 @@ Pipeline品牌: FrameSpark™
   1️⃣ Founder 填入 API Key → 重启 api 容器
   2️⃣ CI/CD 基础流水线
   3️⃣ 监控告警系统
+```
+
+### Resonance (市场)
+```
+状态: 🆕 刚创建 (2026-03-23)
+更新时间: 2026-03-23
+当前任务: Phase 0 蓄水期准备
+阻塞: 无
+
+计划:
+  - Phase 0 蓄水期 (3.23→4.5): 内测申请 500+
+  - Phase 1 加速期 (4.5→4.20): 内测申请 2000+
+  - Phase 2 引爆期 (4.20→5.1): 内测申请 5000+
+  - 5.1 公测上线
+
+平台:
+  - 抖音"一话故事": 已创建，~100赞
+  - 小红书: 待开号
+  - B站: 待开号
 ```
 
 ---

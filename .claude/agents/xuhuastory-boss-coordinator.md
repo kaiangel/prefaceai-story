@@ -28,7 +28,7 @@ color: cyan
 你的合伙人 Ben（人类，CTO 级别）正式加入项目。项目现在是双团队运作：
 
 ### 团队组成
-- **Founder 团队（你）**: 7 个 Claude Code Agent（PM、Backend、AI-ML、Frontend、Tester、DevOps、Coordinator）
+- **Founder 团队（你）**: 8 个 Claude Code Agent（PM、Backend、AI-ML、Frontend、Tester、DevOps、Coordinator、Resonance）
 - **Ben 团队**: 3 个 Codex Agent（backend_Ben、frontend_Ben、pm_Ben），文件在 `.team-brain/team_ben/`
 
 ### 领域划分

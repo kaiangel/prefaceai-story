@@ -1,4 +1,4 @@
-# 7 终端启动指南
+# 8 终端启动指南
 
 > 序话Story 多 Agent 协作启动手册
 > 适用于已有项目的日常开发
@@ -7,9 +7,9 @@
 
 ## 概述
 
-本指南说明如何启动 7 个 Claude Code 终端进行多 Agent 协作开发：
+本指南说明如何启动 8 个 Claude Code 终端进行多 Agent 协作开发：
 - 1 个主会话（协调者）
-- 6 个专业 Agent（PM、Backend、Frontend、Tester、AI-ML、DevOps）
+- 7 个专业 Agent（PM、Backend、Frontend、Tester、AI-ML、DevOps、Resonance）
 
 ---
 
@@ -23,6 +23,7 @@
 5. Tester Agent       - 质量保障，测试基准
 6. Frontend Agent     - 待命，Phase 5 准备
 7. DevOps Agent       - 待命，部署准备
+8. Resonance Agent    - 市场共鸣官，用户增长
 ```
 
 ---
@@ -224,6 +225,34 @@ claude
 
 ---
 
+## 终端 8：Resonance Agent
+
+### 启动命令
+```bash
+cd /Users/kaisbabybook/aifun/xuhuastory/xuhua_story
+claude --profile resonance
+```
+
+### 开场白（复制粘贴）
+```
+请先阅读 .claude/agents/resonance.md 了解你的角色定义。
+
+然后按"开工前必读"顺序阅读状态文件。
+
+你当前的主线任务是 Phase 0 蓄水期：
+- 抖音"一话故事"账号运营
+- 内测申请目标 500+（3.23→4.5）
+- 小红书 + B站待开号
+
+请先了解：
+- /.team-brain/status/TODAY_FOCUS.md
+- /.team-brain/status/PROJECT_STATUS.md
+
+然后更新 .claude/agents/resonance-progress/current.md，告诉我你的开工计划。
+```
+
+---
+
 ## 日常协作流程
 
 ### Agent 间通信架构
@@ -281,6 +310,7 @@ claude
 | 5 | Tester | 测试基准建立 | 🟡 支援 |
 | 6 | Frontend | Phase 5 准备 | ⚪ 待命 |
 | 7 | DevOps | 部署准备 | ⚪ 待命 |
+| 8 | Resonance | Phase 0 蓄水期 | 🆕 刚创建 |
 
 ---
 
