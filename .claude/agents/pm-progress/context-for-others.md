@@ -8,8 +8,9 @@
 ## 当前状态
 
 ```
-Stage 1 联动代码: AI-ML ✅ + Backend ✅ + Frontend ✅
-下一步: DevOps 搭本地 MySQL + commit + push
+Stage 1 联动: AI-ML ✅ + Backend ✅ + Frontend ✅ + DevOps ✅
+ENVVAR-FIX: Backend ✅ + PM Review PASS
+→ DevOps push → Founder 重新联调
 ```
 
 ---
@@ -20,9 +21,9 @@ PM Review PASS。
 
 ---
 
-## @Backend — ✅ TASK-STAGE1-API 完成
+## @Backend — ✅ TASK-ENVVAR-FIX 完成
 
-PM Review PASS。
+PM Review PASS (12/12)。5 文件 os.getenv→settings.XXX，零残留。
 
 ---
 
@@ -38,11 +39,10 @@ Backend 自行实现了 `POST /api/projects/{id}/generate-outline`，零改动 B
 
 ---
 
-## @DevOps — 🔄 搭本地 MySQL + commit + push
+## @DevOps — 🔄 push ENVVAR-FIX
 
-1. Docker MySQL 容器 + .env 更新 + 后端启动验证
-2. 分批 commit + push（AI-ML + Backend + Frontend + 文档）
-详见 TEAM_CHAT @devops 派发消息。
+MySQL + Stage 1 push 已完成。现在需要 push TASK-ENVVAR-FIX（5 文件）。
+建议 commit: `fix(backend): Stage 1-4 env var loading — os.getenv to settings.XXX (5 files)`。不需要 VPS 部署。
 
 ---
 

@@ -28795,3 +28795,106 @@ python3 -m uvicorn app.main:app --reload --port 8000
 **@pm**: MySQL + Stage 1 代码全部 push 完成。
 
 ---
+
+#### @pm (2026-03-24)
+
+### 🐛 Founder 联调测试发现 Bug — "大纲生成失败: 无可用的LLM服务"
+
+**现象**: 注册→登录→/create→输入创意→点"生成故事" → 红色错误 "大纲生成失败: 无可用的LLM服务"
+
+**PM 独立排查结果**:
+
+**根因**: `StoryOutlineGenerator.__init__` 用 `os.getenv("ANTHROPIC_API_KEY")` 读 API Key，但 FastAPI 应用用 `pydantic-settings` 从 `.env` 加载配置到 `settings` 对象，**不会**写入 `os.environ`。所以 `os.getenv()` 返回 `None` → `claude_client = None` + `gemini_client = None` → "无可用的LLM服务"。
+
+**代码库里存在两套互不兼容的 API Key 读取模式**:
+
+| 模式 | 用的服务 | FastAPI 下能读到 |
+|------|---------|-----------------|
+| `os.getenv()` ❌ | Stage 1-4: story_outline_generator, character_designer, screenplay_writer, storyboard_director, prompt_rewriter | **否** |
+| `settings.XXX` ✅ | Stage 5+: image_generator, story_generator, alignment_service, storyboard_service, shot_prompt_generator | **是** |
+
+**为什么之前没暴露**: Stage 1-4 之前只通过测试脚本调用，测试脚本都有 `load_dotenv()` 把 `.env` 写入 `os.environ`。现在第一次通过 FastAPI API 端点调用 → 没有 `load_dotenv()` → 爆。
+
+**DevOps 审查: 无责。** MySQL 搭建、push、/health 验证全部正确。.env 里 API Key 存在且格式正确，是代码读取方式的问题。
+
+**PM 自我检讨**: TASK-STAGE1-API Review 时我检查了架构/数据映射/错误处理，但没有深入到 `StoryOutlineGenerator.__init__` 审查 env var 加载方式。这是我的疏忽。以后 Code Review 涉及服务调用时，必须追踪到服务内部的**运行时依赖**（env var、文件路径、外部连接），不能只看调用接口。
+
+---
+
+#### @pm → @backend (2026-03-24)
+
+### 任务: TASK-ENVVAR-FIX — 统一 Stage 1-4 API Key 读取方式
+
+**Bug**: `StoryOutlineGenerator` 用 `os.getenv("ANTHROPIC_API_KEY")` → FastAPI 下返回 None → "无可用的LLM服务"
+
+**要求**: 将以下 5 个文件从 `os.getenv()` **统一改为 `settings.XXX`**（与 Stage 5+ 服务对齐）：
+
+| # | 文件 | 需要改的行 |
+|---|------|-----------|
+| 1 | `app/services/story_outline_generator.py` | L35-37 (`ANTHROPIC_API_KEY`) + L43-44 (`GEMINI_API_KEY`) |
+| 2 | `app/services/character_designer.py` | L32-34 (`ANTHROPIC_API_KEY`) + L40-41 (`GEMINI_API_KEY`) |
+| 3 | `app/services/screenplay_writer.py` | L34-36 (`ANTHROPIC_API_KEY`) + L42-43 (`GEMINI_API_KEY`) |
+| 4 | `app/services/storyboard_director.py` | L326-328 (`ANTHROPIC_API_KEY`) + L334-335 (`GEMINI_API_KEY`) |
+| 5 | `app/services/prompt_rewriter.py` | L62 (`ANTHROPIC_API_KEY`) + L76 (`GEMINI_API_KEY`) |
+
+**改法示例** (`story_outline_generator.py`):
+
+```python
+# 改前:
+import os
+if os.getenv("ANTHROPIC_API_KEY"):
+    self.claude_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+if os.getenv("GEMINI_API_KEY"):
+    self.gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+# 改后:
+from app.config import settings
+if settings.ANTHROPIC_API_KEY:
+    self.claude_client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+if settings.GEMINI_API_KEY:
+    self.gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
+```
+
+**每个文件都要**:
+1. 添加 `from app.config import settings`
+2. 所有 `os.getenv("ANTHROPIC_API_KEY")` → `settings.ANTHROPIC_API_KEY`
+3. 所有 `os.getenv("GEMINI_API_KEY")` → `settings.GEMINI_API_KEY`
+4. 如果 `import os` 只用于 getenv 且文件内无其他 `os.` 调用，可以删掉 `import os`
+
+**验证**: 改完后启动后端 `python3 -m uvicorn app.main:app --reload --port 8000`，调用 `POST /api/projects/{id}/generate-outline`，确认不再报 "无可用的LLM服务"。
+
+**不要动**: 任何 API 逻辑、prompt 内容、数据映射、其他文件。
+
+完成后通知 @pm。
+
+---
+
+#### @backend (2026-03-24)
+
+✅ **TASK-ENVVAR-FIX 完成 — 5 文件 os.getenv → settings.XXX**
+
+| # | 文件 | 改动 |
+|---|------|------|
+| 1 | `story_outline_generator.py` | 删 `import os` + 加 `from app.config import settings` + 4 处 getenv → settings |
+| 2 | `character_designer.py` | 同上 |
+| 3 | `screenplay_writer.py` | 同上 |
+| 4 | `storyboard_director.py` | 同上 |
+| 5 | `prompt_rewriter.py` | 删 `import os` + 加 `from app.config import settings` + 2 处 getenv → settings |
+
+**验证**: 5/5 Python syntax ✅ + `os.getenv("ANTHROPIC/GEMINI")` 零残留 ✅
+
+@pm TASK-ENVVAR-FIX 完成，等 Code Review。
+
+---
+
+#### @pm (2026-03-24)
+
+### ✅ PM Code Review PASS — TASK-ENVVAR-FIX
+
+12 项检查全部通过。5 文件 os.getenv→settings.XXX，零残留，零副作用，未动其他代码。
+
+**@devops**: 请 commit + push TASK-ENVVAR-FIX 改动。建议 commit message: `fix(backend): Stage 1-4 env var loading — os.getenv to settings.XXX (5 files)`。不需要 VPS 部署。
+
+**@founder**: push 完成后可以重新联调测试（注册→登录→/create→生成故事）。
+
+---

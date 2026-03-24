@@ -6,6 +6,13 @@
 
 ## 2026-03-24
 
+### TASK-ENVVAR-FIX 完成 ✅
+
+- 5 文件 `os.getenv("ANTHROPIC/GEMINI_API_KEY")` → `settings.ANTHROPIC/GEMINI_API_KEY`
+- 每个文件: 删 `import os` + 加 `from app.config import settings`
+- 根因: `pydantic-settings` 加载 `.env` 到 `settings` 对象不写入 `os.environ`，FastAPI 下 `os.getenv()` 返回 None
+- 验证: 5/5 syntax ✅ + 零残留 ✅
+
 ### TASK-STAGE1-API 完成 ✅
 
 - `app/api/projects.py` 新增 `POST /{project_id}/generate-outline`

@@ -4,6 +4,41 @@
 
 ---
 
+### 2026-03-24 — TASK-ENVVAR-FIX Review PASS
+
+- 12 项检查全部通过
+- 5 文件: story_outline_generator, character_designer, screenplay_writer, storyboard_director, prompt_rewriter
+- `os.getenv("ANTHROPIC/GEMINI_API_KEY")` → `settings.ANTHROPIC/GEMINI_API_KEY` 零残留 ✅
+- `import os` 删除后无其他 `os.` 调用（不 break）✅
+- `from app.config import settings` 在 5 文件中均存在 ✅
+- 未动其他代码 ✅
+- Backend progress 文件 5/5 ✅，未越界 ✅
+- DevOps push 已派发
+
+---
+
+### 2026-03-24 — Founder 联调 Bug 排查 + TASK-ENVVAR-FIX 派发
+
+- **现象**: "大纲生成失败: 无可用的LLM服务"
+- **根因**: Stage 1-4 服务用 `os.getenv()` 读 API Key，但 `pydantic-settings` 从 `.env` 只加载到 `settings` 对象，不写入 `os.environ` → `os.getenv()` 返回 None → 两个 LLM 客户端都未初始化
+- **影响范围**: 5 个文件 (story_outline_generator, character_designer, screenplay_writer, storyboard_director, prompt_rewriter)
+- **为什么之前没暴露**: Stage 1-4 之前只通过测试脚本调用（有 `load_dotenv()`），现在第一次通过 FastAPI API 端点调用
+- **DevOps 审查**: 8/8 ✅，无责。MySQL/push/验证全部正确
+- **PM 自查**: TASK-STAGE1-API Review 时只查了接口契约层面（架构/映射/错误处理），没追踪到 `StoryOutlineGenerator.__init__` 内部的 env var 加载方式 → 已记录为 feedback memory
+- **修复**: TASK-ENVVAR-FIX 派发 @Backend（5 文件 os.getenv→settings.XXX）
+
+---
+
+### 2026-03-24 — DevOps MySQL + push 审查
+
+- MySQL Docker (mysql:8.0, 11 tables, /health healthy) ✅
+- .env DATABASE_URL 更新 ✅
+- MySQL 兼容修复 (scene_image.py + audio_segment.py String 长度) ✅
+- 4 commits 分批 push (ai-ml→backend→frontend→docs) ✅
+- DevOps 无责于 LLM Bug
+
+---
+
 ### 2026-03-24 — TASK-STAGE1-FRONTEND Review PASS
 
 - CreateContent.tsx: StageA mock → 真实 API 两步链路

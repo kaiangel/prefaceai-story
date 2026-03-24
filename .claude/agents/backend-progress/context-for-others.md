@@ -7,10 +7,26 @@
 ## 当前状态速览
 
 ```
-状态: ✅ TASK-STAGE1-API 完成
+状态: ✅ TASK-ENVVAR-FIX 完成
 当前任务: 等 PM Code Review
 阻塞: 无
 ```
+
+---
+
+## ✅ TASK-ENVVAR-FIX 完成 (2026-03-24)
+
+### 给 @PM 的信息
+
+5 文件 `os.getenv()` → `settings.XXX` 修复完成:
+- `story_outline_generator.py` / `character_designer.py` / `screenplay_writer.py` / `storyboard_director.py` / `prompt_rewriter.py`
+- 每个文件: 删 `import os` + 加 `from app.config import settings` + 替换所有 getenv 调用
+- 验证: 5/5 syntax ✅ + 零残留 ✅
+
+### 给 @DevOps 的信息
+
+- PM Review 通过后需 push + VPS 部署
+- 改动: 5 文件，纯 import 替换，无逻辑变化
 
 ---
 

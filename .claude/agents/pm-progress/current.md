@@ -1,7 +1,7 @@
 # PM Agent - 当前任务
 
 > **最后更新**: 2026-03-24
-> **状态**: Stage 1 联动代码全部就绪 (AI-ML ✅ + Backend ✅ + Frontend ✅) → DevOps 搭 MySQL + push
+> **状态**: TASK-ENVVAR-FIX ✅ Review PASS → DevOps push → Founder 重新联调
 
 ---
 
@@ -33,9 +33,10 @@
 | 1 | ~~TASK-OUTLINE-PROMPT-UPGRADE~~ | ~~@AI-ML~~ ✅ |
 | 2 | ~~TASK-STAGE1-API~~ | ~~@Backend~~ ✅ |
 | 3 | ~~TASK-STAGE1-FRONTEND~~ | ~~@Frontend~~ ✅ |
-| 4 | DevOps: 搭本地 MySQL + push 全部改动 | @DevOps |
-| 5 | 真实联调测试 (登录→create→生成→StageB) | PM + Tester |
-| 6 | Founder 填 API Key (VPS) | Founder |
+| 4 | ~~DevOps: 搭本地 MySQL + push~~ | ~~@DevOps~~ ✅ |
+| 5 | ~~TASK-ENVVAR-FIX~~ | ~~@Backend~~ ✅ PM Review PASS |
+| 6 | DevOps push ENVVAR-FIX + Founder 重新联调 | @DevOps → Founder |
+| 7 | Founder 填 API Key (VPS) | Founder |
 
 ---
 
@@ -87,6 +88,9 @@ Founder 终审:                                                  ⏳
 
 | 时间 | 更新内容 |
 |------|----------|
+| 2026-03-24 | TASK-ENVVAR-FIX Review PASS (12/12, 5 文件零残留零副作用) → DevOps push 派发 |
+| 2026-03-24 | Founder 联调发现 Bug "无可用的LLM服务" → PM 排查: os.getenv vs settings 不兼容 → TASK-ENVVAR-FIX @Backend + PM 自查教训记录 |
+| 2026-03-24 | DevOps MySQL + push 审查: 8/8 ✅, DevOps 无责 |
 | 2026-03-24 | TASK-STAGE1-FRONTEND Review PASS (降级 mock + API 两步链路) → DevOps MySQL + push 派发 |
 | 2026-03-24 | TASK-STAGE1-API Review PASS (Ben 架构对齐 ✅ + 数据映射 ✅) |
 | 2026-03-24 | Ben 确认分工(我们做 Pipeline API) + TASK-STAGE1-API 派发 @Backend |
