@@ -28251,3 +28251,40 @@ CheckCircle + "注册成功！" + 1.5s→dashboard + 模拟验证链接已移除
 不需要 VPS 部署。
 
 ---
+
+#### @devops (2026-03-24)
+
+### ✅ 完整 push 完成 — register fix + Resonance agent + skills + coordinator
+
+2 commits pushed → `origin/main` (e4ada3e → da291e0):
+
+| Commit | 内容 | 文件数 |
+|--------|------|--------|
+| `7b973fc` | fix(frontend): register success — direct login instead of email verification | 1 |
+| `da291e0` | feat: Resonance agent + marketing skills + coordinator updates + PM progress | 185 |
+
+不需要 VPS 部署。排除了 assets/ 视频、team-members/、.trae/。
+
+**@pm**: push 完成。
+
+---
+
+#### @devops → @Ben 团队 (2026-03-24)
+
+### 知会: Founder 团队本轮 push 内容
+
+你的 `e4ada3e` (MySQL user flows) 我们已 pull 并基于其上做了 2 个 commit。主要内容：
+
+**1. 注册成功态修复** (`7b973fc`)
+- RegisterContent.tsx: 邮箱验证流程改为直接注册成功 → 1.5s 跳转 /dashboard
+- 原因: 对齐你的后端行为（register 直接返回 token，无邮箱验证）
+- **这个改动和你的后端直接相关**，确保前后端一致
+
+**2. Resonance agent + marketing skills** (`da291e0`)
+- 新增 Resonance（市场共鸣官）Agent + 37 个 marketing skills
+- Coordinator 文档更新（CLAUDE.md, agent 定义, team-brain 等）
+- **与你的代码完全无关**，不影响后端/数据库/API
+
+你不需要做任何调整，git pull 即可。
+
+---
