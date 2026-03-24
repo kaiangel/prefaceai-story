@@ -2,9 +2,12 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
+import { Sparkles, AlertCircle } from "lucide-react";
 import { useCreate } from "@/contexts/CreateContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch, getStoredToken } from "@/lib/api";
 import { mockOutline } from "@/lib/mock-data";
+import type { StoryOutline, StoryLength } from "@/types/create";
 import CreateHeader from "@/components/layout/CreateHeader";
 import StoryIdeaInput from "@/components/ui/StoryIdeaInput";
 import LengthSelector from "@/components/ui/LengthSelector";
@@ -17,9 +20,19 @@ import StageC from "@/components/create/StageC";
 import StageD from "@/components/create/StageD";
 import StageE from "@/components/create/StageE";
 
+// Length → API parameters mapping
+const LENGTH_PARAMS: Record<StoryLength, { duration: number; characters: number }> = {
+  flash: { duration: 1, characters: 2 },
+  short: { duration: 3, characters: 3 },
+  medium: { duration: 6, characters: 3 },
+  epic: { duration: 6, characters: 4 },
+};
+
 function StageA() {
   const { state, dispatch } = useCreate();
+  const { isLoggedIn } = useAuth();
   const [ideaError, setIdeaError] = useState("");
+  const [apiError, setApiError] = useState("");
   const [loading, setLoading] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -29,7 +42,7 @@ function StageA() {
     };
   }, []);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!state.idea.trim()) {
       setIdeaError("请输入你的故事创意");
       return;
@@ -39,14 +52,56 @@ function StageA() {
       return;
     }
     setIdeaError("");
+    setApiError("");
     setLoading(true);
-    // Mock: 模拟 AI 生成大纲，然后跳转到 Stage B
-    timerRef.current = setTimeout(() => {
-      dispatch({ type: "SET_OUTLINE", payload: mockOutline });
+
+    const token = getStoredToken();
+
+    // If not logged in or no token, use mock data
+    if (!isLoggedIn || !token) {
+      timerRef.current = setTimeout(() => {
+        dispatch({ type: "SET_OUTLINE", payload: mockOutline });
+        dispatch({ type: "SET_STAGE", payload: "confirm" });
+        setLoading(false);
+      }, 1500);
+      return;
+    }
+
+    try {
+      const params = LENGTH_PARAMS[state.length] || LENGTH_PARAMS.short;
+
+      // Step 1: Create project
+      const project = await apiFetch<{ project_id: string }>(
+        "/projects/",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            original_idea: state.idea.trim(),
+            style_preset: state.stylePreset || "illustration",
+            total_chapters: 1,
+            chapter_duration_minutes: params.duration,
+            character_count: params.characters,
+            language: "zh-CN",
+          }),
+        },
+        token
+      );
+
+      // Step 2: Generate outline (synchronous, 10-30s)
+      const outline = await apiFetch<StoryOutline>(
+        `/projects/${project.project_id}/generate-outline`,
+        { method: "POST" },
+        token
+      );
+
+      dispatch({ type: "SET_OUTLINE", payload: outline });
       dispatch({ type: "SET_STAGE", payload: "confirm" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "生成失败，请稍后重试";
+      setApiError(message);
+    } finally {
       setLoading(false);
-      timerRef.current = null;
-    }, 1500);
+    }
   };
 
   const handleIdeaChange = (value: string) => {
@@ -161,6 +216,14 @@ function StageA() {
             transition={{ delay: 0.35 }}
             className="pt-2"
           >
+            {/* API Error */}
+            {apiError && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-error/10 border border-error/20 mb-3">
+                <AlertCircle className="w-4 h-4 text-error flex-shrink-0" />
+                <span className="text-sm text-error flex-1">{apiError}</span>
+              </div>
+            )}
+
             <button
               onClick={handleSubmit}
               disabled={loading}
@@ -169,7 +232,12 @@ function StageA() {
               {loading ? (
                 <>
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  正在构思...
+                  AI 正在构思故事大纲...
+                </>
+              ) : apiError ? (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  重试
                 </>
               ) : (
                 <>
@@ -179,7 +247,7 @@ function StageA() {
               )}
             </button>
             <p className="text-center text-text-muted text-xs mt-3">
-              预计生成时间 3-5 分钟，取决于故事篇幅
+              {loading ? "大纲生成中，约需 10-30 秒..." : "AI 将根据你的创意生成完整故事大纲"}
             </p>
           </motion.div>
         </div>
