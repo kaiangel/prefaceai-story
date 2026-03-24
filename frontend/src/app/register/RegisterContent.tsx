@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, Mail, Lock, Ticket } from "lucide-react";
+import { Eye, EyeOff, CheckCircle, Mail, Lock, Ticket } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -70,6 +70,9 @@ export default function RegisterContent() {
     const ok = await register({ email: email.trim(), password, inviteCode: inviteCode.trim() });
     if (ok) {
       setSuccess(true);
+      redirectTimerRef.current = setTimeout(() => {
+        router.push("/dashboard");
+      }, 1500);
     } else {
       setLoading(false);
       setErrors({ inviteCode: "邀请码无效，请检查后重试" });
@@ -85,20 +88,11 @@ export default function RegisterContent() {
           className="text-center"
         >
           <div className="w-20 h-20 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-6">
-            <Mail className="w-10 h-10 text-success" />
+            <CheckCircle className="w-10 h-10 text-success" />
           </div>
-          <h1 className="text-2xl font-bold mb-2">验证邮件已发送</h1>
-          <p className="text-text-secondary mb-2">
-            请查收 <span className="text-brand-primary">{email}</span> 的验证邮件
-          </p>
-          <p className="text-text-tertiary text-sm mb-4">点击邮件中的链接完成注册</p>
-          {/* Dev mode: simulate email verification */}
-          <Link
-            href="/verify-email"
-            className="text-xs text-text-muted hover:text-brand-primary transition-colors"
-          >
-            （开发模式）模拟验证 →
-          </Link>
+          <h1 className="text-2xl font-bold mb-2">注册成功！</h1>
+          <p className="text-text-secondary mb-2">欢迎加入序话Story</p>
+          <p className="text-text-tertiary text-sm">正在跳转到工作台...</p>
         </motion.div>
       </div>
     );
