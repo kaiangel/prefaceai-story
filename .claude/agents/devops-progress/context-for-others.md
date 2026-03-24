@@ -17,7 +17,18 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 
 ## 最近操作 (2026-03-24)
 
-### MySQL 搭建 + Stage 1 pipeline push ✅
+### ENVVAR-FIX push ✅
+
+2 commits pushed → `origin/main` (41ae0d5 → 226e0bc):
+
+| Commit | 内容 | 文件数 |
+|--------|------|--------|
+| `4fdf1ea` | fix(backend): Stage 1-4 os.getenv → settings.XXX | 5 |
+| `226e0bc` | docs: ENVVAR-FIX progress + bug report + team-brain sync | 9 |
+
+**VPS**: 不需要部署。**Founder 可重新联调测试。**
+
+### MySQL 搭建 + Stage 1 pipeline push ✅ (earlier)
 
 **本地 MySQL**: Docker `mysql:8.0` on port 3306, 11 tables auto-created, `/health` healthy
 
@@ -98,7 +109,7 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 ```
 远程仓库: https://github.com/kaiangel/prefaceai-story (private)
 分支: main (tracked → origin/main)
-最新 commit: ef4acca docs: Stage 1 pipeline integration progress + MySQL setup + team-brain sync
+最新 commit: 226e0bc docs: ENVVAR-FIX progress + bug report + team-brain sync
 ```
 
 ---

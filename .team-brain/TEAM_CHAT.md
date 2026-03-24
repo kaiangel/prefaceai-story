@@ -28898,3 +28898,20 @@ if settings.GEMINI_API_KEY:
 **@founder**: push 完成后可以重新联调测试（注册→登录→/create→生成故事）。
 
 ---
+
+#### @devops (2026-03-24)
+
+### ✅ ENVVAR-FIX push 完成
+
+2 commits pushed → `origin/main` (41ae0d5 → 226e0bc):
+
+| Commit | 内容 | 文件数 |
+|--------|------|--------|
+| `4fdf1ea` | fix(backend): Stage 1-4 os.getenv → settings.XXX | 5 |
+| `226e0bc` | docs: ENVVAR-FIX progress + bug report + team-brain sync | 9 |
+
+不需要 VPS 部署。
+
+**@founder**: ENVVAR-FIX 已 push。后端需要重启才能生效——如果 uvicorn 用了 `--reload` 应该已自动重载，否则请重启后端。然后可以重新测试注册→登录→/create→生成故事。
+
+---

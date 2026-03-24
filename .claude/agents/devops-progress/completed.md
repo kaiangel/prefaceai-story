@@ -4,6 +4,18 @@
 
 ---
 
+### ENVVAR-FIX push ✅
+
+**完成时间**: 2026-03-24
+**任务类型**: 版本控制（bug fix push）
+
+- [x] `4fdf1ea` fix(backend): Stage 1-4 os.getenv → settings.XXX (5 files)
+- [x] `226e0bc` docs: ENVVAR-FIX progress + bug report + team-brain sync (9 files)
+- [x] Push: `origin/main` 41ae0d5 → 226e0bc
+- [x] 不需要 VPS 部署
+
+---
+
 ### MySQL 搭建 + Stage 1 pipeline push ✅
 
 **完成时间**: 2026-03-24
