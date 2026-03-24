@@ -11,11 +11,11 @@ Phase 2.0 第四阶段 - 分镜脚本生成器（核心升级）
 """
 
 import json
-import os
 import re
 from typing import Optional
 import anthropic
 from google import genai
+from app.config import settings
 
 from app.prompts.storyboard_prompts import NARRATION_TO_VISUAL_EXTRACTION_RULES, COMIC_MODE_NARRATIVE_RULES
 
@@ -323,16 +323,16 @@ class StoryboardDirector:
         # 主模型: Claude Sonnet 4.6
         self.claude_client = None
         self.claude_model = "claude-sonnet-4-6"
-        if os.getenv("ANTHROPIC_API_KEY"):
+        if settings.ANTHROPIC_API_KEY:
             self.claude_client = anthropic.Anthropic(
-                api_key=os.getenv("ANTHROPIC_API_KEY")
+                api_key=settings.ANTHROPIC_API_KEY
             )
 
         # 备用模型: Gemini 3 Flash
         self.gemini_client = None
         self.gemini_model = "gemini-3-flash-preview"
-        if os.getenv("GEMINI_API_KEY"):
-            self.gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        if settings.GEMINI_API_KEY:
+            self.gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     async def direct(
         self,

@@ -12,10 +12,10 @@ Phase 2.0 第一阶段 - 故事大纲生成器
 """
 
 import json
-import os
 from typing import Optional
 import anthropic
 from google import genai
+from app.config import settings
 
 
 class StoryOutlineGenerator:
@@ -32,16 +32,16 @@ class StoryOutlineGenerator:
         # 主模型: Claude Sonnet 4.6
         self.claude_client = None
         self.claude_model = "claude-sonnet-4-6"
-        if os.getenv("ANTHROPIC_API_KEY"):
+        if settings.ANTHROPIC_API_KEY:
             self.claude_client = anthropic.Anthropic(
-                api_key=os.getenv("ANTHROPIC_API_KEY")
+                api_key=settings.ANTHROPIC_API_KEY
             )
 
         # 备用模型: Gemini 3 Flash
         self.gemini_client = None
         self.gemini_model = "gemini-3-flash-preview"
-        if os.getenv("GEMINI_API_KEY"):
-            self.gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        if settings.GEMINI_API_KEY:
+            self.gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     async def generate(
         self,

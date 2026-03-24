@@ -11,8 +11,8 @@ Author: @Backend
 调用本服务对 prompt 进行智能改写，然后重试图像生成。
 """
 
-import os
 from typing import Optional, Dict
+from app.config import settings
 
 from app.prompts.prompt_safety_rewrite import (
     build_rewrite_prompt,
@@ -59,7 +59,7 @@ class PromptRewriter:
         # 主模型: Claude Sonnet 4.6
         try:
             import anthropic
-            api_key = os.getenv("ANTHROPIC_API_KEY")
+            api_key = settings.ANTHROPIC_API_KEY
             if api_key:
                 self.client = anthropic.AsyncAnthropic(api_key=api_key)
                 print("[PromptRewriter] ✅ Anthropic 客户端初始化成功 (Sonnet 4.6)")
@@ -73,7 +73,7 @@ class PromptRewriter:
         # 备用模型: Gemini 3.1 Flash
         try:
             from google import genai
-            gemini_key = os.getenv("GEMINI_API_KEY")
+            gemini_key = settings.GEMINI_API_KEY
             if gemini_key:
                 self.gemini_client = genai.Client(api_key=gemini_key)
                 print("[PromptRewriter] ✅ Gemini 3.1 Flash 备用客户端初始化成功")
