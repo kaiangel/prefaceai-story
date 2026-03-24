@@ -11,6 +11,7 @@ from app.models.chapter import Chapter
 from app.models.job import GenerationJob
 from app.schemas.project import ProjectCreate, ProjectResponse, ProjectDetail
 from app.services.job_manager import JobManager, run_story_generation_task
+from app.services.story_outline_generator import StoryOutlineGenerator
 from app.api.auth import get_current_user
 from app.models.user import User
 
@@ -157,6 +158,81 @@ async def get_project(
         raise HTTPException(status_code=404, detail="项目不存在")
 
     return ProjectDetail.model_validate(project)
+
+
+@router.post("/{project_id}/generate-outline")
+async def generate_outline(
+    project_id: str,
+    user_id: int = Depends(verify_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate story outline for a project using Stage 1 (StoryOutlineGenerator)"""
+    # 1. Verify project exists and belongs to current user
+    result = await db.execute(
+        select(Project).where(Project.id == project_id, Project.user_id == user_id)
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    # 2. Map chapter_duration_minutes to character_count default
+    duration = project.chapter_duration_minutes or 3
+    character_count = project.character_count or 3
+
+    # 3. Call StoryOutlineGenerator
+    generator = StoryOutlineGenerator()
+    try:
+        outline = await generator.generate(
+            idea=project.original_idea,
+            style_preset=project.style_preset,
+            target_duration_minutes=duration,
+            language=project.language or "zh-CN",
+            character_count=character_count,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"大纲生成失败: {str(e)}")
+
+    # 4. Update project title from generated outline
+    if outline.get("title"):
+        project.title = outline["title"]
+        db.add(project)
+        await db.flush()
+
+    # 5. Map snake_case → camelCase for frontend
+    characters = []
+    for i, char in enumerate(outline.get("characters_overview", []), 1):
+        characters.append({
+            "id": f"char_{i:03d}",
+            "name": char.get("name_suggestion", ""),
+            "nameEn": char.get("name_en", ""),
+            "description": char.get("description", ""),
+            "personality": char.get("personality", ""),
+        })
+
+    plot_points = []
+    for i, pp in enumerate(outline.get("plot_points", []), 1):
+        plot_points.append({
+            "id": f"pp_{i}",
+            "description": pp.get("description", "") if isinstance(pp, dict) else str(pp),
+        })
+
+    endings = []
+    for i, ending in enumerate(outline.get("ending_options", []), 1):
+        endings.append({
+            "id": ending.get("id", f"ending_{i}"),
+            "description": ending.get("description", ""),
+            "isSelected": i == 1,
+        })
+
+    return {
+        "title": outline.get("title", ""),
+        "titleEn": outline.get("title_en", ""),
+        "summary": outline.get("summary", ""),
+        "characters": characters,
+        "plotPoints": plot_points,
+        "endings": endings,
+        "mood": outline.get("mood", ""),
+    }
 
 
 @router.delete("/{project_id}")

@@ -13,8 +13,8 @@ class AudioSegment(Base):
     """
     __tablename__ = "audio_segments"
 
-    id = Column(String, primary_key=True)
-    chapter_id = Column(String, ForeignKey("chapters.id", ondelete="CASCADE"), nullable=False)
+    id = Column(String(255), primary_key=True)
+    chapter_id = Column(String(255), ForeignKey("chapters.id", ondelete="CASCADE"), nullable=False)
     segment_index = Column(Integer, nullable=False)
 
     # 时间信息
@@ -25,7 +25,7 @@ class AudioSegment(Base):
 
     # 匹配信息
     matched_scene_id = Column(Integer, nullable=True)
-    matched_image_path = Column(String, nullable=True)
+    matched_image_path = Column(String(255), nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
 

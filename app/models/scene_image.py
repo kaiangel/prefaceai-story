@@ -14,8 +14,8 @@ class SceneImage(Base):
     """
     __tablename__ = "scene_images"
 
-    id = Column(String, primary_key=True)
-    chapter_id = Column(String, ForeignKey("chapters.id", ondelete="CASCADE"), nullable=False)
+    id = Column(String(255), primary_key=True)
+    chapter_id = Column(String(255), ForeignKey("chapters.id", ondelete="CASCADE"), nullable=False)
     scene_id = Column(Integer, nullable=False)
 
     # Prompt信息
@@ -25,17 +25,17 @@ class SceneImage(Base):
     negative_prompt = Column(Text)  # 负面提示词
 
     # 存储路径
-    image_path = Column(String, nullable=False)  # 本地存储路径
-    image_url = Column(String)  # CDN/OSS URL（未来使用）
-    thumbnail_path = Column(String)  # 缩略图路径
+    image_path = Column(String(255), nullable=False)  # 本地存储路径
+    image_url = Column(String(500))  # CDN/OSS URL（未来使用）
+    thumbnail_path = Column(String(500))  # 缩略图路径
 
     # 图像属性
     width = Column(Integer, default=1024)
     height = Column(Integer, default=1024)
-    aspect_ratio = Column(String, default="2:3")
+    aspect_ratio = Column(String(16), default="2:3")
 
     # 生成信息
-    generation_model = Column(String)  # 使用的模型
+    generation_model = Column(String(128))  # 使用的模型
     generation_params = Column(Text)  # 生成参数（JSON）
     generation_time_seconds = Column(Integer)  # 生成耗时
 
@@ -56,19 +56,19 @@ class CharacterReference(Base):
     """
     __tablename__ = "character_references"
 
-    id = Column(String, primary_key=True)
-    project_id = Column(String, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
-    character_name = Column(String, nullable=False)
+    id = Column(String(255), primary_key=True)
+    project_id = Column(String(255), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    character_name = Column(String(255), nullable=False)
 
     # 图像信息
-    image_path = Column(String, nullable=False)
-    image_url = Column(String)
+    image_path = Column(String(255), nullable=False)
+    image_url = Column(String(500))
     width = Column(Integer)
     height = Column(Integer)
 
     # 生成信息
     prompt_used = Column(Text)  # 生成时使用的prompt
-    generation_model = Column(String)
+    generation_model = Column(String(128))
 
     # 状态
     is_active = Column(Boolean, default=True)
