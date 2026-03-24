@@ -17,16 +17,20 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 
 ## 最近操作 (2026-03-24)
 
-### ENVVAR-FIX push ✅
+### LLM-FIX push ✅ — Stage 1 E2E 联调通过
 
-2 commits pushed → `origin/main` (41ae0d5 → 226e0bc):
+2 commits pushed → `origin/main` (3d27445 → a0b3598):
 
 | Commit | 内容 | 文件数 |
 |--------|------|--------|
-| `4fdf1ea` | fix(backend): Stage 1-4 os.getenv → settings.XXX | 5 |
-| `226e0bc` | docs: ENVVAR-FIX progress + bug report + team-brain sync | 9 |
+| `376d6b7` | fix(backend): Stage 1 LLM call — system prompt + async + debug logging | 1 |
+| `a0b3598` | docs: Stage 1 E2E success + LLM-FIX progress + team-brain sync | 12 |
 
-**VPS**: 不需要部署。**Founder 可重新联调测试。**
+**VPS**: 不需要部署。
+
+### ENVVAR-FIX push ✅ (earlier)
+
+2 commits (4fdf1ea + 226e0bc), 41ae0d5 → 226e0bc
 
 ### MySQL 搭建 + Stage 1 pipeline push ✅ (earlier)
 
@@ -109,7 +113,7 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 ```
 远程仓库: https://github.com/kaiangel/prefaceai-story (private)
 分支: main (tracked → origin/main)
-最新 commit: 226e0bc docs: ENVVAR-FIX progress + bug report + team-brain sync
+最新 commit: a0b3598 docs: Stage 1 E2E success + LLM-FIX progress + team-brain sync
 ```
 
 ---
