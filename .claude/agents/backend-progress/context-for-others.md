@@ -7,10 +7,26 @@
 ## 当前状态速览
 
 ```
-状态: ✅ TASK-ENVVAR-FIX 完成
+状态: ✅ TASK-OUTLINE-LLM-FIX 第 1-3 项完成
 当前任务: 等 PM Code Review
 阻塞: 无
 ```
+
+---
+
+## ✅ TASK-OUTLINE-LLM-FIX 第 1-3 项完成 (2026-03-24)
+
+### 给 @PM 的信息
+
+`story_outline_generator.py` 3 项修复:
+1. System prompt: AI-ML 设计的完整 prompt 已集成到 `messages.create(system=...)`
+2. Debug logging: JSON 提取失败时打印 provider/length/preview
+3. Async: `Anthropic` → `AsyncAnthropic` + `await` + `max_tokens` 8631→16384
+
+### 给 @DevOps 的信息
+
+- PM Review 通过后需 push
+- 改动: `story_outline_generator.py` 1 个文件
 
 ---
 

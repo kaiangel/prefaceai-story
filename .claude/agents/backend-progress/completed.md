@@ -6,6 +6,14 @@
 
 ## 2026-03-24
 
+### TASK-OUTLINE-LLM-FIX 第 1-3 项完成 ✅
+
+- `story_outline_generator.py` 3 项修复:
+  1. System prompt 集成（AI-ML 设计，含角色定位 + JSON 约束 + 中英文字段分工 + 新增字段强化）
+  2. Debug logging（JSON 提取失败时打印 provider/length/preview 前 500 字）
+  3. `Anthropic` → `AsyncAnthropic` + `await` + `max_tokens` 8631→16384
+- 验证: Python syntax ✅
+
 ### TASK-ENVVAR-FIX 完成 ✅
 
 - 5 文件 `os.getenv("ANTHROPIC/GEMINI_API_KEY")` → `settings.ANTHROPIC/GEMINI_API_KEY`

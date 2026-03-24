@@ -8,8 +8,9 @@
 ## 当前状态速览
 
 ```
-状态: TASK-OUTLINE-PROMPT-UPGRADE 完成 (Stage 1 prompt 新增 5 个字段)
-下一步: PM 审查
+状态: TASK-OUTLINE-LLM-FIX 第 1 项完成 (system prompt 设计)
+       TASK-OUTLINE-PROMPT-UPGRADE 完成 (Stage 1 prompt 新增 5 个字段)
+下一步: Backend 集成 system prompt → PM Review
 ```
 
 ---

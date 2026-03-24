@@ -28915,3 +28915,264 @@ if settings.GEMINI_API_KEY:
 **@founder**: ENVVAR-FIX 已 push。后端需要重启才能生效——如果 uvicorn 用了 `--reload` 应该已自动重载，否则请重启后端。然后可以重新测试注册→登录→/create→生成故事。
 
 ---
+
+#### @pm (2026-03-24)
+
+### 🐛 Founder 第二次联调 — 新错误 "无法从LLM响应中提取JSON"
+
+**ENVVAR-FIX 确认生效**（不再报"无可用的LLM服务"）。LLM 调用成功返回了内容，但 `_extract_json()` 三级回退全部失败。
+
+**根因**: 对比能工作的 `story_generator.py` 和失败的 `story_outline_generator.py`：
+
+| 对比项 | story_generator (能工作) | story_outline_generator (失败) |
+|--------|--------------------------|-------------------------------|
+| system prompt | ✅ `"Always respond with valid JSON only. No markdown, no explanation, just pure JSON."` | ❌ 无 |
+| system 参数 | ✅ `system=system_prompt` | ❌ 未传 |
+| max_tokens | 16384 | 8631 |
+| 客户端 | `AsyncAnthropic` (异步) | `Anthropic` (同步，阻塞事件循环) |
+
+没有 system prompt → Claude 在 JSON 前后加解释性文字或生成语法错误的 JSON → 三级提取全部失败。
+
+**DevOps 审查**: ENVVAR-FIX push 5/5 ✅，无责。
+
+---
+
+#### @pm → @ai-ml + @backend (2026-03-24)
+
+### 任务: TASK-OUTLINE-LLM-FIX — Stage 1 LLM 调用修复（3 项）
+
+**Bug**: `story_outline_generator.py` 调用 Claude 时缺少 system prompt + 使用同步客户端 → JSON 提取失败 + 阻塞事件循环。
+
+**分工**:
+- **@ai-ml**: 设计 system prompt（第 1 项）
+- **@backend**: 代码集成 system prompt + debug logging + async 客户端（第 1-3 项全部）
+
+---
+
+#### 第 1 项（必须）— @ai-ml 设计 + @backend 集成：添加 system prompt
+
+参考 `story_generator.py:147-149` 的已有模式：
+
+```python
+system_prompt = """You are a professional screenwriter.
+Always respond with valid JSON only. No markdown, no explanation, just pure JSON.
+For complex stories with many scenes, output all scenes in a single JSON response."""
+```
+
+**@ai-ml 要做的**：
+
+为 `StoryOutlineGenerator` 设计一个 system prompt，要求：
+1. 角色定位（故事策划师 + 视觉导演）
+2. **必须明确指令**: "Always respond with valid JSON only. No markdown code blocks, no explanation, no text before or after the JSON. Just pure JSON."
+3. 输出格式：纯 JSON，不要 ```json 包裹（直接 `{...}`）
+4. 语言要求与现有 prompt 一致（中文故事内容，英文视觉描述）
+
+把设计好的 system prompt 文本写在 TEAM_CHAT 里，@backend 来集成到代码中。
+
+---
+
+#### 第 2 项（必须）— @backend：添加 debug logging
+
+在 `_extract_json()` 返回 None 时，打印原始响应的前 500 字符，方便后续排查：
+
+**修改文件**: `app/services/story_outline_generator.py`
+
+**位置**: `generate()` 方法中 `_extract_json` 调用后（约 L123-136）
+
+```python
+# 提取JSON
+outline = self._extract_json(content)
+
+if outline:
+    # ... 现有成功逻辑
+else:
+    # 新增: debug logging
+    print(f"[StoryOutlineGenerator] ❌ JSON提取失败")
+    print(f"  provider: {provider}")
+    print(f"  response length: {len(content)} chars")
+    print(f"  response preview: {content[:500]}")
+    raise ValueError("无法从LLM响应中提取JSON")
+```
+
+---
+
+#### 第 3 项（必须）— @backend：同步客户端 → 异步客户端
+
+`story_outline_generator.py` 的 `__init__` 中把 `Anthropic` 改为 `AsyncAnthropic`，`messages.create` 改为 `await ... messages.create`。
+
+参考 `story_generator.py:35` 的模式：
+
+```python
+# 改前 (story_outline_generator.py):
+self.claude_client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+# 调用:
+response = self.claude_client.messages.create(...)
+
+# 改后:
+self.claude_client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+# 调用:
+response = await self.claude_client.messages.create(...)
+```
+
+同时把 `system` prompt 集成到 `messages.create()` 调用中：
+
+```python
+response = await self.claude_client.messages.create(
+    model=self.claude_model,
+    max_tokens=16384,  # 从 8631 增加到 16384，与 story_generator 对齐
+    messages=[
+        {"role": "user", "content": prompt}
+    ],
+    system=system_prompt,  # AI-ML 设计的 system prompt
+)
+```
+
+**改动清单**:
+
+| 行 | 改前 | 改后 |
+|----|------|------|
+| L36-38 | `anthropic.Anthropic(api_key=...)` | `anthropic.AsyncAnthropic(api_key=...)` |
+| L93-99 | `self.claude_client.messages.create(model=..., max_tokens=8631, messages=[...])` | `await self.claude_client.messages.create(model=..., max_tokens=16384, messages=[...], system=system_prompt)` |
+| L123-136 | 无 debug logging | 添加 provider/length/preview 打印 |
+
+**不要动**: prompt 内容（`_build_prompt`）、`_extract_json` 逻辑、Gemini fallback、`_validate_outline`、任何其他文件。
+
+---
+
+#### 执行顺序
+
+1. **@ai-ml** 先设计 system prompt → 写入 TEAM_CHAT
+2. **@backend** 读取 AI-ML 的 system prompt → 集成代码（3 项全部）
+3. **@backend** 验证: Python syntax ✅ + 启动后端无报错
+4. 通知 @pm → PM Code Review
+
+---
+
+#### @ai-ml (2026-03-24)
+
+### ✅ TASK-OUTLINE-LLM-FIX 第 1 项完成 — system prompt 设计
+
+**@backend 请使用以下 system prompt**，作为 `story_outline_generator.py` 中 Claude `messages.create()` 的 `system=` 参数：
+
+```python
+SYSTEM_PROMPT = """You are a professional story planner and visual director for an AI-powered webtoon/short video generation system.
+
+Always respond with valid JSON only. No markdown code blocks, no explanation, no text before or after the JSON. Output a single JSON object starting with { and ending with }.
+
+Critical rules:
+- Chinese text for: title, logline, summary, character names, display_name, plot descriptions, mood, ending descriptions, signage_text, description, personality, emotional_journey
+- English text for: title_en, name_en, emotional_arc values, narrative_pace, visual_tone fields, color_palette, archetype, interior_description, exterior_description, key_visual_elements
+- All ending_options must have 3 distinct options with meaningful differences
+- All characters_overview entries must include description (20-30 Chinese chars, appearance) and personality (10-20 Chinese chars, traits)
+- mood must be exactly one of: 感人 / 治愈 / 热血 / 悬疑 / 浪漫 / 温馨"""
+```
+
+**设计说明**:
+
+| 要素 | 说明 |
+|------|------|
+| 角色定位 | "story planner and visual director" — 与 `_build_prompt` 中"故事策划师和视觉导演"对齐 |
+| JSON 严格约束 | "No markdown code blocks, no explanation, no text before or after" — 堵住 Claude 加解释性文字的倾向 |
+| 格式强化 | "starting with { and ending with }" — 明确告知不要 ```json 包裹 |
+| 中英文分工 | 逐字段明确哪些中文哪些英文 — 防止 color_palette 输出中文、description 输出英文 |
+| 新增字段强化 | ending_options 3 选项 + description/personality 字数要求 + mood 枚举值 — 防止 LLM 遗漏新增字段 |
+
+**与 story_generator.py 的对比**:
+
+| 维度 | story_generator | story_outline_generator (新) |
+|------|----------------|------------------------------|
+| 角色 | screenwriter | story planner + visual director |
+| JSON 约束 | 3 句 | 同等强度 + 格式细化 |
+| 语言规则 | 无 | ✅ 明确中英文分工（Stage 1 特有需求） |
+| 字段约束 | 无 | ✅ 新增字段 ending/description/personality/mood |
+
+@backend 可以开始集成（第 1-3 项全部）。@pm 第 1 项 AI-ML 交付完成。
+
+---
+
+#### @pm (2026-03-24)
+
+### ✅ PM Review PASS — TASK-OUTLINE-LLM-FIX 第 1 项 (AI-ML system prompt)
+
+10 项检查全部通过。角色定位对齐、JSON 约束到位、中英文字段分工准确（18 字段抽查全匹配）、新增字段强化完整。
+
+**@ai-ml**: 小补充 — system prompt 中文字段列表漏了 2 个：`display_name`（unique_locations 的场景中文名）和 `emotional_journey`（characters_overview 的情感轨迹）。请补到 Chinese text 那行里。补完后 @backend 直接用最新版集成即可。
+
+**@backend**: 等 AI-ML 补完上面 2 个字段后开始集成第 1-3 项。
+
+---
+
+#### @ai-ml (2026-03-24)
+
+### ✅ system prompt 已补完 — +display_name +emotional_journey
+
+已直接在上方 system prompt 代码块原文中补上 2 个中文字段：
+
+- `display_name` — unique_locations 的场景中文显示名（如"雨夜公交站"）
+- `emotional_journey` — characters_overview 的角色情感变化轨迹
+
+**最终中文字段列表**: title, logline, summary, character names, display_name, plot descriptions, mood, ending descriptions, signage_text, description, personality, emotional_journey
+
+@backend 可直接使用上方最新版 system prompt 集成。
+
+---
+
+#### @backend (2026-03-24)
+
+✅ **TASK-OUTLINE-LLM-FIX 第 1-3 项完成 — story_outline_generator.py**
+
+| # | 修复项 | 改动 |
+|---|--------|------|
+| 1 | System prompt | AI-ML 设计的 `system_prompt` 集成 → `messages.create(system=system_prompt)` |
+| 2 | Debug logging | `_extract_json` 失败时打印 provider / response length / preview (前 500 字) |
+| 3 | Async + max_tokens | `Anthropic` → `AsyncAnthropic` + `await messages.create` + `max_tokens` 8631 → 16384 |
+
+**验证**: Python syntax ✅
+
+@pm TASK-OUTLINE-LLM-FIX 第 1-3 项完成，等 Code Review。
+
+---
+
+#### @pm (2026-03-24)
+
+### ✅ PM Code Review PASS — TASK-OUTLINE-LLM-FIX 第 1-3 项
+
+14 项检查全部通过。system prompt 集成正确（含补完版）、debug logging 到位、AsyncAnthropic + await + max_tokens 16384 全部正确。零副作用，未动其他代码。
+
+**@devops**: 请 commit + push TASK-OUTLINE-LLM-FIX。建议 commit: `fix(backend): Stage 1 LLM call — system prompt + async client + debug logging`。不需要 VPS 部署。
+
+**@founder**: push 完成后可以第三次联调测试。
+
+---
+
+#### @founder (2026-03-24)
+
+### ✅ 第三次联调成功 — Stage 1 前后端 E2E 通了
+
+注册→登录→/create→输入创意→生成故事→StageB 展示真实大纲 ✅
+
+---
+
+#### @pm (2026-03-24)
+
+### 🎉 Stage 1 前后端联调通过 — 通知 DevOps push
+
+**Stage 1 E2E 全链路**: 用户输入创意 → `POST /api/projects/` → `POST /api/projects/{id}/generate-outline` → Claude Sonnet 4.6 生成真实大纲 → StageB 展示 ✅
+
+今日修复历程:
+1. ENVVAR-FIX: os.getenv→settings.XXX (5 文件) ✅
+2. LLM-FIX: system prompt + AsyncAnthropic + max_tokens 16384 + debug logging ✅
+3. Founder 第三次联调 ✅
+
+**@devops**: 请 commit + push 全部未提交改动。当前未提交文件包括:
+- `app/services/story_outline_generator.py`（LLM-FIX: system prompt + async + debug logging）
+- AI-ML / Backend / PM progress 文件
+- TEAM_CHAT + daily-sync + TODAY_FOCUS
+
+建议 2 commits:
+1. `fix(backend): Stage 1 LLM call — system prompt + async client + debug logging`
+2. `docs: Stage 1 联调通过 + LLM-FIX progress + team-brain sync`
+
+不需要 VPS 部署（本地联调阶段）。
+
+---

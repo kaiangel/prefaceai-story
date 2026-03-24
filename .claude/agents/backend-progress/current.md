@@ -1,23 +1,23 @@
 # Backend Agent - 当前任务
 
 > **最后更新**: 2026-03-24
-> **状态**: ✅ TASK-ENVVAR-FIX 完成，等 PM Review
+> **状态**: ✅ TASK-OUTLINE-LLM-FIX 第 1-3 项完成，等 PM Review
 
 ---
 
 ## 刚完成
 
-### ✅ TASK-ENVVAR-FIX — 5 文件 os.getenv → settings.XXX (2026-03-24)
+### ✅ TASK-OUTLINE-LLM-FIX 第 1-3 项 (2026-03-24)
 
-| # | 文件 | 改动 |
-|---|------|------|
-| 1 | `story_outline_generator.py` | `import os` 删除 + `from app.config import settings` + 4 处 os.getenv → settings |
-| 2 | `character_designer.py` | 同上 |
-| 3 | `screenplay_writer.py` | 同上 |
-| 4 | `storyboard_director.py` | 同上 |
-| 5 | `prompt_rewriter.py` | `import os` 删除 + `from app.config import settings` + 2 处 os.getenv → settings |
+**文件**: `app/services/story_outline_generator.py`
 
-**验证**: 5/5 syntax ✅ + `os.getenv("ANTHROPIC/GEMINI")` 零残留 ✅
+| # | 修复项 | 改动 |
+|---|--------|------|
+| 1 | System prompt 集成 | AI-ML 设计的 `system_prompt` 变量 + `system=system_prompt` 传参 |
+| 2 | Debug logging | `_extract_json` 失败时打印 provider / length / preview (前 500 字) |
+| 3 | Async + max_tokens | `Anthropic` → `AsyncAnthropic` + `messages.create` → `await` + `8631` → `16384` |
+
+**验证**: Python syntax ✅
 
 ---
 
@@ -31,8 +31,8 @@
 
 | 时间 | 更新内容 |
 |------|----------|
+| 2026-03-24 | ✅ TASK-OUTLINE-LLM-FIX (3 项) |
 | 2026-03-24 | ✅ TASK-ENVVAR-FIX (5 文件) |
 | 2026-03-24 | ✅ TASK-STAGE1-API |
 | 2026-03-18 | ✅ TASK-CORS-RESTRICT + TASK-LOG-SANITIZE |
 | 2026-03-17 | ✅ TASK-OB2-MODEL-SYNC + OB-3 + OB-4 |
-| 2026-03-17 11:30 | ✅ TASK-REWRITER-CLEANUP (3 项) |

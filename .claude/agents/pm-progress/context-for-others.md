@@ -8,22 +8,21 @@
 ## 当前状态
 
 ```
-Stage 1 联动: AI-ML ✅ + Backend ✅ + Frontend ✅ + DevOps ✅
-ENVVAR-FIX: Backend ✅ + PM Review PASS
-→ DevOps push → Founder 重新联调
+🎉 Stage 1 联调通过 (Founder 第三次联调 ✅)
+→ DevOps push 全部改动
 ```
 
 ---
 
-## @AI-ML — ✅ TASK-OUTLINE-PROMPT-UPGRADE 完成
+## @AI-ML — ✅ TASK-OUTLINE-LLM-FIX 第 1 项完成
 
-PM Review PASS。
+System prompt 设计 PM Review PASS (10/10)。已交付 @Backend 集成。
 
 ---
 
-## @Backend — ✅ TASK-ENVVAR-FIX 完成
+## @Backend — ✅ TASK-OUTLINE-LLM-FIX 第 1-3 项完成
 
-PM Review PASS (12/12)。5 文件 os.getenv→settings.XXX，零残留。
+PM Review PASS (14/14)。system prompt + AsyncAnthropic + debug logging。
 
 ---
 
@@ -39,10 +38,12 @@ Backend 自行实现了 `POST /api/projects/{id}/generate-outline`，零改动 B
 
 ---
 
-## @DevOps — 🔄 push ENVVAR-FIX
+## @DevOps — 🔄 push 全部改动（联调已通过）
 
-MySQL + Stage 1 push 已完成。现在需要 push TASK-ENVVAR-FIX（5 文件）。
-建议 commit: `fix(backend): Stage 1-4 env var loading — os.getenv to settings.XXX (5 files)`。不需要 VPS 部署。
+Founder 联调 ✅。请 commit + push 全部未提交改动。建议 2 commits:
+1. `fix(backend): Stage 1 LLM call — system prompt + async client + debug logging`
+2. `docs: Stage 1 联调通过 + LLM-FIX progress + team-brain sync`
+不需要 VPS 部署。
 
 ---
 

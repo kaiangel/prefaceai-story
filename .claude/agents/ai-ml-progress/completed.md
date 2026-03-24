@@ -6,6 +6,19 @@
 
 ## 2026-03-24
 
+### TASK-OUTLINE-LLM-FIX 第 1 项 — system prompt 设计 ✅
+
+**完成时间**: 2026-03-24
+**交付方式**: TEAM_CHAT 发布，@backend 集成
+
+StoryOutlineGenerator 专用 system prompt:
+- 角色定位: story planner + visual director
+- JSON 严格约束: no markdown, no explanation, pure JSON { ... }
+- 中英文分工: 逐字段明确（title 中文, title_en 英文, color_palette 英文, description 中文等）
+- 新增字段强化: ending_options 3 选项 + description/personality 字数 + mood 枚举
+
+---
+
 ### TASK-OUTLINE-PROMPT-UPGRADE — Stage 1 Prompt 新增 4 个字段 ✅
 
 **完成时间**: 2026-03-24

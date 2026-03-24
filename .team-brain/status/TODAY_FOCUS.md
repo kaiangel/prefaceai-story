@@ -1,7 +1,7 @@
 # 今日重点 (2026-03-24)
 
 > 每天更新，所有 Agent 开工前必读
-> **当前状态**: **TASK-ENVVAR-FIX ✅ Review PASS → DevOps push → Founder 重新联调**
+> **当前状态**: **🎉 Stage 1 联调通过 → DevOps push 全部改动**
 > **⚠️ 文档更新协议**: 共享文档由PM统一更新，详见 `.team-brain/TEAM_PROTOCOL.md`
 
 ---
@@ -23,7 +23,12 @@ Stage 1 前后端联动任务派发:                                     ✅ AI-
   - Founder 联调测试:                                                ❌ Bug "无可用的LLM服务"
   - PM 排查: os.getenv vs settings 不兼容:                           ✅ 根因确认
   - TASK-ENVVAR-FIX @Backend:                                         ✅ PM Review PASS
-  - DevOps push ENVVAR-FIX:                                            🔄 待派发
+  - DevOps push ENVVAR-FIX:                                            ✅ 完成
+  - Founder 第二次联调:                                                 ❌ Bug "无法从LLM响应中提取JSON"
+  - PM 排查: 缺 system prompt + 同步客户端:                              ✅ 根因确认
+  - TASK-OUTLINE-LLM-FIX @AI-ML + @Backend:                             ✅ PM Review PASS
+  - Founder 第三次联调:                                                  ✅ 通过
+  - DevOps push:                                                         🔄 待 push
 ```
 
 ---
@@ -34,12 +39,12 @@ Stage 1 前后端联动任务派发:                                     ✅ AI-
 
 | Agent | 状态 | 说明 |
 |-------|------|------|
-| @pm | ✅ ENVVAR-FIX Review PASS | DevOps push 派发 |
-| @ai-ml | ✅ TASK-OUTLINE-PROMPT-UPGRADE 完成 | PM Review PASS |
-| @backend | ✅ TASK-ENVVAR-FIX 完成 | PM Review PASS |
+| @pm | 🎉 联调通过 | DevOps push 派发 |
+| @ai-ml | ✅ system prompt 完成 | PM Review PASS |
+| @backend | ✅ LLM-FIX 第 1-3 项完成 | PM Review PASS |
 | @tester | ✅ 空闲 | 等联调完成后测试 |
 | @frontend | ✅ TASK-STAGE1-FRONTEND 完成 | PM Review PASS |
-| @devops | 🔄 push ENVVAR-FIX | PM Review PASS, 可 push |
+| @devops | 🔄 push 全部改动 | 联调 ✅, 可 push |
 | @resonance | 🆕 Phase 0 | 蓄水期 |
 
 ### Ben 团队
@@ -54,4 +59,4 @@ Stage 1 前后端联动任务派发:                                     ✅ AI-
 
 ## 下一步
 
-~~AI-ML prompt ✅~~ → ~~Backend API ✅~~ → ~~Frontend ✅~~ → ~~PM Review ✅~~ → ~~DevOps MySQL+push ✅~~ → ~~Founder 联调 ❌ Bug~~ → ~~ENVVAR-FIX ✅~~ → **DevOps push** → Founder 重新联调
+~~AI-ML prompt ✅~~ → ~~Backend API ✅~~ → ~~Frontend ✅~~ → ~~DevOps MySQL+push ✅~~ → ~~ENVVAR-FIX ✅~~ → ~~LLM-FIX ✅~~ → ~~Founder 联调 ✅~~ → **DevOps push**

@@ -1,11 +1,19 @@
 # AI-ML Agent - 当前任务
 
 > **最后更新**: 2026-03-24
-> **状态**: ✅ TASK-OUTLINE-PROMPT-UPGRADE 完成，等 PM 审查
+> **状态**: ✅ TASK-OUTLINE-LLM-FIX 第 1 项完成 (system prompt 设计)，等 Backend 集成
 
 ---
 
 ## 刚完成
+
+### TASK-OUTLINE-LLM-FIX 第 1 项 — system prompt 设计 ✅
+
+**完成时间**: 2026-03-24
+**交付方式**: TEAM_CHAT 发布，@backend 集成
+**内容**: StoryOutlineGenerator 专用 system prompt — 角色定位 + JSON 严格约束 + 中英文分工 + 新增字段强化
+
+---
 
 ### TASK-OUTLINE-PROMPT-UPGRADE — Stage 1 Prompt 新增 4 个字段 ✅
 
@@ -37,7 +45,7 @@
 
 | 任务 | 优先级 | 状态 |
 |------|--------|------|
-| PM 审查 TASK-OUTLINE-PROMPT-UPGRADE | — | 等 PM |
+| TASK-OUTLINE-LLM-FIX 第 1 项 (system prompt) | — | ✅ 已交付，等 Backend 集成 |
 | TASK-STYLE-THUMBNAILS (15 风格缩略图) | P0 | 暂缓 |
 | TASK-STYLE-EXPANSION (80→25-35 风格精选) | P1 | 暂缓 |
 | 6人场景一致性 90%->95% | P2 | 暂缓 |
@@ -48,6 +56,7 @@
 
 | 时间 | 更新内容 |
 |------|----------|
+| 2026-03-24 | TASK-OUTLINE-LLM-FIX 第 1 项: system prompt 设计 (JSON 约束 + 中英文分工 + 新增字段强化) |
 | 2026-03-24 | TASK-OUTLINE-PROMPT-UPGRADE: Stage 1 prompt 新增 summary + ending_options + mood + description + personality |
 | 2026-03-17 | TASK-OB1-CLEANUP: prompt_safety_rewrite.py 11 处 "Haiku"→"Sonnet 4.6" |
 | 2026-03-16 | TASK-IMG-SAFETY-RETRY-AIML: 5 类新关键词 + 2 个改写模板 + 简化 spec + 结构优化建议 |
