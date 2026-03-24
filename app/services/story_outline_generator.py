@@ -181,6 +181,15 @@ class StoryOutlineGenerator:
     "title": "故事标题（中文）",
     "title_en": "Story Title in English",
     "logline": "一句话故事梗概（50字以内）",
+    "summary": "故事简介（100-200字，用2-3句话描述核心故事情节，比logline更详细但比plot_points更精炼）",
+
+    "ending_options": [
+        {{"id": "ending_1", "description": "结局选项1描述（1句话）"}},
+        {{"id": "ending_2", "description": "结局选项2描述（1句话）"}},
+        {{"id": "ending_3", "description": "结局选项3描述（1句话）"}}
+    ],
+
+    "mood": "从以下选一个最匹配的: 感人 / 治愈 / 热血 / 悬疑 / 浪漫 / 温馨",
 
     "emotional_arc": {{
         "opening": "情感起点（如: isolated_melancholy, peaceful_ordinary, excited_anticipation）",
@@ -209,6 +218,8 @@ class StoryOutlineGenerator:
             "role": "protagonist / supporting / background",
             "name_suggestion": "建议的角色中文名",
             "name_en": "English Name",
+            "description": "外貌简述，20-30字中文（如：28岁程序员，戴黑框眼镜，穿灰色卫衣，背双肩包）",
+            "personality": "性格简述，10-20字中文（如：内向沉稳，不善表达但心思细腻）",
             "archetype": "角色原型（如: exhausted_office_worker, cheerful_student, wise_elder）",
             "age_range": "young_adult / adult / middle_aged / elderly / child / teen",
             "gender": "male / female",
@@ -259,6 +270,10 @@ class StoryOutlineGenerator:
 5. **时长控制**：plot_points的estimated_duration_seconds总和应接近{target_seconds}秒
 6. **家庭关系**：如果故事涉及家庭成员，characters_overview中的family_role必须准确标注，family_relationships必须完整记录角色间关系
 7. **招牌文字**：如果 unique_location 是店铺、餐馆、客栈等有招牌的场所，signage_text 应填写该店铺在故事世界中的真实招牌名称（如 "李记桂花糕"、"百味居"）。signage_text 是用于图像生成的店铺招牌文字，不是开发标签。如果场所没有招牌（如街道、公园、家中），signage_text 为空字符串 ""。
+8. **故事简介**：summary 要比 logline 更详细，但不是 plot_points 的罗列，是对故事核心情节的概括描述（100-200字）
+9. **结局选项**：ending_options 三个选项应有明显差异（如：温馨/开放/反转），让用户有真实的选择感
+10. **情绪基调**：mood 从6个预设值（感人/治愈/热血/悬疑/浪漫/温馨）中选最匹配的一个
+11. **角色简述**：description 和 personality 是给前端用户看的中文简述，不是给图像生成用的英文描述。description 聚焦外貌特征（年龄、穿着、显著特征），personality 聚焦性格特点
 
 ## TITLE CONSISTENCY (IMPORTANT)
 
