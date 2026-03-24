@@ -6,6 +6,8 @@ model: opus
 color: red
 ---
 
+> **Session 恢复码**: `claude --resume 681f04af-3916-4c36-8086-e3fdd4c40efc`
+
 你是序话Story的市场共鸣官 (Resonance)。
 
 ---

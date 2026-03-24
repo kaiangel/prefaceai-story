@@ -1,41 +1,46 @@
 # Backend Agent - 给其他 Agent 的上下文
 
-> **最后更新**: 2026-03-18
+> **最后更新**: 2026-03-24
 
 ---
 
 ## 当前状态速览
 
 ```
-状态: ✅ TASK-CORS-RESTRICT + TASK-LOG-SANITIZE 完成
+状态: ✅ TASK-STAGE1-API 完成
 当前任务: 等 PM Code Review
 阻塞: 无
 ```
 
 ---
 
-## ✅ TASK-CORS-RESTRICT + TASK-LOG-SANITIZE 完成 (2026-03-18)
+## ✅ TASK-STAGE1-API 完成 (2026-03-24)
 
 ### 给 @PM 的信息
 
-两项安全加固完成，请审查:
+`POST /api/projects/{project_id}/generate-outline` 已就绪:
 
-**TASK-CORS-RESTRICT**:
-- `app/main.py` L40: `["*"]` → `["https://prefaceai.mov", "http://localhost:3000"]`
-- 仅改 `allow_origins`，其余 CORS 配置不动
+- 加在 `app/api/projects.py` 中（Ben 的文件，遵循 Ben 架构模式）
+- 认证: `Depends(verify_user)` + 项目归属验证
+- 调用: `StoryOutlineGenerator.generate()` (同步等待，10-30s)
+- 数据映射: PM 规格 100% 对齐（characters/plotPoints/endings/mood/summary）
+- 额外: 生成后自动更新 Project.title
+- 零改动 Ben 现有端点
 
-**TASK-LOG-SANITIZE**:
-- 新建 `app/middleware/log_sanitizer.py`（独立模块）
-- 新建 `app/middleware/__init__.py`
-- `app/main.py` +3 行（import + install 调用 + 注释）
-- 方案: patch `builtins.print`，正则匹配敏感字段替换为 `***REDACTED***`
-- 覆盖格式: 环境变量键值对 + sk-ant- / sk- / AIzaSy / AKLT 等 API Key 格式
-- 正常日志不受影响（无敏感关键字的文本原样输出）
+### 给 @Frontend 的信息
 
-**验证**: 4 项脱敏测试 PASS + CORS 白名单确认 + print patch 确认
+API 端点就绪:
+```
+POST /api/projects/{project_id}/generate-outline
+Authorization: Bearer {token}
+
+Response: { title, titleEn, summary, characters[], plotPoints[], endings[], mood }
+```
+- `endings[0].isSelected = true`，其余 `false`
+- 预计响应时间 10-30 秒（Claude LLM 调用）
+- 错误: 404 (项目不存在) / 500 (大纲生成失败)
 
 ### 给 @DevOps 的信息
 
-- 改动文件: `app/main.py` + 新建 `app/middleware/` (2 文件)
-- PM Review 通过后可部署，部署后 CORS 生效 + 日志脱敏生效
-- Founder 填 API Key 的前置条件
+- 改动: `app/api/projects.py` 1 处 import + 1 个新端点
+- PM Review 通过后需 push + VPS 部署

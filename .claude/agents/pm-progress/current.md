@@ -1,7 +1,7 @@
 # PM Agent - 当前任务
 
 > **最后更新**: 2026-03-24
-> **状态**: ✅ 修复 Review PASS → DevOps 完整 push（含 Resonance + skills）
+> **状态**: Stage 1 联动代码全部就绪 (AI-ML ✅ + Backend ✅ + Frontend ✅) → DevOps 搭 MySQL + push
 
 ---
 
@@ -30,8 +30,12 @@
 
 | # | 事项 | 等谁 |
 |---|------|------|
-| 1 | DevOps 完整 push（修复 + Resonance + skills + Coordinator） | @DevOps |
-| 2 | Founder 填 API Key | Founder |
+| 1 | ~~TASK-OUTLINE-PROMPT-UPGRADE~~ | ~~@AI-ML~~ ✅ |
+| 2 | ~~TASK-STAGE1-API~~ | ~~@Backend~~ ✅ |
+| 3 | ~~TASK-STAGE1-FRONTEND~~ | ~~@Frontend~~ ✅ |
+| 4 | DevOps: 搭本地 MySQL + push 全部改动 | @DevOps |
+| 5 | 真实联调测试 (登录→create→生成→StageB) | PM + Tester |
+| 6 | Founder 填 API Key (VPS) | Founder |
 
 ---
 
@@ -83,7 +87,12 @@ Founder 终审:                                                  ⏳
 
 | 时间 | 更新内容 |
 |------|----------|
-| 2026-03-24 | 注册修复 Review PASS + DevOps 完整 push 派发 (修复 + Resonance agent + 37 marketing skills + Coordinator 更新) |
+| 2026-03-24 | TASK-STAGE1-FRONTEND Review PASS (降级 mock + API 两步链路) → DevOps MySQL + push 派发 |
+| 2026-03-24 | TASK-STAGE1-API Review PASS (Ben 架构对齐 ✅ + 数据映射 ✅) |
+| 2026-03-24 | Ben 确认分工(我们做 Pipeline API) + TASK-STAGE1-API 派发 @Backend |
+| 2026-03-24 | AI-ML TASK-OUTLINE-PROMPT-UPGRADE Review PASS |
+| 2026-03-24 | Stage 1 前后端联动派发: AI-ML prompt 升级 + API 端点(分工TBD) + Frontend 对接 |
+| 2026-03-24 | 注册修复 Review PASS + DevOps 完整 push (修复 + Resonance + skills) |
 | 2026-03-24 | Ben commit e4ada3e 全维度分析 (29 files, API 对照+安全+数据模型) + 注册成功态修复派发 @Frontend |
 | 2026-03-23 | 修复 Review PASS (6/6 + 1 记录) + DevOps push 派发 |
 | 2026-03-23 | Founder 走查 + PM 独立审查: 7 项问题 → 派发 @Frontend |

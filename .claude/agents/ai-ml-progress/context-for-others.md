@@ -1,14 +1,14 @@
 # AI-ML Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 AI-ML 的工作状态和 Prompt 约束
-> **最后更新**: 2026-03-17
+> **最后更新**: 2026-03-24
 
 ---
 
 ## 当前状态速览
 
 ```
-状态: TASK-OB1-CLEANUP 完成 (prompt_safety_rewrite.py Haiku→Sonnet 4.6)
+状态: TASK-OUTLINE-PROMPT-UPGRADE 完成 (Stage 1 prompt 新增 5 个字段)
 下一步: PM 审查
 ```
 

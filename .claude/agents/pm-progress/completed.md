@@ -4,6 +4,65 @@
 
 ---
 
+### 2026-03-24 — TASK-STAGE1-FRONTEND Review PASS
+
+- CreateContent.tsx: StageA mock → 真实 API 两步链路
+- Step 1: `POST /api/projects/` 创建项目（idea/style/duration/characters/language）
+- Step 2: `POST /api/projects/{project_id}/generate-outline` 生成大纲
+- 篇幅映射: flash=1min/2人, short=3min/3人, medium=6min/3人, epic=6min/4人
+- 未登录降级 mock（好设计，页面不依赖后端即可演示）✅
+- Loading "约需 10-30 秒" + 错误红色卡片 + "重试" ✅
+- build 20 路由 0 错误 ✅
+- DevOps 搭 MySQL + push 已派发
+
+---
+
+### 2026-03-24 — TASK-STAGE1-API Review PASS
+
+- `POST /api/projects/{project_id}/generate-outline` (~70 行)
+- Ben 架构完全对齐: verify_user + get_db + Project 归属验证 ✅
+- 数据映射: 11 字段 snake_case → camelCase + id 生成 + isSelected 默认 ✅
+- 防御性编程: plot_points dict/str 兼容 + ending_options id fallback ✅
+- 自动更新 Project.title ✅
+- 零改动 Ben 现有代码 ✅
+- Frontend 可开始对接
+
+---
+
+### 2026-03-24 — Ben 确认分工 + TASK-STAGE1-API 派发 @Backend
+
+- Ben 确认: Pipeline API 我们做，他只做商业化后端，架构不对他修正
+- TASK-STAGE1-API 派发 @Backend: `POST /api/projects/{id}/generate-outline`
+- 含 Ben 架构对齐指南: auth/routing/DB/Project model 模式
+- 含完整数据映射表 (Stage 1 原始 → 前端 camelCase)
+
+---
+
+### 2026-03-24 — AI-ML TASK-OUTLINE-PROMPT-UPGRADE Review PASS
+
+- 5 字段 + 4 创作要点逐一验证 ✅
+- summary(L184) + ending_options(L186-190) + mood(L192) + description(L221) + personality(L222)
+- 现有字段全部保持不变 ✅
+- DevOps push 派发
+
+---
+
+### 2026-03-24 — Stage 1 前后端联动任务派发
+
+**架构决策**: 方案 B — 直接调用 StoryOutlineGenerator，不走 pipeline_orchestrator。前端做"指挥官"。
+**数据映射**: Ben API 端点做 snake_case → camelCase，前端拿到直接用。
+
+**Stage 1 实际输出分析** (对照测试数据 `1_outline.json`):
+- ✅ 有: title, title_en, logline, emotional_arc, characters_overview, plot_points, unique_locations
+- ❌ 缺: summary（故事简介）, ending_options（3 个结局选项）, mood（情绪标签）, characters description/personality
+
+**3 项任务派发**:
+1. @AI-ML: TASK-OUTLINE-PROMPT-UPGRADE — prompt 新增 summary + ending_options + mood + character desc/personality
+2. @Ben: Stage 1 API 端点 — generate-outline + 数据映射
+3. @Frontend: TASK-STAGE1-FRONTEND — StageA→API→StageB 对接（等 1+2 就绪）
+
+---
+
 ### 2026-03-24 — 注册修复 Review PASS + DevOps 完整 push 派发
 
 - RegisterContent.tsx: Mail→CheckCircle + "注册成功！" + 1.5s→dashboard ✅

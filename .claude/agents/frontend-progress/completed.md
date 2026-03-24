@@ -6,6 +6,21 @@
 
 ## 2026-03-24
 
+### TASK-STAGE1-FRONTEND — StageA → 真实 API ✅
+
+**完成时间**: 2026-03-24
+**验收状态**: 待 PM Review
+
+- [x] CreateContent.tsx: handleSubmit mock → 真实 API (create project + generate outline)
+- [x] 篇幅→参数映射 (flash/short/medium/epic)
+- [x] Loading "AI 正在构思故事大纲..." + 10-30s 提示
+- [x] 错误处理: 红色错误卡 + 重试按钮
+- [x] 未登录降级: 无 token 时 mock 数据
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
 ### 注册成功态对齐后端 ✅
 
 **完成时间**: 2026-03-24

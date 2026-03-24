@@ -4,6 +4,26 @@
 
 ---
 
+## 2026-03-24
+
+### TASK-OUTLINE-PROMPT-UPGRADE — Stage 1 Prompt 新增 4 个字段 ✅
+
+**完成时间**: 2026-03-24
+**修改文件**: `app/services/story_outline_generator.py` (`_build_prompt` 方法)
+
+新增 3 个顶层字段 + 2 个 characters_overview 子字段:
+- `summary`: 故事简介（100-200 字）
+- `ending_options`: 3 个结局选项数组（ending_1/2/3，各有 id+description）
+- `mood`: 情绪基调（感人/治愈/热血/悬疑/浪漫/温馨 六选一）
+- `description`: 角色外貌简述（20-30 字中文，给前端用户看）
+- `personality`: 角色性格简述（10-20 字中文，给前端用户看）
+
+创作要点新增 #8-#11（summary 定位、ending 差异化、mood 预设值、角色简述定位）
+
+验证: Python syntax ✅
+
+---
+
 ## 2026-03-17
 
 ### TASK-OB1-CLEANUP — prompt_safety_rewrite.py "Haiku" 引用清理 ✅

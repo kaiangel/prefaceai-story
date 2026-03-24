@@ -4,6 +4,19 @@
 
 ---
 
+## 2026-03-24
+
+### TASK-STAGE1-API 完成 ✅
+
+- `app/api/projects.py` 新增 `POST /{project_id}/generate-outline`
+- 遵循 Ben 架构模式（verify_user + get_db + Project 归属验证）
+- 调用 `StoryOutlineGenerator.generate()`，snake_case → camelCase 映射
+- 返回格式与前端 `StoryOutline` 接口对齐
+- 生成后自动更新 Project.title
+- 零改动 Ben 现有端点
+
+---
+
 ## 2026-03-18
 
 ### TASK-CORS-RESTRICT 完成 ✅

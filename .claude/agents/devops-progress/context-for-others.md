@@ -73,7 +73,7 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 - **前端已可访问**: `https://prefaceai.mov` 返回 Landing Page（V2 品牌宣言 + 新 logo + 风格缩略图）
 - **API 已可访问**: `https://prefaceai.mov/api/health` 返回 healthy
 - **CORS 已限制**: `allow_origins=["https://prefaceai.mov", "http://localhost:3000"]` ✅
-- **代码通过 rsync 部署**: 非 git clone，后续可配置 deploy key
+- **🚨 部署方式（Ben 强制要求）**: 发布到 VPS 必须用 **rsync 本地代码 + Docker rebuild**，**不要在服务器上 git pull**
 - **SSH 端口 58913**: 非默认 22
 
 ## 运维风险摘要 (详见 devops-progress/current.md)

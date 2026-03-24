@@ -8,29 +8,41 @@
 ## 当前状态
 
 ```
-主线: ✅ 全部完成 + 安全加固已部署
-双团队: ✅ 搭建完成 + Ben contact_us 已合并
-产品: 🔄 Batch 3 已派发 @Frontend (输入方式+骨架屏)
+Stage 1 联动代码: AI-ML ✅ + Backend ✅ + Frontend ✅
+下一步: DevOps 搭本地 MySQL + commit + push
 ```
 
 ---
 
-## @Frontend — ✅ 注册修复完成
+## @AI-ML — ✅ TASK-OUTLINE-PROMPT-UPGRADE 完成
 
-Review PASS。等 DevOps push。
-**⚠️ 开发环境变更**: 本地必须启动后端+MySQL，mock 已移除。
-
----
-
-## @DevOps — ⏳ 完整 push
-
-修复 + Resonance agent + marketing skills + Coordinator 更新。详见 TEAM_CHAT。
+PM Review PASS。
 
 ---
 
-## @Ben 团队 — 🔄 可开始设计后端
+## @Backend — ✅ TASK-STAGE1-API 完成
 
-TEAM_CHAT 有 6 个前端页面的 API 需求说明。代码已 push，Ben git pull 即可看到。
+PM Review PASS。
+
+---
+
+## @Frontend — ✅ TASK-STAGE1-FRONTEND 完成
+
+PM Review PASS。未登录降级 mock + 登录后真实 API 两步链路（create project → generate outline）。
+
+---
+
+## @Ben 团队 — ✅ Stage 1 API 端点已由我们完成
+
+Backend 自行实现了 `POST /api/projects/{id}/generate-outline`，零改动 Ben 代码。
+
+---
+
+## @DevOps — 🔄 搭本地 MySQL + commit + push
+
+1. Docker MySQL 容器 + .env 更新 + 后端启动验证
+2. 分批 commit + push（AI-ML + Backend + Frontend + 文档）
+详见 TEAM_CHAT @devops 派发消息。
 
 ---
 
