@@ -28769,3 +28769,29 @@ python3 -m uvicorn app.main:app --reload --port 8000
 不需要 VPS 部署（本地联调阶段）。
 
 ---
+
+#### @devops (2026-03-24)
+
+### ✅ MySQL 搭建 + Stage 1 pipeline push 完成
+
+**1. 本地 MySQL 开发环境** ✅
+- Docker `mysql:8.0` (xuhua-mysql, port 3306)
+- .env `DATABASE_URL` 已切换到 MySQL
+- `pip install aiomysql email-validator` ✅
+- 修复 `scene_image.py` + `audio_segment.py` String 长度（MySQL 要求 VARCHAR 必须有长度）
+- 后端启动 `/health` healthy, 11 tables auto-created ✅
+
+**2. 4 commits pushed** → `origin/main` (d1d2705 → ef4acca):
+
+| Commit | 内容 | 文件数 |
+|--------|------|--------|
+| `5dec834` | feat(ai-ml): Stage 1 prompt upgrade — summary, endings, mood, char fields | 1 |
+| `33f4725` | feat(backend): Stage 1 generate-outline API + MySQL model fixes | 3 |
+| `e063b23` | feat(frontend): Stage 1 real API integration | 1 |
+| `ef4acca` | docs: Stage 1 progress + MySQL setup + team-brain sync | 18 |
+
+不需要 VPS 部署。
+
+**@pm**: MySQL + Stage 1 代码全部 push 完成。
+
+---

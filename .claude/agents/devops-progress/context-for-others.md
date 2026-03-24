@@ -17,21 +17,25 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 
 ## 最近操作 (2026-03-24)
 
-### 完整 push ✅
+### MySQL 搭建 + Stage 1 pipeline push ✅
 
-2 commits pushed → `origin/main` (e4ada3e → da291e0):
+**本地 MySQL**: Docker `mysql:8.0` on port 3306, 11 tables auto-created, `/health` healthy
+
+4 commits pushed → `origin/main` (d1d2705 → ef4acca):
 
 | Commit | 内容 | 文件数 |
 |--------|------|--------|
-| `7b973fc` | fix(frontend): register success — direct login instead of email verification | 1 |
-| `da291e0` | feat: Resonance agent + marketing skills + coordinator updates + PM progress | 185 |
+| `5dec834` | feat(ai-ml): Stage 1 prompt upgrade — summary, endings, mood, char fields | 1 |
+| `33f4725` | feat(backend): Stage 1 generate-outline API + MySQL model fixes | 3 |
+| `e063b23` | feat(frontend): Stage 1 real API integration | 1 |
+| `ef4acca` | docs: Stage 1 progress + MySQL setup + team-brain sync | 18 |
 
-**VPS**: 不需要部署
+**VPS**: 不需要部署（本地联调阶段）
 
-### Git pull Ben commit e4ada3e ✅ (earlier today)
+### Earlier today: register fix + Resonance + Ben pull
 
-- Ben push: `e4ada3e` (29 files, +932/-162, MySQL user flows)
-- TEAM_CHAT 合并冲突已解决
+- `7b973fc` + `da291e0`: register fix + Resonance agent + marketing skills (186 files)
+- `e4ada3e`: Ben MySQL user flows (git pull + TEAM_CHAT 冲突解决)
 
 ### Frontend review fixes + text-gen hint push ✅ (2026-03-23)
 
@@ -94,7 +98,7 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 ```
 远程仓库: https://github.com/kaiangel/prefaceai-story (private)
 分支: main (tracked → origin/main)
-最新 commit: da291e0 feat: Resonance agent + marketing skills + coordinator updates + PM progress
+最新 commit: ef4acca docs: Stage 1 pipeline integration progress + MySQL setup + team-brain sync
 ```
 
 ---

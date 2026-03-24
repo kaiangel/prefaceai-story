@@ -4,6 +4,27 @@
 
 ---
 
+### MySQL 搭建 + Stage 1 pipeline push ✅
+
+**完成时间**: 2026-03-24
+**任务类型**: 基础设施 + 版本控制
+
+**MySQL 搭建**:
+- [x] Docker `mysql:8.0` container (xuhua-mysql, port 3306)
+- [x] .env DATABASE_URL 切换到 MySQL
+- [x] pip install aiomysql email-validator
+- [x] 修复 scene_image.py + audio_segment.py String 长度（MySQL 兼容）
+- [x] 后端启动 `/health` healthy, 11 tables auto-created
+
+**Stage 1 push** (4 commits, d1d2705 → ef4acca):
+- [x] `5dec834` feat(ai-ml): Stage 1 prompt upgrade (1 file)
+- [x] `33f4725` feat(backend): generate-outline API + MySQL model fixes (3 files)
+- [x] `e063b23` feat(frontend): Stage 1 real API integration (1 file)
+- [x] `ef4acca` docs: progress + team-brain sync (18 files)
+- [x] 不需要 VPS 部署
+
+---
+
 ### 完整 push: register fix + Resonance + skills + coordinator ✅
 
 **完成时间**: 2026-03-24
