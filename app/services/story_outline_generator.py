@@ -39,9 +39,57 @@ class StoryOutlineGenerator:
 
         # 备用模型: Gemini 3 Flash
         self.gemini_client = None
-        self.gemini_model = "gemini-3-flash-preview"
+        self.gemini_model = "gemini-3.1-flash-lite-preview"
         if settings.GEMINI_API_KEY:
             self.gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
+
+    @staticmethod
+    def _build_user_reference_context(
+        character_refs_analysis: list[dict] | None = None,
+        scene_refs_analysis: list[dict] | None = None,
+        custom_style_name: str | None = None,
+    ) -> str:
+        """构建用户参考图上下文段，追加到 _build_prompt 末尾。
+        当所有参考为空时返回空字符串。"""
+        sections = []
+
+        if character_refs_analysis:
+            char_lines = []
+            for i, char in enumerate(character_refs_analysis, 1):
+                desc = char.get("description_zh", "未知角色")
+                char_lines.append(f"- 角色{i}: {desc}")
+            sections.append(
+                f"""### 用户提供的角色参考（共 {len(character_refs_analysis)} 个）
+{chr(10).join(char_lines)}
+请确保 characters_overview 中的角色设定贴合这些参考的外貌和气质。角色数量可以多于参考数（系统会补充原创角色），但参考中的角色必须出现且描述一致。"""
+            )
+
+        if scene_refs_analysis:
+            scene_lines = []
+            for i, scene in enumerate(scene_refs_analysis, 1):
+                desc = scene.get("description_zh", "未知场景")
+                scene_lines.append(f"- 场景{i}: {desc}")
+            sections.append(
+                f"""### 用户提供的场景参考（共 {len(scene_refs_analysis)} 个）
+{chr(10).join(scene_lines)}
+请确保 unique_locations 中至少包含这些场景或与之高度相似的场景。可以添加额外场景以丰富故事。"""
+            )
+
+        if custom_style_name:
+            sections.append(
+                f"""### 用户选择的自定义视觉风格
+用户上传了风格参考图，期望的视觉风格为: {custom_style_name}
+请确保 visual_tone 的 color_palette 和整体氛围与此风格一致。"""
+            )
+
+        if not sections:
+            return ""
+
+        return """
+
+## 用户提供的视觉参考（IMPORTANT: 大纲必须贴合这些参考）
+
+""" + "\n\n".join(sections)
 
     async def generate(
         self,
@@ -49,7 +97,10 @@ class StoryOutlineGenerator:
         style_preset: str,
         target_duration_minutes: int = 3,
         language: str = "zh-CN",
-        character_count: int = 3
+        character_count: int = 3,
+        character_refs_analysis: list[dict] | None = None,
+        scene_refs_analysis: list[dict] | None = None,
+        custom_style_name: str | None = None,
     ) -> dict:
         """
         生成故事大纲
@@ -60,6 +111,9 @@ class StoryOutlineGenerator:
             target_duration_minutes: 目标时长（分钟）
             language: 语言
             character_count: 角色数量
+            character_refs_analysis: 用户角色参考图分析结果
+            scene_refs_analysis: 用户场景参考图分析结果
+            custom_style_name: 用户自定义风格名
 
         Returns:
             outline dict
@@ -77,6 +131,17 @@ class StoryOutlineGenerator:
             language=language,
             character_count=character_count
         )
+
+        # 追加用户参考图上下文（Prompt 4）
+        ref_context = self._build_user_reference_context(
+            character_refs_analysis=character_refs_analysis,
+            scene_refs_analysis=scene_refs_analysis,
+            custom_style_name=custom_style_name,
+        )
+        if ref_context:
+            prompt = prompt.rstrip() + "\n" + ref_context + "\n\n现在开始生成故事大纲："
+        else:
+            prompt = prompt.rstrip() + "\n\n现在开始生成故事大纲："
 
         print(f"[StoryOutlineGenerator] 生成故事大纲...")
         print(f"  idea: {idea}")
@@ -346,8 +411,6 @@ Review all family_relationships entries together. For each person mentioned:
 - 所有location的key_visual_elements必须是**英文**（用于图像生成）
 - characters_overview只是概览，详细外貌在Stage 2生成
 - plot_points要足够细致，每个情节点对应故事的一个关键转折
-
-现在开始生成故事大纲：
 """
 
     def _extract_json(self, content: str) -> Optional[dict]:

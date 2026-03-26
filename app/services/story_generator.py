@@ -18,7 +18,7 @@ class StoryGenerator:
     CLAUDE_MODEL = "claude-sonnet-4-6"  # Claude Sonnet 4.6 as primary (DEC-012)
 
     GEMINI_MODELS = [
-        "gemini-3.1-flash-preview",  # Gemini 3.1 Flash
+        "gemini-3.1-flash-lite-preview",  # Gemini 3.1 Flash
         "gemini-2.5-flash",      # Fast and reliable Gemini fallback
     ]
 

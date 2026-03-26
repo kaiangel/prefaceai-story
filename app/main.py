@@ -9,6 +9,7 @@ from app.database import init_db, close_db
 from app.api import api_router
 from app.api.images import router as images_router
 from app.api.audio import router as audio_router
+from app.api.utils import router as utils_router
 import app.models  # noqa: F401
 from app.config import settings
 from app.middleware.log_sanitizer import install as install_log_sanitizer
@@ -56,6 +57,7 @@ app.add_middleware(
 app.include_router(api_router)
 app.include_router(images_router)
 app.include_router(audio_router)
+app.include_router(utils_router)
 
 
 @app.get("/")

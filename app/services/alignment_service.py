@@ -43,7 +43,7 @@ class AlignmentService:
 
         # 备用模型: Gemini 3.1 Flash
         self.gemini_client = None
-        self.gemini_model = "gemini-3.1-flash-preview"
+        self.gemini_model = "gemini-3.1-flash-lite-preview"
         if settings.GEMINI_API_KEY:
             self.gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
 

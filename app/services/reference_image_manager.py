@@ -166,7 +166,8 @@ class ReferenceImageManager:
         character: Dict[str, Any],
         project_style: ProjectStyleConfig,
         image_generator,
-        delay: float = 3.0
+        delay: float = 3.0,
+        seed_image: "Image.Image | None" = None,
     ) -> Dict[str, Any]:
         """
         生成角色的多张参考图（肖像+全身）- 串行生成确保一致性
@@ -190,13 +191,16 @@ class ReferenceImageManager:
         results = {}
 
         # 1. 先生成正面肖像特写（作为基准参考）
-        print(f"      [1/2] 生成 {char_name} 正面肖像（基准参考）...")
+        if seed_image:
+            print(f"      [1/2] 生成 {char_name} 正面肖像（使用用户上传 seed 图）...")
+        else:
+            print(f"      [1/2] 生成 {char_name} 正面肖像（基准参考）...")
         portrait_result = await self.generate_character_reference(
             character=character,
             project_style=project_style,
             image_generator=image_generator,
             ref_type='portrait',
-            portrait_ref=None  # 肖像不需要参考
+            portrait_ref=seed_image  # 用户上传图作为参考（or None）
         )
         results['portrait'] = portrait_result
 
@@ -677,9 +681,14 @@ and smaller build — NOT by switching to a cuter or more cartoon-like art style
         """检查是否有某角色的参考图"""
         return char_id in self.character_references
 
-    def set_reference(self, char_id: str, image: Image.Image):
+    def set_reference(self, char_id: str, image: Image.Image, ref_type: str = "fullbody"):
         """手动设置角色参考图"""
-        self.character_references[char_id] = image
+        if char_id not in self.character_references:
+            self.character_references[char_id] = {}
+        if isinstance(self.character_references[char_id], dict):
+            self.character_references[char_id][ref_type] = image
+        else:
+            self.character_references[char_id] = {ref_type: image}
 
     def clear_references(self):
         """清空所有参考图"""

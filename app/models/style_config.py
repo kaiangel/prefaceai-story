@@ -60,6 +60,9 @@ class ProjectStyleConfig(BaseModel):
     # 固定的风格prompt片段（每张图都会加上）
     style_suffix: str = ""                # 自动生成的风格描述
 
+    # 自定义风格覆盖（从用户上传风格参考图分析生成）
+    custom_enforcement: Optional[Any] = None
+
     # 来自story.json的原始visual_style
     raw_visual_style: Optional[Dict[str, Any]] = None
 

@@ -75,7 +75,10 @@ class Phase2PipelineOrchestrator:
         character_count: int = 3,
         generate_images: bool = True,
         max_concurrent_images: int = 2,
-        shots_limit: int = 0
+        shots_limit: int = 0,
+        custom_style_analysis: dict = None,
+        character_seeds: dict = None,
+        scene_seeds: dict = None,
     ) -> dict:
         """
         运行完整的5阶段生成流程
@@ -233,19 +236,29 @@ class Phase2PipelineOrchestrator:
                 print("\n--- 5a. 生成角色参考图 ---")
                 ref_manager = ReferenceImageManager()
 
-                # 创建风格配置
+                # 创建风格配置（自定义风格优先）
                 project_style = ProjectStyleConfig(style_preset=style_preset)
+                if custom_style_analysis:
+                    from app.services.style_enforcer import StyleEnforcer
+                    custom_enforcement = StyleEnforcer.create_custom_enforcement(custom_style_analysis)
+                    project_style.custom_enforcement = custom_enforcement
 
                 # 为每个角色生成参考图
                 char_list = characters.get("characters", [])
                 for char in char_list:
-                    char_name = char.get("name", char.get("id", "unknown"))
-                    print(f"  生成 {char_name} 参考图...", end=" ")
+                    char_id = char.get("id", "unknown")
+                    char_name = char.get("name", char_id)
+                    seed = (character_seeds or {}).get(char_id)
+                    if seed:
+                        print(f"  生成 {char_name} 参考图（使用用户 seed 图）...", end=" ")
+                    else:
+                        print(f"  生成 {char_name} 参考图...", end=" ")
                     try:
                         await ref_manager.generate_character_multi_refs(
                             character=char,
                             project_style=project_style,
-                            image_generator=self.image_generator
+                            image_generator=self.image_generator,
+                            seed_image=seed,
                         )
                         print("✅")
                     except Exception as e:
@@ -284,7 +297,8 @@ class Phase2PipelineOrchestrator:
                             image_generator=self.image_generator,
                             unique_locations=unique_locations,
                             delay=3.0,
-                            location_character_counts=location_char_counts  # T21
+                            location_character_counts=location_char_counts,  # T21
+                            seed_images=scene_seeds,  # 用户上传场景 seed 图
                         )
 
                         # 保存场景参考图

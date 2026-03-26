@@ -11,11 +11,30 @@ StylePreset = Literal[
     "cyberpunk",
     "ink",
     "cartoon",
-    "chinese",
     "manga",
     "oil_painting",
     "watercolor",
     "pixel",
+    "pixar_3d",
+    "ghibli",
+    "anime",
+    "slam_dunk",
+    "korean_webtoon",
+    "children_book",
+    # 新增 13 个
+    "ukiyo_e",
+    "vintage_film",
+    "pencil_sketch",
+    "chibi",
+    "dark_fantasy",
+    "pop_art",
+    "paper_cut",
+    "steampunk",
+    "art_nouveau",
+    "noir",
+    "comic_western",
+    "pastel_dream",
+    "gothic",
 ]
 
 
@@ -29,6 +48,11 @@ class ProjectCreate(BaseModel):
     character_count: int = Field(default=2, ge=1, le=6, description="角色数量")
     language: str = Field(default="zh-CN", description="语言")
     voice_preset: str | None = Field(default=None, description="TTS音色ID")
+    aspect_ratio: str = Field(default="2:3", description="画面比例")
+    document_text: str | None = Field(default=None, description="上传文档的解析文本")
+    custom_style_analysis: dict | None = Field(default=None, description="自定义风格分析结果")
+    character_refs_analysis: list[dict] | None = Field(default=None, description="角色参考图分析结果")
+    scene_refs_analysis: list[dict] | None = Field(default=None, description="场景参考图分析结果")
 
 
 class ProjectResponse(BaseModel):

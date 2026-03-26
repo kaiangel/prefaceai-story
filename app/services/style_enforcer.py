@@ -285,7 +285,254 @@ class StyleEnforcer:
             style_description="You are crafting in the tradition of pixel art masters — artists who turned severe technical constraints into an aesthetic that feels more deliberate and honest than any high-resolution render. Light is constructed pixel by pixel: dithering patterns simulate gradients with mathematical precision, limited palettes force every shadow to be a conscious color choice, and highlights land on exactly the right pixel to make forms read clearly at any scale. Colors are curated with the discipline of a limited palette — each hue earned its place, warm tones cluster for life and energy, cool tones for calm and mystery, and the careful juxtaposition of two or three colors creates the illusion of dozens. Every surface honors the grid: crisp aliased edges define clean silhouettes, clusters of pixels suggest texture — brick, wood, fabric, metal — through pattern rather than detail, and each tile of environment is placed with the intentionality of mosaic. Characters are designed for instant recognition — distinctive silhouettes readable at thumbnail size, emotions conveyed through the tilt of a few-pixel head and the position of dot eyes, each pose a carefully chosen frame that implies motion. Each composition respects the pixel grid's geometry: clean horizontal staging, thoughtful use of the limited canvas, and the retro warmth of an era when every single pixel was placed by a human hand with purpose.",
             quality_keywords=["clean pixels", "well-designed pixel art", "professional retro"]
         ),
+
+        # ============ 浮世绘风格 ============
+        "ukiyo_e": StyleEnforcement(
+            style_name="ukiyo_e",
+            style_display_name="Ukiyo-e Japanese Woodblock Print",
+            mandatory_keywords=[
+                "ukiyo-e style", "Japanese woodblock print", "flat color areas",
+                "bold outlines", "traditional Japanese art", "decorative patterns",
+                "Edo period aesthetic", "woodcut texture", "Japanese composition"
+            ],
+            forbidden_keywords=[
+                "photorealistic", "photograph", "3D render", "CGI", "digital effects",
+                "neon lights", "modern setting", "Western art style", "gradient shading",
+                "photographic", "realistic skin texture", "smooth blending", "pixel art"
+            ],
+            style_description="You are carving in the tradition of ukiyo-e masters — Hokusai, Hiroshige, Utamaro — artists who compressed the floating world into flat planes of pure color and fearless line. Light does not model form through gradient — it exists as decisive areas of color separated by bold outlines, each block printed with the pressure of carved cherry wood against mulberry paper. Colors are the pigments of the woodblock palette: indigo blues that deepen like evening water, vermillion reds that burn with festival intensity, soft ochres and greens drawn from mineral and vegetable sources, and the warm cream of washi paper glowing through unprinted areas. Every surface declares its flat, printed nature: fabric patterns rendered as precise repeating motifs, water as stylized curling waves, clouds as decorative bands floating across the composition. Characters are defined by costume and posture rather than anatomical modeling — flowing kimono lines, elaborate hair arrangements, faces rendered with minimal but expressive economy: a tilted head, a sidelong glance, fingers delicately positioned. Each composition follows ukiyo-e's sophisticated spatial logic: layered flat planes creating depth without perspective, diagonal elements generating dynamic tension, and asymmetric balance where a single branch or figure anchors vast areas of atmospheric space.",
+            quality_keywords=["masterful woodblock print", "museum quality ukiyo-e", "detailed traditional art", "authentic Japanese aesthetic", "elegant composition"]
+        ),
+
+        # ============ 复古胶片风格 ============
+        "vintage_film": StyleEnforcement(
+            style_name="vintage_film",
+            style_display_name="Vintage Film Photography",
+            mandatory_keywords=[
+                "vintage film photography", "film grain", "analog camera aesthetic",
+                "Kodak Portra tones", "retro color grading", "soft focus",
+                "70s 80s film look", "nostalgic photography", "warm film tones"
+            ],
+            forbidden_keywords=[
+                "digital clarity", "HDR", "neon", "cyberpunk", "anime", "cartoon",
+                "3D render", "sharp digital", "modern clean", "vector", "pixel art",
+                "illustration", "painting", "watercolor"
+            ],
+            style_description="You are shooting in the tradition of analog film photographers — artists who understood that imperfection is intimacy, that grain is warmth, and that faded color carries the weight of time. Light arrives through the gentle imprecision of vintage glass: soft halation blooming around highlights, lens flares that streak like golden memories, and a natural falloff at frame edges that pulls focus to the center like a whispered secret. Colors wear the patina of aged emulsion — Kodak warmth where skin glows amber, Fuji greens that drift toward teal in shadows, highlights that roll off into creamy whites rather than clinical brightness, and an overall palette that feels like looking at life through honey-colored glass. Every surface carries the honest texture of photochemical process: film grain dancing across the image like visual static, slight color shifts between frames, the occasional light leak painting an edge in unexpected warmth. Characters exist in the unselfconscious beauty of candid moments — the unstaged gesture, the genuine laugh caught between poses, the intimacy of someone unaware they are being observed through a viewfinder. Each composition breathes with the relaxed confidence of photographers who had 36 exposures and made each one count: centered subjects with generous negative space, natural framing through doorways and windows, and the patient stillness of waiting for the right moment rather than manufacturing it.",
+            quality_keywords=["authentic film look", "beautiful analog tones", "professional vintage photography", "nostalgic quality", "cinematic film grain"]
+        ),
+
+        # ============ 铅笔素描风格 ============
+        "pencil_sketch": StyleEnforcement(
+            style_name="pencil_sketch",
+            style_display_name="Pencil Sketch Drawing",
+            mandatory_keywords=[
+                "pencil sketch", "graphite drawing", "hand-drawn lines",
+                "crosshatching", "sketched artwork", "pencil on paper",
+                "detailed pencil work", "monochrome drawing", "fine linework"
+            ],
+            forbidden_keywords=[
+                "photorealistic", "full color", "vibrant colors", "neon",
+                "3D render", "digital painting", "watercolor", "oil painting",
+                "cartoon", "anime", "pixel art", "glossy", "saturated"
+            ],
+            style_description="You are drawing in the tradition of master draftsmen — artists who proved that a single graphite pencil against white paper holds infinite range, from the palest whisper of tone to the deepest velvet black. Light is built through the absence and accumulation of marks: bright areas where the paper breathes untouched, mid-tones constructed through patient parallel hatching, and deep shadows layered through crosshatching that builds density like woven darkness. The tonal palette spans the full graphite spectrum — hard pencil lines that leave silvery traces for distant details, soft graphite laid on its side for broad atmospheric washes, and the rich near-black of 6B pressed firmly for moments of dramatic emphasis. Every surface reveals the hand that made it: the slight wobble of a freehand line that proves human presence, the varied pressure that gives each stroke its own character, eraser marks that leave ghost traces of revised decisions, and the tooth of paper grain catching graphite in its texture. Characters emerge through the accumulation of observed detail — the weight of fabric rendered through directional strokes, the luminosity of eyes built from carefully preserved highlights, the suggestion of life in the looseness of hair and the precision of a gaze. Each composition thinks in terms of tonal architecture: large shapes of light and dark establishing the structure, focal areas rendered in crisp detail while periphery dissolves into suggestion, and generous white space that gives the drawing room to breathe.",
+            quality_keywords=["masterful pencil work", "detailed graphite drawing", "professional sketch quality", "artistic linework", "museum quality drawing"]
+        ),
+
+        # ============ Q版卡通风格 ============
+        "chibi": StyleEnforcement(
+            style_name="chibi",
+            style_display_name="Chibi Cute Cartoon",
+            mandatory_keywords=[
+                "chibi style", "super deformed", "cute cartoon", "big head small body",
+                "kawaii aesthetic", "adorable characters", "rounded proportions",
+                "pastel colors", "chibi anime"
+            ],
+            forbidden_keywords=[
+                "photorealistic", "photograph", "realistic anatomy", "realistic proportions",
+                "dark gritty", "horror", "violent", "mature content", "oil painting",
+                "ink wash", "noir", "gothic", "harsh shadows", "realistic skin"
+            ],
+            style_description="You are drawing in the tradition of chibi and super-deformed character design — artists who discovered that shrinking a character to their most essential, adorable proportions amplifies emotion by a thousand percent. Light is universally kind: soft even illumination that eliminates harsh shadows, gentle highlights on round cheeks, and an overall brightness that keeps every scene feeling safe and joyful. Colors burst with sugary energy — cotton candy pinks, sky blues, mint greens, sunny yellows — all pushed toward their most cheerful saturation, with pastel backgrounds that never compete with the characters' candy-colored world. Proportions follow the sacred chibi ratio: heads occupy one-half to one-third of total body height, eyes are enormous sparkling orbs that carry every emotion from giddy joy to comedic despair, and tiny stubby limbs gesture with maximum expressiveness despite minimal anatomy. Characters express through exaggeration and simplicity — a blush rendered as two rosy circles, anger as a comically oversized vein mark, joy as closed crescent eyes and a mouth wider than physically possible, each emotion dialed to its most readable extreme. Each composition keeps things delightfully simple: clean uncluttered backgrounds often reduced to color fields or simple patterns, characters centered and prominent, and generous use of cute decorative elements — sparkles, hearts, stars, musical notes — floating around characters like emotional subtitles.",
+            quality_keywords=["adorable chibi art", "professional kawaii style", "cute character design", "polished chibi illustration", "clean coloring"]
+        ),
+
+        # ============ 暗黑奇幻风格 ============
+        "dark_fantasy": StyleEnforcement(
+            style_name="dark_fantasy",
+            style_display_name="Dark Fantasy Art",
+            mandatory_keywords=[
+                "dark fantasy art", "epic fantasy illustration", "dramatic dark lighting",
+                "mythical atmosphere", "fantasy concept art", "otherworldly",
+                "dark magical ambiance", "epic scale", "fantasy character design"
+            ],
+            forbidden_keywords=[
+                "photorealistic photograph", "cute", "kawaii", "chibi", "bright cheerful",
+                "pastel colors", "children's style", "pixel art", "minimalist",
+                "flat design", "cartoon comedy", "pop art", "light-hearted"
+            ],
+            style_description="You are painting in the tradition of dark fantasy masters — Beksinski's organic nightmares, Frazetta's primal power, and the brooding majesty of artists who find beauty in shadow and terror in grandeur. Light is rare and precious: a single torch flame carving warmth from engulfing darkness, bioluminescent flora casting an alien glow through primordial caverns, moonlight filtering through storm clouds to silver-edge a figure standing against the void. Colors are drawn from a palette of ancient darkness — deep crimsons like dried blood, midnight blues that swallow distance, tarnished golds that suggest fallen glory, and the sickly greens of things that grow where light cannot reach. Every surface tells of age and power: stone carved with forgotten runes now cracked by centuries, armor scarred by battles whose names are lost, forests where trees twist with an intelligence that predates humanity, and skies where clouds form shapes that might be gods or might be warnings. Characters carry the weight of mythic archetypes — warriors whose scars map their survival, sorcerers whose eyes hold forbidden knowledge, creatures that blur the boundary between beautiful and terrifying. Each composition builds toward the sublime: vast scale that dwarfs human figures against impossible architecture, dramatic contrasts between illuminated subjects and consuming darkness, and the careful placement of light sources that make every shadow feel like it might contain something watching.",
+            quality_keywords=["epic fantasy illustration", "cinematic dark art", "concept art quality", "detailed fantasy rendering", "atmospheric dark painting"]
+        ),
+
+        # ============ 波普艺术风格 ============
+        "pop_art": StyleEnforcement(
+            style_name="pop_art",
+            style_display_name="Pop Art",
+            mandatory_keywords=[
+                "pop art style", "Andy Warhol inspired", "Roy Lichtenstein",
+                "bold primary colors", "Ben-Day dots", "comic book aesthetic",
+                "graphic bold outlines", "flat vibrant colors", "pop culture art"
+            ],
+            forbidden_keywords=[
+                "photorealistic", "subtle tones", "muted colors", "watercolor",
+                "oil painting texture", "3D render", "anime", "pixel art",
+                "dark gritty", "minimalist", "ink wash", "traditional painting",
+                "soft gradients", "pastel"
+            ],
+            style_description="You are creating in the tradition of Pop Art provocateurs — Warhol, Lichtenstein, Haring — artists who grabbed mass culture by the throat and held it up as fine art, proving that bold is beautiful and repetition is revelation. Light is graphic rather than natural: flat and even, eliminating subtle shadow in favor of bold color blocks that read like billboard advertisements, with occasional dramatic spotlights rendered as simple geometric shapes. Colors scream with commercial intensity — fire engine red, electric blue, taxi cab yellow, shocking pink — each applied in flat unmodulated areas that vibrate against each other with optical aggression, creating images that demand attention from across any room. Every surface is reduced to its graphic essence: Ben-Day dots simulating tone and texture with mechanical precision, thick black outlines containing color like stained glass, and the deliberate absence of nuanced shading replaced by hard-edged shadow shapes. Characters become icons — faces simplified to their most recognizable features then amplified, expressions frozen at their most dramatic or banal, ordinary people elevated to celebrity status through the sheer force of graphic treatment. Each composition embraces the language of commercial design: centered subjects with maximum impact, text elements integrated as graphic components, serial repetition that transforms single images into patterns, and the aggressive cropping that turns a face or an object into a cultural statement.",
+            quality_keywords=["bold pop art", "graphic art quality", "professional pop illustration", "iconic pop style", "vibrant graphic design"]
+        ),
+
+        # ============ 中国剪纸风格 ============
+        "paper_cut": StyleEnforcement(
+            style_name="paper_cut",
+            style_display_name="Chinese Paper Cut Art",
+            mandatory_keywords=[
+                "Chinese paper cut art", "jianzhi style", "paper cutting silhouette",
+                "intricate paper craft", "red paper cut", "folk art aesthetic",
+                "traditional Chinese craft", "layered paper", "decorative cutout"
+            ],
+            forbidden_keywords=[
+                "photorealistic", "3D render", "digital effects", "neon",
+                "Western art", "anime", "manga", "oil painting", "watercolor wash",
+                "pixel art", "gradient shading", "photographic", "smooth blending"
+            ],
+            style_description="You are cutting in the tradition of Chinese jianzhi masters — folk artists whose scissors and knives transform flat paper into worlds of astonishing intricacy, where negative space tells the story as eloquently as the remaining form. Light does not fall from any source — it passes through: the bright background shining through cut-away areas creates luminous negative shapes that define figures, patterns, and scenes, while the uncut paper creates bold silhouettes rich with internal detail. Color follows the jianzhi tradition — predominantly festive red against white or gold backgrounds, with occasional polychrome versions layering colored papers to create depth, each color a distinct flat plane with no gradation. Every surface celebrates the paper's own nature: crisp clean edges where the blade has passed, intricate internal patterns of flowers, clouds, and geometric motifs cut within larger forms, and the slight dimensional quality of layered paper casting tiny real shadows. Characters are defined through silhouette and costume detail — elaborate headdresses, flowing robes with patterned borders, theatrical poses that read clearly as flat shapes, faces in profile or three-quarter view rendered with minimal but expressive cutout features. Each composition follows folk art's decorative logic: bilateral symmetry for auspicious subjects, border frames of intertwining vines and auspicious symbols, layered foreground and background planes that create theatrical depth, and the joyful density of pattern filling every available space with meaning and beauty.",
+            quality_keywords=["exquisite paper cut art", "masterful jianzhi craft", "traditional folk art quality", "intricate cutting detail", "authentic Chinese craft"]
+        ),
+
+        # ============ 蒸汽朋克风格 ============
+        "steampunk": StyleEnforcement(
+            style_name="steampunk",
+            style_display_name="Steampunk Aesthetic",
+            mandatory_keywords=[
+                "steampunk style", "Victorian aesthetic", "brass and copper machinery",
+                "clockwork mechanisms", "steam-powered technology", "industrial gears",
+                "retro-futuristic", "Victorian fashion", "mechanical details"
+            ],
+            forbidden_keywords=[
+                "modern technology", "digital screens", "neon lights", "minimalist",
+                "clean futuristic", "anime", "chibi", "kawaii", "pixel art",
+                "flat colors", "watercolor", "paper cut", "ink wash", "pastel"
+            ],
+            style_description="You are engineering in the tradition of steampunk visionaries — artists who imagined a future that the Victorians might have built, where steam power never yielded to electricity and every machine is a work of brass-and-glass art. Light comes from flame and filament: gas lamps casting warm amber pools through fog-thick streets, furnace glow painting engineers in hellish orange, and the pale daylight of industrial cities filtering through soot-stained skylights. Colors are drawn from the steampunk material palette — warm brass and burnished copper, deep mahogany and rich leather brown, verdigris patina on aged bronze, and the steel-gray of iron machinery, all set against the sepia warmth of aged parchment and the cream of Victorian wallpaper. Every surface is a celebration of mechanical craft: exposed gears meshing with mathematical precision, riveted metal plates joined with visible bolts, polished wood inlaid with brass instruments, glass dials and pressure gauges clustered on every available surface. Characters dress at the intersection of elegance and engineering — top hats fitted with brass goggles, corsets reinforced with leather straps, waistcoats hung with pocket watches and miniature tools, and the soot under fingernails that marks an inventor who works with their hands. Each composition builds layered mechanical worlds: foreground machinery framing characters like industrial portraiture, background skylines bristling with smokestacks and airship masts, and the satisfying visual density of a world where every device proudly displays its working parts.",
+            quality_keywords=["detailed steampunk illustration", "professional mechanical design", "atmospheric steampunk art", "Victorian-era quality", "intricate machinery detail"]
+        ),
+
+        # ============ 新艺术风格 ============
+        "art_nouveau": StyleEnforcement(
+            style_name="art_nouveau",
+            style_display_name="Art Nouveau Style",
+            mandatory_keywords=[
+                "Art Nouveau style", "Alphonse Mucha inspired", "organic flowing lines",
+                "decorative borders", "floral ornamental patterns", "elegant curves",
+                "sinuous organic forms", "ornate illustration", "belle epoque aesthetic"
+            ],
+            forbidden_keywords=[
+                "photorealistic", "3D render", "pixel art", "minimalist",
+                "harsh geometric", "brutalist", "cyberpunk", "dark gritty",
+                "cartoon comedy", "chibi", "sharp angles only", "industrial"
+            ],
+            style_description="You are designing in the tradition of Art Nouveau masters — Mucha, Klimt, Beardsley — artists who believed that art should flow like nature and that decoration is not excess but essence. Light glows from within: figures and flowers seem to generate their own radiance, with soft golden halos and warm backlighting that makes every subject appear blessed by an inner luminosity, shadows remaining gentle and warm rather than harsh. Colors follow nature's most elegant palette — dusty rose, sage green, warm gold, deep teal, and muted lavender — applied in flat or gently gradated areas bounded by the defining outlines, occasionally punctuated by rich jewel tones that glow like stained glass panels. Every surface is alive with organic ornament: sinuous vine tendrils framing the composition, flowers that are botanically recognizable yet stylized into flowing decorative motifs, hair cascading in impossible arabesque curves that become part of the overall pattern. Characters — predominantly elegant figures — are defined by the flowing line that traces their forms: long necks, cascading hair that merges with surrounding flora, draped fabrics that follow the body in idealized curves, and poses that embody grace and contemplation rather than action. Each composition follows Mucha's theatrical logic: figures centered within elaborate decorative frames, symmetrical or near-symmetrical arrangements that lend poster-like impact, halo-shaped backgrounds that sanctify the subject, and the integration of typography and ornament into a unified visual experience where every element serves both decoration and narrative.",
+            quality_keywords=["masterful Art Nouveau illustration", "Mucha-quality decorative art", "elegant ornamental design", "professional belle epoque style", "exquisite flowing linework"]
+        ),
+
+        # ============ 黑色电影风格 ============
+        "noir": StyleEnforcement(
+            style_name="noir",
+            style_display_name="Film Noir Cinematic",
+            mandatory_keywords=[
+                "film noir style", "high contrast black and white", "dramatic shadows",
+                "venetian blind lighting", "hard-boiled detective aesthetic",
+                "chiaroscuro", "moody atmosphere", "1940s cinematic", "noir lighting"
+            ],
+            forbidden_keywords=[
+                "bright colors", "vibrant", "cheerful", "kawaii", "cartoon comedy",
+                "pastel", "children's style", "pixel art", "pop art",
+                "watercolor", "flat lighting", "even illumination", "neon"
+            ],
+            style_description="You are filming in the tradition of noir cinematographers — artists who proved that darkness is not the absence of light but its most powerful expression, where shadows carry more story than anything illumination reveals. Light is the protagonist's adversary and confessor: a single desk lamp carving a face into halves of knowledge and secret, venetian blind shadows striping a wall like prison bars, the cold fluorescent of an interrogation room leaving no place to hide, and the rain-blurred glow of a distant streetlight promising safety that never arrives. The palette is the grayscale's full dramatic range — crushed blacks that swallow entire backgrounds, silvery mid-tones on rain-wet surfaces, and the shocking bright white of a femme fatale's cigarette smoke or a detective's shirt cuff emerging from darkness. Every surface glistens with noir's signature moisture: rain-slicked streets reflecting fractured light, polished desk surfaces mirroring the overhead interrogation lamp, chrome bumpers of parked sedans catching stray illumination, and the wet sheen of a trench coat that has been through one too many stakeouts. Characters are defined by what the light chooses to reveal — a jaw clenched in determination, eyes hidden under a fedora brim, the curl of cigarette smoke rising from a silhouette, hands that grip or gesture from pools of shadow. Each composition uses noir's geometric vocabulary: extreme high angles that make characters feel trapped, low angles that turn ordinary people into threatening figures, Dutch tilts for a world off its moral axis, and the deep-focus compositions where foreground and background both hold clues.",
+            quality_keywords=["cinematic noir photography", "dramatic black and white", "professional film noir", "atmospheric monochrome", "masterful shadow work"]
+        ),
+
+        # ============ 欧美漫画风格 ============
+        "comic_western": StyleEnforcement(
+            style_name="comic_western",
+            style_display_name="Western Comic Book Art",
+            mandatory_keywords=[
+                "Western comic book style", "Marvel DC aesthetic", "bold comic colors",
+                "superhero art", "dynamic action poses", "comic book inking",
+                "heroic proportions", "dramatic comic composition", "comic panel art"
+            ],
+            forbidden_keywords=[
+                "anime", "manga", "chibi", "kawaii", "photorealistic photograph",
+                "watercolor", "ink wash", "pixel art", "minimalist",
+                "soft pastel", "oil painting", "children's book", "cute"
+            ],
+            style_description="You are drawing in the tradition of Western comic book legends — Kirby, Ross, Lee, McFarlane — artists who turned ink and color into a mythology where every human body becomes heroic architecture and every panel crackles with kinetic force. Light is theatrical and purposeful: dramatic rim lighting that separates figures from backgrounds like spotlights on a stage, bold shadow shapes that define musculature and create instant drama, and the signature comic technique of colored lighting — blue key light from one side, warm fill from another — that gives flat illustrations three-dimensional punch. Colors are the saturated primaries and secondaries of four-color printing pushed to maximum impact — Superman blue, Hulk green, Spider-Man red — applied in bold flat areas with decisive shadow shapes, skin tones that glow with idealized vitality, and backgrounds that shift color temperature to match the emotional register of the scene. Every surface declares its material through confident linework: muscles defined by precise anatomical inking, fabric stretching and folding under physical force, metal reflecting environment in simplified highlight shapes, and the dynamic hatching and crosshatching that builds texture and shadow. Characters embody heroic idealism — powerful proportions with broad shoulders and dynamic stances, clenched fists and billowing capes that suggest action even in still moments, faces that project determination and emotion with comic clarity. Each composition explodes with energy: dramatic foreshortening that makes fists and feet burst toward the viewer, diagonal compositions that keep the eye racing, the iconic low angle that makes every figure monumental, and dynamic camera angles borrowed from action cinematography.",
+            quality_keywords=["professional comic book art", "heroic illustration quality", "dynamic comic composition", "bold inking", "cinematic comic style"]
+        ),
+
+        # ============ 梦幻马卡龙风格 ============
+        "pastel_dream": StyleEnforcement(
+            style_name="pastel_dream",
+            style_display_name="Pastel Dreamscape",
+            mandatory_keywords=[
+                "pastel color palette", "dreamy soft aesthetic", "ethereal atmosphere",
+                "soft pink and lavender tones", "gentle gradient lighting",
+                "whimsical fairy tale", "cotton candy colors", "soft focus dreamy"
+            ],
+            forbidden_keywords=[
+                "dark", "gritty", "noir", "horror", "harsh shadows",
+                "cyberpunk", "industrial", "photorealistic", "desaturated",
+                "monochrome", "black and white", "gothic", "violent", "bold contrast"
+            ],
+            style_description="You are painting in the tradition of pastel dreamscape artists — creators who build worlds from spun sugar and morning mist, where every color arrives pre-softened and every edge dissolves into reverie. Light suffuses everything with gentle warmth: no harsh source, no hard shadow, just an omnipresent luminous glow as if the entire world is lit from within by rose-gold dawn that never quite becomes full day. Colors exist exclusively in their most tender register — powder pink, baby blue, lavender, mint cream, peach, and soft coral — each further softened by the addition of white until they feel like tinted air rather than pigment, gradients transitioning so gently between hues that boundaries disappear into chromatic whispers. Every surface feels impossibly soft: clouds that look like they would yield to a finger's touch, petals with translucent edges, fabrics that drift and float as if gravity itself has been gentled, and backgrounds that fade into luminous fog at their edges. Characters are delicate and idealized — smooth skin with the faintest blush, large gentle eyes that shimmer with reflected pastel light, hair that flows in soft waves catching pink and lavender highlights, and expressions that lean toward wonder, tenderness, and quiet joy. Each composition creates floating sanctuary: subjects surrounded by generous breathing space of soft gradient, decorative elements — butterflies, petals, sparkles, bubbles — drifting through the air like visual poetry, and an overall sense that the frame captures a moment existing somewhere between waking and the sweetest possible dream.",
+            quality_keywords=["beautiful pastel art", "ethereal illustration quality", "professional dreamy aesthetic", "soft luminous coloring", "delicate atmospheric art"]
+        ),
+
+        # ============ 哥特风格 ============
+        "gothic": StyleEnforcement(
+            style_name="gothic",
+            style_display_name="Gothic Dark Romantic",
+            mandatory_keywords=[
+                "gothic art style", "dark romantic aesthetic", "cathedral architecture",
+                "ornate dark details", "dramatic chiaroscuro", "Victorian gothic",
+                "ravens and roses", "stained glass", "dark elegance"
+            ],
+            forbidden_keywords=[
+                "bright cheerful", "kawaii", "chibi", "pastel", "pop art",
+                "cartoon comedy", "pixel art", "minimalist", "flat design",
+                "children's style", "sunny", "beach", "tropical"
+            ],
+            style_description="You are creating in the tradition of Gothic romantics — artists who find transcendent beauty in darkness, who see cathedrals as stone prayers and graveyards as gardens of memory. Light enters through colored glass: stained windows casting jewel-toned patterns across stone floors, candelabra flames making shadows dance on vaulted ceilings, moonlight filtering through gargoyle-guarded apertures to silver-edge figures in prayer or contemplation. Colors are drawn from the Gothic palette — deep burgundy, midnight purple, forest black-green, tarnished silver, and bone white — occasionally pierced by the gemstone brilliance of stained glass ruby and sapphire that burn with spiritual intensity against surrounding shadow. Every surface carries the weight of centuries: stone walls where moisture traces dark veins, wrought iron twisted into thorned arabesques, velvet that absorbs light into its deep folds, aged wood carved with saints and sinners, and the patina of silver tarnishing under generations of candlesmoke. Characters embody dark elegance — pale skin that glows against dark clothing, features caught between beauty and melancholy, elaborate Victorian or medieval dress rich with lace and embroidery, and the stillness of figures who have made peace with the darkness around them. Each composition builds architectural drama: towering vertical elements that draw the eye upward like nave columns, pointed arches framing figures like altarpieces, the interplay of massive stone structure and intimate human vulnerability, and the presence of Gothic's symbolic vocabulary — ravens, roses, thorns, keys, and the ever-present dance of candlelight against encroaching shadow.",
+            quality_keywords=["atmospheric gothic art", "dark romantic illustration", "detailed gothic architecture", "professional dark fantasy", "elegant Victorian aesthetic"]
+        ),
     }
+
+    @classmethod
+    def create_custom_enforcement(cls, analysis: dict) -> "StyleEnforcement":
+        """从自定义风格分析结果创建动态 StyleEnforcement"""
+        return StyleEnforcement(
+            style_name="custom",
+            style_display_name=analysis.get("style_display_name", "Custom Style"),
+            mandatory_keywords=analysis.get("mandatory_keywords", []),
+            forbidden_keywords=analysis.get("forbidden_keywords", []),
+            style_description=analysis.get("style_description", ""),
+            quality_keywords=analysis.get("quality_keywords", []),
+        )
 
     @classmethod
     def get_enforcement(cls, style_name: str) -> Optional[StyleEnforcement]:

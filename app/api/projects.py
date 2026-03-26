@@ -1,8 +1,10 @@
 """Projects API"""
 
 import asyncio
+import json
 from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db, async_session_maker
@@ -33,18 +35,27 @@ async def create_project(
     Create a new project and start generating the first chapter
     """
     # 1. Create project record
+    # 如果有文档文本，拼接到 original_idea
+    idea = project_data.original_idea
+    if project_data.document_text:
+        idea = f"{idea}\n\n---\n附加文档内容:\n{project_data.document_text}"
+
     project_id = str(uuid4())
     project = Project(
         id=project_id,
         user_id=user_id,
         title="未命名项目",  # Will be updated after story generation
-        original_idea=project_data.original_idea,
+        original_idea=idea,
         style_preset=project_data.style_preset,
         total_chapters=project_data.total_chapters,
         chapter_duration_minutes=project_data.chapter_duration_minutes,
         character_count=project_data.character_count,
         language=project_data.language,
         voice_preset=project_data.voice_preset,
+        aspect_ratio=project_data.aspect_ratio,
+        custom_style_analysis_json=json.dumps(project_data.custom_style_analysis, ensure_ascii=False) if project_data.custom_style_analysis else None,
+        character_refs_analysis_json=json.dumps(project_data.character_refs_analysis, ensure_ascii=False) if project_data.character_refs_analysis else None,
+        scene_refs_analysis_json=json.dumps(project_data.scene_refs_analysis, ensure_ascii=False) if project_data.scene_refs_analysis else None,
     )
     db.add(project)
 
@@ -188,15 +199,19 @@ async def generate_outline(
             target_duration_minutes=duration,
             language=project.language or "zh-CN",
             character_count=character_count,
+            character_refs_analysis=json.loads(project.character_refs_analysis_json) if project.character_refs_analysis_json else None,
+            scene_refs_analysis=json.loads(project.scene_refs_analysis_json) if project.scene_refs_analysis_json else None,
+            custom_style_name=json.loads(project.custom_style_analysis_json).get("style_display_name") if project.custom_style_analysis_json else None,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"大纲生成失败: {str(e)}")
 
-    # 4. Update project title from generated outline
+    # 4. Store raw LLM outline + update project title
+    project.raw_outline_json = json.dumps(outline, ensure_ascii=False)
     if outline.get("title"):
         project.title = outline["title"]
-        db.add(project)
-        await db.flush()
+    db.add(project)
+    await db.flush()
 
     # 5. Map snake_case → camelCase for frontend
     characters = []
@@ -233,6 +248,33 @@ async def generate_outline(
         "endings": endings,
         "mood": outline.get("mood", ""),
     }
+
+
+class ConfirmOutlineRequest(BaseModel):
+    """用户确认/修改后的大纲"""
+    outline: dict
+
+
+@router.post("/{project_id}/confirm-outline")
+async def confirm_outline(
+    project_id: str,
+    req: ConfirmOutlineRequest,
+    user_id: int = Depends(verify_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Store user-confirmed outline after StageB edits"""
+    result = await db.execute(
+        select(Project).where(Project.id == project_id, Project.user_id == user_id)
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    project.confirmed_outline_json = json.dumps(req.outline, ensure_ascii=False)
+    db.add(project)
+    await db.commit()
+
+    return {"success": True, "message": "大纲已确认"}
 
 
 @router.delete("/{project_id}")

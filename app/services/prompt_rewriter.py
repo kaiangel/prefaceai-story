@@ -151,7 +151,7 @@ class PromptRewriter:
             if rewritten is None and self.gemini_client:
                 try:
                     response = await self.gemini_client.aio.models.generate_content(
-                        model="gemini-3.1-flash-preview",
+                        model="gemini-3.1-flash-lite-preview",
                         contents=rewrite_prompt,
                         config={"max_output_tokens": self.MAX_TOKENS}
                     )
@@ -279,7 +279,7 @@ class PromptRewriter:
             if rewritten is None and self.gemini_client:
                 try:
                     response = await self.gemini_client.aio.models.generate_content(
-                        model="gemini-3.1-flash-preview",
+                        model="gemini-3.1-flash-lite-preview",
                         contents=rewrite_prompt,
                         config={"max_output_tokens": self.MAX_TOKENS}
                     )
@@ -317,7 +317,7 @@ class PromptRewriter:
             if rewritten is None and self.gemini_client:
                 try:
                     response = await self.gemini_client.aio.models.generate_content(
-                        model="gemini-3.1-flash-preview",
+                        model="gemini-3.1-flash-lite-preview",
                         contents=rewrite_prompt,
                         config={"max_output_tokens": self.MAX_TOKENS}
                     )

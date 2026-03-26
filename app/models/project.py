@@ -19,6 +19,12 @@ class Project(Base):
     character_count = Column(Integer, default=2)
     language = Column(String(32), default="zh-CN")
     voice_preset = Column(String(128), nullable=True)
+    aspect_ratio = Column(String(16), default="2:3")
+    raw_outline_json = Column(Text, nullable=True)        # LLM 返回的原始大纲 JSON
+    confirmed_outline_json = Column(Text, nullable=True)   # 用户确认后的最终大纲 JSON
+    custom_style_analysis_json = Column(Text, nullable=True)       # 自定义风格分析结果
+    character_refs_analysis_json = Column(Text, nullable=True)     # 角色参考图分析结果
+    scene_refs_analysis_json = Column(Text, nullable=True)         # 场景参考图分析结果
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

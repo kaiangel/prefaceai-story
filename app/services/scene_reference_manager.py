@@ -295,7 +295,8 @@ class SceneReferenceManager:
         image_generator,
         unique_locations: List[Dict[str, Any]] = None,
         delay: float = 3.0,
-        location_character_counts: Dict[str, int] = None
+        location_character_counts: Dict[str, int] = None,
+        seed_images: Dict[str, "Image.Image"] = None,
     ) -> Dict[str, Dict[str, Any]]:
         """
         P2.0核心方法：为每种场景类型生成锚点图
@@ -346,13 +347,15 @@ class SceneReferenceManager:
                 anchor_info = anchors[interior_key]
                 print(f"  生成锚点图 [{current_index}/{total_count}]: {interior_key}...")
 
+                # seed_image: 用户上传的场景参考图（如有）
+                scene_seed = (seed_images or {}).get(location_id)
                 interior_image, interior_result = await self._generate_single_anchor(
                     anchor_key=interior_key,
                     anchor_info=anchor_info,
                     view_type='interior',
                     project_style=project_style,
                     image_generator=image_generator,
-                    reference_image=None,  # 内景无参考图
+                    reference_image=scene_seed,  # 用户 seed 图或 None
                     location_id=location_id,  # 🚨 传入原始location_id用于存储
                     num_characters=loc_num_chars  # T21: 角色数量
                 )
