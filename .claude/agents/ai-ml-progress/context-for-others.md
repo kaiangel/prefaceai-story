@@ -8,10 +8,14 @@
 ## 当前状态速览
 
 ```
-状态: TASK-OUTLINE-LLM-FIX 第 1 项完成 (system prompt 设计)
-       TASK-OUTLINE-PROMPT-UPGRADE 完成 (Stage 1 prompt 新增 5 个字段)
-下一步: Backend 集成 system prompt → PM Review
+状态: TASK-PHASE2-PROMPTS 完成 (4 个分析/上下文 prompt) + TASK-STYLE-EXPAND-28 完成
+下一步: Backend 集成 4 prompts → PM Review
 ```
+
+### @Backend 注意
+- Prompt 1-3 集成到 utils.py 的 3 个分析端点
+- Prompt 4 (`_build_user_reference_context`) 集成到 story_outline_generator.py 的 `_build_prompt`
+- Prompt 4 是 Python 函数，返回空字符串当无参考 → 用 `prompt += _build_user_reference_context(...)` 即可
 
 ---
 

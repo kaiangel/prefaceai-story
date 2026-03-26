@@ -4,6 +4,40 @@
 
 ---
 
+## 2026-03-25
+
+### TASK-PHASE2-PROMPTS — Phase 2 分析/上下文 prompt 设计 ✅
+
+**完成时间**: 2026-03-25
+**交付方式**: TEAM_CHAT 发布，@backend 集成
+
+4 个 prompt:
+1. 自定义风格分析 (STYLE_ANALYSIS_PROMPT) — 6 维分析 → StyleEnforcement JSON + display_tags
+2. 角色特征提取 (CHARACTER_ANALYSIS_PROMPT) — 6 维分析 → description_zh/en + gender + age_range + display_name
+3. 场景特征提取 (SCENE_ANALYSIS_PROMPT) — 6 维分析 → description_zh/en + location_type + atmosphere + display_name
+4. 用户参考上下文段 (_build_user_reference_context) — 动态函数，角色/场景/风格三段按需拼接，无参考时返回空字符串
+
+设计要点:
+- Prompt 1 的 mandatory/forbidden 直接对齐 StyleEnforcement，Backend 零转换
+- Prompt 2/3 核心用文本描述（PM 决策避免前后端耦合），保留少量结构化字段（gender/age_range/location_type）
+- Prompt 4 是函数而非纯文本，处理部分参考缺失
+
+---
+
+### TASK-STYLE-EXPAND-28 — 13 个新风格完整配置 ✅
+
+**完成时间**: 2026-03-25
+**交付方式**: TEAM_CHAT 发布，@backend + @frontend 集成
+
+13 个新风格: ukiyo_e, vintage_film, pencil_sketch, chibi, dark_fantasy, pop_art, paper_cut, steampunk, art_nouveau, noir, comic_western, pastel_dream, gothic
+
+每个风格交付:
+- StyleEnforcement 6 维度 (name, display_name, mandatory 8-10, forbidden 10-15, description 100-300 字, quality 5-8)
+- 前端展示 (label 中文名 + description 定位 + CSS gradient)
+- StylePreset Literal 扩展 15→28
+
+---
+
 ## 2026-03-24
 
 ### TASK-OUTLINE-LLM-FIX 第 1 项 — system prompt 设计 ✅

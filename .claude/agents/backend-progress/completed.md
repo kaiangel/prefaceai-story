@@ -4,6 +4,73 @@
 
 ---
 
+## 2026-03-25
+
+### TASK-PHASE2-PIPELINE 完成 ✅ (含 ProjectStyleConfig bug 修复)
+
+- `style_enforcer.py`: +`create_custom_enforcement(analysis)` 类方法
+- `reference_image_manager.py`: `generate_character_multi_refs` +`seed_image` + `set_reference` dict 格式修复
+- `scene_reference_manager.py`: `generate_anchor_images` +`seed_images` 参数
+- `pipeline_orchestrator.py`: `run()` +3 参数 + 自定义风格 enforcement + seed 传参
+
+### TASK-PHASE2-INTEGRATE Backend 完成 ✅
+
+- `app/schemas/project.py`: +3 字段 (custom_style_analysis, character_refs_analysis, scene_refs_analysis)
+- `app/models/project.py`: +3 JSON 字段
+- `app/api/projects.py`: create_project 存储 + generate_outline 传参
+- `story_outline_generator.py`: 移除 _build_prompt 末尾重复 + else 分支补"现在开始生成故事大纲："（PM Review #7 修复）
+
+### TASK-PHASE2-INFRA 完成 ✅
+
+- 新建 `app/services/file_storage.py`: validate_image + compress_image + save/delete_upload
+- `app/api/utils.py`: +3 分析端点 (analyze-style/character/scene) + `_vision_analyze` helper + AI-ML Prompt 1-3
+- `story_outline_generator.py`: +`_build_user_reference_context()` (Prompt 4) + `generate()` 新增 3 参数
+- 安全校验: 图片类型+大小+PIL验证 + 超 2048px 等比缩小
+
+### TASK-UTILS-ASYNC-FIX 完成 ✅
+
+- `app/api/utils.py` OCR 端点: Gemini 同步→异步 + Anthropic 同步→异步
+
+### Phase 1 Step 2: StyleEnforcer 28 + Literal 28 完成 ✅
+
+- `app/services/style_enforcer.py`: +13 个 `StyleEnforcement` 条目（AI-ML 设计）
+- `app/schemas/project.py`: `StylePreset` Literal 15 → 28
+- 验证: StyleEnforcement 28 ✅ + StylePreset 28 ✅
+
+### TASK-STYLE-LITERAL-FIX 完成 ✅ (P0)
+
+- `app/schemas/project.py`: `StylePreset` Literal 10 → 15，删 `"chinese"` 残留，加 5 个缺失风格
+- 修复 422 bug（含默认 `korean_webtoon`）
+
+### TASK-DOC-TEXT-WIRE Backend 完成 ✅
+
+- `app/schemas/project.py`: +`document_text` 字段
+- `app/api/projects.py`: `create_project` 拼接 `document_text` 到 `original_idea`
+
+### TASK-OCR-ENDPOINT 完成 ✅
+
+- 新建 `app/api/utils.py`: `POST /api/utils/ocr` (Gemini + Haiku) + `POST /api/utils/parse-document` (pdfplumber)
+- `app/main.py` +2 行注册
+
+### TASK-ASPECT-RATIO-WIRE Backend 完成 ✅
+
+- `app/schemas/project.py` L32: +`aspect_ratio` 字段到 `ProjectCreate`
+- `app/api/projects.py` L50: +`aspect_ratio=project_data.aspect_ratio` 到 `create_project`
+
+### TASK-GEMINI-MODEL-FIX 完成 ✅
+
+- 7 文件 9 处 Gemini 备用模型 ID → `gemini-3.1-flash-lite-preview`
+- PM 派发 6 文件 + 额外 `story_generator.py` (共 7 文件)
+- 旧 ID `gemini-3-flash-preview` + `gemini-3.1-flash-preview` 零残留
+
+### TASK-OUTLINE-STORAGE 完成 ✅
+
+- `app/models/project.py`: +3 字段 (`aspect_ratio`, `raw_outline_json`, `confirmed_outline_json`)
+- `app/api/projects.py`: `generate_outline` 存 raw + 新增 `POST /{project_id}/confirm-outline`
+- 遵循 Ben 架构模式 (verify_user + get_db + 归属验证)
+
+---
+
 ## 2026-03-24
 
 ### TASK-OUTLINE-LLM-FIX 第 1-3 项完成 ✅

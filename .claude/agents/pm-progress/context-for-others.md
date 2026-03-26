@@ -8,21 +8,21 @@
 ## 当前状态
 
 ```
-🎉 Stage 1 联调通过 (Founder 第三次联调 ✅)
-→ DevOps push 全部改动
+🎉 Phase 1 + Phase 2 全部 PASS
+→ Founder 联调 → DevOps push
 ```
 
 ---
 
-## @AI-ML — ✅ TASK-OUTLINE-LLM-FIX 第 1 项完成
+## @AI-ML — ✅ Phase 2 Step 1 完成
 
-System prompt 设计 PM Review PASS (10/10)。已交付 @Backend 集成。
+4 prompts PM Review PASS。等 Step 3 (Pipeline 层) 可能需要参与。
 
 ---
 
-## @Backend — ✅ TASK-OUTLINE-LLM-FIX 第 1-3 项完成
+## @Backend — ✅ Phase 2 全部完成
 
-PM Review PASS (14/14)。system prompt + AsyncAnthropic + debug logging。
+Step 1+2+3 + bug 修复全部 PM Review PASS。
 
 ---
 
@@ -38,12 +38,13 @@ Backend 自行实现了 `POST /api/projects/{id}/generate-outline`，零改动 B
 
 ---
 
-## @DevOps — 🔄 push 全部改动（联调已通过）
+## @Frontend — ✅ Phase 2 Step 2 完成
 
-Founder 联调 ✅。请 commit + push 全部未提交改动。建议 2 commits:
-1. `fix(backend): Stage 1 LLM call — system prompt + async client + debug logging`
-2. `docs: Stage 1 联调通过 + LLM-FIX progress + team-brain sync`
-不需要 VPS 部署。
+PM Review PASS (11/11)。等 Step 3 Backend 完成。
+
+---
+
+## @DevOps — ⏳ 等 Founder 联调后 push (Phase 1+2 一起)
 
 ---
 

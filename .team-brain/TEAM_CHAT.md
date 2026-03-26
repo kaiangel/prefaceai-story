@@ -29177,6 +29177,85 @@ Critical rules:
 
 ---
 
+#### @pm → @backend (2026-03-25)
+
+### 任务 A: TASK-GEMINI-MODEL-FIX — 备用 Gemini 模型 ID 统一修正（6 文件）
+
+**背景**: PM 调研确认 `gemini-3.1-flash-preview` **不存在**（Google 官方 404）。Gemini 3.1 Flash 系列只有 `flash-lite` 和 `flash-image`。Founder 决定全部统一为 `gemini-3.1-flash-lite-preview`（$0.25/$1.50，比 3-flash 的 $0.50/$3.00 便宜一半）。
+
+**6 个文件逐一列出**:
+
+| # | 文件 | 当前值 | 改为 |
+|---|------|--------|------|
+| 1 | `app/services/story_outline_generator.py` L42 | `gemini-3-flash-preview` | `gemini-3.1-flash-lite-preview` |
+| 2 | `app/services/character_designer.py` L39 | `gemini-3-flash-preview` | `gemini-3.1-flash-lite-preview` |
+| 3 | `app/services/screenplay_writer.py` L41 | `gemini-3-flash-preview` | `gemini-3.1-flash-lite-preview` |
+| 4 | `app/services/storyboard_director.py` L333 | `gemini-3-flash-preview` | `gemini-3.1-flash-lite-preview` |
+| 5 | `app/services/prompt_rewriter.py` L154/282/320 | `gemini-3.1-flash-preview` (**无效 ID**) | `gemini-3.1-flash-lite-preview` |
+| 6 | `app/services/alignment_service.py` L46 | `gemini-3.1-flash-preview` (**无效 ID**) | `gemini-3.1-flash-lite-preview` |
+
+**验证**: 改完后 grep 确认 `gemini-3-flash-preview` 和 `gemini-3.1-flash-preview` 在 `app/services/` 下零残留。
+
+---
+
+### 任务 B: TASK-OUTLINE-STORAGE — Stage 1 大纲三阶段存储
+
+**背景**: Ben (CTO) 提出 Stage 1 大纲流程必须存 3 样东西，Founder 已与 Ben 沟通确认由我们 Backend 实现。
+
+**需要存储的 3 样东西**:
+
+| # | 什么 | 时机 | 为什么 |
+|---|------|------|--------|
+| 1 | **用户输入参数** — StageA 提交的全部参数（故事创意、篇幅、风格、画面比例、语言等） | 用户点"生成故事"时 | 可追溯用户当时输入了什么 |
+| 2 | **原始 LLM 大纲** — Claude/Gemini 返回的第一版大纲，用户还没修改 | LLM 返回后立刻存 | 排查异常的唯一证据（用户投诉"大纲不对"时可调出对比） |
+| 3 | **用户确认大纲** — 用户在 StageB 修改完（改角色/调情节/选结局/换情绪）后的最终版 | 用户在 StageB 点"确认"时 | 后续 Stage 2-5 pipeline 实际使用的版本 |
+
+**具体要求**:
+
+**第 1 样（用户输入参数）**:
+- `POST /api/projects/` 已经存了 `original_idea`、`style_preset`、`chapter_duration_minutes`、`character_count`、`language`
+- 检查是否还缺 StageA 的其他参数（如 `aspect_ratio` 画面比例），缺的补上
+- 如果 Project model 已有字段够用就不用加新表
+
+**第 2 样（原始 LLM 大纲）**:
+- 在 `generate_outline` 端点中，LLM 返回后、映射前，把原始 JSON 存到数据库
+- 建议存为 JSON 文本字段（完整原始响应，不丢信息）
+- 存储位置：可以在 Project model 上加字段（如 `raw_outline_json`），或建新表，遵循 Ben 现有模式
+
+**第 3 样（用户确认大纲）**:
+- 需要新增端点: `POST /api/projects/{project_id}/confirm-outline`（或类似）
+- 前端 StageB 点"确认"时调用，传入用户修改后的大纲 JSON
+- 存到数据库（如 `confirmed_outline_json`）
+- 这个端点同样要遵循 Ben 架构模式（`verify_user` + `get_db` + Project 归属验证）
+
+**⚠️ 必须遵循 Ben 的架构模式**:
+- auth: `verify_user` + `Depends(get_current_user)`
+- DB: `get_db` + `AsyncSession`
+- 表/字段命名: 与 Ben 现有 Project model 一致
+- 不要新建路由文件，加到 `app/api/projects.py` 里
+
+**⚠️ 开工前必须先全面阅读 Ben 团队已有代码（Founder 特别强调）**:
+- `app/models/` — 所有 Model 定义（Project, Chapter, User, InviteCode 等），字段命名规范、类型约定、外键关系
+- `app/schemas/` — 所有 Pydantic Schema，了解 Ben 的请求/响应格式模式
+- `app/api/` — 所有现有端点，了解路由、auth、错误处理的统一模式
+- `app/database.py` — DB 连接和 session 管理
+- `.team-brain/team_ben/` — Ben 团队文档（只读），了解 Ben 的架构思路和后续规划
+- `.team-brain/shared-memory/` — 双团队共享记忆
+
+目的: 确保新增的字段/端点与 Ben 已有的数据库结构、命名规范、架构风格**完全对齐**，不产生风格冲突或命名不一致。
+
+**不要动**: 前端代码、prompt 内容、pipeline 逻辑、Ben 现有的端点和 model。
+
+---
+
+#### 执行顺序
+
+1. **先做任务 A**（简单，纯字符串替换），完成后通知 @pm
+2. **再做任务 B**（需要设计 DB 字段/端点），完成后通知 @pm
+3. 两个任务都完成后一起 PM Review
+
+---
+
 #### @devops (2026-03-24)
 
 ### ✅ LLM-FIX push 完成 — Stage 1 E2E 联调通过
@@ -29191,5 +29270,2011 @@ Critical rules:
 不需要 VPS 部署。
 
 **@pm**: LLM-FIX push 完成。Stage 1 联调代码全部在 GitHub。
+
+---
+
+#### @backend (2026-03-25)
+
+### ✅ 任务 A: TASK-GEMINI-MODEL-FIX 完成 — 7 文件 9 处
+
+全部统一为 `gemini-3.1-flash-lite-preview`:
+
+| # | 文件 | 原值 | 处数 |
+|---|------|------|------|
+| 1 | `story_outline_generator.py` | `gemini-3-flash-preview` | 1 |
+| 2 | `character_designer.py` | `gemini-3-flash-preview` | 1 |
+| 3 | `screenplay_writer.py` | `gemini-3-flash-preview` | 1 |
+| 4 | `storyboard_director.py` | `gemini-3-flash-preview` | 1 |
+| 5 | `prompt_rewriter.py` | `gemini-3.1-flash-preview` (无效) | 3 |
+| 6 | `alignment_service.py` | `gemini-3.1-flash-preview` (无效) | 1 |
+| 7 | `story_generator.py` | `gemini-3.1-flash-preview` (无效) | 1 |
+
+**注**: PM 派发 6 文件，额外发现 `story_generator.py` L21 也是无效 ID，一并修复。
+
+验证: `gemini-3-flash-preview` + `gemini-3.1-flash-preview` 在 `app/services/` 零残留 ✅
+
+---
+
+### ✅ 任务 B: TASK-OUTLINE-STORAGE 完成 — 大纲三阶段存储
+
+**改动文件**:
+
+| 文件 | 改动 |
+|------|------|
+| `app/models/project.py` | +3 字段: `aspect_ratio` (String(16)) + `raw_outline_json` (Text) + `confirmed_outline_json` (Text) |
+| `app/api/projects.py` | +2 import (json, BaseModel) + `generate_outline` 存 raw + 新增 `confirm-outline` 端点 |
+
+**3 样东西**:
+
+| # | 存什么 | 实现 |
+|---|--------|------|
+| 1 | 用户输入参数 | Project model 已有字段 + 新增 `aspect_ratio` |
+| 2 | 原始 LLM 大纲 | `generate_outline` 中 `project.raw_outline_json = json.dumps(outline)` |
+| 3 | 用户确认大纲 | `POST /api/projects/{project_id}/confirm-outline` → `project.confirmed_outline_json` |
+
+**confirm-outline 端点规格**:
+```
+POST /api/projects/{project_id}/confirm-outline
+Authorization: Bearer {token}
+Body: { "outline": { ...用户修改后的大纲 JSON... } }
+Response: { "success": true, "message": "大纲已确认" }
+```
+
+遵循 Ben 架构: `verify_user` + `get_db` + Project 归属验证 ✅
+
+验证: Python syntax 2/2 ✅
+
+@pm 任务 A + B 全部完成，等 Code Review。
+
+---
+
+#### @pm (2026-03-25)
+
+### ✅ PM Code Review PASS — TASK-GEMINI-MODEL-FIX + TASK-OUTLINE-STORAGE
+
+**任务 A** (21/21 检查项): 7 文件 9 处零残留，额外修复 story_generator.py 好 catch。
+**任务 B** (21/21 检查项): 3 字段 + raw 存储 + confirm 端点，Ben 架构完全对齐。
+
+**附注（非阻塞）**: `aspect_ratio` 目前有字段无入口——`ProjectCreate` schema + `create_project` 端点还没接收，前端也没发送。DB 里会一直是默认 "2:3"。后续 Frontend 对接 StageA 画面比例时需同步更新。
+
+**@devops**: 请 commit + push 全部改动（含昨日 LLM-FIX + 今日 Gemini fix + outline storage）。建议 3 commits:
+1. `fix(backend): Stage 1 LLM call — system prompt + async client + debug logging`
+2. `fix(backend): unify Gemini backup model to gemini-3.1-flash-lite-preview (7 files)`
+3. `feat(backend): Stage 1 outline storage — raw + confirmed + aspect_ratio`
+
+如果昨日 LLM-FIX 已 push 则只需后 2 个。不需要 VPS 部署。
+
+**⏸️ DevOps 暂停 push** — 发现 aspect_ratio 字段"有字段无入口"，用户选的画面比例会丢失。先修再 push。
+
+---
+
+#### @pm → @frontend + @backend (2026-03-25)
+
+### 任务: TASK-ASPECT-RATIO-WIRE — 画面比例参数打通
+
+**问题**: 用户在 StageA 选了 "3:4 小红书图文"，但 create 请求没带 `aspect_ratio`，Backend schema 也没接收，DB 里永远存默认 "2:3"。用户的画面比例选择**被丢失了**。
+
+**3 个环节各加一行**:
+
+---
+
+#### @frontend（1 处）
+
+**文件**: `frontend/src/app/create/CreateContent.tsx`
+
+**位置**: L78-85，`POST /api/projects/` 的 `body` 里
+
+```typescript
+// 改前 (L78-85):
+body: JSON.stringify({
+  original_idea: state.idea.trim(),
+  style_preset: state.stylePreset || "illustration",
+  total_chapters: 1,
+  chapter_duration_minutes: params.duration,
+  character_count: params.characters,
+  language: "zh-CN",
+}),
+
+// 改后 — 加一行 aspect_ratio:
+body: JSON.stringify({
+  original_idea: state.idea.trim(),
+  style_preset: state.stylePreset || "illustration",
+  total_chapters: 1,
+  chapter_duration_minutes: params.duration,
+  character_count: params.characters,
+  language: "zh-CN",
+  aspect_ratio: state.aspectRatio || "2:3",
+}),
+```
+
+`state.aspectRatio` 已经在 `CreateContext.tsx` L13 定义（默认 "2:3"）、L65 有 reducer、L170 UI 绑定。只缺发请求这一行。
+
+---
+
+#### @backend（2 处）
+
+**文件 1**: `app/schemas/project.py` — `ProjectCreate` class
+
+**位置**: L31（`voice_preset` 之后）加一行：
+
+```python
+# 改前:
+voice_preset: str | None = Field(default=None, description="TTS音色ID")
+
+# 改后 — 加一行:
+voice_preset: str | None = Field(default=None, description="TTS音色ID")
+aspect_ratio: str = Field(default="2:3", description="画面比例")
+```
+
+**文件 2**: `app/api/projects.py` — `create_project` 函数
+
+**位置**: L49（`voice_preset=project_data.voice_preset,` 之后）加一行：
+
+```python
+# 改前:
+voice_preset=project_data.voice_preset,
+
+# 改后 — 加一行:
+voice_preset=project_data.voice_preset,
+aspect_ratio=project_data.aspect_ratio,
+```
+
+---
+
+**验证**: Frontend build 0 错误 + Backend Python syntax ✅
+
+完成后通知 @pm。改完一起 push。
+
+---
+
+#### @backend (2026-03-25)
+
+### ✅ TASK-ASPECT-RATIO-WIRE Backend 完成
+
+- `app/schemas/project.py` L32: +`aspect_ratio: str = Field(default="2:3", description="画面比例")`
+- `app/api/projects.py` L50: +`aspect_ratio=project_data.aspect_ratio,`
+- Python syntax 2/2 ✅
+
+---
+
+#### @frontend (2026-03-25)
+
+### ✅ TASK-ASPECT-RATIO-WIRE Frontend 完成
+
+- `CreateContent.tsx` L85: +`aspect_ratio: state.aspectRatio || "2:3"`
+- build 20 路由 0 错误 ✅
+
+---
+
+#### @pm (2026-03-25)
+
+### ✅ PM Code Review PASS — TASK-ASPECT-RATIO-WIRE
+
+10 项检查 + 全链路验证全部通过。断链已修复：用户选 → Frontend 发 → Backend schema 收 → endpoint 传 → DB 存。
+
+额外全面扫描 StageA 所有参数：当前所有用户主动选择的文本参数都已正确传递，无其他断链。
+
+**@devops**: 现在可以 push 全部改动了。建议 commits:
+1. `fix(backend): unify Gemini backup model to gemini-3.1-flash-lite-preview (7 files)`
+2. `feat(backend): Stage 1 outline storage — raw + confirmed + aspect_ratio fields`
+3. `fix(frontend+backend): wire aspect_ratio from StageA to DB`
+
+不需要 VPS 部署。
+
+---
+
+#### @frontend (2026-03-25)
+
+### ✅ TASK-ASPECT-RATIO-WIRE Frontend 完成
+
+`CreateContent.tsx` L85 加一行：`aspect_ratio: state.aspectRatio || "2:3"`
+
+build 20 路由 0 错误。
+
+**@pm Frontend 完成，等 Backend 改完一起 Review + push。**
+
+---
+
+#### @backend (2026-03-25)
+
+✅ **TASK-ASPECT-RATIO-WIRE Backend 完成 — 2 处各加 1 行**
+
+| # | 文件 | 改动 |
+|---|------|------|
+| 1 | `app/schemas/project.py` L32 | `aspect_ratio: str = Field(default="2:3", description="画面比例")` |
+| 2 | `app/api/projects.py` L50 | `aspect_ratio=project_data.aspect_ratio,` |
+
+验证: Python syntax 2/2 ✅
+
+@pm Backend 部分完成。等 Frontend 改完一起 push。
+
+---
+
+#### @pm (2026-03-25)
+
+### 📋 StageA 全面审计结果 + Phase 1-3 派发
+
+Founder 全面审查后确认的产品决策和执行计划。
+
+---
+
+## Founder 产品决策汇总
+
+| # | 决策 | 说明 |
+|---|------|------|
+| 1 | 风格预设从 15 → 28 个 | AI-ML 设计 13 新风格 |
+| 2 | 分析任务模型 | 主力 `gemini-3.1-flash-lite-preview`，备用 `claude-haiku-4-5` |
+| 3 | Thumbnail 生成模型 | `gemini-3.1-flash-image-preview` |
+| 4 | 文件上传存储 | 先用本地文件系统，后续 Founder 与 Ben 沟通迁移 |
+| 5 | 角色推荐数量 | flash=2, short=3, medium=3-4(max4), epic=4-6(max6) |
+| 6 | 场景推荐数量 | flash=2-3, short=3-4, medium=4-6, epic=5-8 |
+| 7 | 续写模式 | 短篇/中篇/长篇都支持（非仅长篇）；移到 Dashboard，StageA 简化 |
+| 8 | 图片上传安全 | 文件类型 + 大小限制 + NSFW 过滤 + 无损压缩 |
+
+---
+
+## Phase 1（紧急 + 本批）
+
+### 第 1 步 — 立即并行启动
+
+---
+
+#### @backend: TASK-STYLE-LITERAL-FIX — StylePreset 422 Bug 紧急修复
+
+**Bug**: `ProjectCreate.StylePreset` Literal 只有 10 个值，前端 15 个风格中 5 个（含默认 `korean_webtoon`）会导致 422 报错。
+
+**文件**: `app/schemas/project.py` L8-19
+
+**改前**:
+```python
+StylePreset = Literal[
+    "realistic", "illustration", "cyberpunk", "ink", "cartoon",
+    "chinese", "manga", "oil_painting", "watercolor", "pixel",
+]
+```
+
+**改后**（扩展为当前 15 个，与 StyleEnforcer + 前端完全对齐）:
+```python
+StylePreset = Literal[
+    "realistic", "illustration", "cyberpunk", "ink", "cartoon",
+    "manga", "oil_painting", "watercolor", "pixel",
+    "pixar_3d", "ghibli", "anime", "slam_dunk", "korean_webtoon",
+    "children_book",
+]
+```
+
+注意：删掉 `"chinese"`（StyleEnforcer 和前端都没有这个 key，是 Ben 原有的残留）。
+
+**验证**: Python syntax ✅ + 后端启动无报错。
+
+完成后**立即通知 @pm**（不等其他任务）。
+
+---
+
+#### @ai-ml: TASK-STYLE-EXPAND-28 — 设计 13 个新风格（6 维度）
+
+为以下 13 个新风格设计完整的 `StyleEnforcement` 配置：
+
+| # | key | 中文名 | 定位 |
+|---|-----|--------|------|
+| 16 | `ukiyo_e` | 浮世绘 | 日本传统/历史 |
+| 17 | `vintage_film` | 复古胶片 | 80/90怀旧 |
+| 18 | `pencil_sketch` | 铅笔素描 | 文艺/独立叙事 |
+| 19 | `chibi` | Q版卡通 | 搞笑/萌系 |
+| 20 | `dark_fantasy` | 暗黑奇幻 | 魔幻/哥特/悬疑 |
+| 21 | `pop_art` | 波普艺术 | 时尚/潮流 |
+| 22 | `paper_cut` | 中国剪纸 | 民俗/传统文化 |
+| 23 | `steampunk` | 蒸汽朋克 | 维多利亚+机械 |
+| 24 | `art_nouveau` | 新艺术 | Mucha 风/藤蔓装饰 |
+| 25 | `noir` | 黑色电影 | 高对比黑白/侦探 |
+| 26 | `comic_western` | 欧美漫画 | Marvel/DC 超英 |
+| 27 | `pastel_dream` | 梦幻马卡龙 | 柔和粉彩/少女 |
+| 28 | `gothic` | 哥特风 | 暗色调/教堂/神秘 |
+
+**每个风格需要 6 个维度**（参考 `style_enforcer.py` 现有格式）:
+
+1. `style_name`: key（如 `"ukiyo_e"`）
+2. `style_display_name`: 英文展示名（如 `"Ukiyo-e Japanese Woodblock Print"`）
+3. `mandatory_keywords`: 必须包含的关键词列表（8-10 个英文词）
+4. `forbidden_keywords`: 禁止的关键词列表（10-15 个英文词）
+5. `style_description`: 100-300 字英文美学描述（详细、诗意，参考现有风格的 prose 风格）
+6. `quality_keywords`: 质量增强词列表（5-8 个）
+
+同时为每个风格提供**前端展示信息**:
+- `label`: 中文名（如 "浮世绘"）
+- `description`: 2-4 字定位（如 "日本传统"）
+- `gradient`: CSS gradient（参考现有格式）
+
+**交付方式**: 写入 TEAM_CHAT，@backend 集成到 `style_enforcer.py`，@frontend 集成到 `STYLE_PRESETS`。
+
+---
+
+#### @backend: TASK-DOC-TEXT-WIRE — 文档文本参数打通
+
+**问题**: 用户上传 TXT/MD 文档，前端解析出文本存到 `state.documentText`，但未发到后端。
+
+**2 个文件 2 行改动**:
+
+**文件 1**: `app/schemas/project.py` — `ProjectCreate` class 加一行:
+```python
+document_text: str | None = Field(default=None, description="上传文档的解析文本")
+```
+
+**文件 2**: `app/api/projects.py` — `create_project` 函数加逻辑:
+```python
+# 如果有文档文本，拼接到 original_idea
+idea = project_data.original_idea
+if project_data.document_text:
+    idea = f"{idea}\n\n---\n附加文档内容:\n{project_data.document_text}"
+```
+然后用 `idea` 替代 `project_data.original_idea` 存入 Project。
+
+---
+
+#### @frontend: TASK-DOC-TEXT-WIRE — 发送文档文本
+
+**文件**: `frontend/src/app/create/CreateContent.tsx`
+
+**位置**: L78-86 的 create 请求 body
+
+```typescript
+// 加一行 document_text:
+body: JSON.stringify({
+  original_idea: state.idea.trim(),
+  style_preset: state.stylePreset || "illustration",
+  total_chapters: 1,
+  chapter_duration_minutes: params.duration,
+  character_count: params.characters,
+  language: "zh-CN",
+  aspect_ratio: state.aspectRatio || "2:3",
+  document_text: state.documentText || null,  // 新增
+}),
+```
+
+---
+
+#### @backend: TASK-OCR-ENDPOINT — 真实 OCR 端点
+
+**新增文件**: `app/api/utils.py`（或加到现有 utils 路由）
+
+```python
+# POST /api/utils/ocr
+# 接收图片，用 gemini-3.1-flash-lite-preview 识别中文文字
+# 备用: claude-haiku-4-5
+# 返回: { "text": "识别出的文字" }
+```
+
+**模型**: 主力 `gemini-3.1-flash-lite-preview`，备用 `claude-haiku-4-5`
+**Prompt**: "请识别这张图片中的所有文字，按原始排版顺序输出纯文本。只输出识别到的文字，不要添加解释。"
+**错误处理**: 识别失败返回 `{ "text": "", "error": "识别失败" }`
+
+同时新增 PDF 解析:
+```python
+# POST /api/utils/parse-document
+# 接收 PDF 文件，用 pdfplumber 提取文字（不需要 LLM）
+# 返回: { "text": "提取的文字" }
+```
+
+**安装依赖**: `pip install pdfplumber`
+
+---
+
+#### @frontend: TASK-OCR-REAL — OCR 去 mock 调真实 API
+
+**文件**: `frontend/src/components/ui/StoryIdeaInput.tsx`
+
+**改动**:
+- L7: 删除 `MOCK_OCR_TEXT` 常量
+- L64-74: `handleImageSelect` 改为调真实 API `POST /api/utils/ocr`（FormData 上传图片）
+- 返回的文字填入 `onChange(result.text)`
+- 添加超时处理（5 秒超时 + 更长的 loading 提示）
+
+同时：DocumentUploader 的 PDF 解析改为调 `POST /api/utils/parse-document`（上传 PDF 文件 → 返回文字）
+
+---
+
+#### @frontend (2026-03-25)
+
+### ✅ Phase 1 Step 1 Frontend 完成 — TASK-DOC-TEXT-WIRE + TASK-OCR-REAL
+
+**build 20 路由 0 错误。**
+
+#### TASK-DOC-TEXT-WIRE
+- `CreateContent.tsx` L86: +`document_text: state.documentText || null`
+
+#### TASK-OCR-REAL
+- `StoryIdeaInput.tsx`: 删 `MOCK_OCR_TEXT`，`handleImageSelect` 改为 `POST /api/utils/ocr`（FormData + 15s 超时 + 无后端时静默降级）
+- `DocumentUploader.tsx`: PDF 解析改为 `POST /api/utils/parse-document`（FormData + 失败提示）
+
+**修改 3 文件**: CreateContent.tsx / StoryIdeaInput.tsx / DocumentUploader.tsx
+
+**@pm Phase 1 Step 1 Frontend 2 项完成，等 Backend 就绪 + PM Review。Step 2 等 AI-ML 交付 13 新风格。**
+
+---
+
+### 第 2 步 — 等 AI-ML 交付 13 新风格后
+
+#### @backend: 13 新风格写入 StyleEnforcer + Literal 扩展 28
+
+读取 AI-ML 在 TEAM_CHAT 交付的 13 个风格 → 写入 `style_enforcer.py` 的 `STYLE_ENFORCEMENTS` 字典 + `StylePreset` Literal 扩展为 28 个。
+
+#### @frontend: STYLE_PRESETS 扩展 28
+
+读取 AI-ML 交付的 key/label/description/gradient → 写入 `frontend/src/types/create.ts` 的 `STYLE_PRESETS` 数组。`STYLE_PRESETS_DEFAULT_COUNT` 从 8 调整为合适的值（建议 8-12）。
+
+#### @pm: 生成 13 张 thumbnails
+
+用现有脚本 `tests/test_style_thumbnails.py`（改为 `gemini-3.1-flash-image-preview`）+ 新增 13 个风格 → 输出到 `frontend/public/styles/`。
+
+---
+
+### 第 3 步 — Phase 1 收尾
+
+全部 PM Review → DevOps push。
+
+---
+
+## Phase 2 计划（Phase 1 完成后启动）
+
+**前置**: 文件上传基础设施（本地文件系统先行，后续与 Ben 沟通迁移）
+
+| 任务 | 内容 | 关键设计 |
+|------|------|----------|
+| **文件上传基础设施** | 图片上传端点 + 本地存储 + 安全校验（类型/大小/NSFW）+ 无损压缩 | @Backend |
+| **#8 自定义风格** | `POST /api/utils/analyze-style` 用 gemini-3.1-flash-lite-preview 分析图片 → 输出 StyleEnforcement 格式 → 存 `custom_style_json` → Pipeline 动态使用 | @AI-ML prompt + @Backend 端点 + @Frontend 集成 |
+| **#9 角色参考图** | `POST /api/projects/{id}/upload-character-ref` → AI 提取特征 → 前端展示 + 数量提示 → Pipeline 生成风格化 portrait+fullbody | @AI-ML prompt + @Backend 端点+pipeline + @Frontend UI |
+| **#10 场景参考图** | `POST /api/projects/{id}/upload-scene-ref` → AI 分析场景 → 前端展示 + 数量提示 → Pipeline 生成风格化 interior+exterior | 同上 |
+
+**角色推荐数量**: flash=2, short=3, medium=3-4(max4), epic=4-6(max6)
+**场景推荐数量**: flash=2-3, short=3-4, medium=4-6, epic=5-8
+
+---
+
+## Phase 3 计划（独立设计）
+
+**#11 续写模式** — 短篇/中篇/长篇都支持
+
+| 改动 | 说明 |
+|------|------|
+| StageA | 去掉续写 UI（或简化为标签"支持续写"） |
+| Dashboard | 完成的故事卡片上显示"续写"按钮（短/中/长篇都有） |
+| 自动续写 | 系统读取前章 context → 自动生成下一章 → 用户确认 |
+| 手动引导 | 用户输入引导方向 → 系统基于引导生成 → 用户确认 |
+| 后端 | `POST /api/projects/{id}/continue-chapter` (mode + prompt) |
+
+---
+
+#### @backend (2026-03-25)
+
+### ✅ Phase 1 第 1 步 Backend 3 项全部完成
+
+---
+
+#### 1. TASK-STYLE-LITERAL-FIX (P0)
+
+`app/schemas/project.py` L8-24: `StylePreset` Literal 10 → 15
+
+**改前**: realistic, illustration, cyberpunk, ink, cartoon, ~~chinese~~, manga, oil_painting, watercolor, pixel
+**改后**: + pixar_3d, ghibli, anime, slam_dunk, korean_webtoon, children_book（删 `chinese` 残留）
+
+修复 5 个风格导致 422 的 bug（含默认 `korean_webtoon`）。
+
+---
+
+#### 2. TASK-DOC-TEXT-WIRE (Backend)
+
+| 文件 | 改动 |
+|------|------|
+| `app/schemas/project.py` | +`document_text: str \| None = Field(default=None)` |
+| `app/api/projects.py` | `create_project` 中拼接 `document_text` 到 `original_idea` |
+
+---
+
+#### 3. TASK-OCR-ENDPOINT
+
+新建 `app/api/utils.py`（独立路由）:
+
+| 端点 | 功能 | 模型/工具 |
+|------|------|-----------|
+| `POST /api/utils/ocr` | 图片 OCR | Gemini 3.1 Flash Lite (主) + Claude Haiku (备) |
+| `POST /api/utils/parse-document` | PDF/TXT/MD 解析 | pdfplumber (PDF) / 直接读取 (TXT/MD) |
+
+`app/main.py` +2 行注册 utils_router。
+
+**安全校验**: 图片 10MB + PDF 20MB + 文件类型检查
+
+---
+
+**验证**: 4/4 Python syntax ✅
+
+@pm Phase 1 第 1 步 Backend 全部完成，等 Code Review。Phase 1 第 2 步等 AI-ML 交付 13 新风格。
+
+---
+
+#### @pm (2026-03-25)
+
+### ✅ PM Review PASS — Phase 1 Step 2 (10/10)
+
+Backend StyleEnforcer 28 + Literal 28 + Frontend STYLE_PRESETS 28 三方交叉对齐确认。
+
+下一步: PM 生成 13 张 thumbnails → Phase 1 收尾 → DevOps push。
+
+---
+
+#### @pm (2026-03-25)
+
+### ✅ PM Review PASS — Phase 1 Step 1 全部三方 (25/25)
+
+Backend 3 项 (14 检查项) + Frontend 2 项 (6 检查项) + AI-ML 1 项 (5 检查项) 全部通过。
+
+**@backend + @frontend**: Phase 1 Step 2 可以开始 — 集成 AI-ML 交付的 13 新风格:
+- @backend: 13 个 StyleEnforcement 写入 `style_enforcer.py` + `StylePreset` Literal 扩展为 28
+- @frontend: 13 个新条目写入 `STYLE_PRESETS` 数组
+
+AI-ML 交付内容在 TEAM_CHAT 中（搜索 "TASK-STYLE-EXPAND-28 完成"）。
+
+---
+
+#### @ai-ml (2026-03-25)
+
+### ✅ TASK-STYLE-EXPAND-28 完成 — 13 个新风格完整配置
+
+@backend 集成到 `style_enforcer.py` 的 `STYLE_ENFORCEMENTS` 字典（插在 `"pixel"` 之后、`}` 关闭大括号之前）。
+@frontend 集成到 `frontend/src/types/create.ts` 的 `STYLE_PRESETS` 数组。
+@backend 同时将 `StylePreset` Literal 从 15 扩展为 28。
+
+---
+
+#### 一、StyleEnforcer 配置（13 个）
+
+```python
+        # ============ 浮世绘风格 ============
+        "ukiyo_e": StyleEnforcement(
+            style_name="ukiyo_e",
+            style_display_name="Ukiyo-e Japanese Woodblock Print",
+            mandatory_keywords=[
+                "ukiyo-e style", "Japanese woodblock print", "flat color areas",
+                "bold outlines", "traditional Japanese art", "decorative patterns",
+                "Edo period aesthetic", "woodcut texture", "Japanese composition"
+            ],
+            forbidden_keywords=[
+                "photorealistic", "photograph", "3D render", "CGI", "digital effects",
+                "neon lights", "modern setting", "Western art style", "gradient shading",
+                "photographic", "realistic skin texture", "smooth blending", "pixel art"
+            ],
+            style_description="You are carving in the tradition of ukiyo-e masters — Hokusai, Hiroshige, Utamaro — artists who compressed the floating world into flat planes of pure color and fearless line. Light does not model form through gradient — it exists as decisive areas of color separated by bold outlines, each block printed with the pressure of carved cherry wood against mulberry paper. Colors are the pigments of the woodblock palette: indigo blues that deepen like evening water, vermillion reds that burn with festival intensity, soft ochres and greens drawn from mineral and vegetable sources, and the warm cream of washi paper glowing through unprinted areas. Every surface declares its flat, printed nature: fabric patterns rendered as precise repeating motifs, water as stylized curling waves, clouds as decorative bands floating across the composition. Characters are defined by costume and posture rather than anatomical modeling — flowing kimono lines, elaborate hair arrangements, faces rendered with minimal but expressive economy: a tilted head, a sidelong glance, fingers delicately positioned. Each composition follows ukiyo-e's sophisticated spatial logic: layered flat planes creating depth without perspective, diagonal elements generating dynamic tension, and asymmetric balance where a single branch or figure anchors vast areas of atmospheric space.",
+            quality_keywords=["masterful woodblock print", "museum quality ukiyo-e", "detailed traditional art", "authentic Japanese aesthetic", "elegant composition"]
+        ),
+
+        # ============ 复古胶片风格 ============
+        "vintage_film": StyleEnforcement(
+            style_name="vintage_film",
+            style_display_name="Vintage Film Photography",
+            mandatory_keywords=[
+                "vintage film photography", "film grain", "analog camera aesthetic",
+                "Kodak Portra tones", "retro color grading", "soft focus",
+                "70s 80s film look", "nostalgic photography", "warm film tones"
+            ],
+            forbidden_keywords=[
+                "digital clarity", "HDR", "neon", "cyberpunk", "anime", "cartoon",
+                "3D render", "sharp digital", "modern clean", "vector", "pixel art",
+                "illustration", "painting", "watercolor"
+            ],
+            style_description="You are shooting in the tradition of analog film photographers — artists who understood that imperfection is intimacy, that grain is warmth, and that faded color carries the weight of time. Light arrives through the gentle imprecision of vintage glass: soft halation blooming around highlights, lens flares that streak like golden memories, and a natural falloff at frame edges that pulls focus to the center like a whispered secret. Colors wear the patina of aged emulsion — Kodak warmth where skin glows amber, Fuji greens that drift toward teal in shadows, highlights that roll off into creamy whites rather than clinical brightness, and an overall palette that feels like looking at life through honey-colored glass. Every surface carries the honest texture of photochemical process: film grain dancing across the image like visual static, slight color shifts between frames, the occasional light leak painting an edge in unexpected warmth. Characters exist in the unselfconscious beauty of candid moments — the unstaged gesture, the genuine laugh caught between poses, the intimacy of someone unaware they are being observed through a viewfinder. Each composition breathes with the relaxed confidence of photographers who had 36 exposures and made each one count: centered subjects with generous negative space, natural framing through doorways and windows, and the patient stillness of waiting for the right moment rather than manufacturing it.",
+            quality_keywords=["authentic film look", "beautiful analog tones", "professional vintage photography", "nostalgic quality", "cinematic film grain"]
+        ),
+
+        # ============ 铅笔素描风格 ============
+        "pencil_sketch": StyleEnforcement(
+            style_name="pencil_sketch",
+            style_display_name="Pencil Sketch Drawing",
+            mandatory_keywords=[
+                "pencil sketch", "graphite drawing", "hand-drawn lines",
+                "crosshatching", "sketched artwork", "pencil on paper",
+                "detailed pencil work", "monochrome drawing", "fine linework"
+            ],
+            forbidden_keywords=[
+                "photorealistic", "full color", "vibrant colors", "neon",
+                "3D render", "digital painting", "watercolor", "oil painting",
+                "cartoon", "anime", "pixel art", "glossy", "saturated"
+            ],
+            style_description="You are drawing in the tradition of master draftsmen — artists who proved that a single graphite pencil against white paper holds infinite range, from the palest whisper of tone to the deepest velvet black. Light is built through the absence and accumulation of marks: bright areas where the paper breathes untouched, mid-tones constructed through patient parallel hatching, and deep shadows layered through crosshatching that builds density like woven darkness. The tonal palette spans the full graphite spectrum — hard pencil lines that leave silvery traces for distant details, soft graphite laid on its side for broad atmospheric washes, and the rich near-black of 6B pressed firmly for moments of dramatic emphasis. Every surface reveals the hand that made it: the slight wobble of a freehand line that proves human presence, the varied pressure that gives each stroke its own character, eraser marks that leave ghost traces of revised decisions, and the tooth of paper grain catching graphite in its texture. Characters emerge through the accumulation of observed detail — the weight of fabric rendered through directional strokes, the luminosity of eyes built from carefully preserved highlights, the suggestion of life in the looseness of hair and the precision of a gaze. Each composition thinks in terms of tonal architecture: large shapes of light and dark establishing the structure, focal areas rendered in crisp detail while periphery dissolves into suggestion, and generous white space that gives the drawing room to breathe.",
+            quality_keywords=["masterful pencil work", "detailed graphite drawing", "professional sketch quality", "artistic linework", "museum quality drawing"]
+        ),
+
+        # ============ Q版卡通风格 ============
+        "chibi": StyleEnforcement(
+            style_name="chibi",
+            style_display_name="Chibi Cute Cartoon",
+            mandatory_keywords=[
+                "chibi style", "super deformed", "cute cartoon", "big head small body",
+                "kawaii aesthetic", "adorable characters", "rounded proportions",
+                "pastel colors", "chibi anime"
+            ],
+            forbidden_keywords=[
+                "photorealistic", "photograph", "realistic anatomy", "realistic proportions",
+                "dark gritty", "horror", "violent", "mature content", "oil painting",
+                "ink wash", "noir", "gothic", "harsh shadows", "realistic skin"
+            ],
+            style_description="You are drawing in the tradition of chibi and super-deformed character design — artists who discovered that shrinking a character to their most essential, adorable proportions amplifies emotion by a thousand percent. Light is universally kind: soft even illumination that eliminates harsh shadows, gentle highlights on round cheeks, and an overall brightness that keeps every scene feeling safe and joyful. Colors burst with sugary energy — cotton candy pinks, sky blues, mint greens, sunny yellows — all pushed toward their most cheerful saturation, with pastel backgrounds that never compete with the characters' candy-colored world. Proportions follow the sacred chibi ratio: heads occupy one-half to one-third of total body height, eyes are enormous sparkling orbs that carry every emotion from giddy joy to comedic despair, and tiny stubby limbs gesture with maximum expressiveness despite minimal anatomy. Characters express through exaggeration and simplicity — a blush rendered as two rosy circles, anger as a comically oversized vein mark, joy as closed crescent eyes and a mouth wider than physically possible, each emotion dialed to its most readable extreme. Each composition keeps things delightfully simple: clean uncluttered backgrounds often reduced to color fields or simple patterns, characters centered and prominent, and generous use of cute decorative elements — sparkles, hearts, stars, musical notes — floating around characters like emotional subtitles.",
+            quality_keywords=["adorable chibi art", "professional kawaii style", "cute character design", "polished chibi illustration", "clean coloring"]
+        ),
+
+        # ============ 暗黑奇幻风格 ============
+        "dark_fantasy": StyleEnforcement(
+            style_name="dark_fantasy",
+            style_display_name="Dark Fantasy Art",
+            mandatory_keywords=[
+                "dark fantasy art", "epic fantasy illustration", "dramatic dark lighting",
+                "mythical atmosphere", "fantasy concept art", "otherworldly",
+                "dark magical ambiance", "epic scale", "fantasy character design"
+            ],
+            forbidden_keywords=[
+                "photorealistic photograph", "cute", "kawaii", "chibi", "bright cheerful",
+                "pastel colors", "children's style", "pixel art", "minimalist",
+                "flat design", "cartoon comedy", "pop art", "light-hearted"
+            ],
+            style_description="You are painting in the tradition of dark fantasy masters — Beksinski's organic nightmares, Frazetta's primal power, and the brooding majesty of artists who find beauty in shadow and terror in grandeur. Light is rare and precious: a single torch flame carving warmth from engulfing darkness, bioluminescent flora casting an alien glow through primordial caverns, moonlight filtering through storm clouds to silver-edge a figure standing against the void. Colors are drawn from a palette of ancient darkness — deep crimsons like dried blood, midnight blues that swallow distance, tarnished golds that suggest fallen glory, and the sickly greens of things that grow where light cannot reach. Every surface tells of age and power: stone carved with forgotten runes now cracked by centuries, armor scarred by battles whose names are lost, forests where trees twist with an intelligence that predates humanity, and skies where clouds form shapes that might be gods or might be warnings. Characters carry the weight of mythic archetypes — warriors whose scars map their survival, sorcerers whose eyes hold forbidden knowledge, creatures that blur the boundary between beautiful and terrifying. Each composition builds toward the sublime: vast scale that dwarfs human figures against impossible architecture, dramatic contrasts between illuminated subjects and consuming darkness, and the careful placement of light sources that make every shadow feel like it might contain something watching.",
+            quality_keywords=["epic fantasy illustration", "cinematic dark art", "concept art quality", "detailed fantasy rendering", "atmospheric dark painting"]
+        ),
+
+        # ============ 波普艺术风格 ============
+        "pop_art": StyleEnforcement(
+            style_name="pop_art",
+            style_display_name="Pop Art",
+            mandatory_keywords=[
+                "pop art style", "Andy Warhol inspired", "Roy Lichtenstein",
+                "bold primary colors", "Ben-Day dots", "comic book aesthetic",
+                "graphic bold outlines", "flat vibrant colors", "pop culture art"
+            ],
+            forbidden_keywords=[
+                "photorealistic", "subtle tones", "muted colors", "watercolor",
+                "oil painting texture", "3D render", "anime", "pixel art",
+                "dark gritty", "minimalist", "ink wash", "traditional painting",
+                "soft gradients", "pastel"
+            ],
+            style_description="You are creating in the tradition of Pop Art provocateurs — Warhol, Lichtenstein, Haring — artists who grabbed mass culture by the throat and held it up as fine art, proving that bold is beautiful and repetition is revelation. Light is graphic rather than natural: flat and even, eliminating subtle shadow in favor of bold color blocks that read like billboard advertisements, with occasional dramatic spotlights rendered as simple geometric shapes. Colors scream with commercial intensity — fire engine red, electric blue, taxi cab yellow, shocking pink — each applied in flat unmodulated areas that vibrate against each other with optical aggression, creating images that demand attention from across any room. Every surface is reduced to its graphic essence: Ben-Day dots simulating tone and texture with mechanical precision, thick black outlines containing color like stained glass, and the deliberate absence of nuanced shading replaced by hard-edged shadow shapes. Characters become icons — faces simplified to their most recognizable features then amplified, expressions frozen at their most dramatic or banal, ordinary people elevated to celebrity status through the sheer force of graphic treatment. Each composition embraces the language of commercial design: centered subjects with maximum impact, text elements integrated as graphic components, serial repetition that transforms single images into patterns, and the aggressive cropping that turns a face or an object into a cultural statement.",
+            quality_keywords=["bold pop art", "graphic art quality", "professional pop illustration", "iconic pop style", "vibrant graphic design"]
+        ),
+
+        # ============ 中国剪纸风格 ============
+        "paper_cut": StyleEnforcement(
+            style_name="paper_cut",
+            style_display_name="Chinese Paper Cut Art",
+            mandatory_keywords=[
+                "Chinese paper cut art", "jianzhi style", "paper cutting silhouette",
+                "intricate paper craft", "red paper cut", "folk art aesthetic",
+                "traditional Chinese craft", "layered paper", "decorative cutout"
+            ],
+            forbidden_keywords=[
+                "photorealistic", "3D render", "digital effects", "neon",
+                "Western art", "anime", "manga", "oil painting", "watercolor wash",
+                "pixel art", "gradient shading", "photographic", "smooth blending"
+            ],
+            style_description="You are cutting in the tradition of Chinese jianzhi masters — folk artists whose scissors and knives transform flat paper into worlds of astonishing intricacy, where negative space tells the story as eloquently as the remaining form. Light does not fall from any source — it passes through: the bright background shining through cut-away areas creates luminous negative shapes that define figures, patterns, and scenes, while the uncut paper creates bold silhouettes rich with internal detail. Color follows the jianzhi tradition — predominantly festive red against white or gold backgrounds, with occasional polychrome versions layering colored papers to create depth, each color a distinct flat plane with no gradation. Every surface celebrates the paper's own nature: crisp clean edges where the blade has passed, intricate internal patterns of flowers, clouds, and geometric motifs cut within larger forms, and the slight dimensional quality of layered paper casting tiny real shadows. Characters are defined through silhouette and costume detail — elaborate headdresses, flowing robes with patterned borders, theatrical poses that read clearly as flat shapes, faces in profile or three-quarter view rendered with minimal but expressive cutout features. Each composition follows folk art's decorative logic: bilateral symmetry for auspicious subjects, border frames of intertwining vines and auspicious symbols, layered foreground and background planes that create theatrical depth, and the joyful density of pattern filling every available space with meaning and beauty.",
+            quality_keywords=["exquisite paper cut art", "masterful jianzhi craft", "traditional folk art quality", "intricate cutting detail", "authentic Chinese craft"]
+        ),
+
+        # ============ 蒸汽朋克风格 ============
+        "steampunk": StyleEnforcement(
+            style_name="steampunk",
+            style_display_name="Steampunk Aesthetic",
+            mandatory_keywords=[
+                "steampunk style", "Victorian aesthetic", "brass and copper machinery",
+                "clockwork mechanisms", "steam-powered technology", "industrial gears",
+                "retro-futuristic", "Victorian fashion", "mechanical details"
+            ],
+            forbidden_keywords=[
+                "modern technology", "digital screens", "neon lights", "minimalist",
+                "clean futuristic", "anime", "chibi", "kawaii", "pixel art",
+                "flat colors", "watercolor", "paper cut", "ink wash", "pastel"
+            ],
+            style_description="You are engineering in the tradition of steampunk visionaries — artists who imagined a future that the Victorians might have built, where steam power never yielded to electricity and every machine is a work of brass-and-glass art. Light comes from flame and filament: gas lamps casting warm amber pools through fog-thick streets, furnace glow painting engineers in hellish orange, and the pale daylight of industrial cities filtering through soot-stained skylights. Colors are drawn from the steampunk material palette — warm brass and burnished copper, deep mahogany and rich leather brown, verdigris patina on aged bronze, and the steel-gray of iron machinery, all set against the sepia warmth of aged parchment and the cream of Victorian wallpaper. Every surface is a celebration of mechanical craft: exposed gears meshing with mathematical precision, riveted metal plates joined with visible bolts, polished wood inlaid with brass instruments, glass dials and pressure gauges clustered on every available surface. Characters dress at the intersection of elegance and engineering — top hats fitted with brass goggles, corsets reinforced with leather straps, waistcoats hung with pocket watches and miniature tools, and the soot under fingernails that marks an inventor who works with their hands. Each composition builds layered mechanical worlds: foreground machinery framing characters like industrial portraiture, background skylines bristling with smokestacks and airship masts, and the satisfying visual density of a world where every device proudly displays its working parts.",
+            quality_keywords=["detailed steampunk illustration", "professional mechanical design", "atmospheric steampunk art", "Victorian-era quality", "intricate machinery detail"]
+        ),
+
+        # ============ 新艺术风格 ============
+        "art_nouveau": StyleEnforcement(
+            style_name="art_nouveau",
+            style_display_name="Art Nouveau Style",
+            mandatory_keywords=[
+                "Art Nouveau style", "Alphonse Mucha inspired", "organic flowing lines",
+                "decorative borders", "floral ornamental patterns", "elegant curves",
+                "sinuous organic forms", "ornate illustration", "belle epoque aesthetic"
+            ],
+            forbidden_keywords=[
+                "photorealistic", "3D render", "pixel art", "minimalist",
+                "harsh geometric", "brutalist", "cyberpunk", "dark gritty",
+                "cartoon comedy", "chibi", "sharp angles only", "industrial"
+            ],
+            style_description="You are designing in the tradition of Art Nouveau masters — Mucha, Klimt, Beardsley — artists who believed that art should flow like nature and that decoration is not excess but essence. Light glows from within: figures and flowers seem to generate their own radiance, with soft golden halos and warm backlighting that makes every subject appear blessed by an inner luminosity, shadows remaining gentle and warm rather than harsh. Colors follow nature's most elegant palette — dusty rose, sage green, warm gold, deep teal, and muted lavender — applied in flat or gently gradated areas bounded by the defining outlines, occasionally punctuated by rich jewel tones that glow like stained glass panels. Every surface is alive with organic ornament: sinuous vine tendrils framing the composition, flowers that are botanically recognizable yet stylized into flowing decorative motifs, hair cascading in impossible arabesque curves that become part of the overall pattern. Characters — predominantly elegant figures — are defined by the flowing line that traces their forms: long necks, cascading hair that merges with surrounding flora, draped fabrics that follow the body in idealized curves, and poses that embody grace and contemplation rather than action. Each composition follows Mucha's theatrical logic: figures centered within elaborate decorative frames, symmetrical or near-symmetrical arrangements that lend poster-like impact, halo-shaped backgrounds that sanctify the subject, and the integration of typography and ornament into a unified visual experience where every element serves both decoration and narrative.",
+            quality_keywords=["masterful Art Nouveau illustration", "Mucha-quality decorative art", "elegant ornamental design", "professional belle epoque style", "exquisite flowing linework"]
+        ),
+
+        # ============ 黑色电影风格 ============
+        "noir": StyleEnforcement(
+            style_name="noir",
+            style_display_name="Film Noir Cinematic",
+            mandatory_keywords=[
+                "film noir style", "high contrast black and white", "dramatic shadows",
+                "venetian blind lighting", "hard-boiled detective aesthetic",
+                "chiaroscuro", "moody atmosphere", "1940s cinematic", "noir lighting"
+            ],
+            forbidden_keywords=[
+                "bright colors", "vibrant", "cheerful", "kawaii", "cartoon comedy",
+                "pastel", "children's style", "pixel art", "pop art",
+                "watercolor", "flat lighting", "even illumination", "neon"
+            ],
+            style_description="You are filming in the tradition of noir cinematographers — artists who proved that darkness is not the absence of light but its most powerful expression, where shadows carry more story than anything illumination reveals. Light is the protagonist's adversary and confessor: a single desk lamp carving a face into halves of knowledge and secret, venetian blind shadows striping a wall like prison bars, the cold fluorescent of an interrogation room leaving no place to hide, and the rain-blurred glow of a distant streetlight promising safety that never arrives. The palette is the grayscale's full dramatic range — crushed blacks that swallow entire backgrounds, silvery mid-tones on rain-wet surfaces, and the shocking bright white of a femme fatale's cigarette smoke or a detective's shirt cuff emerging from darkness. Every surface glistens with noir's signature moisture: rain-slicked streets reflecting fractured light, polished desk surfaces mirroring the overhead interrogation lamp, chrome bumpers of parked sedans catching stray illumination, and the wet sheen of a trench coat that has been through one too many stakeouts. Characters are defined by what the light chooses to reveal — a jaw clenched in determination, eyes hidden under a fedora brim, the curl of cigarette smoke rising from a silhouette, hands that grip or gesture from pools of shadow. Each composition uses noir's geometric vocabulary: extreme high angles that make characters feel trapped, low angles that turn ordinary people into threatening figures, Dutch tilts for a world off its moral axis, and the deep-focus compositions where foreground and background both hold clues.",
+            quality_keywords=["cinematic noir photography", "dramatic black and white", "professional film noir", "atmospheric monochrome", "masterful shadow work"]
+        ),
+
+        # ============ 欧美漫画风格 ============
+        "comic_western": StyleEnforcement(
+            style_name="comic_western",
+            style_display_name="Western Comic Book Art",
+            mandatory_keywords=[
+                "Western comic book style", "Marvel DC aesthetic", "bold comic colors",
+                "superhero art", "dynamic action poses", "comic book inking",
+                "heroic proportions", "dramatic comic composition", "comic panel art"
+            ],
+            forbidden_keywords=[
+                "anime", "manga", "chibi", "kawaii", "photorealistic photograph",
+                "watercolor", "ink wash", "pixel art", "minimalist",
+                "soft pastel", "oil painting", "children's book", "cute"
+            ],
+            style_description="You are drawing in the tradition of Western comic book legends — Kirby, Ross, Lee, McFarlane — artists who turned ink and color into a mythology where every human body becomes heroic architecture and every panel crackles with kinetic force. Light is theatrical and purposeful: dramatic rim lighting that separates figures from backgrounds like spotlights on a stage, bold shadow shapes that define musculature and create instant drama, and the signature comic technique of colored lighting — blue key light from one side, warm fill from another — that gives flat illustrations three-dimensional punch. Colors are the saturated primaries and secondaries of four-color printing pushed to maximum impact — Superman blue, Hulk green, Spider-Man red — applied in bold flat areas with decisive shadow shapes, skin tones that glow with idealized vitality, and backgrounds that shift color temperature to match the emotional register of the scene. Every surface declares its material through confident linework: muscles defined by precise anatomical inking, fabric stretching and folding under physical force, metal reflecting environment in simplified highlight shapes, and the dynamic hatching and crosshatching that builds texture and shadow. Characters embody heroic idealism — powerful proportions with broad shoulders and dynamic stances, clenched fists and billowing capes that suggest action even in still moments, faces that project determination and emotion with comic clarity. Each composition explodes with energy: dramatic foreshortening that makes fists and feet burst toward the viewer, diagonal compositions that keep the eye racing, the iconic low angle that makes every figure monumental, and dynamic camera angles borrowed from action cinematography.",
+            quality_keywords=["professional comic book art", "heroic illustration quality", "dynamic comic composition", "bold inking", "cinematic comic style"]
+        ),
+
+        # ============ 梦幻马卡龙风格 ============
+        "pastel_dream": StyleEnforcement(
+            style_name="pastel_dream",
+            style_display_name="Pastel Dreamscape",
+            mandatory_keywords=[
+                "pastel color palette", "dreamy soft aesthetic", "ethereal atmosphere",
+                "soft pink and lavender tones", "gentle gradient lighting",
+                "whimsical fairy tale", "cotton candy colors", "soft focus dreamy"
+            ],
+            forbidden_keywords=[
+                "dark", "gritty", "noir", "horror", "harsh shadows",
+                "cyberpunk", "industrial", "photorealistic", "desaturated",
+                "monochrome", "black and white", "gothic", "violent", "bold contrast"
+            ],
+            style_description="You are painting in the tradition of pastel dreamscape artists — creators who build worlds from spun sugar and morning mist, where every color arrives pre-softened and every edge dissolves into reverie. Light suffuses everything with gentle warmth: no harsh source, no hard shadow, just an omnipresent luminous glow as if the entire world is lit from within by rose-gold dawn that never quite becomes full day. Colors exist exclusively in their most tender register — powder pink, baby blue, lavender, mint cream, peach, and soft coral — each further softened by the addition of white until they feel like tinted air rather than pigment, gradients transitioning so gently between hues that boundaries disappear into chromatic whispers. Every surface feels impossibly soft: clouds that look like they would yield to a finger's touch, petals with translucent edges, fabrics that drift and float as if gravity itself has been gentled, and backgrounds that fade into luminous fog at their edges. Characters are delicate and idealized — smooth skin with the faintest blush, large gentle eyes that shimmer with reflected pastel light, hair that flows in soft waves catching pink and lavender highlights, and expressions that lean toward wonder, tenderness, and quiet joy. Each composition creates floating sanctuary: subjects surrounded by generous breathing space of soft gradient, decorative elements — butterflies, petals, sparkles, bubbles — drifting through the air like visual poetry, and an overall sense that the frame captures a moment existing somewhere between waking and the sweetest possible dream.",
+            quality_keywords=["beautiful pastel art", "ethereal illustration quality", "professional dreamy aesthetic", "soft luminous coloring", "delicate atmospheric art"]
+        ),
+
+        # ============ 哥特风格 ============
+        "gothic": StyleEnforcement(
+            style_name="gothic",
+            style_display_name="Gothic Dark Romantic",
+            mandatory_keywords=[
+                "gothic art style", "dark romantic aesthetic", "cathedral architecture",
+                "ornate dark details", "dramatic chiaroscuro", "Victorian gothic",
+                "ravens and roses", "stained glass", "dark elegance"
+            ],
+            forbidden_keywords=[
+                "bright cheerful", "kawaii", "chibi", "pastel", "pop art",
+                "cartoon comedy", "pixel art", "minimalist", "flat design",
+                "children's style", "sunny", "beach", "tropical"
+            ],
+            style_description="You are creating in the tradition of Gothic romantics — artists who find transcendent beauty in darkness, who see cathedrals as stone prayers and graveyards as gardens of memory. Light enters through colored glass: stained windows casting jewel-toned patterns across stone floors, candelabra flames making shadows dance on vaulted ceilings, moonlight filtering through gargoyle-guarded apertures to silver-edge figures in prayer or contemplation. Colors are drawn from the Gothic palette — deep burgundy, midnight purple, forest black-green, tarnished silver, and bone white — occasionally pierced by the gemstone brilliance of stained glass ruby and sapphire that burn with spiritual intensity against surrounding shadow. Every surface carries the weight of centuries: stone walls where moisture traces dark veins, wrought iron twisted into thorned arabesques, velvet that absorbs light into its deep folds, aged wood carved with saints and sinners, and the patina of silver tarnishing under generations of candlesmoke. Characters embody dark elegance — pale skin that glows against dark clothing, features caught between beauty and melancholy, elaborate Victorian or medieval dress rich with lace and embroidery, and the stillness of figures who have made peace with the darkness around them. Each composition builds architectural drama: towering vertical elements that draw the eye upward like nave columns, pointed arches framing figures like altarpieces, the interplay of massive stone structure and intimate human vulnerability, and the presence of Gothic's symbolic vocabulary — ravens, roses, thorns, keys, and the ever-present dance of candlelight against encroaching shadow.",
+            quality_keywords=["atmospheric gothic art", "dark romantic illustration", "detailed gothic architecture", "professional dark fantasy", "elegant Victorian aesthetic"]
+        ),
+```
+
+---
+
+#### 二、前端 STYLE_PRESETS（13 个新条目）
+
+@frontend 插到 `STYLE_PRESETS` 数组末尾（`pixel` 之后，`]` 之前）:
+
+```typescript
+  // — Phase 1 新增 13 个风格 —
+  { key: "ukiyo_e", label: "浮世绘", description: "日本传统", gradient: "linear-gradient(135deg, #c2185b, #f48fb1)", thumbnail: "/styles/ukiyo_e.jpg" },
+  { key: "vintage_film", label: "复古胶片", description: "80/90怀旧", gradient: "linear-gradient(135deg, #d4a574, #8b6914)", thumbnail: "/styles/vintage_film.jpg" },
+  { key: "pencil_sketch", label: "铅笔素描", description: "文艺手绘", gradient: "linear-gradient(135deg, #636363, #a2a2a2)", thumbnail: "/styles/pencil_sketch.jpg" },
+  { key: "chibi", label: "Q版卡通", description: "萌系搞笑", gradient: "linear-gradient(135deg, #ff9a9e, #fad0c4)", thumbnail: "/styles/chibi.jpg" },
+  { key: "dark_fantasy", label: "暗黑奇幻", description: "魔幻/哥特", gradient: "linear-gradient(135deg, #0f0f23, #4a1942)", thumbnail: "/styles/dark_fantasy.jpg" },
+  { key: "pop_art", label: "波普艺术", description: "时尚潮流", gradient: "linear-gradient(135deg, #ff0844, #ffb199)", thumbnail: "/styles/pop_art.jpg" },
+  { key: "paper_cut", label: "中国剪纸", description: "民俗文化", gradient: "linear-gradient(135deg, #d32f2f, #ff6659)", thumbnail: "/styles/paper_cut.jpg" },
+  { key: "steampunk", label: "蒸汽朋克", description: "维多利亚机械", gradient: "linear-gradient(135deg, #5d4037, #d4a574)", thumbnail: "/styles/steampunk.jpg" },
+  { key: "art_nouveau", label: "新艺术", description: "Mucha装饰", gradient: "linear-gradient(135deg, #6d9b7b, #d4a574)", thumbnail: "/styles/art_nouveau.jpg" },
+  { key: "noir", label: "黑色电影", description: "高反差黑白", gradient: "linear-gradient(135deg, #1a1a1a, #4a4a4a)", thumbnail: "/styles/noir.jpg" },
+  { key: "comic_western", label: "欧美漫画", description: "超英/动作", gradient: "linear-gradient(135deg, #1565c0, #e53935)", thumbnail: "/styles/comic_western.jpg" },
+  { key: "pastel_dream", label: "梦幻马卡龙", description: "柔美少女", gradient: "linear-gradient(135deg, #fbc2eb, #a6c1ee)", thumbnail: "/styles/pastel_dream.jpg" },
+  { key: "gothic", label: "哥特风", description: "暗色/神秘", gradient: "linear-gradient(135deg, #1a0a2e, #6a1b4d)", thumbnail: "/styles/gothic.jpg" },
+```
+
+---
+
+#### 三、StylePreset Literal 扩展为 28
+
+@backend `app/schemas/project.py` 的 `StylePreset` 扩展（在现有 15 个后追加 13 个）:
+
+```python
+StylePreset = Literal[
+    # 现有 15 个
+    "realistic", "illustration", "cyberpunk", "ink", "cartoon",
+    "manga", "oil_painting", "watercolor", "pixel",
+    "pixar_3d", "ghibli", "anime", "slam_dunk", "korean_webtoon",
+    "children_book",
+    # 新增 13 个
+    "ukiyo_e", "vintage_film", "pencil_sketch", "chibi",
+    "dark_fantasy", "pop_art", "paper_cut", "steampunk",
+    "art_nouveau", "noir", "comic_western", "pastel_dream", "gothic",
+]
+```
+
+---
+
+@backend 集成到 `style_enforcer.py` + `project.py` Literal。@frontend 集成到 `create.ts` STYLE_PRESETS。@pm 生成 13 张 thumbnails。13/13 风格全部交付。
+
+---
+
+#### @frontend (2026-03-25)
+
+### ✅ Phase 1 Step 2 Frontend 完成 — STYLE_PRESETS 15 → 28
+
+**文件**: `frontend/src/types/create.ts`
+
+- `STYLE_PRESETS` 数组末尾追加 13 个新风格（ukiyo_e → gothic），完全对齐 AI-ML 交付
+- `STYLE_PRESETS_DEFAULT_COUNT` 从 8 调整为 10（默认显示 10 个，其余"更多"展开）
+- 总计 28 个风格预设
+
+build 20 路由 0 错误。
+
+**@pm Step 2 Frontend 完成，等 Backend StyleEnforcer + PM Review。**
+
+---
+
+#### @backend (2026-03-25)
+
+### ✅ Phase 1 Step 2 Backend 完成 — StyleEnforcer 28 + Literal 28
+
+| 文件 | 改动 |
+|------|------|
+| `app/services/style_enforcer.py` | +13 个 `StyleEnforcement` 条目（AI-ML 设计，插在 `"pixel"` 之后） |
+| `app/schemas/project.py` | `StylePreset` Literal 15 → 28 |
+
+**验证**: syntax ✅ + StyleEnforcement count = 28 ✅ + StylePreset count = 28 ✅
+
+@pm Phase 1 Step 1 + Step 2 Backend 全部完成，等 Code Review。
+
+---
+
+#### @pm (2026-03-25)
+
+### 🔍 Phase 1 全面审计 — 16 文件交叉验证
+
+12 项交叉验证全部 PASS（28 key 三方对齐 + Gemini/os.getenv 零残留 + 全部端点/特性到位）。
+
+**发现 1 个需修的问题**:
+
+`app/api/utils.py` OCR 端点用了同步客户端（和之前 story_outline_generator.py 同一类 bug）：
+- Gemini: `client.models.generate_content` → 应改为 `await client.aio.models.generate_content`
+- Anthropic: `anthropic.Anthropic` → 应改为 `anthropic.AsyncAnthropic` + `await`
+
+---
+
+#### @pm → @backend (2026-03-25)
+
+### 任务: TASK-UTILS-ASYNC-FIX — utils.py 同步客户端修复
+
+**Bug**: `app/api/utils.py` 的 OCR 端点在 `async def` 里用同步客户端，阻塞事件循环（和之前 TASK-OUTLINE-LLM-FIX 同一类问题）。
+
+**改动**:
+
+**Gemini 路径** (L28-36):
+```python
+# 改前:
+client = genai.Client(api_key=settings.GEMINI_API_KEY)
+response = client.models.generate_content(...)
+
+# 改后:
+client = genai.Client(api_key=settings.GEMINI_API_KEY)
+response = await client.aio.models.generate_content(...)
+```
+
+**Anthropic 路径** (L44-58):
+```python
+# 改前:
+client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+response = client.messages.create(...)
+
+# 改后:
+client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+response = await client.messages.create(...)
+```
+
+**验证**: Python syntax ✅ + 后端启动无报错。
+
+完成后通知 @pm → PM Review → **Founder 本地浏览器联调测试** → 确认成功后 DevOps push。
+
+---
+
+#### @backend (2026-03-25)
+
+✅ **TASK-UTILS-ASYNC-FIX 完成 — utils.py 2 处同步→异步**
+
+| # | 路径 | 改动 |
+|---|------|------|
+| 1 | Gemini L30 | `client.models.generate_content` → `await client.aio.models.generate_content` |
+| 2 | Anthropic L45+47 | `anthropic.Anthropic` → `AsyncAnthropic` + `await client.messages.create` |
+
+验证: Python syntax ✅
+
+@pm TASK-UTILS-ASYNC-FIX 完成，等 Review。
+
+---
+
+#### @pm (2026-03-25)
+
+### ✅ PM Review PASS — TASK-UTILS-ASYNC-FIX (5/5) + 13 Thumbnails (5/5)
+
+**Backend**: Gemini `await aio.generate_content` + Anthropic `AsyncAnthropic` + `await` 全部正确。
+**PM Thumbnails**: 13/13 成功，28 张全部在 `frontend/public/styles/`。
+
+**@founder**: 可以本地联调测试了。28 个风格有缩略图 + OCR/文档解析 + 大纲生成全链路。
+
+联调成功后通知我 → DevOps push。
+
+---
+
+#### @pm (2026-03-25)
+
+### 🔍 Founder 联调发现 3 点 + Phase 2 设计更新
+
+**Founder 联调观察**:
+
+1. **验证 Bug**: 上传了文档但没手动输入文字 → 点生成 → 报错"请输入故事创意"。应该 idea 或 documentText 有一个就行
+2. **自定义风格/角色标签是 mock**: 始终显示 5 个固定标签（warm color palette...），不管上传什么图。角色永远"未命名角色"。无角色/场景推荐数提示 → Phase 2
+3. **关键产品洞察**: 用户上传的角色/场景参考图的 AI 分析结果应该喂给大纲生成，否则 LLM 不知道用户提供了什么角色/场景 → 生成的大纲和用户预期脱节
+
+**Founder 补充澄清（Phase 2 参考图生成逻辑）**:
+
+> 内容跟角色/场景参考图走，风格跟自定义风格参考图走。
+
+生成最终参考图时：
+- **角色参考图**: 内容保持用户上传角色的外貌特征 + 风格统一为用户上传的自定义风格
+- **场景参考图**: 内容保持用户上传场景的环境特征 + 风格统一为用户上传的自定义风格
+- 不是直接拿原始图当参考图，而是用它们作为"内容种子" + 自定义风格作为"风格种子"
+
+---
+
+#### @pm → @frontend (2026-03-25)
+
+### 任务: TASK-VALIDATION-FIX — 文档上传后验证逻辑修复
+
+**Bug**: 用户上传了文档（documentText 有值）但没在输入框手动输入 → 点"生成故事" → 报错"请输入你的故事创意"。
+
+**文件**: `frontend/src/app/create/CreateContent.tsx`
+
+**位置**: L46-49
+
+```typescript
+// 改前:
+if (!state.idea.trim()) {
+  setIdeaError("请输入你的故事创意");
+  return;
+}
+
+// 改后:
+if (!state.idea.trim() && !state.documentText?.trim()) {
+  setIdeaError("请输入故事创意或上传故事文档");
+  return;
+}
+```
+
+**验证**: build 0 错误 + 上传文档不输入文字 → 能正常点"生成故事"。
+
+完成后通知 @pm。
+
+---
+
+#### @frontend (2026-03-25)
+
+### ✅ TASK-VALIDATION-FIX 完成
+
+`CreateContent.tsx` L46: `!state.idea.trim()` → `!state.idea.trim() && !state.documentText?.trim()`
+
+错误提示: "请输入你的故事创意" → "请输入故事创意或上传故事文档"
+
+build 20 路由 0 错误。
+
+**@pm 完成，等你 Review。**
+
+---
+
+#### @pm (2026-03-25)
+
+### 📋 Phase 2 设计更新 — 自定义参考图 AI 分析 → 大纲生成
+
+基于 Founder 联调洞察，Phase 2 的核心流程从"分析后存起来给 Pipeline 用"升级为"分析结果同时喂给大纲生成"。
+
+**更新后的完整流程**:
+
+```
+=== StageA 输入阶段 ===
+
+用户上传自定义风格参考图
+  → 立即调 POST /api/utils/analyze-style
+  → AI 返回: mandatory_keywords, forbidden_keywords, style_description, quality_keywords
+  → 前端展示精简标签（真实 AI 分析结果，非 mock）
+  → 用户看到 → 确认/换图
+
+用户上传角色参考图（最多5张）
+  → 每张立即调 POST /api/projects/{id}/upload-character-ref
+  → AI 返回: gender, age, hair, build, clothing, distinctive_features
+  → 前端展示提取结果 + 角色推荐数提示
+  → "短篇推荐3个角色，建议再上传1个"
+
+用户上传场景参考图（最多8张）
+  → 每张立即调 POST /api/projects/{id}/upload-scene-ref
+  → AI 返回: location_type, atmosphere, lighting, key_elements
+  → 前端展示 + 场景推荐数提示
+
+=== 用户点"生成故事" ===
+
+前端把以下全部发到 generate_outline:
+  - idea + document_text（文字创意）
+  - style_preset 或 custom_style_analysis（风格）
+  - character_refs_analysis: [{ gender, age, hair, clothing, ... }, ...]（角色分析结果）
+  - scene_refs_analysis: [{ location_type, atmosphere, ... }, ...]（场景分析结果）
+  - duration, character_count, language, aspect_ratio
+
+StoryOutlineGenerator prompt 新增上下文段:
+  "用户提供了以下角色参考：
+   角色1 — 年轻女性，长发，穿校服
+   角色2 — 老年男性，白发，穿中式衣服
+   请确保大纲中的角色设定贴合这些参考。"
+  "用户提供了以下场景参考：
+   场景1 — 日式传统房间，木质地板，障子门
+   请确保大纲中的场景设定贴合这些参考。"
+
+→ LLM 生成贴合用户视觉参考的大纲
+
+=== Stage 5 生成图片阶段 ===
+
+生成最终角色参考图（portrait + fullbody）:
+  - 内容种子: 用户上传的角色照片（提取的外貌特征）
+  - 风格种子: 用户上传的自定义风格（分析出的 StyleEnforcement）
+  - 输出: 风格统一的角色参考图
+
+生成最终场景参考图（interior + exterior）:
+  - 内容种子: 用户上传的场景照片（提取的环境特征）
+  - 风格种子: 同上
+  - 输出: 风格统一的场景参考图
+
+没有自定义参考图的情况 → 标准流程不变
+```
+
+**Phase 2 涉及的改动全景**:
+
+| 层 | 改什么 | 谁做 |
+|----|--------|------|
+| **AI-ML** | 设计 3 个分析 prompt（风格/角色/场景） + StoryOutlineGenerator prompt 新增"用户参考上下文"段 | @AI-ML |
+| **Backend** | 3 个分析端点 + 文件上传存储 + ProjectCreate 新增分析结果字段 + generate_outline 读取分析结果传给 LLM | @Backend |
+| **Frontend** | mock → 真实 API + 角色/场景推荐数 UI + 分析结果随 create 请求发送 | @Frontend |
+| **Pipeline** | ReferenceImageManager 接收用户上传图作为"内容种子" + 自定义风格作为"风格种子" | @Backend + @AI-ML |
+
+---
+
+#### @pm (2026-03-25)
+
+### ✅ PM Review PASS — TASK-VALIDATION-FIX
+
+L46: `!state.idea.trim() && !state.documentText?.trim()` + 提示语更新。正确。
+
+---
+
+#### @pm (2026-03-25)
+
+### 📋 Phase 2 设计复查 + Step 1 派发
+
+**复查发现 5 个设计缺陷**（已在 Step 1-3 计划中修正）:
+1. `set_reference()` 存储格式不匹配（flat Image vs dict）
+2. 前端 extractedInfo 和后端 character 格式不一致 → **决策: AI 提取返回文本描述，不用结构化字段，避免耦合**
+3. SceneUploader 零 AI 分析
+4. `generate_character_multi_refs()` 无 seed 图参数
+5. 场景无 interior/exterior 判定逻辑
+
+---
+
+## Phase 2 Step 1 — 基础层（AI-ML + Backend 并行）
+
+### @ai-ml: TASK-PHASE2-PROMPTS — 设计 4 个分析/上下文 prompt
+
+**需要设计 4 个 prompt，写入 TEAM_CHAT，@backend 集成。**
+
+---
+
+#### Prompt 1: 自定义风格分析
+
+**用途**: `POST /api/utils/analyze-style` 端点，用户上传风格参考图 → AI 分析
+**模型**: `gemini-3.1-flash-lite-preview`，备用 `claude-haiku-4-5`
+**输入**: 一张风格参考图片
+**输出格式**: JSON，与 `StyleEnforcement` 结构对齐：
+
+```json
+{
+  "style_display_name": "图片风格的英文名（如 Warm Watercolor Illustration）",
+  "mandatory_keywords": ["keyword1", "keyword2", ...],
+  "forbidden_keywords": ["keyword1", "keyword2", ...],
+  "style_description": "100-300 字英文美学描述",
+  "quality_keywords": ["keyword1", ...],
+  "display_tags": ["中文标签1", "中文标签2", ...]
+}
+```
+
+注意:
+- `display_tags` 是给前端用户看的精简中文标签（3-5 个）
+- 其余字段是给 StyleEnforcer 内部用的英文信息
+- prompt 要指导 LLM 从图片中识别: 色调/光影/笔触/构图风格/媒介感/氛围
+
+---
+
+#### Prompt 2: 角色特征提取
+
+**用途**: `POST /api/projects/{id}/upload-character-ref` 端点，用户上传角色参考图 → AI 分析
+**模型**: 同上
+**输入**: 一张角色照片（任何角度/自拍/全身/半身）
+**输出格式**: JSON
+
+```json
+{
+  "description_zh": "角色文本描述，30-50字中文（如：约25岁年轻女性，黑色长直发，鹅蛋脸，穿白色校服上衣和深蓝色百褶裙）",
+  "description_en": "Same description in English for image generation prompts",
+  "gender": "female",
+  "age_range": "young_adult",
+  "display_name": "建议的角色称呼（如：长发女生）"
+}
+```
+
+注意:
+- `description_zh` 喂给 StoryOutlineGenerator（让大纲贴合角色）
+- `description_en` 后续给 Stage 2 CharacterDesigner + ReferenceImageManager 用
+- `display_name` 替代前端当前的"未命名角色"
+- prompt 要从图片中识别: 性别/年龄段/发型发色/脸型/身材/穿着/显著特征
+
+---
+
+#### Prompt 3: 场景特征提取
+
+**用途**: `POST /api/projects/{id}/upload-scene-ref` 端点
+**模型**: 同上
+**输入**: 一张场景照片
+**输出格式**: JSON
+
+```json
+{
+  "description_zh": "场景文本描述，30-50字中文（如：日式传统和室，木质地板，障子门半开，阳光从庭院洒入）",
+  "description_en": "Same in English",
+  "location_type": "interior / exterior / both",
+  "atmosphere": "描述氛围（如 warm_cozy / mysterious_quiet）",
+  "display_name": "建议的场景名（如：日式和室）"
+}
+```
+
+注意:
+- `location_type` 帮系统决定生成 interior 还是 exterior 参考图
+- `display_name` 替代前端当前的"场景 1"
+- prompt 要从图片中识别: 内景/外景/时间/天气/氛围/关键视觉元素
+
+---
+
+#### Prompt 4: StoryOutlineGenerator 用户参考上下文段
+
+**用途**: 当用户提供了自定义角色/场景参考图时，在 `_build_prompt` 的 prompt 里追加一段上下文
+**模型**: 不需要单独模型，是文本模板
+
+设计一个 prompt 模板，当有用户参考时追加到 `_build_prompt` 的末尾（"现在开始生成故事大纲"之前）：
+
+```
+## 用户提供的视觉参考（IMPORTANT: 大纲必须贴合这些参考）
+
+### 角色参考
+用户提供了 {N} 个角色的参考照片：
+- 角色1: {description_zh_1}
+- 角色2: {description_zh_2}
+请确保 characters_overview 中的角色设定贴合这些参考的外貌和气质。
+
+### 场景参考
+用户提供了 {M} 个场景的参考照片：
+- 场景1: {description_zh_1}
+请确保 unique_locations 中至少包含这些场景或类似场景。
+
+### 自定义风格
+用户上传了风格参考图，期望的视觉风格为: {style_display_name}
+请确保 visual_tone 与此风格一致。
+```
+
+当某类参考为空时（如没有角色参考），对应段落不出现。
+
+---
+
+### @backend: TASK-PHASE2-INFRA — 文件上传基础设施 + 3 个分析端点
+
+**依赖**: 等 AI-ML 交付 prompt 后集成，但基础设施可以先搭。
+
+---
+
+#### 1. 文件上传基础设施
+
+**新增**: `app/services/file_storage.py`
+
+```python
+# 本地文件存储服务
+# - save_upload(file, category, project_id) → 返回文件路径
+# - get_upload(path) → 返回文件
+# - delete_upload(path)
+# 存储路径: ./storage/uploads/{project_id}/{category}/{filename}
+# category: "character_ref" / "scene_ref" / "style_ref"
+```
+
+**安全校验** (在每个上传端点里):
+- 文件类型: 仅 image/jpeg, image/png, image/webp
+- 文件大小: 单张不超过 10MB
+- 基本校验: 能被 PIL 打开为有效图片
+
+**压缩** (可选，不损细节):
+- 如果图片超过 2048px 任一边，等比缩小到 2048px
+- 保存为 JPEG quality=90（平衡文件大小和质量）
+
+---
+
+#### 2. 三个分析端点
+
+**文件**: 加到 `app/api/utils.py`（和现有 OCR 端点同文件）
+
+**端点 A**: `POST /api/utils/analyze-style`
+- 接收图片 → AI 分析（AI-ML 的 Prompt 1）→ 返回 StyleEnforcement 格式 JSON
+- 模型: `gemini-3.1-flash-lite-preview`，备用 `claude-haiku-4-5`
+- 返回: `{ "style_display_name": "...", "mandatory_keywords": [...], ..., "display_tags": [...] }`
+- **不需要认证**（在创建项目之前调用）
+
+**端点 B**: `POST /api/utils/analyze-character`
+- 接收图片 → AI 分析（AI-ML 的 Prompt 2）→ 返回角色特征 JSON
+- 模型: 同上
+- 返回: `{ "description_zh": "...", "description_en": "...", "gender": "...", "age_range": "...", "display_name": "..." }`
+- **不需要认证**
+
+**端点 C**: `POST /api/utils/analyze-scene`
+- 接收图片 → AI 分析（AI-ML 的 Prompt 3）→ 返回场景特征 JSON
+- 模型: 同上
+- 返回: `{ "description_zh": "...", "description_en": "...", "location_type": "...", "atmosphere": "...", "display_name": "..." }`
+- **不需要认证**
+
+**重要**: 这 3 个端点是**分析**端点（返回 AI 提取结果），不负责文件持久化存储。文件存储在 create project 时一起做（Phase 2 Step 2）。
+
+---
+
+#### 执行顺序
+
+1. **@ai-ml** 设计 4 个 prompt → 写入 TEAM_CHAT
+2. **@backend** 先搭文件存储基础设施（不依赖 AI-ML）
+3. **@backend** 等 AI-ML prompt 交付 → 集成 3 个分析端点
+4. 通知 @pm → PM Review
+
+---
+
+## Phase 2 Step 2-3 高层计划（Step 1 完成后派发）
+
+**Step 2（集成层）**:
+- Frontend: mock→真实 API + 推荐数提示 + 分析结果随 create 请求发送
+- Backend: ProjectCreate 新增分析结果字段 + generate_outline 传参考上下文给 LLM
+
+**Step 3（Pipeline 层）**:
+- Backend: ReferenceImageManager 新增 seed 图代码路径 + SceneReferenceManager seed 图支持
+- Backend: Pipeline orchestrator 分支逻辑（有/无用户参考图）
+
+---
+
+#### @pm (2026-03-25)
+
+### ✅ PM Review PASS — Phase 2 Step 1 (AI-ML + Backend, 18/18)
+
+AI-ML 4 prompts 全部到位 + Backend file_storage + 3 分析端点 + StoryOutlineGenerator 参考上下文。
+
+**1 个低优先级问题**: `_build_prompt` L413 已有"现在开始生成故事大纲"，`generate()` L142 又加了一个 → 重复。不阻塞，Backend 有空修一下（从 `_build_prompt` 末尾移除，统一在 `generate()` 加）。
+
+---
+
+## Phase 2 Step 2 派发 — 集成层（Frontend + Backend）
+
+### @frontend: TASK-PHASE2-INTEGRATE — mock→真实 API + 推荐数 + 分析结果发送
+
+**3 个 mock 替换 + 1 个推荐数 UI + 1 个 create 请求更新**:
+
+---
+
+#### 1. CustomStyleUploader → 真实 API
+
+**文件**: `frontend/src/components/ui/CustomStyleUploader.tsx`
+
+- 删除 `mockStyleAnalysis()` 调用
+- 改为调 `POST /api/utils/analyze-style`（FormData 上传图片）
+- 返回的 `display_tags` 替代当前 mock 的 5 个固定关键词
+- 返回的完整 JSON 存到 state（供 create 请求发送）
+- 超时处理: 10 秒 + loading 状态 + 失败提示
+
+**state 改动** (`CreateContext.tsx`):
+- `customStyleKeywords: string[]` → 改为存完整分析结果: `customStyleAnalysis: StyleAnalysisResult | null`
+- 或保持 `customStyleKeywords` 给 UI 展示标签，另加一个 `customStyleAnalysis` 存完整 JSON
+
+---
+
+#### 2. CharacterUploader → 真实 API
+
+**文件**: `frontend/src/components/ui/CharacterUploader.tsx`
+
+- 删除 `mockCharacterExtract()` 调用
+- 改为调 `POST /api/utils/analyze-character`（FormData 上传图片）
+- 返回的 `display_name` 替代 "未命名角色"
+- 返回的 `description_zh` 存到 `extractedInfo` 或新字段
+- 返回的完整 JSON 存到 `CharacterRef`（供 create 请求发送）
+
+**CharacterRef 类型更新** (`types/create.ts`):
+```typescript
+interface CharacterRef {
+  id: string;
+  name: string;                    // ← 改用 AI 的 display_name
+  uploadedImage: File | null;
+  uploadedImageUrl: string | null;
+  analysisResult: {                // ← 新增: AI 分析完整结果
+    description_zh: string;
+    description_en: string;
+    gender: string;
+    age_range: string;
+    display_name: string;
+  } | null;
+  portraitUrl: string | null;
+  fullbodyUrl: string | null;
+}
+```
+
+---
+
+#### 3. SceneUploader → 真实 API
+
+**文件**: `frontend/src/components/ui/SceneUploader.tsx`
+
+- 当前零 AI 分析，只存文件
+- 新增: 上传后调 `POST /api/utils/analyze-scene`
+- 返回的 `display_name` 替代 "场景 1"
+- 返回的完整 JSON 存到 `SceneRef`
+
+**SceneRef 类型更新** (`types/create.ts`):
+```typescript
+interface SceneRef {
+  id: string;
+  name: string;                    // ← 改用 AI 的 display_name
+  uploadedImage: File | null;
+  uploadedImageUrl: string | null;
+  analysisResult: {                // ← 新增: AI 分析结果
+    description_zh: string;
+    description_en: string;
+    location_type: string;
+    atmosphere: string;
+    display_name: string;
+  } | null;
+  interiorUrl: string | null;
+  exteriorUrl: string | null;
+}
+```
+
+---
+
+#### 4. 角色/场景推荐数提示
+
+**位置**: `CharacterUploader.tsx` 和 `SceneUploader.tsx`
+
+在已有的 "可选，最多X个" 标签旁边或下方，根据当前选择的篇幅显示推荐提示:
+
+**需要从父组件传入 `storyLength`**（从 `CreateContent.tsx` 的 `state.length` 传入）。
+
+**角色推荐逻辑**:
+```
+flash=2, short=3, medium=3-4(max4), epic=4-6(max6)
+```
+- 当已上传数 < 推荐最小值: 显示"短篇推荐 {min} 个角色，建议再上传 {min - N} 个"
+- 当已上传数 >= 推荐最小值: 不显示提示
+- 当用户不继续上传: 显示"系统将根据故事自动补足角色"
+
+**场景推荐逻辑**:
+```
+flash=2-3, short=3-4, medium=4-6, epic=5-8
+```
+同上模式。
+
+---
+
+#### 5. create 请求发送分析结果
+
+**文件**: `frontend/src/app/create/CreateContent.tsx`
+
+在 `POST /api/projects/` 的 body 里新增:
+```typescript
+body: JSON.stringify({
+  // ... 现有字段 ...
+  custom_style_analysis: state.customStyleAnalysis || null,           // 新增
+  character_refs_analysis: state.characters                           // 新增
+    .filter(c => c.analysisResult)
+    .map(c => c.analysisResult),
+  scene_refs_analysis: state.scenes                                   // 新增
+    .filter(s => s.analysisResult)
+    .map(s => s.analysisResult),
+}),
+```
+
+---
+
+### @backend: TASK-PHASE2-INTEGRATE — schema + generate_outline 传参
+
+**2 个文件改动**:
+
+#### 1. ProjectCreate schema 新增字段
+
+**文件**: `app/schemas/project.py`
+
+```python
+custom_style_analysis: dict | None = Field(default=None, description="自定义风格分析结果")
+character_refs_analysis: list[dict] | None = Field(default=None, description="角色参考图分析结果")
+scene_refs_analysis: list[dict] | None = Field(default=None, description="场景参考图分析结果")
+```
+
+#### 2. generate_outline 端点传参
+
+**文件**: `app/api/projects.py` — `generate_outline` 函数
+
+```python
+# 从 Project 或请求中获取分析结果（Step 2 先从 create 请求存到 Project）
+outline = await generator.generate(
+    idea=project.original_idea,
+    style_preset=project.style_preset,
+    target_duration_minutes=duration,
+    language=project.language or "zh-CN",
+    character_count=character_count,
+    # 新增 3 个参数:
+    character_refs_analysis=json.loads(project.character_refs_analysis_json) if project.character_refs_analysis_json else None,
+    scene_refs_analysis=json.loads(project.scene_refs_analysis_json) if project.scene_refs_analysis_json else None,
+    custom_style_name=json.loads(project.custom_style_analysis_json).get("style_display_name") if project.custom_style_analysis_json else None,
+)
+```
+
+**注意**: 需要在 Project model 加 3 个新 JSON 字段 (`custom_style_analysis_json`, `character_refs_analysis_json`, `scene_refs_analysis_json`) + `create_project` 端点存储。
+
+同时修复低优先级问题: 从 `_build_prompt` L413 移除"现在开始生成故事大纲："，统一在 `generate()` 加。
+
+---
+
+#### 执行顺序
+
+1. **@backend** 先做: schema + model 字段 + create_project 存储 + generate_outline 传参 + prompt 重复修复
+2. **@frontend** 并行做: mock→真实 API + 推荐数 UI + create 请求更新
+3. 通知 @pm → PM Review
+
+---
+
+#### @ai-ml (2026-03-25)
+
+### ✅ TASK-PHASE2-PROMPTS 完成 — 4 个 prompt 全部交付
+
+@backend 集成到对应端点。Prompt 4 集成到 `story_outline_generator.py` 的 `_build_prompt`。
+
+---
+
+#### Prompt 1: 自定义风格分析 (analyze-style)
+
+```python
+STYLE_ANALYSIS_PROMPT = """You are a professional visual style analyst for an AI-powered story illustration system.
+
+Analyze this image and extract its visual style characteristics. Your analysis will be used to enforce this exact style on all generated story illustrations.
+
+Always respond with valid JSON only. No markdown code blocks, no explanation, no text before or after the JSON.
+
+Analyze these dimensions:
+1. COLOR PALETTE: Dominant colors, color temperature (warm/cool/neutral), saturation level, contrast range
+2. LIGHTING: Light source direction, shadow hardness, ambient light quality, highlight behavior
+3. BRUSHWORK/TEXTURE: Visible strokes, edge quality (sharp/soft/painterly), surface texture, medium feel
+4. COMPOSITION STYLE: Typical framing, depth of field treatment, background approach
+5. MEDIUM/GENRE: What art medium or genre this most resembles (e.g., watercolor, oil painting, anime, photography)
+6. MOOD/ATMOSPHERE: Overall emotional tone conveyed by the visual treatment
+
+Output format:
+{
+  "style_display_name": "A concise English name for this style (e.g., Warm Watercolor Illustration, Moody Film Photography)",
+  "mandatory_keywords": ["8-10 English keywords that MUST appear in every image prompt to reproduce this style"],
+  "forbidden_keywords": ["10-15 English keywords that must NEVER appear, as they would break this style"],
+  "style_description": "A 100-300 word English prose description of this visual style. Describe how light behaves, what colors dominate, how edges and textures feel, what atmosphere pervades. Write as instructions to an image generator: 'You are painting in the style of...' This will be injected before every image generation prompt.",
+  "quality_keywords": ["5-8 English quality enhancement keywords specific to this style"],
+  "display_tags": ["3-5个中文标签，给用户看的风格特征摘要，如：暖色调、手绘质感、柔和光影"]
+}"""
+```
+
+**设计说明**:
+- 6 维分析维度确保覆盖视觉风格的完整特征空间
+- `mandatory_keywords` / `forbidden_keywords` 直接对齐 `StyleEnforcement` 数据结构，Backend 零转换
+- `style_description` 采用和现有 28 风格相同的"You are painting/shooting in the style of..."句式，与 StyleEnforcer 的 `enforce_prompt()` 注入模板无缝衔接
+- `display_tags` 是中文标签，替代前端当前的 mock 固定标签
+
+---
+
+#### Prompt 2: 角色特征提取 (analyze-character)
+
+```python
+CHARACTER_ANALYSIS_PROMPT = """You are a professional character visual analyst for an AI-powered story illustration system.
+
+Analyze this photo and extract the person's visual appearance characteristics. Your analysis will be used to: (1) guide story outline generation to match this character, and (2) generate consistent character reference images in various art styles.
+
+Always respond with valid JSON only. No markdown code blocks, no explanation, no text before or after the JSON.
+
+Focus on VISUAL characteristics only — what can be seen in the image:
+1. GENDER & AGE: Apparent gender and age range
+2. FACE: Face shape, skin tone, eye shape/color, eyebrow style, nose, lips, any facial hair
+3. HAIR: Color, length, style, texture
+4. BUILD: Height impression, body build (slim/medium/athletic/heavy)
+5. CLOTHING: What they are currently wearing, from top to bottom, including accessories
+6. DISTINCTIVE FEATURES: Any immediately noticeable features (glasses, scars, tattoos, piercings, birthmarks, jewelry)
+
+Output format:
+{
+  "description_zh": "角色外貌的中文描述，30-50字。写法示例：约25岁年轻女性，黑色长直发及腰，鹅蛋脸，皮肤白皙，穿白色校服衬衫和深蓝色百褶裙，戴细框眼镜",
+  "description_en": "Same description in English, 30-60 words. Example: A young woman around 25, with long straight black hair reaching her waist, oval face, fair skin, wearing a white school uniform shirt and dark blue pleated skirt, thin-framed glasses",
+  "gender": "male / female",
+  "age_range": "child / teen / young_adult / adult / middle_aged / elderly",
+  "display_name": "一个简短的中文称呼，基于最显著特征（如：长发女生、眼镜男生、白发老人、红衣少女）"
+}
+
+Rules:
+- description_zh and description_en must describe the SAME features, just in different languages
+- Focus on permanent/semi-permanent features (face, hair, build) over temporary ones (expression, pose)
+- If clothing is clearly a uniform or costume, note the type (school uniform, business suit, traditional dress)
+- If the photo is unclear or partial (e.g., only showing a hand), describe what is visible and note limitations
+- display_name should be 2-5 Chinese characters, immediately recognizable"""
+```
+
+**设计说明**:
+- `description_zh` 喂给 StoryOutlineGenerator（Prompt 4），让大纲贴合用户角色
+- `description_en` 给 Stage 2 CharacterDesigner + ReferenceImageManager，直接用于图像生成 prompt
+- 按 PM 决策，核心信息用文本描述而非结构化字段（避免前后端耦合）
+- `gender` / `age_range` 保留结构化，因为前端需要做简单过滤/排序
+- `display_name` 替代前端的"未命名角色"
+
+---
+
+#### Prompt 3: 场景特征提取 (analyze-scene)
+
+```python
+SCENE_ANALYSIS_PROMPT = """You are a professional scene/environment visual analyst for an AI-powered story illustration system.
+
+Analyze this photo and extract the scene's visual and spatial characteristics. Your analysis will be used to: (1) guide story outline generation to include this type of location, and (2) generate consistent scene reference images (interior/exterior).
+
+Always respond with valid JSON only. No markdown code blocks, no explanation, no text before or after the JSON.
+
+Analyze these dimensions:
+1. SPACE TYPE: Is this an interior (indoor), exterior (outdoor), or a transitional space (doorway, porch, balcony)?
+2. LOCATION CATEGORY: What type of place is this? (e.g., café, classroom, street, park, temple, bedroom)
+3. TIME & WEATHER: If discernible — time of day, season, weather conditions
+4. ATMOSPHERE: Overall mood and feeling of the space (cozy, grand, cramped, serene, bustling)
+5. KEY VISUAL ELEMENTS: The 3-5 most prominent visual features that define this space (e.g., wooden beams, neon signs, cherry blossoms, bookshelves)
+6. LIGHTING: Natural/artificial, direction, warmth, notable light effects (e.g., dappled sunlight, candlelight)
+
+Output format:
+{
+  "description_zh": "场景的中文描述，30-50字。写法示例：日式传统和室，铺着榻榻米，障子门半开，午后阳光从庭院透入，角落放着插花",
+  "description_en": "Same description in English, 30-60 words. Example: A traditional Japanese tatami room with sliding shoji doors half-open, afternoon sunlight streaming in from the garden, a flower arrangement in the corner",
+  "location_type": "interior / exterior / both",
+  "atmosphere": "用1-2个英文词描述氛围（如 warm_cozy / mysterious_quiet / vibrant_bustling / serene_natural）",
+  "display_name": "场景的简短中文名，2-6字（如：日式和室、雨夜街头、咖啡馆、竹林小径）"
+}
+
+Rules:
+- description_zh and description_en must describe the SAME features
+- location_type determines whether the system generates interior reference, exterior reference, or both
+- If the image shows both indoor and outdoor (e.g., a café with visible street through windows), use "both"
+- Focus on spatial and environmental features, not people in the scene
+- display_name should be evocative and specific enough to distinguish from generic locations"""
+```
+
+**设计说明**:
+- `location_type` 是 Phase 2 关键字段 — 直接决定 SceneReferenceManager 生成 interior/exterior/both
+- `atmosphere` 用英文因为后续进入 prompt 系统
+- 6 维分析覆盖空间类型/位置/时间/氛围/视觉元素/光照，比前端 mock 的单一 tag 精确得多
+- 规则明确"不关注图中的人"——场景分析只看环境
+
+---
+
+#### Prompt 4: StoryOutlineGenerator 用户参考上下文模板
+
+```python
+def _build_user_reference_context(
+    character_refs_analysis: list[dict] | None = None,
+    scene_refs_analysis: list[dict] | None = None,
+    custom_style_name: str | None = None,
+) -> str:
+    """构建用户参考图上下文段，追加到 _build_prompt 末尾（'现在开始生成故事大纲'之前）。
+    当所有参考为空时返回空字符串。"""
+    sections = []
+
+    if character_refs_analysis:
+        char_lines = []
+        for i, char in enumerate(character_refs_analysis, 1):
+            desc = char.get("description_zh", "未知角色")
+            char_lines.append(f"- 角色{i}: {desc}")
+        sections.append(
+            f"""### 用户提供的角色参考（共 {len(character_refs_analysis)} 个）
+{chr(10).join(char_lines)}
+请确保 characters_overview 中的角色设定贴合这些参考的外貌和气质。角色数量可以多于参考数（系统会补充原创角色），但参考中的角色必须出现且描述一致。"""
+        )
+
+    if scene_refs_analysis:
+        scene_lines = []
+        for i, scene in enumerate(scene_refs_analysis, 1):
+            desc = scene.get("description_zh", "未知场景")
+            scene_lines.append(f"- 场景{i}: {desc}")
+        sections.append(
+            f"""### 用户提供的场景参考（共 {len(scene_refs_analysis)} 个）
+{chr(10).join(scene_lines)}
+请确保 unique_locations 中至少包含这些场景或与之高度相似的场景。可以添加额外场景以丰富故事。"""
+        )
+
+    if custom_style_name:
+        sections.append(
+            f"""### 用户选择的自定义视觉风格
+用户上传了风格参考图，期望的视觉风格为: {custom_style_name}
+请确保 visual_tone 的 color_palette 和整体氛围与此风格一致。"""
+        )
+
+    if not sections:
+        return ""
+
+    return """
+
+## 用户提供的视觉参考（IMPORTANT: 大纲必须贴合这些参考）
+
+""" + "\n\n".join(sections)
+```
+
+**设计说明**:
+- 函数而非纯文本模板 — 因为需要动态拼接（有的用户上传角色没上传场景，反之亦然）
+- 三段独立（角色/场景/风格），缺哪段不出现哪段
+- 角色段明确"角色数量可以多于参考数" — 防止 LLM 严格限制为用户提供的角色数
+- 场景段明确"可以添加额外场景" — 同理
+- 返回空字符串当无参考 — Backend 用 `prompt += _build_user_reference_context(...)` 即可
+
+**Backend 集成位置**: `story_outline_generator.py` 的 `_build_prompt` 方法，在 `现在，请根据以上要求` 之前插入此函数的返回值。
+
+---
+
+@backend Prompt 1-3 集成到对应端点的 LLM 调用，Prompt 4 集成到 `story_outline_generator.py`。4/4 prompt 全部交付，@pm 等 Review。
+
+---
+
+---
+
+#### @backend (2026-03-25)
+
+### ✅ TASK-PHASE2-INFRA 完成 — 文件存储 + 3 分析端点 + Prompt 4
+
+**新建文件**:
+| 文件 | 内容 |
+|------|------|
+| `app/services/file_storage.py` | validate_image + compress_image (>2048px→JPEG q=90) + save/delete_upload |
+
+**修改文件**:
+| 文件 | 改动 |
+|------|------|
+| `app/api/utils.py` | +`_vision_analyze` 公用 helper + 3 端点 + AI-ML Prompt 1-3 全文集成 |
+| `app/services/story_outline_generator.py` | +`_build_user_reference_context()` (Prompt 4) + `generate()` 新增 3 可选参数 |
+
+**3 个分析端点** (均无需认证):
+
+| 端点 | Prompt | 返回 |
+|------|--------|------|
+| `POST /api/utils/analyze-style` | AI-ML Prompt 1 | `{ style_display_name, mandatory/forbidden/quality_keywords, style_description, display_tags }` |
+| `POST /api/utils/analyze-character` | AI-ML Prompt 2 | `{ description_zh, description_en, gender, age_range, display_name }` |
+| `POST /api/utils/analyze-scene` | AI-ML Prompt 3 | `{ description_zh, description_en, location_type, atmosphere, display_name }` |
+
+**Prompt 4 集成**: `_build_user_reference_context(character_refs_analysis, scene_refs_analysis, custom_style_name)` → 追加到 `_build_prompt` 末尾
+
+**安全**: validate_image (JPEG/PNG/WebP + 10MB + PIL) + compress_image (>2048px 缩 + JPEG q=90) + Gemini→Haiku 双 LLM fallback
+
+**验证**: 3/3 Python syntax ✅
+
+@pm TASK-PHASE2-INFRA 完成，等 Code Review。
+
+---
+
+#### @backend (2026-03-25)
+
+### ✅ TASK-PHASE2-INTEGRATE Backend 完成 — schema + model + 存储 + 传参
+
+| 文件 | 改动 |
+|------|------|
+| `app/schemas/project.py` | +3 字段: `custom_style_analysis` (dict) + `character_refs_analysis` (list[dict]) + `scene_refs_analysis` (list[dict]) |
+| `app/models/project.py` | +3 JSON 字段: `custom_style_analysis_json` + `character_refs_analysis_json` + `scene_refs_analysis_json` (Text) |
+| `app/api/projects.py` | `create_project` 存 3 个 JSON + `generate_outline` 传 3 参数给 `generator.generate()` |
+| `story_outline_generator.py` | 移除 `_build_prompt` 末尾重复的"现在开始生成故事大纲："（统一在 `generate()` 加） |
+
+**验证**: 4/4 Python syntax ✅
+
+@pm TASK-PHASE2-INTEGRATE Backend 完成，等 Code Review。
+
+---
+
+#### @frontend (2026-03-25)
+
+### ✅ TASK-PHASE2-INTEGRATE Frontend 完成 — 5 项
+
+**build 20 路由 0 错误。**
+
+| # | 改动 |
+|---|------|
+| 1 | `CustomStyleUploader.tsx`: mock→`POST /api/utils/analyze-style`，`display_tags` 给 UI，完整 JSON 存 state |
+| 2 | `CharacterUploader.tsx`: mock→`POST /api/utils/analyze-character`，AI `display_name` 替代"未命名角色"，推荐数提示 |
+| 3 | `SceneUploader.tsx`: 新增 `POST /api/utils/analyze-scene`，AI `display_name`，推荐数提示 |
+| 4 | 推荐数: 角色 flash=2/short=3/medium=3-4/epic=4-6，场景 flash=2-3/short=3-4/medium=4-6/epic=5-8 |
+| 5 | `CreateContent.tsx`: body +`custom_style_analysis` + `character_refs_analysis` + `scene_refs_analysis` |
+
+**类型更新**: CharacterRef `extractedInfo`→`analysisResult`；SceneRef +`analysisResult`；CreateState +`customStyleAnalysis`
+
+**修改 8 文件**: types/create.ts, CreateContext.tsx, CustomStyleUploader.tsx, CharacterUploader.tsx, SceneUploader.tsx, CreateContent.tsx, StyleSelector.tsx, mock-data.ts
+
+**@pm Frontend 完成，等 Backend + PM Review。**
+
+---
+
+#### @pm (2026-03-25)
+
+### PM Review — Phase 2 Step 2
+
+**Frontend: ✅ PASS (11/11)** — 3 个 mock→真实 API + 推荐数 UI (角色/场景推荐数与 Founder 决策一致) + create 请求 3 字段 + 类型定义。
+
+**Backend: 发现 1 个回归 bug**:
+
+`story_outline_generator.py` `generate()` L142: 移除 `_build_prompt` 末尾"现在开始生成故事大纲"后，只在 `ref_context` 不为空时加回。**标准流程（无参考图）prompt 末尾缺这句话。**
+
+**@backend**: 加 else 分支:
+```python
+if ref_context:
+    prompt = prompt.rstrip() + "\n" + ref_context + "\n\n现在开始生成故事大纲："
+else:
+    prompt = prompt.rstrip() + "\n\n现在开始生成故事大纲："
+```
+
+修完通知我 → Step 2 整体 PASS → Step 3。
+
+---
+
+#### @backend (2026-03-25)
+
+✅ **else 分支修复完成** — `story_outline_generator.py` L143-144
+
+```python
+else:
+    prompt = prompt.rstrip() + "\n\n现在开始生成故事大纲："
+```
+
+syntax ✅。@pm 修完了。
+
+---
+
+#### @pm (2026-03-25)
+
+### ✅ Phase 2 Step 2 整体 PASS — else 修复确认
+
+L143-144 else 分支正确。Step 2 全部通过。
+
+---
+
+## Phase 2 Step 3 派发 — Pipeline 层
+
+### @backend: TASK-PHASE2-PIPELINE — 用户上传图作为"内容种子"生成参考图
+
+**核心逻辑**: 用户上传的角色/场景图是"内容种子"，自定义风格是"风格种子"。Pipeline 生成参考图时，把用户上传图作为参考图传给图像生成模型，同时用自定义风格（或预设风格）做 StyleEnforcer 强制，输出风格统一的最终参考图。
+
+---
+
+#### 1. ReferenceImageManager — 新增 seed 图支持
+
+**文件**: `app/services/reference_image_manager.py`
+
+**改动 A**: `generate_character_multi_refs()` 新增 `seed_image` 参数
+
+```python
+async def generate_character_multi_refs(
+    self,
+    character: Dict[str, Any],
+    project_style: ProjectStyleConfig,
+    image_generator,
+    delay: float = 3.0,
+    seed_image: Image.Image | None = None,  # 新增: 用户上传的角色照片
+) -> Dict[str, Any]:
+```
+
+**逻辑分支**:
+- `seed_image is None` → 现有流程不变（从 prompt 从零生成 portrait）
+- `seed_image is not None` → 生成 portrait 时把 `seed_image` 作为 `reference_images` 传入，prompt 加一段 "Match this person's appearance — same face shape, hair style, skin tone, and build. Adapt clothing and posture to the target style."
+
+**改动 B**: `set_reference()` L680 修复格式
+
+当前 `set_reference` 存 flat Image，但 `get_references_for_scene` 期望 dict 格式 `{'portrait': Image, 'fullbody': Image}`。
+
+```python
+# 改前:
+def set_reference(self, char_id: str, image: Image.Image):
+    self.character_references[char_id] = image
+
+# 改后:
+def set_reference(self, char_id: str, image: Image.Image, ref_type: str = "fullbody"):
+    if char_id not in self.character_references:
+        self.character_references[char_id] = {}
+    if isinstance(self.character_references[char_id], dict):
+        self.character_references[char_id][ref_type] = image
+    else:
+        self.character_references[char_id] = {ref_type: image}
+```
+
+---
+
+#### 2. SceneReferenceManager — 新增 seed 图支持
+
+**文件**: `app/services/scene_reference_manager.py`
+
+场景参考图当前由 `_generate_single_anchor()` 生成 interior/exterior。新增 seed 图逻辑:
+
+- 当用户上传了场景图 + AI 分析结果有 `location_type`:
+  - `location_type == "interior"` → 用 seed 图作为参考生成 interior，exterior 从 prompt 生成
+  - `location_type == "exterior"` → 用 seed 图作为参考生成 exterior，interior 从 prompt 生成
+  - `location_type == "both"` → seed 图同时作为 interior 和 exterior 的参考
+
+- Prompt 加一段: "Use this reference image as the basis for the scene environment. Maintain the spatial layout, key architectural elements, and atmosphere. Adapt the visual style to match the project's style enforcement."
+
+---
+
+#### 3. Pipeline Orchestrator — 分支逻辑
+
+**文件**: `app/services/pipeline_orchestrator.py`
+
+在 "5a. 生成角色参考图" 段（L232-254）加分支:
+
+```python
+# 检查项目是否有用户上传的角色参考图
+user_char_seeds = {}  # char_id → PIL Image
+if project has character upload images:
+    for uploaded_char in user_uploaded_characters:
+        seed_img = Image.open(uploaded_char.file_path)
+        user_char_seeds[uploaded_char.char_id] = seed_img
+
+for char in char_list:
+    char_id = char.get("id")
+    seed = user_char_seeds.get(char_id)  # None if no user upload
+    await ref_manager.generate_character_multi_refs(
+        character=char,
+        project_style=project_style,
+        image_generator=self.image_generator,
+        seed_image=seed,  # 传入用户上传图（or None）
+    )
+```
+
+场景参考图同理。
+
+**注意**: 自定义风格的 StyleEnforcer 动态创建已在 Step 1 `_build_user_reference_context` 处理了大纲层面。Pipeline 层面需要从 Project 读取 `custom_style_analysis_json`，如果有值则动态创建 `StyleEnforcement` 替代 preset。
+
+---
+
+#### 4. 自定义风格 → StyleEnforcer 动态创建
+
+**文件**: `app/services/style_enforcer.py`
+
+新增类方法:
+
+```python
+@classmethod
+def create_custom_enforcement(cls, analysis: dict) -> StyleEnforcement:
+    """从自定义风格分析结果创建动态 StyleEnforcement"""
+    return StyleEnforcement(
+        style_name="custom",
+        style_display_name=analysis.get("style_display_name", "Custom Style"),
+        mandatory_keywords=analysis.get("mandatory_keywords", []),
+        forbidden_keywords=analysis.get("forbidden_keywords", []),
+        style_description=analysis.get("style_description", ""),
+        quality_keywords=analysis.get("quality_keywords", []),
+    )
+```
+
+Pipeline 在创建 `ProjectStyleConfig` 时判断: 如果有 `custom_style_analysis_json`，用动态 StyleEnforcement；否则用 preset。
+
+---
+
+#### 注意事项
+
+- **不要改** Stage 1-4 的 prompt 内容（除了已有的上下文段）
+- **不要改** 前端代码（Step 2 已完成）
+- **保持** 无用户参考图时的现有流程完全不变
+- Pipeline 的改动要做好 `if seed_image is None` 分支，确保标准流程不受影响
+- 测试: 有和无用户参考图两种路径都要能跑通（至少 syntax 验证）
+
+完成后通知 @pm → PM Review → Founder 联调 → DevOps push（Phase 1 + Phase 2 一起）。
+
+---
+
+#### @backend (2026-03-25)
+
+### ✅ TASK-PHASE2-PIPELINE 完成 — seed 图 + StyleEnforcer 动态创建 (4 文件)
+
+| # | 文件 | 改动 |
+|---|------|------|
+| 1 | `style_enforcer.py` | +`create_custom_enforcement(analysis)` 类方法 — 从分析 JSON 创建动态 StyleEnforcement |
+| 2 | `reference_image_manager.py` | `generate_character_multi_refs` +`seed_image` 参数（传入用户照片作为 portrait 参考）+ `set_reference` 修复 dict 格式 |
+| 3 | `scene_reference_manager.py` | `generate_anchor_images` +`seed_images: Dict[str, Image]` 参数，内景调用传 seed |
+| 4 | `pipeline_orchestrator.py` | `run()` +3 参数 (`custom_style_analysis`, `character_seeds`, `scene_seeds`) + 自定义风格创建 `ProjectStyleConfig.custom_enforcement` + 角色/场景 seed 传参 |
+
+**分支保护**: 所有改动都是 `if xxx is None` 分支，无参考图时走原流程零影响。
+
+**验证**: 4/4 Python syntax ✅
+
+@pm TASK-PHASE2-PIPELINE 完成。Phase 2 全部 3 步 Backend 已完成，等 Code Review → Founder 联调 → DevOps push。
+
+---
+
+#### @pm (2026-03-25)
+
+### PM Review — Phase 2 Step 3 (12 项检查，1 个 bug)
+
+Step 3 整体架构正确（seed_image + set_reference dict 修复 + SceneRef seed + orchestrator 3 参数 + 动态 StyleEnforcer）。
+
+**Bug**: `ProjectStyleConfig`（`app/models/style_config.py`）是 Pydantic BaseModel，没有 `custom_enforcement` 字段。Pipeline L244 `project_style.custom_enforcement = custom_enforcement` 会 `AttributeError`。
+
+**@backend**: 在 `app/models/style_config.py` 的 `ProjectStyleConfig` 加字段:
+```python
+from typing import Any
+custom_enforcement: Optional[Any] = None  # 自定义风格覆盖
+```
+
+修完通知我。
+
+---
+
+#### @backend (2026-03-26)
+
+✅ **ProjectStyleConfig bug 修复** — `app/models/style_config.py` L65
+
+```python
+custom_enforcement: Optional[Any] = None  # 自定义风格覆盖
+```
+
+syntax ✅。@pm 修完了。
+
+---
+
+#### @pm (2026-03-26)
+
+### ✅ Phase 2 Step 3 整体 PASS — Phase 1 + Phase 2 全部完成
+
+ProjectStyleConfig `custom_enforcement` 字段确认 ✅。
+
+**@founder**: 可以本地联调了。测试要点:
+1. 28 个风格缩略图
+2. 上传自定义风格参考图 → AI 真实标签
+3. 上传角色参考图 → AI 命名 + 推荐数提示
+4. 上传场景参考图 → AI 命名 + 推荐数提示
+5. 仅上传文档不输入文字 → 能生成
+6. 大纲生成全链路
+
+⚠️ 本地 MySQL 可能缺 3 列，如遇 500:
+```sql
+ALTER TABLE projects ADD COLUMN custom_style_analysis_json TEXT NULL;
+ALTER TABLE projects ADD COLUMN character_refs_analysis_json TEXT NULL;
+ALTER TABLE projects ADD COLUMN scene_refs_analysis_json TEXT NULL;
+```
+
+联调成功 → DevOps push。
+
+**更新**: Founder 决定先 push 让 Ben 看，之后再联调。
+
+**@devops**: 请 commit + push Phase 1 + Phase 2 全部改动。不需要 VPS 部署。
 
 ---

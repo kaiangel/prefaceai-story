@@ -4,6 +4,149 @@
 
 ---
 
+### 2026-03-26 — Phase 2 Step 3 PASS + Phase 1+2 全部完成
+
+- ProjectStyleConfig `custom_enforcement` 修复确认 ✅
+- Phase 1+2 全量: Backend 16 文件 + Frontend 10 文件 + 2 新文件 + 13 thumbnails + 1 测试脚本
+- Founder 联调已通知（含 MySQL 新列提醒）
+
+---
+
+### 2026-03-25 — Phase 2 Step 3 Review (11/12, 1 bug)
+
+- StyleEnforcer create_custom_enforcement ✅
+- ReferenceImageManager seed_image + set_reference dict ✅
+- SceneReferenceManager seed_images ✅
+- Pipeline orchestrator 3 参数 + 分支逻辑 ✅
+- **Bug**: ProjectStyleConfig 缺 `custom_enforcement` 字段 → 通知 Backend 修复
+
+---
+
+### 2026-03-25 — Phase 2 Step 2 PASS + Step 3 派发
+
+- else 修复确认 ✅ (L143-144)
+- Step 2 整体 PASS
+- Step 3 派发 @Backend: ReferenceImageManager seed_image 参数 + set_reference 格式修复 + SceneReferenceManager seed 图 + Pipeline orchestrator 分支 + StyleEnforcer create_custom_enforcement
+
+---
+
+### 2026-03-25 — Phase 2 Step 2 Review
+
+- **Frontend PASS (11/11)**: 3 mock→真实 API + 推荐数 UI (角色/场景与 Founder 决策一致) + create 请求 3 字段 + CharacterAnalysisResult/SceneAnalysisResult 类型
+- **Backend 发现回归 bug**: `generate()` L142 缺 else 分支 → 标准流程 prompt 末尾缺"现在开始生成故事大纲" → 已通知修复
+
+---
+
+### 2026-03-25 — Phase 2 Step 1 Review PASS (18/18) + Step 2 派发
+
+- AI-ML 4 prompts 全部到位 (风格分析/角色提取/场景提取/大纲上下文) ✅
+- Backend file_storage.py + 3 分析端点 + StoryOutlineGenerator 参考上下文 ✅
+- 发现 1 低优先级: _build_prompt 和 generate() 都有"现在开始生成故事大纲" → 重复
+- Step 2 派发: @Frontend (mock→真实 API + 推荐数 + create 发送) + @Backend (schema + model + 传参 + 修复)
+
+---
+
+### 2026-03-25 — Phase 2 设计复查 + Step 1 派发
+
+- VALIDATION-FIX Review PASS ✅
+- Phase 2 设计复查发现 5 个缺陷（set_reference 格式不匹配 + extractedInfo 格式耦合 + 场景零分析 + 无 seed 图参数 + 无 interior/exterior 判定）
+- 设计决策: AI 提取返回文本描述（非结构化字段），避免前后端格式耦合
+- Phase 2 分 3 步: Step 1 基础层 → Step 2 集成层 → Step 3 Pipeline 层
+- Step 1 派发: @AI-ML (4 prompts) + @Backend (文件存储 + 3 分析端点)
+
+---
+
+### 2026-03-25 — Founder 联调 3 发现 + Phase 2 设计更新
+
+- **发现 1**: 验证 Bug (idea OR documentText) → TASK-VALIDATION-FIX 派发 @Frontend
+- **发现 2**: 确认自定义风格/角色标签是 mock → Phase 2
+- **发现 3 (关键洞察)**: 用户上传的角色/场景 AI 分析结果应喂给大纲生成 → Phase 2 设计重大更新
+- **Founder 澄清**: 最终参考图 = 内容种子(用户角色/场景) + 风格种子(用户自定义风格)
+- **Phase 2 设计更新**: 分析→大纲→Pipeline 全链路设计，含 AI-ML/Backend/Frontend/Pipeline 4 层改动全景
+
+---
+
+### 2026-03-25 — ASYNC-FIX Review PASS + Thumbnails 13/13
+
+- TASK-UTILS-ASYNC-FIX (5/5): Gemini `await aio` + Anthropic `AsyncAnthropic` + `await` ✅
+- 13 张新风格 thumbnails 全部生成成功 (13/13, 平均 22.9s/张)，直接输出到 `frontend/public/styles/`
+- 总 28 张 thumbnail 与 STYLE_PRESETS key 完全对齐 ✅
+- Founder 联调已通知
+
+---
+
+### 2026-03-25 — Phase 1 全面审计 (16 文件 12 项验证)
+
+- 12 项交叉验证全部 PASS（Gemini/os.getenv 零残留 + 28 key 三方对齐 + 全部端点特性到位）
+- **发现 1 个问题**: utils.py OCR 用同步客户端阻塞事件循环 → TASK-UTILS-ASYNC-FIX 派发 @Backend
+- DB 新列生产迁移提醒已记录到 memory（VPS 部署时触发）
+
+---
+
+### 2026-03-25 — Phase 1 Step 2 Review PASS (10/10)
+
+- Backend: StyleEnforcer 28 (style_name grep 确认) + Literal 28 ✅
+- Frontend: STYLE_PRESETS 28 + DEFAULT_COUNT 10 ✅
+- 三方 28 key 交叉对齐确认 ✅
+- 下一步: PM 生成 13 thumbnails
+
+---
+
+### 2026-03-25 — Phase 1 Step 1 全部 Review PASS (25/25)
+
+- **Backend** (14 项): STYLE-LITERAL-FIX (Literal 10→15, chinese 删除) ✅ + DOC-TEXT-WIRE (schema + 拼接逻辑) ✅ + OCR-ENDPOINT (utils.py 新建, Gemini+Haiku 双模型, pdfplumber PDF) ✅
+- **Frontend** (6 项): DOC-TEXT-WIRE (document_text 发送) ✅ + OCR-REAL (MOCK_OCR_TEXT 删除, 真实 API + 15s 超时 + 静默降级) ✅
+- **AI-ML** (5 项): STYLE-EXPAND-28 (13 新风格 × 6 维度 StyleEnforcement + 前端展示信息) ✅
+- Step 2 集成通知 Backend + Frontend
+
+---
+
+### 2026-03-25 — StageA 全面审计 + Phase 1-3 派发
+
+- **审计发现 11 项问题**: #2 文档文本丢失 + #3 OCR mock + #7 风格 422 bug + #8 自定义风格断链 + #9 角色参考断链 + #10 场景参考断链 + #11 续写模式未实现
+- **Founder 产品决策**: 28 风格 + gemini-3.1-flash-lite-preview 主力 + claude-haiku-4-5 备用 + 本地文件系统先行 + 角色/场景推荐数更新 + 续写模式扩展到短/中/长篇
+- **Phase 1 派发**: 7 项任务 @AI-ML (13 新风格) + @Backend (Literal fix + 文档 + OCR + StyleEnforcer) + @Frontend (文档 + OCR 去 mock + STYLE_PRESETS) + @PM (13 thumbnails)
+- **Phase 2 计划**: 文件上传基础设施 + #8/#9/#10
+- **Phase 3 计划**: #11 续写模式 Dashboard 化
+
+---
+
+### 2026-03-25 — TASK-ASPECT-RATIO-WIRE Review PASS
+
+- Backend 2 处 + Frontend 1 处，10 项检查全部通过
+- 全链路验证: 用户选 → Frontend 发 → schema 收 → endpoint 传 → DB 存 ✅
+- 额外全面扫描: StageA 所有文本参数已正确传递，无其他断链
+- DevOps push 已派发
+
+---
+
+### 2026-03-25 — TASK-ASPECT-RATIO-WIRE 派发
+
+- PM 发现 aspect_ratio "有字段无入口"：用户选的画面比例被丢失（DB 永远存默认 "2:3"）
+- 3 个环节断链: Frontend 没发 → Backend schema 没收 → create_project 没传
+- 派发: Frontend 1 处 (CreateContent.tsx body 加一行) + Backend 2 处 (schema + endpoint 各加一行)
+- DevOps push 暂停，等修完一起 push
+
+---
+
+### 2026-03-25 — GEMINI-FIX + OUTLINE-STORAGE Review PASS
+
+**任务 A (GEMINI-FIX)**: 7 文件 9 处 → `gemini-3.1-flash-lite-preview`，旧 ID 零残留 ✅，额外修复 story_generator.py ✅
+**任务 B (OUTLINE-STORAGE)**: Project model +3 字段 (aspect_ratio + raw_outline_json + confirmed_outline_json) + generate_outline 存 raw + confirm-outline 新端点（Ben 架构对齐 ✅）
+**附注**: aspect_ratio 有字段无入口（ProjectCreate schema 待后续更新）
+DevOps push 已派发
+
+---
+
+### 2026-03-25 — TASK-GEMINI-MODEL-FIX + TASK-OUTLINE-STORAGE 派发
+
+- **Gemini 调研**: `gemini-3.1-flash-preview` 不存在（Google 404），3.1 Flash 系列只有 flash-lite 和 flash-image
+- **TASK-GEMINI-MODEL-FIX**: 6 文件备用 Gemini 统一改为 `gemini-3.1-flash-lite-preview`（4 升级 + 2 修正无效 ID）
+- **TASK-OUTLINE-STORAGE**: Ben 提出 Stage 1 存 3 样东西（输入参数 + 原始大纲 + 确认大纲），Founder 确认由我们 Backend 做
+- 两项任务派发 @Backend，先 A 后 B
+
+---
+
 ### 2026-03-24 — 🎉 Stage 1 前后端联调通过
 
 - Founder 第三次联调成功: 注册→登录→/create→输入创意→Claude 生成真实大纲→StageB 展示 ✅

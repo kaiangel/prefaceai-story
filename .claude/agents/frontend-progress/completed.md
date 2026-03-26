@@ -4,6 +4,66 @@
 
 ---
 
+## 2026-03-25
+
+### TASK-PHASE2-INTEGRATE Frontend ✅
+
+**完成时间**: 2026-03-25
+
+- [x] CustomStyleUploader: mock→`POST /api/utils/analyze-style`
+- [x] CharacterUploader: mock→`POST /api/utils/analyze-character` + 推荐数
+- [x] SceneUploader: +`POST /api/utils/analyze-scene` + 推荐数
+- [x] CreateContent: body +3 分析字段 + storyLength props
+- [x] types: CharacterRef `extractedInfo`→`analysisResult`, SceneRef +`analysisResult`, +`customStyleAnalysis`
+- [x] mock-data.ts: `extractedInfo`→`analysisResult: null`
+
+**8 文件修改，`npm run build` 20 路由通过 ✅**
+
+---
+
+### TASK-VALIDATION-FIX ✅
+
+**完成时间**: 2026-03-25
+
+- [x] CreateContent.tsx L46: `!state.idea.trim()` → `!state.idea.trim() && !state.documentText?.trim()`
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
+### Phase 1 Step 2: STYLE_PRESETS 28 ✅
+
+**完成时间**: 2026-03-25
+
+- [x] `types/create.ts`: STYLE_PRESETS 追加 13 新风格（ukiyo_e→gothic）
+- [x] STYLE_PRESETS_DEFAULT_COUNT: 8 → 10
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
+### Phase 1 Step 1: TASK-DOC-TEXT-WIRE + TASK-OCR-REAL ✅
+
+**完成时间**: 2026-03-25
+
+- [x] CreateContent.tsx L86: +`document_text: state.documentText || null`
+- [x] StoryIdeaInput.tsx: 删 MOCK_OCR_TEXT, OCR → `POST /api/utils/ocr` (FormData + 15s 超时)
+- [x] DocumentUploader.tsx: PDF → `POST /api/utils/parse-document`
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
+### TASK-ASPECT-RATIO-WIRE Frontend ✅
+
+**完成时间**: 2026-03-25
+
+- [x] CreateContent.tsx L85: body 加 `aspect_ratio: state.aspectRatio || "2:3"`
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
 ## 2026-03-24
 
 ### TASK-STAGE1-FRONTEND — StageA → 真实 API ✅

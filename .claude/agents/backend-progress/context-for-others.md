@@ -1,78 +1,112 @@
 # Backend Agent - 给其他 Agent 的上下文
 
-> **最后更新**: 2026-03-24
+> **最后更新**: 2026-03-25
 
 ---
 
 ## 当前状态速览
 
 ```
-状态: ✅ TASK-OUTLINE-LLM-FIX 第 1-3 项完成
-当前任务: 等 PM Code Review
+状态: ✅ TASK-PHASE2-PIPELINE 完成 (含 ProjectStyleConfig bug 修复)
+当前任务: 等 PM 确认 → Founder 联调 → DevOps push
 阻塞: 无
 ```
 
 ---
 
-## ✅ TASK-OUTLINE-LLM-FIX 第 1-3 项完成 (2026-03-24)
+## ✅ TASK-STYLE-LITERAL-FIX 完成 (2026-03-25, P0)
 
 ### 给 @PM 的信息
 
-`story_outline_generator.py` 3 项修复:
-1. System prompt: AI-ML 设计的完整 prompt 已集成到 `messages.create(system=...)`
-2. Debug logging: JSON 提取失败时打印 provider/length/preview
-3. Async: `Anthropic` → `AsyncAnthropic` + `await` + `max_tokens` 8631→16384
-
-### 给 @DevOps 的信息
-
-- PM Review 通过后需 push
-- 改动: `story_outline_generator.py` 1 个文件
+`StylePreset` Literal 从 10 → 15，与 StyleEnforcer + 前端 15 风格完全对齐。删掉 `"chinese"` 残留。修复 5 个风格导致 422 的 bug。
 
 ---
 
-## ✅ TASK-ENVVAR-FIX 完成 (2026-03-24)
+## ✅ TASK-DOC-TEXT-WIRE Backend 完成 (2026-03-25)
 
 ### 给 @PM 的信息
 
-5 文件 `os.getenv()` → `settings.XXX` 修复完成:
-- `story_outline_generator.py` / `character_designer.py` / `screenplay_writer.py` / `storyboard_director.py` / `prompt_rewriter.py`
-- 每个文件: 删 `import os` + 加 `from app.config import settings` + 替换所有 getenv 调用
-- 验证: 5/5 syntax ✅ + 零残留 ✅
-
-### 给 @DevOps 的信息
-
-- PM Review 通过后需 push + VPS 部署
-- 改动: 5 文件，纯 import 替换，无逻辑变化
-
----
-
-## ✅ TASK-STAGE1-API 完成 (2026-03-24)
-
-### 给 @PM 的信息
-
-`POST /api/projects/{project_id}/generate-outline` 已就绪:
-
-- 加在 `app/api/projects.py` 中（Ben 的文件，遵循 Ben 架构模式）
-- 认证: `Depends(verify_user)` + 项目归属验证
-- 调用: `StoryOutlineGenerator.generate()` (同步等待，10-30s)
-- 数据映射: PM 规格 100% 对齐（characters/plotPoints/endings/mood/summary）
-- 额外: 生成后自动更新 Project.title
-- 零改动 Ben 现有端点
+- `ProjectCreate` 新增 `document_text: str | None`
+- `create_project` 中: 如果有 `document_text`，拼接到 `original_idea`（`\n\n---\n附加文档内容:\n{text}`）
 
 ### 给 @Frontend 的信息
 
-API 端点就绪:
-```
-POST /api/projects/{project_id}/generate-outline
-Authorization: Bearer {token}
+Backend 已接收 `document_text`。POST body 加 `document_text: state.documentText || null` 即可。
 
-Response: { title, titleEn, summary, characters[], plotPoints[], endings[], mood }
+---
+
+## ✅ TASK-OCR-ENDPOINT 完成 (2026-03-25)
+
+### 给 @PM 的信息
+
+新建 `app/api/utils.py`（独立路由），2 个端点:
+
+**POST /api/utils/ocr**:
+- 接收: `file` (FormData 图片)
+- 校验: 图片类型 + 10MB 限制
+- 模型: 主力 `gemini-3.1-flash-lite-preview`，备用 `claude-haiku-4-5-20251001`
+- 返回: `{ "text": "识别文字" }` 或 `{ "text": "", "error": "识别失败" }`
+
+**POST /api/utils/parse-document**:
+- 接收: `file` (FormData PDF/TXT/MD)
+- 校验: 文件名后缀 + 20MB 限制
+- PDF: pdfplumber 提取，TXT/MD: 直接读取 (UTF-8/GBK fallback)
+- 返回: `{ "text": "提取文字" }`
+
+### 给 @Frontend 的信息
+
+OCR 去 mock 调真实 API:
 ```
-- `endings[0].isSelected = true`，其余 `false`
-- 预计响应时间 10-30 秒（Claude LLM 调用）
-- 错误: 404 (项目不存在) / 500 (大纲生成失败)
+// 图片 OCR
+const formData = new FormData();
+formData.append('file', imageFile);
+const res = await fetch('/api/utils/ocr', { method: 'POST', body: formData });
+
+// PDF 解析
+formData.append('file', pdfFile);
+const res = await fetch('/api/utils/parse-document', { method: 'POST', body: formData });
+```
 
 ### 给 @DevOps 的信息
 
-- 改动: `app/api/projects.py` 1 处 import + 1 个新端点
-- PM Review 通过后需 push + VPS 部署
+- 需要安装 `pdfplumber`: `pip install pdfplumber`
+- 新文件: `app/api/utils.py`
+- `app/main.py` +2 行注册
+
+---
+
+## ✅ Phase 1 Step 2: StyleEnforcer 28 + Literal 28 (2026-03-25)
+
+### 给 @PM 的信息
+
+- `style_enforcer.py`: +13 个 `StyleEnforcement`（AI-ML 设计完整配置，逐字复制）
+- `project.py` `StylePreset` Literal: 15 → 28
+- 验证: StyleEnforcement count = 28 ✅ + StylePreset count = 28 ✅
+
+---
+
+## ✅ TASK-PHASE2-INFRA 完成 (2026-03-25)
+
+### 给 @PM 的信息
+
+**新建**: `app/services/file_storage.py` — 文件上传验证+压缩+本地存储
+**修改**: `app/api/utils.py` — 3 个分析端点 + 公用 `_vision_analyze` helper
+**修改**: `story_outline_generator.py` — Prompt 4 `_build_user_reference_context()` + `generate()` 3 新参数
+
+3 个端点全部不需要认证（创建项目之前调用）。
+
+### 给 @Frontend 的信息
+
+3 个分析 API 就绪:
+```
+POST /api/utils/analyze-style       → { style_display_name, mandatory_keywords, ..., display_tags }
+POST /api/utils/analyze-character   → { description_zh, description_en, gender, age_range, display_name }
+POST /api/utils/analyze-scene       → { description_zh, description_en, location_type, atmosphere, display_name }
+```
+全部接收 FormData `file` 字段（图片），返回 JSON。无需 Bearer token。
+
+### 给 @DevOps 的信息
+
+- 新增 Pillow 依赖（已在 requirements.txt）
+- 新建 `app/services/file_storage.py`
+- 存储路径: `./storage/uploads/{project_id}/{category}/{filename}`
