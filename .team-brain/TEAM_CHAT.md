@@ -31278,3 +31278,48 @@ ALTER TABLE projects ADD COLUMN scene_refs_analysis_json TEXT NULL;
 **@devops**: 请 commit + push Phase 1 + Phase 2 全部改动。不需要 VPS 部署。
 
 ---
+
+#### @devops (2026-03-26)
+
+### ✅ Phase 1+2 全部 push 完成
+
+4 commits pushed → `origin/main` (40ca049 → dc6ef0d):
+
+| Commit | 内容 | 文件数 |
+|--------|------|--------|
+| `673a907` | feat(frontend): 13 new style thumbnails (28 total) | 14 |
+| `1bbfebf` | feat(backend): Phase 2 — image analysis endpoints + seed refs + dynamic style | 18 |
+| `408ae6a` | feat(frontend): Phase 2 — real image analysis + 28 styles + seed uploaders | 10 |
+| `dc6ef0d` | docs: Phase 1+2 complete — agent progress + team-brain sync | 16 |
+
+不需要 VPS 部署。
+
+**@pm**: Phase 1+2 全部代码已在 GitHub。
+
+---
+
+#### @devops → @Ben 团队 (2026-03-26)
+
+### 知会: Phase 1+2 大批量 push（58 files）
+
+Founder 团队完成了两个大功能模块的开发，代码已 push。你 git pull 即可。
+
+**Phase 1 (Stage 1 联动 — 之前已 push)**: 注册→登录→创作→Claude 真实生成大纲，E2E 全链路通了。
+
+**Phase 2 (本次 push)**:
+1. **28 个风格缩略图** — 新增 13 张真实风格预览图
+2. **3 个图片分析 API** — `POST /api/utils/analyze-style/character/scene`，用 Gemini Vision 分析用户上传的图片提取特征
+3. **前端上传器对接真实 API** — 风格/角色/场景上传 mock→真实 AI 分析
+4. **Pipeline 层 seed 图支持** — 用户上传的图作为"内容种子"传入参考图生成
+5. **动态 StyleEnforcer** — 用户上传风格图→AI 分析→动态创建 StyleEnforcement
+
+**与你代码的关系**:
+- `app/api/utils.py` 和 `app/services/file_storage.py` 是新文件，不冲突
+- `app/api/projects.py` 有改动（create_project 存 3 个分析 JSON，generate_outline 传参数），**这个文件你也改过**，git pull 时注意看是否有冲突
+- `app/models/project.py` 和 `app/schemas/project.py` 有新字段（3 个 JSON 列），你的 model 定义可能需要同步
+- Stage 1-4 服务（story_outline_generator 等）`os.getenv` 已统一改为 `settings.XXX`
+- Pipeline 层改动（reference_image_manager, scene_reference_manager, pipeline_orchestrator）都是你不碰的文件
+
+**你不需要做任何调整**，git pull 看有无冲突即可。如有冲突请告知。
+
+---
