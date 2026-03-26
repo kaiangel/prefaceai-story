@@ -6,19 +6,30 @@ export type StoryLength = "flash" | "short" | "medium" | "epic";
 export type AspectRatio = "16:9" | "2:3" | "3:4" | "1:1";
 export type ContinuationMode = "auto" | "user-directed";
 
+export interface CharacterAnalysisResult {
+  description_zh: string;
+  description_en: string;
+  gender: string;
+  age_range: string;
+  display_name: string;
+}
+
 export interface CharacterRef {
   id: string;
   name: string;
   uploadedImage: File | null;
-  uploadedImageUrl: string | null; // object URL for preview
-  extractedInfo: {
-    gender: string;
-    ageAppearance: string;
-    hairDescription: string;
-    clothingDescription: string;
-  } | null;
-  portraitUrl: string | null;  // system-generated
-  fullbodyUrl: string | null;  // system-generated
+  uploadedImageUrl: string | null;
+  analysisResult: CharacterAnalysisResult | null;
+  portraitUrl: string | null;
+  fullbodyUrl: string | null;
+}
+
+export interface SceneAnalysisResult {
+  description_zh: string;
+  description_en: string;
+  location_type: string;
+  atmosphere: string;
+  display_name: string;
 }
 
 export interface SceneRef {
@@ -26,8 +37,9 @@ export interface SceneRef {
   name: string;
   uploadedImage: File | null;
   uploadedImageUrl: string | null;
-  interiorUrl: string | null;  // system-generated
-  exteriorUrl: string | null;  // system-generated
+  analysisResult: SceneAnalysisResult | null;
+  interiorUrl: string | null;
+  exteriorUrl: string | null;
 }
 
 // ============ Stage B: Outline ============
@@ -181,6 +193,7 @@ export interface CreateState {
   customStyleImage: File | null;
   customStyleImageUrl: string | null;
   customStyleKeywords: string[];
+  customStyleAnalysis: Record<string, unknown> | null;
   characters: CharacterRef[];
   scenes: SceneRef[];
 
@@ -221,7 +234,7 @@ export type CreateAction =
   | { type: "SET_LENGTH"; payload: StoryLength }
   | { type: "SET_ASPECT_RATIO"; payload: AspectRatio }
   | { type: "SET_STYLE_PRESET"; payload: string | null }
-  | { type: "SET_CUSTOM_STYLE"; payload: { image: File | null; imageUrl: string | null; keywords: string[] } }
+  | { type: "SET_CUSTOM_STYLE"; payload: { image: File | null; imageUrl: string | null; keywords: string[]; analysis?: Record<string, unknown> | null } }
   | { type: "ADD_CHARACTER"; payload: CharacterRef }
   | { type: "REMOVE_CHARACTER"; payload: string }
   | { type: "UPDATE_CHARACTER"; payload: { id: string; updates: Partial<CharacterRef> } }
@@ -286,9 +299,23 @@ export const STYLE_PRESETS: StylePreset[] = [
   { key: "children_book", label: "儿童绘本", description: "童话寓言", gradient: "linear-gradient(135deg, #ffecd2, #fcb69f)", thumbnail: "/styles/children_book.jpg" },
   { key: "manga", label: "日漫", description: "热血/搞笑", gradient: "linear-gradient(135deg, #ff9a9e, #fecfef)", thumbnail: "/styles/manga.jpg" },
   { key: "pixel", label: "像素艺术", description: "怀旧游戏", gradient: "linear-gradient(135deg, #11998e, #38ef7d)", thumbnail: "/styles/pixel.jpg" },
+  // — Phase 1 新增 13 个风格 —
+  { key: "ukiyo_e", label: "浮世绘", description: "日本传统", gradient: "linear-gradient(135deg, #c2185b, #f48fb1)", thumbnail: "/styles/ukiyo_e.jpg" },
+  { key: "vintage_film", label: "复古胶片", description: "80/90怀旧", gradient: "linear-gradient(135deg, #d4a574, #8b6914)", thumbnail: "/styles/vintage_film.jpg" },
+  { key: "pencil_sketch", label: "铅笔素描", description: "文艺手绘", gradient: "linear-gradient(135deg, #636363, #a2a2a2)", thumbnail: "/styles/pencil_sketch.jpg" },
+  { key: "chibi", label: "Q版卡通", description: "萌系搞笑", gradient: "linear-gradient(135deg, #ff9a9e, #fad0c4)", thumbnail: "/styles/chibi.jpg" },
+  { key: "dark_fantasy", label: "暗黑奇幻", description: "魔幻/哥特", gradient: "linear-gradient(135deg, #0f0f23, #4a1942)", thumbnail: "/styles/dark_fantasy.jpg" },
+  { key: "pop_art", label: "波普艺术", description: "时尚潮流", gradient: "linear-gradient(135deg, #ff0844, #ffb199)", thumbnail: "/styles/pop_art.jpg" },
+  { key: "paper_cut", label: "中国剪纸", description: "民俗文化", gradient: "linear-gradient(135deg, #d32f2f, #ff6659)", thumbnail: "/styles/paper_cut.jpg" },
+  { key: "steampunk", label: "蒸汽朋克", description: "维多利亚机械", gradient: "linear-gradient(135deg, #5d4037, #d4a574)", thumbnail: "/styles/steampunk.jpg" },
+  { key: "art_nouveau", label: "新艺术", description: "Mucha装饰", gradient: "linear-gradient(135deg, #6d9b7b, #d4a574)", thumbnail: "/styles/art_nouveau.jpg" },
+  { key: "noir", label: "黑色电影", description: "高反差黑白", gradient: "linear-gradient(135deg, #1a1a1a, #4a4a4a)", thumbnail: "/styles/noir.jpg" },
+  { key: "comic_western", label: "欧美漫画", description: "超英/动作", gradient: "linear-gradient(135deg, #1565c0, #e53935)", thumbnail: "/styles/comic_western.jpg" },
+  { key: "pastel_dream", label: "梦幻马卡龙", description: "柔美少女", gradient: "linear-gradient(135deg, #fbc2eb, #a6c1ee)", thumbnail: "/styles/pastel_dream.jpg" },
+  { key: "gothic", label: "哥特风", description: "暗色/神秘", gradient: "linear-gradient(135deg, #1a0a2e, #6a1b4d)", thumbnail: "/styles/gothic.jpg" },
 ];
 
-export const STYLE_PRESETS_DEFAULT_COUNT = 8;
+export const STYLE_PRESETS_DEFAULT_COUNT = 10;
 
 // ============ Length Options ============
 

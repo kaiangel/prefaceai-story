@@ -15,6 +15,7 @@ const initialState: CreateState = {
   customStyleImage: null,
   customStyleImageUrl: null,
   customStyleKeywords: [],
+  customStyleAnalysis: null,
   characters: [],
   scenes: [],
   // Stage B
@@ -81,6 +82,7 @@ function createReducer(state: CreateState, action: CreateAction): CreateState {
         customStyleImage: action.payload.image,
         customStyleImageUrl: action.payload.imageUrl,
         customStyleKeywords: action.payload.keywords,
+        customStyleAnalysis: action.payload.analysis ?? null,
         stylePreset: action.payload.image ? null : state.stylePreset,
       };
 

@@ -243,12 +243,7 @@ export async function mockCharacterExtract(
     name: "未命名角色",
     uploadedImage: file,
     uploadedImageUrl: URL.createObjectURL(file),
-    extractedInfo: {
-      gender: "unknown",
-      ageAppearance: "young_adult",
-      hairDescription: "dark hair, medium length",
-      clothingDescription: "casual outfit",
-    },
+    analysisResult: null,
     portraitUrl: null,
     fullbodyUrl: null,
   };

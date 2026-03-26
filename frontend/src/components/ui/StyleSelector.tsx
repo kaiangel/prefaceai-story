@@ -12,7 +12,7 @@ interface StyleSelectorProps {
   customStyleImage: File | null;
   customStyleImageUrl: string | null;
   customStyleKeywords: string[];
-  onCustomStyleChange: (image: File | null, imageUrl: string | null, keywords: string[]) => void;
+  onCustomStyleChange: (image: File | null, imageUrl: string | null, keywords: string[], analysis?: Record<string, unknown> | null) => void;
 }
 
 export default function StyleSelector({

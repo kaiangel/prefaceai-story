@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { FileText, X, Upload } from "lucide-react";
+import { getStoredToken } from "@/lib/api";
 
 interface DocumentUploaderProps {
   file: File | null;
@@ -17,8 +18,25 @@ export default function DocumentUploader({ file, onUpload }: DocumentUploaderPro
 
   const extractText = async (f: File): Promise<string> => {
     if (f.type === "application/pdf") {
-      // PDF: placeholder, real extraction needs library
-      return `[PDF 文档: ${f.name}] 内容将在后端提取`;
+      // PDF: call backend parse-document API
+      try {
+        const token = getStoredToken();
+        const formData = new FormData();
+        formData.append("file", f);
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api"}/utils/parse-document`,
+          {
+            method: "POST",
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            body: formData,
+          }
+        );
+        if (!res.ok) throw new Error("PDF 解析失败");
+        const data = await res.json();
+        return data.text || "";
+      } catch {
+        return `[PDF 文档: ${f.name}] 解析失败，请尝试复制文字手动粘贴`;
+      }
     }
     return await f.text();
   };

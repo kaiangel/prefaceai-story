@@ -2,9 +2,9 @@
 
 import { useRef, useEffect, useState, useCallback } from "react";
 import { ImagePlus, Mic, MicOff, X, Lightbulb } from "lucide-react";
+import { getStoredToken } from "@/lib/api";
 import DocumentUploader from "./DocumentUploader";
 
-const MOCK_OCR_TEXT = "一个人在深夜的城市街头，手里拿着一封没有寄出的信，眼里满是遗憾和不舍";
 const MOCK_VOICE_TEXT = "雨夜公交站，一个加班族和一个失恋女孩因为同一把伞产生交集的温暖故事";
 
 const STORY_TEMPLATES = [
@@ -60,18 +60,41 @@ export default function StoryIdeaInput({
     }
   }, [value]);
 
-  // OCR handlers
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // OCR handlers — real API call to POST /api/utils/ocr
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
     setOcrPreview(url);
     setOcrLoading(true);
-    ocrTimerRef.current = setTimeout(() => {
-      onChange(MOCK_OCR_TEXT);
-      setOcrLoading(false);
-    }, 1500);
     e.target.value = "";
+
+    try {
+      const token = getStoredToken();
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const controller = new AbortController();
+      ocrTimerRef.current = setTimeout(() => controller.abort(), 15000) as unknown as ReturnType<typeof setTimeout>;
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api"}/utils/ocr`,
+        {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData,
+          signal: controller.signal,
+        }
+      );
+
+      if (!res.ok) throw new Error("OCR 识别失败");
+      const data = await res.json();
+      if (data.text) onChange(data.text);
+    } catch {
+      // Fallback: no text extracted, user can type manually
+    } finally {
+      setOcrLoading(false);
+    }
   };
 
   const clearOcr = () => {

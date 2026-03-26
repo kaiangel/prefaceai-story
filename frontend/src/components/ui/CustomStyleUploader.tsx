@@ -3,13 +3,22 @@
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Palette, X, Loader2, Sparkles } from "lucide-react";
-import { mockStyleAnalysis } from "@/lib/mock-data";
+import { getStoredToken } from "@/lib/api";
+
+interface StyleAnalysisResult {
+  style_display_name: string;
+  mandatory_keywords: string[];
+  forbidden_keywords: string[];
+  style_description: string;
+  quality_keywords: string[];
+  display_tags: string[];
+}
 
 interface CustomStyleUploaderProps {
   image: File | null;
   imageUrl: string | null;
   keywords: string[];
-  onUpload: (image: File | null, imageUrl: string | null, keywords: string[]) => void;
+  onUpload: (image: File | null, imageUrl: string | null, keywords: string[], analysis?: Record<string, unknown> | null) => void;
 }
 
 export default function CustomStyleUploader({ image, imageUrl, keywords, onUpload }: CustomStyleUploaderProps) {
@@ -21,9 +30,30 @@ export default function CustomStyleUploader({ image, imageUrl, keywords, onUploa
 
     const url = URL.createObjectURL(file);
     setAnalyzing(true);
-    const result = await mockStyleAnalysis();
-    onUpload(file, url, result);
-    setAnalyzing(false);
+
+    try {
+      const token = getStoredToken();
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api"}/utils/analyze-style`,
+        {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData,
+        }
+      );
+
+      if (!res.ok) throw new Error("风格分析失败");
+      const result: StyleAnalysisResult = await res.json();
+      onUpload(file, url, result.display_tags || [], result as unknown as Record<string, unknown>);
+    } catch {
+      // Fallback: show file without analysis tags
+      onUpload(file, url, ["自定义风格"], null);
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,7 +64,7 @@ export default function CustomStyleUploader({ image, imageUrl, keywords, onUploa
 
   const clear = () => {
     if (imageUrl) URL.revokeObjectURL(imageUrl);
-    onUpload(null, null, []);
+    onUpload(null, null, [], null);
   };
 
   if (image && imageUrl) {

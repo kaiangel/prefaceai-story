@@ -3,29 +3,69 @@
 import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { UserPlus, X, Loader2, ImagePlus } from "lucide-react";
-import type { CharacterRef } from "@/types/create";
-import { mockCharacterExtract } from "@/lib/mock-data";
+import type { CharacterRef, StoryLength } from "@/types/create";
+import { getStoredToken } from "@/lib/api";
+
+const CHAR_RECOMMEND: Record<StoryLength, { min: number; max: number }> = {
+  flash: { min: 2, max: 2 },
+  short: { min: 3, max: 3 },
+  medium: { min: 3, max: 4 },
+  epic: { min: 4, max: 6 },
+};
 
 interface CharacterUploaderProps {
   characters: CharacterRef[];
+  storyLength: StoryLength;
   onAdd: (character: CharacterRef) => void;
   onRemove: (id: string) => void;
 }
 
-export default function CharacterUploader({ characters, onAdd, onRemove }: CharacterUploaderProps) {
+export default function CharacterUploader({ characters, storyLength, onAdd, onRemove }: CharacterUploaderProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const maxChars = 5;
+  const recommend = CHAR_RECOMMEND[storyLength] || CHAR_RECOMMEND.short;
 
   const handleFile = async (file: File) => {
     if (!file.type.startsWith("image/")) return;
     if (characters.length >= maxChars) return;
 
     setUploading(true);
-    const result = await mockCharacterExtract(file);
+
+    let name = "未命名角色";
+    let analysisResult = null;
+
+    try {
+      const token = getStoredToken();
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api"}/utils/analyze-character`,
+        {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData,
+        }
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        name = data.display_name || "未命名角色";
+        analysisResult = data;
+      }
+    } catch {
+      // Fallback: use default name
+    }
+
     const newChar: CharacterRef = {
-      ...result,
       id: `char_${Date.now()}`,
+      name,
+      uploadedImage: file,
+      uploadedImageUrl: URL.createObjectURL(file),
+      analysisResult,
+      portraitUrl: null,
+      fullbodyUrl: null,
     };
     onAdd(newChar);
     setUploading(false);
@@ -43,6 +83,8 @@ export default function CharacterUploader({ characters, onAdd, onRemove }: Chara
     if (file) handleFile(file);
   };
 
+  const remaining = recommend.min - characters.length;
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
@@ -51,6 +93,16 @@ export default function CharacterUploader({ characters, onAdd, onRemove }: Chara
         </label>
         <span className="text-xs text-text-muted">{characters.length}/{maxChars}</span>
       </div>
+
+      {/* Recommendation hint */}
+      {remaining > 0 && (
+        <p className="text-xs text-text-muted">
+          {storyLength === "flash" ? "快闪" : storyLength === "short" ? "短篇" : storyLength === "medium" ? "中篇" : "长篇"}推荐 {recommend.min} 个角色，建议再上传 {remaining} 个
+        </p>
+      )}
+      {characters.length === 0 && (
+        <p className="text-xs text-text-muted">未上传时，系统将根据故事自动补足角色</p>
+      )}
 
       <div className="flex flex-wrap gap-3">
         <AnimatePresence mode="popLayout">

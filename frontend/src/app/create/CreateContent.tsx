@@ -43,8 +43,8 @@ function StageA() {
   }, []);
 
   const handleSubmit = async () => {
-    if (!state.idea.trim()) {
-      setIdeaError("请输入你的故事创意");
+    if (!state.idea.trim() && !state.documentText?.trim()) {
+      setIdeaError("请输入故事创意或上传故事文档");
       return;
     }
     if (state.idea.length > 500) {
@@ -82,6 +82,15 @@ function StageA() {
             chapter_duration_minutes: params.duration,
             character_count: params.characters,
             language: "zh-CN",
+            aspect_ratio: state.aspectRatio || "2:3",
+            document_text: state.documentText || null,
+            custom_style_analysis: state.customStyleAnalysis || null,
+            character_refs_analysis: state.characters
+              .filter(c => c.analysisResult)
+              .map(c => c.analysisResult),
+            scene_refs_analysis: state.scenes
+              .filter(s => s.analysisResult)
+              .map(s => s.analysisResult),
           }),
         },
         token
@@ -184,8 +193,8 @@ function StageA() {
               customStyleImage={state.customStyleImage}
               customStyleImageUrl={state.customStyleImageUrl}
               customStyleKeywords={state.customStyleKeywords}
-              onCustomStyleChange={(image, imageUrl, keywords) =>
-                dispatch({ type: "SET_CUSTOM_STYLE", payload: { image, imageUrl, keywords } })
+              onCustomStyleChange={(image, imageUrl, keywords, analysis) =>
+                dispatch({ type: "SET_CUSTOM_STYLE", payload: { image, imageUrl, keywords, analysis } })
               }
             />
           </motion.div>
@@ -199,11 +208,13 @@ function StageA() {
           >
             <CharacterUploader
               characters={state.characters}
+              storyLength={state.length}
               onAdd={(c) => dispatch({ type: "ADD_CHARACTER", payload: c })}
               onRemove={(id) => dispatch({ type: "REMOVE_CHARACTER", payload: id })}
             />
             <SceneUploader
               scenes={state.scenes}
+              storyLength={state.length}
               onAdd={(s) => dispatch({ type: "ADD_SCENE", payload: s })}
               onRemove={(id) => dispatch({ type: "REMOVE_SCENE", payload: id })}
             />
