@@ -421,10 +421,11 @@ Review all family_relationships entries together. For each person mentioned:
         只处理明显在字符串值中间的引号（前后都是中文/日文/韩文字符）
         """
         import re
-        # 匹配: 中文字符 + " + 1-20个非引号字符 + " + 中文字符
+        # 匹配: 中文字符/全角标点 + " + 1-50个非引号字符 + " + 中文字符/全角标点
         # 例如: 她的"校霸"如今 → 她的\u201c校霸\u201d如今
+        # 覆盖: 全角逗号句号等 (U+FF00-FFEF) + 较长对话 (≤50字)
         result = re.sub(
-            r'([\u4e00-\u9fff\u3000-\u303f])"([^"]{1,20})"([\u4e00-\u9fff\u3000-\u303f])',
+            r'([\u4e00-\u9fff\u3000-\u303f\uff00-\uffef])"([^"]{1,50})"([\u4e00-\u9fff\u3000-\u303f\uff00-\uffef])',
             '\\1\u201c\\2\u201d\\3',
             text
         )
