@@ -41,7 +41,7 @@ StylePreset = Literal[
 class ProjectCreate(BaseModel):
     """Schema for creating a new project"""
 
-    original_idea: str = Field(..., min_length=1, max_length=2000, description="用户原始创意")
+    original_idea: str = Field(default="", max_length=2000, description="用户原始创意")
     style_preset: StylePreset = Field(default="realistic", description="画面风格")
     total_chapters: int = Field(default=1, ge=1, le=10, description="总章节数")
     chapter_duration_minutes: int = Field(default=3, ge=1, le=10, description="每章时长（分钟）")

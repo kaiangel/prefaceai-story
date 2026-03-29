@@ -1,5 +1,13 @@
 "use client";
 
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
 const TOKEN_KEY = "preface_auth_token";
 
@@ -35,11 +43,15 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}, token?: 
     let detail = "请求失败";
     try {
       const payload = await response.json();
-      detail = payload.detail || detail;
+      if (Array.isArray(payload.detail)) {
+        detail = payload.detail.map((e: Record<string, unknown>) => e.msg || e).join("; ");
+      } else {
+        detail = payload.detail || detail;
+      }
     } catch {
       detail = await response.text() || detail;
     }
-    throw new Error(detail);
+    throw new ApiError(detail, response.status);
   }
 
   if (response.status === 204) {

@@ -34,11 +34,30 @@ async def create_project(
     """
     Create a new project and start generating the first chapter
     """
+    # 0. 校验: idea 和 document_text 不能同时为空
+    if not project_data.original_idea.strip() and not (project_data.document_text or "").strip():
+        raise HTTPException(status_code=400, detail="请输入故事创意或上传故事文档")
+
     # 1. Create project record
+    # 埋点 6: 记录前端发来的参数
+    print(f"[CreateProject] 收到参数:")
+    print(f"  idea: {project_data.original_idea[:50]}{'...' if len(project_data.original_idea) > 50 else ''}")
+    print(f"  document_text: {'有 (' + str(len(project_data.document_text)) + '字)' if project_data.document_text else '无'}")
+    print(f"  style_preset: {project_data.style_preset}")
+    print(f"  aspect_ratio: {project_data.aspect_ratio}")
+    print(f"  duration: {project_data.chapter_duration_minutes}min, characters: {project_data.character_count}")
+    print(f"  custom_style: {'有' if project_data.custom_style_analysis else '无'}")
+    print(f"  char_refs: {len(project_data.character_refs_analysis) if project_data.character_refs_analysis else 0}个")
+    print(f"  scene_refs: {len(project_data.scene_refs_analysis) if project_data.scene_refs_analysis else 0}个")
+
     # 如果有文档文本，拼接到 original_idea
-    idea = project_data.original_idea
+    idea = project_data.original_idea.strip()
     if project_data.document_text:
-        idea = f"{idea}\n\n---\n附加文档内容:\n{project_data.document_text}"
+        doc = project_data.document_text.strip()
+        if idea:
+            idea = f"{idea}\n\n---\n附加文档内容:\n{doc}"
+        else:
+            idea = doc
 
     project_id = str(uuid4())
     project = Project(
@@ -189,6 +208,17 @@ async def generate_outline(
     # 2. Map chapter_duration_minutes to character_count default
     duration = project.chapter_duration_minutes or 3
     character_count = project.character_count or 3
+
+    # 埋点 7: 记录传给 LLM 的参数
+    _char_refs = json.loads(project.character_refs_analysis_json) if project.character_refs_analysis_json else None
+    _scene_refs = json.loads(project.scene_refs_analysis_json) if project.scene_refs_analysis_json else None
+    _style_name = json.loads(project.custom_style_analysis_json).get("style_display_name") if project.custom_style_analysis_json else None
+    print(f"[GenerateOutline] 传给 LLM:")
+    print(f"  idea: {project.original_idea[:50]}...")
+    print(f"  style: {project.style_preset}")
+    print(f"  char_refs: {len(_char_refs) if _char_refs else 0}个")
+    print(f"  scene_refs: {len(_scene_refs) if _scene_refs else 0}个")
+    print(f"  custom_style: {_style_name or '无'}")
 
     # 3. Call StoryOutlineGenerator
     generator = StoryOutlineGenerator()
