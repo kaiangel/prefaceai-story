@@ -413,9 +413,29 @@ Review all family_relationships entries together. For each person mentioned:
 - plot_points要足够细致，每个情节点对应故事的一个关键转折
 """
 
+    @staticmethod
+    def _fix_unescaped_quotes(text: str) -> str:
+        """修复 JSON 字符串内部未转义的 ASCII 双引号。
+
+        策略: 将 JSON 值内部的孤立 " 替换为中文引号 ""
+        只处理明显在字符串值中间的引号（前后都是中文/日文/韩文字符）
+        """
+        import re
+        # 匹配: 中文字符 + " + 1-20个非引号字符 + " + 中文字符
+        # 例如: 她的"校霸"如今 → 她的\u201c校霸\u201d如今
+        result = re.sub(
+            r'([\u4e00-\u9fff\u3000-\u303f])"([^"]{1,20})"([\u4e00-\u9fff\u3000-\u303f])',
+            '\\1\u201c\\2\u201d\\3',
+            text
+        )
+        return result
+
     def _extract_json(self, content: str) -> Optional[dict]:
         """从LLM响应中提取JSON"""
         import re
+
+        # 预处理: 修复 JSON 字符串值中未转义的 ASCII 双引号
+        content = self._fix_unescaped_quotes(content)
 
         # 尝试提取```json ... ```块
         json_match = re.search(r'```json\s*([\s\S]*?)\s*```', content)
