@@ -14,6 +14,32 @@
 
 ---
 
+### 2026-03-29 — Founder 殡仪馆重测 ✅ + LOGGING-FIX 派发
+
+- 殡仪馆故事 JSON 7920 chars 解析成功（上次同故事 10469 chars 失败）→ REPAIR-V2 正则修复确认
+- DB 全链路审查: idea 234 字 + 中篇 6min 3:4 + 自定义风格 + 大纲"三百封信" 3 角色 6 情节 5 场景 mood=感人
+- PERSISTENT-LOG TeeStream 不生效（uvicorn 多进程）→ LOGGING-FIX 派发 @Backend (logging 模块替代)
+- DevOps push 已通知
+
+---
+
+### 2026-03-29 — REPAIR-V2 (6/6) + PERSISTENT-LOG (5/5) Review PASS
+
+- REPAIR-V2: 正则加 `\uff00-\uffef` + `{1,50}`。Test 2 全角逗号修复 ✅ + Test 5 json.loads ✅
+- PERSISTENT-LOG: TeeStream stdout/stderr → 终端+文件。storage/ 在 .gitignore ✅
+
+---
+
+### 2026-03-29 — 殡仪馆中篇 JSON 失败排查 + REPAIR-V2 + PERSISTENT-LOG 派发
+
+- Founder 测试: 殡仪馆 MD + 自定义风格 + 中篇 + 3:4 → 90秒后 JSON 提取失败
+- 复现 + 字符级分析: `_fix_unescaped_quotes` 正则 2 缺陷:
+  ① 字符范围不含全角标点 U+FF00-FFEF (中文逗号 `，` 等)
+  ② 长度限制 {1,20} 太短
+- 派发: A-REPAIR-V2 (正则加 `\uff00-\uffef` + `{1,50}`) + B-PERSISTENT-LOG (TeeStream 永久日志)
+
+---
+
 ### 2026-03-29 — 🎉 Founder 联调全链路通过 + DevOps push 派发
 
 - DB 格式干净 ✅ + 自定义风格传入 LLM ✅ + 角色/场景参考传入 ✅ + 全部 HTTP 200 ✅

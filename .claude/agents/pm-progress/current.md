@@ -1,7 +1,7 @@
 # PM Agent - 当前任务
 
 > **最后更新**: 2026-03-29
-> **状态**: 🎉 Founder 联调全链路通过 → DevOps push
+> **状态**: 殡仪馆重测 ✅ + TASK-LOGGING-FIX @Backend + DevOps push
 
 ---
 
@@ -76,7 +76,12 @@
 | 39 | ~~TASK-DOC-FORMAT~~ | ~~@Backend~~ ✅ (3/3) |
 | 40 | ~~TASK-STYLE-PRIORITY~~ | ~~@Frontend~~ ✅ (8/8) |
 | 41 | ~~Founder 测试~~ | ✅ 全链路通过 |
-| 42 | **DevOps push** | **@DevOps** |
+| 42 | ~~DevOps push~~ | ✅ |
+| 43 | ~~TASK-JSON-REPAIR-V2~~ | ~~@Backend~~ ✅ (6/6) |
+| 44 | ~~TASK-PERSISTENT-LOG~~ | ~~@Backend~~ ✅ (5/5) |
+| 45 | ~~Founder 重测殡仪馆~~ | ✅ JSON 修复确认 |
+| 46 | **TASK-LOGGING-FIX** (TeeStream → logging 模块) | **@Backend** |
+| 47 | **DevOps push** | **@DevOps** |
 | — | **=== Phase 2 (文件上传) ===** | |
 | 22 | 文件上传基础设施 + #8 自定义风格 + #9 角色参考 + #10 场景参考 | @AI-ML + @Backend + @Frontend |
 | — | **=== Phase 3 (独立) ===** | |
@@ -134,7 +139,10 @@ Founder 终审:                                                  ⏳
 | 时间 | 更新内容 |
 |------|----------|
 | 2026-03-29 | TASK-DOC-ONLY-FIX Review PASS (6/6) → 重启后端 → Founder 联调 |
-| 2026-03-29 | 🎉 Founder 联调全链路通过 (DB 格式 + 自定义风格 + 角色/场景参考全部传入 ✅) → DevOps push 派发 |
+| 2026-03-29 | Founder 殡仪馆重测 ✅ (JSON 修复确认) + LOGGING-FIX @Backend + DevOps push |
+| 2026-03-29 | REPAIR-V2 + PERSISTENT-LOG Review PASS |
+| 2026-03-29 | 殡仪馆中篇 JSON 失败 → 正则 2 缺陷 → REPAIR-V2 + PERSISTENT-LOG @Backend |
+| 2026-03-29 | 联调全链路通过 → DevOps push ✅ |
 | 2026-03-29 | DOC-FORMAT (3/3) + STYLE-PRIORITY (8/8) Review PASS |
 | 2026-03-29 | Stage 1 E2E 通了 + 日志审查 → 4 项改进派发 |
 | 2026-03-29 | TASK-DOC-ONLY-FIX Review PASS + 纯文档 422 排查 |

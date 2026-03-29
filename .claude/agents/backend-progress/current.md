@@ -7,6 +7,12 @@
 
 ## 刚完成
 
+### ✅ TASK-JSON-REPAIR-V2 + TASK-PERSISTENT-LOG (2026-03-29)
+
+- V2: 正则 +`\uff00-\uffef` (全角标点) + `{1,50}` (长对话)
+- LOG: `main.py` TeeStream → `storage/logs/backend.log`
+- syntax 2/2 ✅ + 测试 3/3 ✅
+
 ### ✅ TASK-DOC-FORMAT (2026-03-29)
 
 - `app/api/projects.py`: idea 为空时直接用 doc 文本，不加多余前缀

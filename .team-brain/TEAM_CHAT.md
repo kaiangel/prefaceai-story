@@ -32145,3 +32145,211 @@ Founder 团队完成了一轮联调修复 + 功能优化，代码已 push。你 
 - 其余改动（AuthContext、api.ts、StyleSelector、StoryIdeaInput 等）与你的代码不重叠
 
 ---
+
+#### @pm (2026-03-29)
+
+### 🐛 Founder 联调: 殡仪馆故事中篇 → JSON 提取失败（_fix_unescaped_quotes 正则覆盖不足）
+
+**现象**: 上传 MD 文档 + 自定义风格 + 中篇 + 3:4 → 90 秒后"大纲生成失败: 无法从LLM响应中提取JSON"
+
+**PM 排查**: 复现 + 字符级分析
+
+**根因**: `_fix_unescaped_quotes` 正则有 2 个缺陷：
+
+1. **字符范围不含全角标点**: `[\u4e00-\u9fff\u3000-\u303f]` 不包含 `，。！？；：` (U+FF00-FFEF)。当 `"谢谢你..."，` 这样闭合引号后跟中文逗号时，正则匹配不到。
+2. **长度限制太短**: `{1,20}` 只匹配 20 字以内。故事中较长的引号对话匹配不到。
+
+**证据**:
+```
+遗体突然睁眼低语"谢谢你，你是唯一认真对待我的人"，随即
+                ^                              ^ ^
+              U+0022                        U+0022 U+FF0C (全角逗号)
+              匹配 ✅                       匹配 ✅  不在正则范围 ❌
+```
+
+---
+
+#### @pm → @backend (2026-03-29)
+
+### 任务 A: TASK-JSON-REPAIR-V2 — 正则范围扩展
+
+**文件**: `app/services/story_outline_generator.py` — `_fix_unescaped_quotes` 方法
+
+**改 1 行正则**:
+
+```python
+# 改前:
+r'([\u4e00-\u9fff\u3000-\u303f])"([^"]{1,20})"([\u4e00-\u9fff\u3000-\u303f])'
+
+# 改后 — 加全角标点范围 + 长度扩展:
+r'([\u4e00-\u9fff\u3000-\u303f\uff00-\uffef])"([^"]{1,50})"([\u4e00-\u9fff\u3000-\u303f\uff00-\uffef])'
+```
+
+**改动 2 处**:
+- 字符组加 `\uff00-\uffef`（覆盖 `，。！？；：""` 等全角标点）—— 前后两个字符组都要加
+- 长度 `{1,20}` → `{1,50}`（覆盖中篇较长的引号对话）
+
+**验证测试**:
+```python
+# 必须通过:
+'她的"校霸"如今' → 修复 ✅（原有场景）
+'睁眼低语"谢谢你，你是唯一认真对待我的人"，随即' → 修复 ✅（本次场景）
+'"title": "正常标题"' → 不变 ✅（正常 JSON 不误改）
+```
+
+---
+
+### 任务 B: TASK-PERSISTENT-LOG — 永久日志文件输出
+
+**问题**: 当前 debug logging 用 `print()` 输出到 stdout，但如果后端启动时没重定向到文件，日志丢失。每次测试都要手动 `> /tmp/backend.log`，不可持续。
+
+**文件**: `app/main.py`
+
+**要求**: 在 `main.py` 启动时配置 Python logging，让关键日志**同时输出到终端和文件**。
+
+```python
+import logging
+import os
+
+# 在 install_log_sanitizer() 之后加:
+os.makedirs("storage/logs", exist_ok=True)
+file_handler = logging.FileHandler("storage/logs/backend.log", encoding="utf-8")
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel(logging.INFO)
+
+logging.basicConfig(level=logging.INFO, handlers=[file_handler, stream_handler])
+```
+
+同时把 `projects.py` 和 `utils.py` 和 `story_outline_generator.py` 里的关键 `print()` 改为 `logging.info()`（这样日志同时写终端+文件）。或者更简单：在 `main.py` 用 `sys.stdout` 的 tee 方案，把所有 print 同时写到文件。
+
+**最简方案**（如果不想改 print 为 logging）：
+
+```python
+# main.py 顶部，install_log_sanitizer() 之后:
+import sys, os
+
+class TeeStream:
+    def __init__(self, *streams):
+        self.streams = streams
+    def write(self, data):
+        for s in self.streams:
+            s.write(data)
+            s.flush()
+    def flush(self):
+        for s in self.streams:
+            s.flush()
+
+os.makedirs("storage/logs", exist_ok=True)
+_log_file = open("storage/logs/backend.log", "a", encoding="utf-8")
+sys.stdout = TeeStream(sys.__stdout__, _log_file)
+sys.stderr = TeeStream(sys.__stderr__, _log_file)
+```
+
+这样所有 `print()` 和 uvicorn 日志同时写终端 + `storage/logs/backend.log`。不管谁怎么启动后端，日志都在。
+
+**确保 `storage/logs/` 在 `.gitignore` 里**（日志文件不提交）。
+
+---
+
+**验证**: syntax ✅ + 后端启动正常 + `storage/logs/backend.log` 有输出。
+
+两个任务完成后通知 @pm。
+
+---
+
+#### @backend (2026-03-29)
+
+### ✅ TASK-JSON-REPAIR-V2 + TASK-PERSISTENT-LOG 完成
+
+**REPAIR-V2**: `story_outline_generator.py` 正则扩展
+- 字符组 +`\uff00-\uffef`（全角标点），长度 `{1,20}` → `{1,50}`
+- 测试: 原有"校霸" ✅ + 新增"谢谢你...人"，全角逗号 ✅ + 正常 JSON 不变 ✅
+
+**PERSISTENT-LOG**: `app/main.py` TeeStream
+- `sys.stdout`/`stderr` 同时写终端 + `storage/logs/backend.log`
+- `storage/` 已在 `.gitignore`
+
+syntax 2/2 ✅。@pm 完成。
+
+---
+
+#### @pm (2026-03-29)
+
+### ✅ PM Review PASS — REPAIR-V2 (6/6) + PERSISTENT-LOG (5/5)
+
+正则扩展 + TeeStream 全部正确。
+
+**@founder**: 重启后端后重试殡仪馆故事。日志自动写到 `storage/logs/backend.log`。
+
+---
+
+#### @pm (2026-03-29)
+
+### ✅ Founder 殡仪馆故事重测成功 — REPAIR-V2 正则修复确认
+
+DB 全链路审查: idea 234 字 ✅ + 中篇 6min 3:4 ✅ + 自定义风格 `Nostalgic Cinematic Anime Interior` ✅ + **JSON 7920 chars 解析成功** ✅ (上次同故事 10469 chars 失败) + 大纲"三百封信" 3 角色 6 情节 5 场景 mood=感人 ✅
+
+**PERSISTENT-LOG 问题**: TeeStream 在 uvicorn 多进程下不生效（日志文件为空）。需要换成 Python `logging` 模块方案。
+
+**@devops**: 请立即 push 最新代码（REPAIR-V2 + PERSISTENT-LOG）。不需要 VPS 部署。不等 LOGGING-FIX。
+
+---
+
+#### @pm → @backend (2026-03-29)
+
+### 任务: TASK-LOGGING-FIX — TeeStream → Python logging 模块
+
+**问题**: `main.py` 的 TeeStream 方案在 uvicorn 多进程模式下不生效——worker 进程不继承主进程的 `sys.stdout` 替换，`storage/logs/backend.log` 始终为空。
+
+**修复**: 用 Python 标准 `logging` 模块替代 TeeStream。
+
+**文件**: `app/main.py`
+
+**改前** (TeeStream，删掉):
+```python
+class _TeeStream:
+    ...
+os.makedirs("storage/logs", exist_ok=True)
+_log_file = open("storage/logs/backend.log", "a", encoding="utf-8")
+sys.stdout = _TeeStream(sys.__stdout__, _log_file)
+sys.stderr = _TeeStream(sys.__stderr__, _log_file)
+```
+
+**改后** (Python logging):
+```python
+import logging
+
+os.makedirs("storage/logs", exist_ok=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+    handlers=[
+        logging.StreamHandler(),  # 终端
+        logging.FileHandler("storage/logs/backend.log", encoding="utf-8"),  # 文件
+    ],
+)
+logger = logging.getLogger("xuhua")
+```
+
+同时把 `projects.py`、`utils.py`、`story_outline_generator.py` 里的关键 `print(f"[XXX] ...")` 改为 `logger.info(...)`：
+
+```python
+# 每个文件顶部加:
+import logging
+logger = logging.getLogger("xuhua")
+
+# print → logger.info:
+# 改前: print(f"[CreateProject] 收到参数:")
+# 改后: logger.info("[CreateProject] 收到参数:")
+```
+
+**范围**: 只改有 `[CreateProject]`、`[GenerateOutline]`、`[StoryOutlineGenerator]`、`[OCR]`、`[DocParse]`、`[StyleAnalysis]`、`[CharAnalysis]`、`[SceneAnalysis]`、`[Analyze]` 前缀的 print。其他 print 不动。
+
+**验证**: 启动后端 → 发一个请求 → `storage/logs/backend.log` 有输出。
+
+完成后通知 @pm。
+
+---

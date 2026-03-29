@@ -6,6 +6,16 @@
 
 ## 2026-03-25
 
+### TASK-JSON-REPAIR-V2 完成 ✅
+
+- 正则扩展: +全角标点 `\uff00-\uffef` + 长度 `{1,50}`
+- 修复殡仪馆故事中"谢谢你...人"，后跟全角逗号的场景
+
+### TASK-PERSISTENT-LOG 完成 ✅
+
+- `main.py` TeeStream: stdout/stderr 同时写终端 + `storage/logs/backend.log`
+- `storage/` 已在 `.gitignore`
+
 ### TASK-DOC-FORMAT 完成 ✅
 
 - `projects.py`: idea 为空+有 doc → 直接用 doc（不加 `\n\n---\n附加文档内容:` 前缀）

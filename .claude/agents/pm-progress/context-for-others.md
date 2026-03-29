@@ -8,8 +8,8 @@
 ## 当前状态
 
 ```
-🎉 Founder 联调全链路通过
-→ DevOps push
+殡仪馆重测 ✅ (JSON 修复确认)
+→ LOGGING-FIX @Backend + DevOps push
 ```
 
 ---
@@ -20,9 +20,9 @@
 
 ---
 
-## @Backend — ✅ TASK-DOC-FORMAT 完成
+## @Backend — 🔄 TASK-LOGGING-FIX
 
-PM Review PASS (3/3)。
+TeeStream 在 uvicorn 多进程下不生效。换成 Python `logging` 模块 + 关键 print → logger.info。详见 TEAM_CHAT。
 
 ---
 
@@ -44,9 +44,7 @@ PM Review PASS (8/8)。自定义风格优先 + loading + OCR 提示。
 
 ---
 
-## @DevOps — 🔄 push 最新代码
-
-联调通过。push 6 个 TASK 改动。不需要 VPS 部署。详见 TEAM_CHAT。
+## @DevOps — 🔄 push 最新代码 (REPAIR-V2 + PERSISTENT-LOG + LOGGING-FIX 完成后)
 
 ---
 
