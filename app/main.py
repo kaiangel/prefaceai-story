@@ -17,6 +17,25 @@ from app.middleware.log_sanitizer import install as install_log_sanitizer
 # 日志脱敏：在任何输出之前安装
 install_log_sanitizer()
 
+# 永久日志：所有 print/stdout/stderr 同时写终端 + 文件
+import sys
+
+class _TeeStream:
+    def __init__(self, *streams):
+        self.streams = streams
+    def write(self, data):
+        for s in self.streams:
+            s.write(data)
+            s.flush()
+    def flush(self):
+        for s in self.streams:
+            s.flush()
+
+os.makedirs("storage/logs", exist_ok=True)
+_log_file = open("storage/logs/backend.log", "a", encoding="utf-8")
+sys.stdout = _TeeStream(sys.__stdout__, _log_file)
+sys.stderr = _TeeStream(sys.__stderr__, _log_file)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
