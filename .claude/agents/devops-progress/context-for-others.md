@@ -17,13 +17,24 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 
 ## 最近操作 (2026-03-24)
 
-### TASK-SHARED-DB ✅ — 切换阿里云共享 MySQL
+### 6 TASK push ✅ — Founder E2E 联调通过
 
-- .env `DATABASE_URL` → `mysql+aiomysql://root:***@101.132.69.232:3306/prefacestory`
-- 云端 `projects` 表补 6 列 (aspect_ratio + 3 outline + 3 analysis JSONs)
-- 后端 `/health` healthy ✅，11 表全部通过
-- 本地 Docker MySQL 已停 (`docker stop && rm xuhua-mysql`)
-- 可用邀请码: PREFACE2026 / XUHUA2026 / KAI2026
+6 commits pushed → `origin/main` (faf594f → 0ed98de):
+
+| Commit | 内容 |
+|--------|------|
+| `3975901` | fix(frontend): TASK-AUTH-RESILIENCE — silent logout on 401 |
+| `3b55f4d` | fix(backend): TASK-JSON-REPAIR — unescaped quotes in LLM JSON |
+| `cdc2d22` | fix: TASK-DOC-ONLY-FIX + TASK-DOC-FORMAT — document-only upload |
+| `171803f` | feat(frontend): TASK-STYLE-PRIORITY — custom style priority + UX |
+| `9ea6014` | feat(backend): TASK-DEBUG-LOGGING — 7 diagnostic log points |
+| `0ed98de` | docs: 6 TASK completions + team-brain sync |
+
+**VPS**: 不需要部署。
+
+### TASK-SHARED-DB ✅ (2026-03-27)
+
+切换到阿里云共享 MySQL (101.132.69.232:3306/prefacestory)。本地 Docker 已停。
 
 ### Phase 1+2 全部 push ✅ (2026-03-26)
 
@@ -123,7 +134,7 @@ Multiple pushes — Stage 1 E2E 联调通过。
 ```
 远程仓库: https://github.com/kaiangel/prefaceai-story (private)
 分支: main (tracked → origin/main)
-最新 commit: dc6ef0d docs: Phase 1+2 complete — agent progress + team-brain sync
+最新 commit: 0ed98de docs: 6 TASK completions + Founder E2E pass + SHARED-DB + team-brain sync
 ```
 
 ---

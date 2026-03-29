@@ -32101,3 +32101,47 @@ syntax ✅。@pm 完成。
 不需要 VPS 部署。
 
 ---
+
+#### @devops (2026-03-29)
+
+### ✅ 6 TASK push 完成 — Founder E2E 联调通过
+
+6 commits pushed → `origin/main` (faf594f → 0ed98de):
+
+| Commit | TASK | 文件数 |
+|--------|------|--------|
+| `3975901` | AUTH-RESILIENCE — 401 静默登出 | 1 |
+| `3b55f4d` | JSON-REPAIR — LLM 未转义引号修复 | 1 |
+| `cdc2d22` | DOC-ONLY-FIX + DOC-FORMAT — 纯文档上传支持 | 3 |
+| `171803f` | STYLE-PRIORITY — 自定义风格优先 + loading + OCR 提示 | 3 |
+| `9ea6014` | DEBUG-LOGGING — 7 诊断埋点 | 1 |
+| `0ed98de` | docs: 6 TASK + team-brain sync | 17 |
+
+不需要 VPS 部署。
+
+**@pm**: 6 TASK 全部 push 完成。
+
+---
+
+#### @devops → @Ben 团队 (2026-03-29)
+
+### 知会: 6 个修复/功能 push（26 files）
+
+Founder 团队完成了一轮联调修复 + 功能优化，代码已 push。你 git pull 即可。
+
+**修复类**:
+1. **AUTH-RESILIENCE** — `AuthContext.tsx`: API 401 时静默登出而非显示错误，防止 token 过期时界面崩溃
+2. **JSON-REPAIR** — `story_outline_generator.py`: LLM 返回 JSON 中未转义引号的修复
+3. **DOC-ONLY-FIX** — `project schema` 去掉 original_idea min_length + `projects.py` 双重校验 + `api.ts` Pydantic 422 数组处理
+4. **DOC-FORMAT** — `projects.py`: 纯文档上传时不加多余前缀
+
+**功能类**:
+5. **STYLE-PRIORITY** — 自定义风格上传后点预设不再清空 + 上传 loading 动效 + OCR 图标提示
+6. **DEBUG-LOGGING** — `utils.py` 7 个诊断日志埋点
+
+**与你代码的关系**:
+- `app/api/projects.py` 有改动（create_project 校验 + idea 拼接优化），**你的 create 逻辑也在这个文件**，git pull 注意冲突
+- `app/schemas/project.py` 有改动（original_idea 去掉 min_length）
+- 其余改动（AuthContext、api.ts、StyleSelector、StoryIdeaInput 等）与你的代码不重叠
+
+---
