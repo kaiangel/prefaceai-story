@@ -6,6 +6,26 @@
 
 ## 2026-03-25
 
+### TASK-DOC-FORMAT 完成 ✅
+
+- `projects.py`: idea 为空+有 doc → 直接用 doc（不加 `\n\n---\n附加文档内容:` 前缀）
+
+### TASK-DOC-ONLY-FIX Backend 完成 ✅
+
+- `project.py` schema: `original_idea` 允许空（纯文档上传场景）
+- `projects.py`: 双重校验 idea+doc 都空 → 400
+
+### TASK-JSON-REPAIR 完成 ✅
+
+- `story_outline_generator.py`: `_fix_unescaped_quotes()` + `_extract_json()` 预处理
+- 修复 Claude 中文 JSON 未转义双引号 (U+0022→U+201C/U+201D)
+- 测试: 3/3 PASS (校霸、正常JSON不变、多处引号)
+
+### TASK-DEBUG-LOGGING 完成 ✅
+
+- `utils.py` 5 埋点 + `projects.py` 2 埋点 = 7 个日志点
+- 只加 print，零逻辑改动
+
 ### TASK-PHASE2-PIPELINE 完成 ✅ (含 ProjectStyleConfig bug 修复)
 
 - `style_enforcer.py`: +`create_custom_enforcement(analysis)` 类方法

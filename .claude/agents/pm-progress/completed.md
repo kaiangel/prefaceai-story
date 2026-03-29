@@ -4,6 +4,112 @@
 
 ---
 
+### 2026-03-29 — Stage 1 E2E 通了 + 日志全链路审查 + 4 项改进派发
+
+- **联调成功**: 全部 200 OK，"爷爷的老照片" 3 角色 6 情节点
+- **日志审查发现**: ① DB 格式不干净 (idea 空时多余前缀) ② 自定义风格被预设覆盖 (StyleSelector handlePresetClick 清空 customStyleAnalysis)
+- **Founder UX 反馈**: ③ 自定义风格上传无 loading 动效 ④ OCR 图标提示太隐晦
+- **根因深挖**: StyleSelector L33-36 `handlePresetClick` 调 `onCustomStyleChange(null,null,[])` 清空了自定义
+- **派发**: A-Backend TASK-DOC-FORMAT + B-Frontend TASK-STYLE-PRIORITY (3 改动)
+
+---
+
+### 2026-03-29 — 🎉 Founder 联调全链路通过 + DevOps push 派发
+
+- DB 格式干净 ✅ + 自定义风格传入 LLM ✅ + 角色/场景参考传入 ✅ + 全部 HTTP 200 ✅
+- DevOps push 6 个 TASK 改动
+
+---
+
+### 2026-03-29 — DOC-FORMAT (3/3) + STYLE-PRIORITY (8/8) Review PASS
+
+- Backend: idea strip + doc 直接用无前缀 ✅
+- Frontend B1: handlePresetClick 不清自定义 + 预设半透明 + "已使用自定义风格" ✅
+- Frontend B2: CustomStyleUploader analyzing 状态 + Loader2 动画 ✅
+- Frontend B3: HelpCircle + hover 提示 "上传包含故事创意文字的图片" ✅
+
+---
+
+### 2026-03-29 — TASK-DOC-ONLY-FIX Review PASS (6/6)
+
+- Backend: original_idea min_length 移除 + 双重校验 (idea 和 doc 都空才 400) ✅
+- Frontend: apiFetch detail 数组处理 (Array.isArray → .msg join) ✅
+
+---
+
+### 2026-03-29 — Founder 联调: 纯文档 422 + [object Object] → TASK-DOC-ONLY-FIX 派发
+
+- 上传 MD 文档不输入文字 → 422 (original_idea min_length=1)
+- 前端 detail 是 Pydantic 数组 → 显示 [object Object]
+- 派发: Backend (min_length 移除 + 双重校验) + Frontend (detail 数组处理)
+
+---
+
+### 2026-03-29 — TASK-JSON-REPAIR Review PASS (8/8)
+
+- _fix_unescaped_quotes 静态方法 ✅ + _extract_json 预处理调用 ✅
+- 4 测试: 根因场景 ✅ + 正常 JSON 不误改 ✅ + json.loads 成功 ✅ + 多对引号 ✅
+
+---
+
+### 2026-03-29 — Founder 联调 JSON 引号 bug 排查 + TASK-JSON-REPAIR 派发
+
+- Founder 联调: 预设风格"欧美漫画"→"无法从LLM响应中提取JSON"（间歇性）
+- 后端日志分析: stop_reason=end_turn, output_tokens=3116, response=6099 chars
+- 完整响应捕获 + 字符级分析: `U+0022` ASCII `"` 在 `"校霸"` 中，破坏 JSON 结构
+- 根因: Claude 在中文文本内输出未转义 ASCII 双引号（`"词"` 而非 `"词"` 或 `\"词\"`）
+- TASK-JSON-REPAIR 派发 @Backend: `_fix_unescaped_quotes()` 正则预处理
+
+---
+
+### 2026-03-29 — TASK-AUTH-RESILIENCE Review PASS (10/10)
+
+- ApiError 类 (api.ts L3-9) ✅ + apiFetch throw ApiError (L50) ✅
+- hydrate catch 401 only (AuthContext L118-125) ✅
+- refreshStories try/catch 容错 (L102-106) ✅
+- import ApiError ✅
+- `/auth/me` 失败正确传播到外层 catch ✅
+
+---
+
+### 2026-03-29 — Founder 联调 + 静默登出 bug 发现 + TASK-AUTH-RESILIENCE 派发
+
+- **联调结果**: 预设风格 ✅ 成功 / 自定义上传 ❌ 返回 mock 数据
+- **DB 取证**: 第二次测试无项目创建 → 前端未调后端 → mock 路径
+- **根因**: `AuthContext.tsx` L113 hydrate catch 把所有错误当 token 失效 → 500/超时也清 token → 用户静默登出
+- **分析范围**: apiFetch error 传递 + hydrate catch + refreshStories 容错 + 后端 auth 401/500 逻辑
+- **结论**: 纯 Frontend bug，后端不需要改
+- **派发**: TASK-AUTH-RESILIENCE @Frontend (3 改动: ApiError 类 + 401 only + refreshStories 容错)
+
+---
+
+### 2026-03-27 — TASK-DEBUG-LOGGING 派发 + Create 页面全交互点分析
+
+- 截图像素级审查: 识别 7 个参数区域 (故事创意+OCR+文档 / 篇幅 / 比例 / 风格+自定义 / 角色参考 / 场景参考 / 生成按钮)
+- 日志覆盖分析: 已有 StoryOutlineGenerator 日志 + 缺 7 个关键埋点 (前端参数→后端接收→LLM 传参)
+- TASK-DEBUG-LOGGING 派发 @Backend: 7 埋点，只加 print 不改逻辑，Founder 测 1 次即可看完整链路
+- 目标: 最少 API 调用次数定位最多问题（省钱）
+
+---
+
+### 2026-03-27 — TASK-SHARED-DB Review PASS (7/7)
+
+- .env → 阿里云 `101.132.69.232:3306/prefacestory` (aiomysql 驱动) ✅
+- 云端 6 列 Python 直连验证全部存在 (6/6) ✅
+- Docker MySQL 已停且删除 ✅
+- `.env` 未被 git 追踪 ✅
+- Founder 联调通知
+
+---
+
+### 2026-03-26 — Ben 双数据库问题 + TASK-SHARED-DB 派发
+
+- Ben 拉代码发现 create 页面显示 mock 数据 → 原因: 我们用本地 Docker MySQL，Ben 用阿里云 MySQL，两个数据库不同步
+- Ben 要求: 开发/测试/生产共用阿里云 MySQL，禁止自建本地数据库
+- TASK-SHARED-DB 派发 @DevOps: .env 切换 + 云端补 6 列 + 验证 + 停 Docker
+
+---
+
 ### 2026-03-26 — Phase 2 Step 3 PASS + Phase 1+2 全部完成
 
 - ProjectStyleConfig `custom_enforcement` 修复确认 ✅

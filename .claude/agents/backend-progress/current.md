@@ -1,30 +1,41 @@
 # Backend Agent - 当前任务
 
-> **最后更新**: 2026-03-25
-> **状态**: ✅ TASK-PHASE2-PIPELINE 完成，等 PM Review
+> **最后更新**: 2026-03-28
+> **状态**: ✅ TASK-DEBUG-LOGGING 完成，等 Founder 联调
 
 ---
 
 ## 刚完成
 
-### ✅ TASK-PHASE2-PIPELINE — seed 图 + StyleEnforcer 动态创建 (2026-03-25)
+### ✅ TASK-DOC-FORMAT (2026-03-29)
 
-4 文件改动：
+- `app/api/projects.py`: idea 为空时直接用 doc 文本，不加多余前缀
+- syntax ✅
 
-| # | 文件 | 改动 |
-|---|------|------|
-| 1 | `style_enforcer.py` | +`create_custom_enforcement(analysis)` 类方法 |
-| 2 | `reference_image_manager.py` | `generate_character_multi_refs` +`seed_image` 参数 + `set_reference` 修复 dict 格式 |
-| 3 | `scene_reference_manager.py` | `generate_anchor_images` +`seed_images` 参数，内景调用传 seed |
-| 4 | `pipeline_orchestrator.py` | `run()` +3 参数 + 自定义风格 enforcement + 角色/场景 seed 传参 |
+### ✅ TASK-DOC-ONLY-FIX Backend (2026-03-29)
 
-**验证**: 4/4 syntax ✅ + PM Review #10 bug 修复: `style_config.py` +`custom_enforcement` 字段 ✅
+- `app/schemas/project.py`: `original_idea` 允许空字符串 (`min_length=1` 移除)
+- `app/api/projects.py`: idea+doc 都空时返回 400
+- syntax 2/2 ✅
+
+### ✅ TASK-JSON-REPAIR (2026-03-29)
+
+- `story_outline_generator.py`: 新增 `_fix_unescaped_quotes()` 静态方法 + `_extract_json()` 开头调用预处理
+- 修复 Claude 在中文 JSON 里输出未转义 ASCII 双引号导致 JSON 解析失败
+- 测试: 3/3 ✅
+
+### ✅ TASK-DEBUG-LOGGING — 7 个日志埋点 (2026-03-28)
+
+- `app/api/utils.py`: 5 个端点各加成功日志 (OCR/DocParse/Style/Char/Scene)
+- `app/api/projects.py`: create_project 参数日志 + generate_outline LLM 参数日志
+- 只加 print，零逻辑改动
+- 验证: 2/2 syntax ✅
 
 ---
 
 ## 待处理队列
 
-- 无。等 PM Review → Founder 联调 → DevOps push。
+- 无。等 Founder 联调。
 
 ---
 
@@ -32,8 +43,6 @@
 
 | 时间 | 更新内容 |
 |------|----------|
-| 2026-03-25 | ✅ TASK-PHASE2-PIPELINE (4 文件) |
-| 2026-03-25 | ✅ TASK-PHASE2-INTEGRATE Backend (4 文件 + else fix) |
-| 2026-03-25 | ✅ TASK-PHASE2-INFRA (file_storage + 3 端点 + Prompt 4) |
-| 2026-03-25 | ✅ Phase 1 全部 + TASK-UTILS-ASYNC-FIX |
-| 2026-03-25 | ✅ TASK-GEMINI-MODEL-FIX + TASK-OUTLINE-STORAGE + TASK-ASPECT-RATIO-WIRE |
+| 2026-03-28 | ✅ TASK-DEBUG-LOGGING (7 埋点) |
+| 2026-03-26 | ✅ TASK-PHASE2-PIPELINE (含 ProjectStyleConfig fix) |
+| 2026-03-25 | ✅ TASK-PHASE2-INTEGRATE + INFRA + Phase 1 全部 |

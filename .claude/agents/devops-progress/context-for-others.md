@@ -17,7 +17,15 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 
 ## 最近操作 (2026-03-24)
 
-### Phase 1+2 全部 push ✅
+### TASK-SHARED-DB ✅ — 切换阿里云共享 MySQL
+
+- .env `DATABASE_URL` → `mysql+aiomysql://root:***@101.132.69.232:3306/prefacestory`
+- 云端 `projects` 表补 6 列 (aspect_ratio + 3 outline + 3 analysis JSONs)
+- 后端 `/health` healthy ✅，11 表全部通过
+- 本地 Docker MySQL 已停 (`docker stop && rm xuhua-mysql`)
+- 可用邀请码: PREFACE2026 / XUHUA2026 / KAI2026
+
+### Phase 1+2 全部 push ✅ (2026-03-26)
 
 4 commits pushed → `origin/main` (40ca049 → dc6ef0d):
 

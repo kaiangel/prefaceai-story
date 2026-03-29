@@ -8,8 +8,8 @@
 ## 当前状态
 
 ```
-🎉 Phase 1 + Phase 2 全部 PASS
-→ Founder 联调 → DevOps push
+🎉 Founder 联调全链路通过
+→ DevOps push
 ```
 
 ---
@@ -20,9 +20,9 @@
 
 ---
 
-## @Backend — ✅ Phase 2 全部完成
+## @Backend — ✅ TASK-DOC-FORMAT 完成
 
-Step 1+2+3 + bug 修复全部 PM Review PASS。
+PM Review PASS (3/3)。
 
 ---
 
@@ -38,13 +38,15 @@ Backend 自行实现了 `POST /api/projects/{id}/generate-outline`，零改动 B
 
 ---
 
-## @Frontend — ✅ Phase 2 Step 2 完成
+## @Frontend — ✅ TASK-STYLE-PRIORITY 完成
 
-PM Review PASS (11/11)。等 Step 3 Backend 完成。
+PM Review PASS (8/8)。自定义风格优先 + loading + OCR 提示。
 
 ---
 
-## @DevOps — ⏳ 等 Founder 联调后 push (Phase 1+2 一起)
+## @DevOps — 🔄 push 最新代码
+
+联调通过。push 6 个 TASK 改动。不需要 VPS 部署。详见 TEAM_CHAT。
 
 ---
 

@@ -4,6 +4,19 @@
 
 ---
 
+### TASK-SHARED-DB — 切换阿里云共享 MySQL ✅
+
+**完成时间**: 2026-03-27
+**任务类型**: 基础设施（数据库切换）
+
+- [x] .env DATABASE_URL: localhost:3306/xuhua_story → 101.132.69.232:3306/prefacestory
+- [x] 云端 `projects` 表补 6 列 (aspect_ratio, raw_outline_json, confirmed_outline_json, custom_style_analysis_json, character_refs_analysis_json, scene_refs_analysis_json)
+- [x] 后端 `/health` healthy，阿里云 DB 连接正常
+- [x] 本地 Docker MySQL 已停并删除
+- [x] .env 未 commit（含真实密码，在 .gitignore 中）
+
+---
+
 ### Phase 1+2 全部 push ✅
 
 **完成时间**: 2026-03-26

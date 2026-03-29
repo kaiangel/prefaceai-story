@@ -4,6 +4,42 @@
 
 ---
 
+## 2026-03-29
+
+### TASK-STYLE-PRIORITY ✅
+
+**完成时间**: 2026-03-29
+
+- [x] B1: StyleSelector — 预设不清自定义，加提示+半透明
+- [x] B2: CustomStyleUploader — 上传即 onUpload 显示预览+loading
+- [x] B3: StoryIdeaInput — HelpCircle + hover 提示
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
+### TASK-DOC-ONLY-FIX Frontend ✅
+
+**完成时间**: 2026-03-29
+
+- [x] api.ts L45-49: Pydantic 422 detail 数组 → `.map(e => e.msg).join("; ")`
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
+### TASK-AUTH-RESILIENCE ✅
+
+**完成时间**: 2026-03-29
+
+- [x] api.ts: ApiError 类 + apiFetch throw ApiError
+- [x] AuthContext.tsx: hydrate catch 只 401 清 token
+- [x] AuthContext.tsx: refreshStories try/catch 不阻塞
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
 ## 2026-03-25
 
 ### TASK-PHASE2-INTEGRATE Frontend ✅

@@ -31323,3 +31323,781 @@ Founder 团队完成了两个大功能模块的开发，代码已 push。你 git
 **你不需要做任何调整**，git pull 看有无冲突即可。如有冲突请告知。
 
 ---
+
+#### @pm (2026-03-26)
+
+### 📋 Ben 指出: 必须共用阿里云 MySQL，禁止自建本地数据库
+
+**问题**: 我们用本地 Docker MySQL (`localhost:3306/xuhua_story`)，Ben 用阿里云 MySQL (`101.132.69.232:3306/prefacestory`)。两个数据库 → Ben 拉代码后看到 mock 数据（云端缺新列 → 500 → 前端降级）。
+
+**Ben 要求**: 开发/测试/生产都连同一个共享数据库，不自建。
+
+---
+
+#### @pm → @devops (2026-03-26)
+
+### 任务: TASK-SHARED-DB — 切换到 Ben 的阿里云共享 MySQL
+
+**4 步，按顺序执行**:
+
+#### 1. 修改 .env DATABASE_URL
+
+```bash
+# 改前 (本地 Docker):
+DATABASE_URL=mysql+aiomysql://root:root123@127.0.0.1:3306/xuhua_story
+
+# 改后 (Ben 阿里云):
+DATABASE_URL=mysql+aiomysql://root:1qazZMG2016xsw2@101.132.69.232:3306/prefacestory?charset=utf8mb4
+```
+
+**注意**: 驱动用 `aiomysql`（我们已安装的），不是 Ben 给的 `asyncmy`。数据库名是 `prefacestory`（不是 `xuhua_story`）。
+
+#### 2. 在云端 MySQL 补新列
+
+先连上云端 MySQL 检查 `projects` 表现有列：
+
+```bash
+mysql -h 101.132.69.232 -P 3306 -u root -p'1qazZMG2016xsw2' prefacestory -e "DESCRIBE projects;"
+```
+
+然后补我们新加的 6 列（如果列已存在会报错，忽略即可）：
+
+```sql
+ALTER TABLE projects ADD COLUMN aspect_ratio VARCHAR(16) DEFAULT '2:3';
+ALTER TABLE projects ADD COLUMN raw_outline_json TEXT NULL;
+ALTER TABLE projects ADD COLUMN confirmed_outline_json TEXT NULL;
+ALTER TABLE projects ADD COLUMN custom_style_analysis_json TEXT NULL;
+ALTER TABLE projects ADD COLUMN character_refs_analysis_json TEXT NULL;
+ALTER TABLE projects ADD COLUMN scene_refs_analysis_json TEXT NULL;
+```
+
+#### 3. 验证后端连接
+
+重启后端 → 测试 `/api/health` + 登录。如需注册新账号，先查云端邀请码：
+```bash
+mysql -h 101.132.69.232 -P 3306 -u root -p'1qazZMG2016xsw2' prefacestory -e "SELECT code, status FROM u_invite_codes;"
+```
+
+#### 4. 确认正常后停掉本地 Docker MySQL
+
+```bash
+docker stop xuhua-mysql && docker rm xuhua-mysql
+```
+
+然后通知 Founder 可以关 Docker Desktop。
+
+**⚠️ 不要 commit .env 文件**（含真实密码）。确认 `.env` 在 `.gitignore` 里。
+
+完成后通知 @pm。
+
+---
+
+#### @devops (2026-03-27)
+
+### ✅ TASK-SHARED-DB 完成 — 已切换阿里云共享 MySQL
+
+**4 步执行结果**:
+
+| 步骤 | 内容 | 结果 |
+|------|------|------|
+| 1. .env | `localhost:3306/xuhua_story` → `101.132.69.232:3306/prefacestory` | ✅ |
+| 2. 补列 | 云端 `projects` 表 +6 列 (aspect_ratio + 3 outline + 3 analysis) | ✅ 6/6 |
+| 3. 验证 | 后端 `/health` healthy，11 表 DESCRIBE 全部通过 | ✅ |
+| 4. 清理 | `docker stop && rm xuhua-mysql` | ✅ |
+
+**可用邀请码**: `PREFACE2026` / `XUHUA2026` / `KAI2026`
+
+**⚠️ .env 含阿里云 root 密码，未 commit（在 .gitignore 中）。**
+
+**@pm**: TASK-SHARED-DB 完成。Founder 可以关 Docker Desktop，然后联调测试（后端需用 `--reload` 启动）。
+
+---
+
+#### @pm (2026-03-27)
+
+### ✅ PM Review PASS — TASK-SHARED-DB (7/7)
+
+云端 6 列 Python 直连验证全部存在。.env 指向阿里云 ✅。Docker 已停 ✅。
+
+**@devops**: 请帮 Founder 启动后端：`python3 -m uvicorn app.main:app --reload --port 8000`
+
+---
+
+#### @pm → @backend (2026-03-27)
+
+### 任务: TASK-DEBUG-LOGGING — Founder 联调前加关键日志埋点
+
+**背景**: Founder 联调时每次"生成故事"都调 LLM API（很贵），需要用最少测试次数定位最多问题。当前日志覆盖不够——能看到 LLM 成功/失败，但**看不到前端发了什么参数、后端收到了什么、传给 LLM 什么**。
+
+**已有日志**: StoryOutlineGenerator 打印 idea/style/target/provider/成功失败 + JSON 提取失败打印 preview。
+
+**缺的日志**: 7 个关键埋点，每个只需 1-3 行 print。
+
+**文件**: `app/api/utils.py` + `app/api/projects.py`（只加 print，不改逻辑）
+
+---
+
+#### 埋点 1-5: `app/api/utils.py`（5 个端点各加成功日志）
+
+**OCR 端点** (`ocr_image`，成功返回前加):
+```python
+print(f"[OCR] ✅ 提取 {len(result.get('text',''))} 字")
+```
+
+**文档解析** (`parse_document`，每个分支成功返回前加):
+```python
+print(f"[DocParse] ✅ {ext} 文件, 提取 {len(text)} 字")
+```
+
+**3 个分析端点** (`analyze_style`/`analyze_character`/`analyze_scene`，成功返回前加):
+```python
+# analyze_style:
+result = await _vision_analyze(compressed, ct, STYLE_ANALYSIS_PROMPT)
+print(f"[StyleAnalysis] ✅ style: {result.get('style_display_name')}, tags: {result.get('display_tags')}")
+return result
+
+# analyze_character:
+result = await _vision_analyze(compressed, ct, CHARACTER_ANALYSIS_PROMPT)
+print(f"[CharAnalysis] ✅ name: {result.get('display_name')}, gender: {result.get('gender')}, age: {result.get('age_range')}")
+return result
+
+# analyze_scene:
+result = await _vision_analyze(compressed, ct, SCENE_ANALYSIS_PROMPT)
+print(f"[SceneAnalysis] ✅ name: {result.get('display_name')}, type: {result.get('location_type')}")
+return result
+```
+
+---
+
+#### 埋点 6: `app/api/projects.py` — `create_project` 函数开头
+
+```python
+# 在 "# 1. Create project record" 之前加:
+print(f"[CreateProject] 收到参数:")
+print(f"  idea: {project_data.original_idea[:50]}{'...' if len(project_data.original_idea) > 50 else ''}")
+print(f"  document_text: {'有 (' + str(len(project_data.document_text)) + '字)' if project_data.document_text else '无'}")
+print(f"  style_preset: {project_data.style_preset}")
+print(f"  aspect_ratio: {project_data.aspect_ratio}")
+print(f"  duration: {project_data.chapter_duration_minutes}min, characters: {project_data.character_count}")
+print(f"  custom_style: {'有' if project_data.custom_style_analysis else '无'}")
+print(f"  char_refs: {len(project_data.character_refs_analysis) if project_data.character_refs_analysis else 0}个")
+print(f"  scene_refs: {len(project_data.scene_refs_analysis) if project_data.scene_refs_analysis else 0}个")
+```
+
+---
+
+#### 埋点 7: `app/api/projects.py` — `generate_outline` 函数，调用 LLM 前
+
+```python
+# 在 "outline = await generator.generate(...)" 之前加:
+_char_refs = json.loads(project.character_refs_analysis_json) if project.character_refs_analysis_json else None
+_scene_refs = json.loads(project.scene_refs_analysis_json) if project.scene_refs_analysis_json else None
+_style_name = json.loads(project.custom_style_analysis_json).get("style_display_name") if project.custom_style_analysis_json else None
+print(f"[GenerateOutline] 传给 LLM:")
+print(f"  idea: {project.original_idea[:50]}...")
+print(f"  style: {project.style_preset}")
+print(f"  char_refs: {len(_char_refs) if _char_refs else 0}个")
+print(f"  scene_refs: {len(_scene_refs) if _scene_refs else 0}个")
+print(f"  custom_style: {_style_name or '无'}")
+```
+
+（注意：这些变量 `_char_refs` 等只用于日志打印，实际传参用现有代码的 `json.loads(...)` 不变）
+
+---
+
+**验证**: Python syntax ✅ + 后端启动无报错。
+
+**不要改任何逻辑**，只加 print。改完后 `--reload` 自动重载，Founder 可以直接测试。
+
+完成后通知 @pm。
+
+---
+
+#### @backend (2026-03-28)
+
+### ✅ TASK-DEBUG-LOGGING 完成 — 7 个日志埋点
+
+| # | 位置 | 日志内容 |
+|---|------|---------|
+| 1 | `utils.py` OCR | `[OCR] ✅ 提取 N 字` |
+| 2 | `utils.py` DocParse | `[DocParse] ✅ ext 文件, 提取 N 字` |
+| 3 | `utils.py` analyze-style | `[StyleAnalysis] ✅ style: X, tags: [...]` |
+| 4 | `utils.py` analyze-character | `[CharAnalysis] ✅ name: X, gender: X, age: X` |
+| 5 | `utils.py` analyze-scene | `[SceneAnalysis] ✅ name: X, type: X` |
+| 6 | `projects.py` create_project | `[CreateProject] 收到参数: idea/doc/style/refs...` |
+| 7 | `projects.py` generate_outline | `[GenerateOutline] 传给 LLM: idea/style/refs...` |
+
+**只加 print，零逻辑改动。** 验证: 2/2 syntax ✅
+
+@pm 完成，Founder 可以联调了。
+
+---
+
+#### @pm (2026-03-29)
+
+### 🐛 Founder 联调发现: 自定义上传时返回 mock 数据
+
+**第一次测试**（预设风格，无自定义上传）：✅ 成功生成真实大纲（DB 确认有项目 id=6b991470, style=pencil_sketch）
+**第二次测试**（自定义风格+角色+场景上传）：❌ 几秒后返回 mock 数据"雨夜公交站"
+
+**DB 证据**: 第二次测试**没有在数据库创建项目** → `POST /api/projects/` 从未被调用 → 前端直接走了 mock 路径（`!isLoggedIn || !token`）
+
+**根因**: `AuthContext.tsx` L112-118 的 `hydrateSession` catch 逻辑**把所有错误都当成 token 失效**，无差别清空 token。
+
+```javascript
+hydrateSession(stored)
+  .catch(() => {
+    setStoredToken(null);  // ← 不管什么错误都删 token
+    setToken(null);
+    setUser(null);
+  })
+```
+
+场景重现: 页面刷新或后端暂时无响应 → `GET /auth/me` 或 `GET /projects/` 超时/500 → catch 清 token → 用户静默登出 → 下次操作走 mock 路径。阿里云 MySQL 延迟高（启动 2 分钟）加剧了这个问题。
+
+---
+
+#### @pm → @frontend (2026-03-29)
+
+### 任务: TASK-AUTH-RESILIENCE — 修复静默登出 bug
+
+**Bug**: 任何后端临时错误（500/超时/网络波动）都会清空用户 token，导致用户被静默登出。真实用户不应因为临时错误被踢出登录。
+
+**3 个改动**:
+
+---
+
+#### 改动 1: `api.ts` — Error 带 HTTP 状态码
+
+当前 `apiFetch` throw 的 Error 没有状态码，调用方无法区分 401（token 失效）和 500（后端故障）。
+
+**文件**: `frontend/src/lib/api.ts`
+
+```typescript
+// 新增自定义 Error 类（文件顶部）
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+// apiFetch 中改 throw:
+// 改前 (L42):
+throw new Error(detail);
+
+// 改后:
+throw new ApiError(detail, response.status);
+```
+
+对于网络错误（fetch 本身抛异常，如超时/断网），`apiFetch` 外层不需要改——这些异常没有 status，调用方可以通过 `err instanceof ApiError` 区分。
+
+---
+
+#### 改动 2: `AuthContext.tsx` — hydrate catch 只在 401 时清 token
+
+**文件**: `frontend/src/contexts/AuthContext.tsx`
+
+```typescript
+// 改前 (L112-118):
+hydrateSession(stored)
+  .catch(() => {
+    setStoredToken(null);
+    setToken(null);
+    setUser(null);
+    setStories([]);
+  })
+  .finally(() => setLoadingUser(false));
+
+// 改后:
+hydrateSession(stored)
+  .catch((err) => {
+    // 只有 401（token 真正失效）才清 token
+    if (err instanceof ApiError && err.status === 401) {
+      setStoredToken(null);
+      setToken(null);
+      setUser(null);
+      setStories([]);
+    }
+    // 其他错误（500/超时/网络）保留 token，下次刷新重试
+  })
+  .finally(() => setLoadingUser(false));
+```
+
+需要在文件顶部 `import { ApiError } from "@/lib/api";`
+
+---
+
+#### 改动 3: `AuthContext.tsx` — refreshStories 失败不阻塞 hydrate
+
+当前 `hydrateSession` 中 `refreshStories` 失败会导致整个 hydrate 失败 → 即使 `/auth/me` 成功了，项目列表加载失败也会触发 catch。
+
+```typescript
+// 改前 (L98-102):
+const hydrateSession = useCallback(async (authToken: string) => {
+    const me = await apiFetch<ApiUser>("/auth/me", {}, authToken);
+    setUser(mapUser(me));
+    await refreshStories(authToken);
+}, [refreshStories]);
+
+// 改后:
+const hydrateSession = useCallback(async (authToken: string) => {
+    const me = await apiFetch<ApiUser>("/auth/me", {}, authToken);
+    setUser(mapUser(me));
+    // refreshStories 失败不阻塞登录（项目列表为空但用户仍登录）
+    try {
+      await refreshStories(authToken);
+    } catch {
+      // 静默: 项目列表稍后重试
+    }
+}, [refreshStories]);
+```
+
+---
+
+**验证**: build 0 错误 + 以下场景都不应该登出用户:
+1. 页面刷新时后端还没启动完 → 保持登录
+2. 后端返回 500 → 保持登录
+3. 网络临时断开 → 保持登录
+4. 只有后端返回 401 → 正确登出
+
+**不需要改后端。** 完成后通知 @pm。
+
+---
+
+#### @frontend (2026-03-29)
+
+### ✅ TASK-AUTH-RESILIENCE 完成 — 3 个改动修复静默登出 bug
+
+**build 20 路由 0 错误。**
+
+| # | 文件 | 改动 |
+|---|------|------|
+| 1 | `api.ts` | 新增 `ApiError extends Error`（带 `status` 字段），`apiFetch` throw `ApiError` 替代 `Error` |
+| 2 | `AuthContext.tsx` L112 | hydrate catch: `() => {清token}` → `(err) => { if (err instanceof ApiError && err.status === 401) {清token} }` |
+| 3 | `AuthContext.tsx` L99 | `hydrateSession` 中 `refreshStories` 包 try/catch，失败不阻塞登录 |
+
+**验证场景**:
+- 后端未启动时刷新页面 → 保持登录（token 保留）
+- 后端返回 500 → 保持登录
+- 后端返回 401 → 正确登出
+
+**@pm 完成，等你 Review。**
+
+---
+
+#### @pm (2026-03-29)
+
+### ✅ PM Review PASS — TASK-AUTH-RESILIENCE (10/10)
+
+3 改动全部正确: ApiError 类 ✅ + hydrate 401 only ✅ + refreshStories 容错 ✅。
+
+**@founder**: 可以重新联调了。
+
+---
+
+#### @pm (2026-03-29)
+
+### 🐛 Founder 联调发现: "无法从LLM响应中提取JSON"（间歇性）
+
+**现象**: 预设风格 + 无自定义 → 点"生成故事" → 红色错误"大纲生成失败: 无法从LLM响应中提取JSON"
+
+**PM 排查**: 后端日志 + 完整响应捕获 + 字符级分析
+
+**根因**: Claude Sonnet 4.6 在中文 JSON 文本里输出了**未转义的 ASCII 双引号**：
+
+```json
+"logline": "社恐女孩...当年欺负她的"校霸"如今落魄..."
+                                    ^       ^
+                                U+0022   U+0022
+                            JSON 解析器以为字符串到这里结束了
+```
+
+`"校霸"` 用的是 ASCII `"` (U+0022) 而不是中文引号 `""` (U+201C/U+201D)。JSON 规范里 `"` 是字符串分隔符，必须转义为 `\"`。Claude 没转义 → JSON 结构破坏 → 三级解析全部失败。
+
+**证据**:
+- `stop_reason: end_turn`（不是 token 截断）
+- `output_tokens: 3116`（正常范围）
+- `json.JSONDecodeError: Expecting ',' delimiter at pos 96`
+- 字符级分析: `[19] U+0022` 和 `[22] U+0022` 是 ASCII 双引号
+
+**间歇性**: 第一次测试成功（Claude 碰巧没用 ASCII 引号），第二次失败（用了）。
+
+---
+
+#### @pm → @backend (2026-03-29)
+
+### 任务: TASK-JSON-REPAIR — 修复 LLM 输出的未转义双引号
+
+**文件**: `app/services/story_outline_generator.py` — `_extract_json()` 方法
+
+**改动**: 在所有 `json.loads()` 调用前，预处理 JSON 文本，修复中文文本中的未转义 ASCII 双引号。
+
+**具体位置**: `_extract_json` 方法（L416-443），在方法开头添加一个预处理步骤：
+
+```python
+def _extract_json(self, content: str) -> Optional[dict]:
+    """从LLM响应中提取JSON"""
+    import re
+
+    # 预处理: 修复 JSON 字符串值中未转义的 ASCII 双引号
+    # Claude 有时在中文文本里输出 "词语" 而不是 \"词语\" 或 "词语"
+    content = self._fix_unescaped_quotes(content)
+
+    # ... 后续三级解析不变 ...
+```
+
+**新增静态方法** `_fix_unescaped_quotes`：
+
+```python
+@staticmethod
+def _fix_unescaped_quotes(text: str) -> str:
+    """修复 JSON 字符串内部未转义的 ASCII 双引号。
+
+    策略: 将 JSON 值内部的孤立 " 替换为中文引号 ""
+    只处理明显在字符串值中间的引号（前后都是中文/日文/韩文字符）
+    """
+    import re
+    # 匹配: 中文字符 + " + 非JSON结构字符 + " + 中文字符
+    # 例如: 她的"校霸"如今 → 她的"校霸"如今
+    result = re.sub(
+        r'([\u4e00-\u9fff\u3000-\u303f])"([^"]{1,20})"([\u4e00-\u9fff\u3000-\u303f])',
+        r'\1"\2"\3',
+        text
+    )
+    return result
+```
+
+**逻辑说明**:
+- 正则匹配：**中文字符 + `"` + 1-20个非引号字符 + `"` + 中文字符**
+- 替换为中文全角引号 `""` (U+201C/U+201D)，它们在 JSON 字符串里是合法内容
+- 限制 1-20 字符避免误匹配跨字段的 JSON 结构引号
+- 前后必须是中文字符（`\u4e00-\u9fff`），确保不会把 JSON key 的引号误替换
+
+**验证**:
+1. Python syntax ✅
+2. 测试用例: `'她的"校霸"如今'` → `'她的\u201c校霸\u201d如今'`
+3. 不影响正常 JSON: `"title": "正常标题"` 不会被替换（`"` 前后不是中文字符）
+
+完成后通知 @pm。
+
+---
+
+#### @backend (2026-03-29)
+
+### ✅ TASK-JSON-REPAIR 完成 — _fix_unescaped_quotes + _extract_json 预处理
+
+- `story_outline_generator.py`: 新增 `_fix_unescaped_quotes()` 静态方法
+- `_extract_json()` 方法开头调用预处理
+- 正则: 中文字符 + `"` + 1-20字符 + `"` + 中文字符 → 替换为 `""`
+- 测试: `她的"校霸"如今` → `她的"校霸"如今` ✅ + 正常 JSON 不变 ✅ + 多处引号 ✅
+
+syntax ✅。@pm 完成了。
+
+---
+
+#### @pm (2026-03-29)
+
+### ✅ PM Review PASS — TASK-JSON-REPAIR (8/8)
+
+4 个测试全部通过：根因场景修复 ✅ + 正常 JSON 不误改 ✅ + 修复后 json.loads 成功 ✅ + 多对引号 ✅。
+
+**@founder**: 可以重试联调。
+
+---
+
+#### @pm (2026-03-29)
+
+### 🐛 Founder 联调发现: 纯文档上传 → `[object Object]` 错误
+
+**现象**: 上传 MD 文档作为故事创意（不手动输入文字）+ 中国水墨 → 点生成 → 红色错误显示 `[object Object]`
+
+**PM 排查**: 后端返回 422，两个问题：
+
+1. **Backend**: `ProjectCreate.original_idea` 有 `min_length=1` → 纯文档上传时 idea 为空 → Pydantic 422
+2. **Frontend**: 422 返回的 `detail` 是 Pydantic 数组格式 `[{type, loc, msg}]`，`apiFetch` 用 `payload.detail` 拿到数组对象 → 显示 `[object Object]`
+
+---
+
+#### @pm → @backend + @frontend (2026-03-29)
+
+### 任务: TASK-DOC-ONLY-FIX — 纯文档上传 422 修复
+
+**2 方各改 1 处**:
+
+---
+
+#### @backend (2 处改动)
+
+**文件 1**: `app/schemas/project.py` — `ProjectCreate`
+
+```python
+# 改前:
+original_idea: str = Field(..., min_length=1, max_length=2000, description="用户原始创意")
+
+# 改后 — 允许空字符串（有 document_text 可替代）:
+original_idea: str = Field(default="", max_length=2000, description="用户原始创意")
+```
+
+**文件 2**: `app/api/projects.py` — `create_project` 函数开头
+
+在现有的 `document_text` 拼接逻辑之前，加双重保险校验：
+
+```python
+# 在 "idea = project_data.original_idea" 之前加:
+if not project_data.original_idea.strip() and not (project_data.document_text or "").strip():
+    raise HTTPException(status_code=400, detail="请输入故事创意或上传故事文档")
+```
+
+这样：
+- 有 idea 无 doc → ✅ 通过
+- 无 idea 有 doc → ✅ 通过
+- 两个都有 → ✅ 通过
+- 两个都空 → ❌ 400 "请输入故事创意或上传故事文档"
+
+---
+
+#### @frontend (1 处改动)
+
+**文件**: `frontend/src/lib/api.ts` — `apiFetch` 的错误处理
+
+当前 L44-46 直接取 `payload.detail`，但 Pydantic 422 的 `detail` 是数组不是字符串。
+
+```typescript
+// 改前 (L44-46):
+const payload = await response.json();
+detail = payload.detail || detail;
+
+// 改后 — 处理 detail 为数组的情况:
+const payload = await response.json();
+if (Array.isArray(payload.detail)) {
+  detail = payload.detail.map((e: any) => e.msg || e).join("; ");
+} else {
+  detail = payload.detail || detail;
+}
+```
+
+这样 Pydantic 422 错误会显示 `"String should have at least 1 character"` 而不是 `[object Object]`。
+
+---
+
+**验证**:
+- Backend: syntax ✅ + 纯文档上传不 422
+- Frontend: build 0 错误 + 422 错误显示可读文字
+
+完成后通知 @pm。
+
+---
+
+#### @backend (2026-03-29)
+
+✅ **TASK-DOC-ONLY-FIX Backend 完成 — 2 处**
+
+| # | 文件 | 改动 |
+|---|------|------|
+| 1 | `app/schemas/project.py` | `original_idea` 从 `Field(..., min_length=1)` → `Field(default="")` |
+| 2 | `app/api/projects.py` | `create_project` 开头加校验: idea+doc 都空 → 400 "请输入故事创意或上传故事文档" |
+
+syntax 2/2 ✅。@pm 完成，等 Frontend 改完一起确认。
+
+---
+
+#### @frontend (2026-03-29)
+
+### ✅ TASK-DOC-ONLY-FIX Frontend 完成
+
+`api.ts` L45-49: Pydantic 422 `detail` 数组处理 — `Array.isArray` → `.map(e => e.msg).join("; ")`
+
+build 20 路由 0 错误。
+
+**@pm Frontend + Backend 都完成了。**
+
+---
+
+#### @frontend (2026-03-29)
+
+### ✅ TASK-STYLE-PRIORITY 完成 — 3 改动
+
+**build 20 路由 0 错误。**
+
+| # | 改动 | 文件 |
+|---|------|------|
+| B1 | 自定义风格优先: `handlePresetClick` 不再清空自定义；预设区加"已使用自定义风格"提示 + 半透明 | StyleSelector.tsx |
+| B2 | 自定义风格上传 loading: 先 `onUpload` 显示图片+loading，再 fetch 分析 | CustomStyleUploader.tsx |
+| B3 | OCR 提示优化: `HelpCircle` 图标 + hover 显示"上传包含故事创意文字的图片，AI 自动识别提取" | StoryIdeaInput.tsx |
+
+**@pm 完成，等你 Review。**
+
+---
+
+#### @pm (2026-03-29)
+
+### ✅ PM Review PASS — TASK-DOC-ONLY-FIX (6/6)
+
+Backend min_length 移除 + 双重校验 ✅。Frontend detail 数组处理 ✅。
+
+**@founder**: 后端重启后可以重试纯文档上传。
+
+---
+
+#### @pm (2026-03-29)
+
+### 📋 Founder 联调成功 + 日志全链路审查 + 4 项改进
+
+**联调结果**: Stage 1 E2E 通了（爷爷的老照片, 3 角色, 6 情节点, 全部 200 OK）。
+
+**日志审查发现 2 个非阻塞 bug + 2 个 UX 改进**:
+
+---
+
+#### @pm → @backend (2026-03-29)
+
+### 任务 A: TASK-DOC-FORMAT — 纯文档上传时 DB 存储格式优化
+
+**问题**: 用户只上传文档不输入文字时，`original_idea` 存的是 `\n\n---\n附加文档内容:\n{doc}`（开头多余换行+前缀）。
+
+**文件**: `app/api/projects.py` — `create_project`
+
+```python
+# 改前:
+idea = project_data.original_idea
+if project_data.document_text:
+    idea = f"{idea}\n\n---\n附加文档内容:\n{project_data.document_text}"
+
+# 改后:
+idea = project_data.original_idea.strip()
+if project_data.document_text:
+    doc = project_data.document_text.strip()
+    if idea:
+        idea = f"{idea}\n\n---\n附加文档内容:\n{doc}"
+    else:
+        idea = doc
+```
+
+这样：有 idea + 有 doc → 拼接；无 idea + 有 doc → 直接用 doc 文本，不加前缀。
+
+---
+
+#### @pm → @frontend (2026-03-29)
+
+### 任务 B: TASK-STYLE-PRIORITY — 自定义风格优先级 + 2 个 UX 改进
+
+**3 个改动**:
+
+---
+
+#### B1: 自定义风格优先于预设
+
+**问题**: 用户上传自定义风格图（AI 识别成功显示标签），之后点了某个预设风格 → `handlePresetClick` 调 `onCustomStyleChange(null, null, [])` 清空了自定义 → create 请求 `custom_style: 无`。
+
+**Founder 要求**: 上传自定义风格后，它应该是最高优先级，点击预设不应该清掉它。用户要取消自定义风格，只能手动点 X 删除。
+
+**文件**: `frontend/src/components/ui/StyleSelector.tsx` L33-36
+
+```typescript
+// 改前:
+const handlePresetClick = (key: string) => {
+    onChange(key);
+    onCustomStyleChange(null, null, []);  // ← 清空自定义
+};
+
+// 改后 — 不清自定义:
+const handlePresetClick = (key: string) => {
+    onChange(key);
+    // 不再清空自定义风格 — 自定义风格只能用户手动删除（点 X）
+};
+```
+
+同时在 `CreateContent.tsx` 发送 create 请求时，确认 `customStyleAnalysis` 即使有预设也会传：
+
+```typescript
+custom_style_analysis: state.customStyleAnalysis || null,  // 已有，不需要改
+```
+
+后端 `generate_outline` 已经优先用 `custom_style_name`（有就用，没有才用 preset），所以后端不需要改。
+
+**UI 提示**（可选但建议做）：当 `customStyleAnalysis` 存在时，在预设风格区域显示一行小字提示"已使用自定义风格，预设仅供参考"或将预设区域半透明化，让用户知道自定义风格生效中。
+
+---
+
+#### B2: 自定义风格上传 Loading 状态
+
+**问题**: 上传自定义风格图后，在 AI 分析完成前，页面无任何变化（无 loading 动效），用户不知道是否上传成功。角色/场景上传有转圈动效，这里没有。
+
+**文件**: `frontend/src/components/ui/CustomStyleUploader.tsx`
+
+在上传图片后、AI 分析完成前，显示 loading 状态：
+- 显示已上传的图片缩略图 + 旋转动画 + "AI 正在分析风格..."
+- 参考角色上传的 `uploading` 状态 + `Loader2` 图标的实现方式
+
+---
+
+#### B3: OCR 图标提示优化
+
+**问题**: 故事创意输入框右上角的图片上传图标，tooltip "上传图片识别文字" 太隐晦，用户容易困惑。
+
+**文件**: `frontend/src/components/ui/StoryIdeaInput.tsx`
+
+在图标旁边（或下方）加一个小的 info icon (ℹ️ 或 `HelpCircle`)，hover 时显示提示：
+
+```
+拍照识别：上传包含文字的图片，AI 自动提取故事创意
+```
+
+或者更简单：给现有图标加一个更明显的 tooltip/文字标签 "拍照取字"。
+
+---
+
+**验证**: Backend syntax ✅ + Frontend build 0 错误。
+
+完成后通知 @pm。
+
+---
+
+#### @backend (2026-03-29)
+
+✅ **TASK-DOC-FORMAT 完成** — `app/api/projects.py` 拼接逻辑优化
+
+有 idea + 有 doc → `idea\n\n---\n附加文档内容:\ndoc`
+无 idea + 有 doc → 直接用 `doc`（不加前缀）
+
+syntax ✅。@pm 完成。
+
+---
+
+#### @pm (2026-03-29)
+
+### ✅ PM Review PASS — TASK-DOC-FORMAT (3/3) + TASK-STYLE-PRIORITY (8/8)
+
+**Backend**: idea 为空时直接用 doc 文本 ✅。
+**Frontend**: 自定义风格不被预设清空 ✅ + 预设半透明提示 ✅ + 上传 loading 动效 ✅ + OCR HelpCircle 提示 ✅。
+
+**@founder**: 后端需重启后测试。
+
+---
+
+#### @pm (2026-03-29)
+
+### ✅ Founder 联调全链路通过 — 通知 DevOps push
+
+**全链路审查结果**:
+- DB 格式干净 ✅（纯文档无多余前缀）
+- 自定义风格传入 LLM ✅（`East Asian Ink Wash Illustration`，上次是`无`）
+- 角色参考传入 ✅（`黑发少年, male, teen`）
+- 场景参考传入 ✅（`烟火下的民宅, type: both`）
+- 自定义风格优先于预设 ✅
+- LLM 生成成功 ✅
+- 全部 HTTP 200 ✅
+
+**@devops**: 请 push 全部最新代码到 GitHub。包含自上次 push 以来的所有改动:
+- TASK-AUTH-RESILIENCE (静默登出修复)
+- TASK-JSON-REPAIR (JSON 未转义引号修复)
+- TASK-DOC-ONLY-FIX (纯文档 422 修复)
+- TASK-DOC-FORMAT (DB 存储格式优化)
+- TASK-STYLE-PRIORITY (自定义风格优先 + loading + OCR 提示)
+- TASK-DEBUG-LOGGING (7 埋点)
+
+不需要 VPS 部署。
+
+---
