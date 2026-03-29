@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import type { User, RegisterForm, StoryCard } from "@/types/create";
-import { apiFetch, getStoredToken, setStoredToken } from "@/lib/api";
+import { apiFetch, ApiError, getStoredToken, setStoredToken } from "@/lib/api";
 
 interface AuthContextValue {
   user: User | null;
@@ -98,7 +98,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hydrateSession = useCallback(async (authToken: string) => {
     const me = await apiFetch<ApiUser>("/auth/me", {}, authToken);
     setUser(mapUser(me));
-    await refreshStories(authToken);
+    // refreshStories 失败不阻塞登录（项目列表为空但用户仍登录）
+    try {
+      await refreshStories(authToken);
+    } catch {
+      // 静默: 项目列表稍后重试
+    }
   }, [refreshStories]);
 
   useEffect(() => {
@@ -110,11 +115,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setToken(stored);
     hydrateSession(stored)
-      .catch(() => {
-        setStoredToken(null);
-        setToken(null);
-        setUser(null);
-        setStories([]);
+      .catch((err) => {
+        // 只有 401（token 真正失效）才清 token
+        if (err instanceof ApiError && err.status === 401) {
+          setStoredToken(null);
+          setToken(null);
+          setUser(null);
+          setStories([]);
+        }
+        // 其他错误（500/超时/网络）保留 token，下次刷新重试
       })
       .finally(() => setLoadingUser(false));
   }, [hydrateSession]);
