@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState, useCallback } from "react";
-import { ImagePlus, Mic, MicOff, X, Lightbulb } from "lucide-react";
+import { ImagePlus, Mic, MicOff, X, Lightbulb, HelpCircle } from "lucide-react";
 import { getStoredToken } from "@/lib/api";
 import DocumentUploader from "./DocumentUploader";
 
@@ -140,14 +140,22 @@ export default function StoryIdeaInput({
         {/* Action buttons — top right of textarea */}
         <div className="absolute top-2.5 right-2.5 flex items-center gap-1">
           {/* Image OCR */}
-          <button
-            type="button"
-            onClick={() => imageInputRef.current?.click()}
-            className="p-1.5 rounded-md text-text-muted hover:text-brand-primary hover:bg-brand-primary/10 transition-colors cursor-pointer"
-            title="上传图片识别文字"
-          >
-            <ImagePlus className="w-4 h-4" />
-          </button>
+          <div className="relative group/ocr flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => imageInputRef.current?.click()}
+              className="p-1.5 rounded-md text-text-muted hover:text-brand-primary hover:bg-brand-primary/10 transition-colors cursor-pointer"
+              title="拍照取字"
+            >
+              <ImagePlus className="w-4 h-4" />
+            </button>
+            <div className="relative">
+              <HelpCircle className="w-3 h-3 text-text-muted/50 cursor-help" />
+              <div className="absolute right-0 top-5 w-48 px-3 py-2 rounded-lg bg-bg-secondary border border-white/10 text-xs text-text-secondary shadow-lg opacity-0 pointer-events-none group-hover/ocr:opacity-100 transition-opacity z-10">
+                上传包含故事创意文字的图片，AI 自动识别提取
+              </div>
+            </div>
+          </div>
           <input
             ref={imageInputRef}
             type="file"

@@ -29,6 +29,8 @@ export default function CustomStyleUploader({ image, imageUrl, keywords, onUploa
     if (!file.type.startsWith("image/")) return;
 
     const url = URL.createObjectURL(file);
+    // 立即显示图片预览 + loading（分析中）
+    onUpload(file, url, [], null);
     setAnalyzing(true);
 
     try {
@@ -49,7 +51,6 @@ export default function CustomStyleUploader({ image, imageUrl, keywords, onUploa
       const result: StyleAnalysisResult = await res.json();
       onUpload(file, url, result.display_tags || [], result as unknown as Record<string, unknown>);
     } catch {
-      // Fallback: show file without analysis tags
       onUpload(file, url, ["自定义风格"], null);
     } finally {
       setAnalyzing(false);

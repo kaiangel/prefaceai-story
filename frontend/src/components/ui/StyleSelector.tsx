@@ -32,24 +32,28 @@ export default function StyleSelector({
 
   const handlePresetClick = (key: string) => {
     onChange(key);
-    if (customStyleImage) {
-      onCustomStyleChange(null, null, []);
-    }
+    // 不清空自定义风格 — 自定义风格只能用户手动点 X 删除
+    // 自定义风格优先级 > 预设，后端已处理优先级
   };
 
-  const handleCustomUpload = (image: File | null, imageUrl: string | null, keywords: string[]) => {
-    onCustomStyleChange(image, imageUrl, keywords);
-    if (image) {
-      onChange(null);
-    }
+  const handleCustomUpload = (image: File | null, imageUrl: string | null, keywords: string[], analysis?: Record<string, unknown> | null) => {
+    onCustomStyleChange(image, imageUrl, keywords, analysis);
+    // 自定义风格上传不清预设（仅作为备选展示），自定义优先
   };
+
+  const hasCustomStyle = !!customStyleImage;
 
   return (
     <div className="space-y-3">
       <label className="text-sm font-medium text-text-secondary">视觉风格</label>
 
+      {/* Custom style active hint */}
+      {hasCustomStyle && (
+        <p className="text-xs text-brand-primary">已使用自定义风格，预设仅供参考</p>
+      )}
+
       {/* Preset Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className={`grid grid-cols-2 sm:grid-cols-4 gap-3 ${hasCustomStyle ? "opacity-50" : ""}`}>
         <AnimatePresence initial={false}>
           {visiblePresets.map((style) => {
             const isSelected = value === style.key;
