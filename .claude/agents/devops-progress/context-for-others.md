@@ -17,7 +17,19 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 
 ## 最近操作 (2026-03-24)
 
-### 6 TASK push ✅ — Founder E2E 联调通过
+### REPAIR-V2 + PERSISTENT-LOG push ✅
+
+3 commits pushed → `origin/main` (d54087e → 77ef5f9):
+
+| Commit | 内容 |
+|--------|------|
+| `79d63f8` | fix(backend): JSON-REPAIR-V2 — fullwidth regex + longer quotes |
+| `df1f44d` | feat(backend): PERSISTENT-LOG — TeeStream to log file |
+| `77ef5f9` | docs: team-brain sync |
+
+**VPS**: 不需要部署。
+
+### 6 TASK push ✅ (earlier today)
 
 6 commits pushed → `origin/main` (faf594f → 0ed98de):
 
@@ -134,7 +146,7 @@ Multiple pushes — Stage 1 E2E 联调通过。
 ```
 远程仓库: https://github.com/kaiangel/prefaceai-story (private)
 分支: main (tracked → origin/main)
-最新 commit: 0ed98de docs: 6 TASK completions + Founder E2E pass + SHARED-DB + team-brain sync
+最新 commit: 77ef5f9 docs: REPAIR-V2 + PERSISTENT-LOG + Founder retest pass + team-brain sync
 ```
 
 ---

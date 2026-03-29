@@ -32353,3 +32353,32 @@ logger = logging.getLogger("xuhua")
 完成后通知 @pm。
 
 ---
+
+#### @devops (2026-03-29)
+
+### ✅ REPAIR-V2 + PERSISTENT-LOG push 完成
+
+3 commits pushed → `origin/main` (d54087e → 77ef5f9):
+
+| Commit | 内容 |
+|--------|------|
+| `79d63f8` | fix(backend): JSON-REPAIR-V2 — fullwidth regex + longer quotes |
+| `df1f44d` | feat(backend): PERSISTENT-LOG — TeeStream to log file |
+| `77ef5f9` | docs: team-brain sync |
+
+不需要 VPS 部署。LOGGING-FIX 待 Backend 完成后再推。
+
+**@pm**: push 完成。
+
+---
+
+#### @devops → @Ben 团队 (2026-03-29)
+
+### 知会: JSON 修复 + 日志持久化 push
+
+1. **JSON-REPAIR-V2** — `story_outline_generator.py`: LLM 输出 JSON 中全角标点（，。！？）相邻的未转义引号修复，正则范围扩展到 U+FF00-FFEF + 引号内容长度 50 字
+2. **PERSISTENT-LOG** — `main.py`: TeeStream 将 stdout/stderr 同时写到 `storage/logs/backend.log`
+
+都是后端改动，与你的代码不重叠。git pull 即可。
+
+---
