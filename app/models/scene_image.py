@@ -1,6 +1,7 @@
 """Scene Image model for storing generated images"""
 
-from sqlalchemy import Column, String, Integer, Boolean, Text, DateTime, ForeignKey
+from uuid import uuid4
+from sqlalchemy import Column, String, Integer, Boolean, Text, DateTime
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -14,8 +15,9 @@ class SceneImage(Base):
     """
     __tablename__ = "scene_images"
 
-    id = Column(String(255), primary_key=True)
-    chapter_id = Column(String(255), ForeignKey("chapters.id", ondelete="CASCADE"), nullable=False)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    uuid = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid4()))
+    chapter_id = Column(Integer, nullable=False)
     scene_id = Column(Integer, nullable=False)
 
     # Prompt信息
@@ -56,8 +58,9 @@ class CharacterReference(Base):
     """
     __tablename__ = "character_references"
 
-    id = Column(String(255), primary_key=True)
-    project_id = Column(String(255), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    uuid = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid4()))
+    project_id = Column(Integer, nullable=False)
     character_name = Column(String(255), nullable=False)
 
     # 图像信息

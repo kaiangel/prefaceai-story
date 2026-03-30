@@ -1,16 +1,17 @@
 """Chapter model"""
 
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, Float, DateTime, ForeignKey, Text
-from sqlalchemy.orm import relationship
+from uuid import uuid4
+from sqlalchemy import Column, String, Integer, Float, DateTime, Text
 from app.database import Base
 
 
 class Chapter(Base):
     __tablename__ = "chapters"
 
-    id = Column(String(36), primary_key=True)
-    project_id = Column(String(36), ForeignKey("projects.id"), nullable=False)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    uuid = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid4()))
+    project_id = Column(Integer, nullable=False)
     chapter_number = Column(Integer, nullable=False)
     status = Column(String(64), default="pending")  # pending/generating_story/generating_images/generating_audio/compositing/completed/failed
     full_script = Column(Text, nullable=True)
@@ -30,7 +31,3 @@ class Chapter(Base):
     voice_preset = Column(String(128), nullable=True)   # 使用的音色
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # Relationships
-    project = relationship("Project", back_populates="chapters")
-    jobs = relationship("GenerationJob", back_populates="chapter", cascade="all, delete-orphan")

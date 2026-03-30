@@ -2,7 +2,6 @@
 
 import json
 from datetime import datetime
-from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.job import GenerationJob
@@ -17,10 +16,9 @@ class JobManager:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create_job(self, chapter_id: str) -> GenerationJob:
+    async def create_job(self, chapter_id: int) -> GenerationJob:
         """Create a new generation job for a chapter"""
         job = GenerationJob(
-            id=str(uuid4()),
             chapter_id=chapter_id,
             status="queued",
             current_stage="story_generation",
@@ -34,7 +32,7 @@ class JobManager:
 
     async def update_job_status(
         self,
-        job_id: str,
+        job_id: int,
         status: str | None = None,
         stage: str | None = None,
         progress: int | None = None,
@@ -70,14 +68,14 @@ class JobManager:
         await self.db.refresh(job)
         return job
 
-    async def get_job(self, job_id: str) -> GenerationJob | None:
+    async def get_job(self, job_id: int) -> GenerationJob | None:
         """Get job by ID"""
         result = await self.db.execute(
             select(GenerationJob).where(GenerationJob.id == job_id)
         )
         return result.scalar_one_or_none()
 
-    async def get_latest_job_for_chapter(self, chapter_id: str) -> GenerationJob | None:
+    async def get_latest_job_for_chapter(self, chapter_id: int) -> GenerationJob | None:
         """Get the most recent job for a chapter"""
         result = await self.db.execute(
             select(GenerationJob)
@@ -90,8 +88,8 @@ class JobManager:
 
 async def run_story_generation_task(
     db: AsyncSession,
-    job_id: str,
-    chapter_id: str,
+    job_id: int,
+    chapter_id: int,
     idea: str,
     style: str,
     chapter_number: int,

@@ -1,7 +1,8 @@
 """Audio segment model for fine-grained timeline management"""
 
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, Float, DateTime, ForeignKey, Text, Index
+from uuid import uuid4
+from sqlalchemy import Column, String, Integer, Float, DateTime, Text, Index
 from app.database import Base
 
 
@@ -13,8 +14,9 @@ class AudioSegment(Base):
     """
     __tablename__ = "audio_segments"
 
-    id = Column(String(255), primary_key=True)
-    chapter_id = Column(String(255), ForeignKey("chapters.id", ondelete="CASCADE"), nullable=False)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    uuid = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid4()))
+    chapter_id = Column(Integer, nullable=False)
     segment_index = Column(Integer, nullable=False)
 
     # 时间信息
