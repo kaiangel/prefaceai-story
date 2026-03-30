@@ -2,10 +2,13 @@
 
 import base64
 import json
+import logging
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from google import genai
 from app.config import settings
 from app.services.file_storage import validate_image, compress_image
+
+logger = logging.getLogger("xuhua")
 
 router = APIRouter(prefix="/api/utils", tags=["utils"])
 
@@ -37,10 +40,10 @@ async def ocr_image(file: UploadFile = File(...)):
                 ],
             )
             result = {"text": response.text.strip()}
-            print(f"[OCR] ✅ 提取 {len(result.get('text',''))} 字")
+            logger.info(f"[OCR] ✅ 提取 {len(result.get('text',''))} 字")
             return result
         except Exception as e:
-            print(f"[OCR] Gemini 失败: {e}")
+            logger.info(f"[OCR] Gemini 失败: {e}")
 
     # 备用: Claude Haiku
     if settings.ANTHROPIC_API_KEY:
@@ -60,10 +63,10 @@ async def ocr_image(file: UploadFile = File(...)):
                 }],
             )
             result = {"text": response.content[0].text.strip()}
-            print(f"[OCR] ✅ 提取 {len(result.get('text',''))} 字")
+            logger.info(f"[OCR] ✅ 提取 {len(result.get('text',''))} 字")
             return result
         except Exception as e:
-            print(f"[OCR] Claude Haiku 失败: {e}")
+            logger.info(f"[OCR] Claude Haiku 失败: {e}")
 
     return {"text": "", "error": "识别失败"}
 
@@ -90,7 +93,7 @@ async def parse_document(file: UploadFile = File(...)):
                     page.extract_text() or "" for page in pdf.pages
                 )
             text = text.strip()
-            print(f"[DocParse] ✅ {ext} 文件, 提取 {len(text)} 字")
+            logger.info(f"[DocParse] ✅ {ext} 文件, 提取 {len(text)} 字")
             return {"text": text}
         except Exception as e:
             return {"text": "", "error": f"PDF 解析失败: {str(e)}"}
@@ -101,7 +104,7 @@ async def parse_document(file: UploadFile = File(...)):
         except UnicodeDecodeError:
             text = contents.decode("gbk", errors="replace")
         text = text.strip()
-        print(f"[DocParse] ✅ {ext} 文件, 提取 {len(text)} 字")
+        logger.info(f"[DocParse] ✅ {ext} 文件, 提取 {len(text)} 字")
         return {"text": text}
 
     else:
@@ -127,7 +130,7 @@ async def _vision_analyze(contents: bytes, content_type: str, prompt: str) -> di
             )
             return json.loads(response.text.strip())
         except Exception as e:
-            print(f"[Analyze] Gemini 失败: {e}")
+            logger.info(f"[Analyze] Gemini 失败: {e}")
 
     # 备用: Claude Haiku
     if settings.ANTHROPIC_API_KEY:
@@ -147,7 +150,7 @@ async def _vision_analyze(contents: bytes, content_type: str, prompt: str) -> di
             )
             return json.loads(response.content[0].text.strip())
         except Exception as e:
-            print(f"[Analyze] Claude Haiku 失败: {e}")
+            logger.info(f"[Analyze] Claude Haiku 失败: {e}")
 
     raise HTTPException(status_code=500, detail="AI 分析失败")
 
@@ -254,7 +257,7 @@ async def analyze_style(file: UploadFile = File(...)):
     """分析风格参考图，返回 StyleEnforcement 格式"""
     compressed, ct = await _validate_and_read_image(file)
     result = await _vision_analyze(compressed, ct, STYLE_ANALYSIS_PROMPT)
-    print(f"[StyleAnalysis] ✅ style: {result.get('style_display_name')}, tags: {result.get('display_tags')}")
+    logger.info(f"[StyleAnalysis] ✅ style: {result.get('style_display_name')}, tags: {result.get('display_tags')}")
     return result
 
 
@@ -263,7 +266,7 @@ async def analyze_character(file: UploadFile = File(...)):
     """分析角色参考图，返回角色特征"""
     compressed, ct = await _validate_and_read_image(file)
     result = await _vision_analyze(compressed, ct, CHARACTER_ANALYSIS_PROMPT)
-    print(f"[CharAnalysis] ✅ name: {result.get('display_name')}, gender: {result.get('gender')}, age: {result.get('age_range')}")
+    logger.info(f"[CharAnalysis] ✅ name: {result.get('display_name')}, gender: {result.get('gender')}, age: {result.get('age_range')}")
     return result
 
 
@@ -272,5 +275,5 @@ async def analyze_scene(file: UploadFile = File(...)):
     """分析场景参考图，返回场景特征"""
     compressed, ct = await _validate_and_read_image(file)
     result = await _vision_analyze(compressed, ct, SCENE_ANALYSIS_PROMPT)
-    print(f"[SceneAnalysis] ✅ name: {result.get('display_name')}, type: {result.get('location_type')}")
+    logger.info(f"[SceneAnalysis] ✅ name: {result.get('display_name')}, type: {result.get('location_type')}")
     return result

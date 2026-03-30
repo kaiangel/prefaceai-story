@@ -12,10 +12,13 @@ Phase 2.0 第一阶段 - 故事大纲生成器
 """
 
 import json
+import logging
 from typing import Optional
 import anthropic
 from google import genai
 from app.config import settings
+
+logger = logging.getLogger("xuhua")
 
 
 class StoryOutlineGenerator:
@@ -143,7 +146,7 @@ class StoryOutlineGenerator:
         else:
             prompt = prompt.rstrip() + "\n\n现在开始生成故事大纲："
 
-        print(f"[StoryOutlineGenerator] 生成故事大纲...")
+        logger.info(f"[StoryOutlineGenerator] 生成故事大纲...")
         print(f"  idea: {idea}")
         print(f"  style: {style_preset}")
         print(f"  target: {target_duration_minutes}分钟, ≥{min_shots} shots")
@@ -192,7 +195,7 @@ Critical rules:
                 content = response.text
                 provider = "gemini"
             except Exception as e:
-                print(f"[StoryOutlineGenerator] ❌ Gemini也失败: {e}")
+                logger.info(f"[StoryOutlineGenerator] ❌ Gemini也失败: {e}")
                 raise
 
         if content is None:
@@ -204,14 +207,14 @@ Critical rules:
         if outline:
             # 验证必要字段
             self._validate_outline(outline, min_shots)
-            print(f"[StoryOutlineGenerator] ✅ 大纲生成成功 (via {provider})")
+            logger.info(f"[StoryOutlineGenerator] ✅ 大纲生成成功 (via {provider})")
             print(f"  title: {outline.get('title', 'N/A')}")
             print(f"  characters: {len(outline.get('characters_overview', []))}个")
             print(f"  plot_points: {len(outline.get('plot_points', []))}个")
             print(f"  locations: {len(outline.get('unique_locations', []))}个")
             return outline
         else:
-            print(f"[StoryOutlineGenerator] ❌ JSON提取失败")
+            logger.info(f"[StoryOutlineGenerator] ❌ JSON提取失败")
             print(f"  provider: {provider}")
             print(f"  response length: {len(content)} chars")
             print(f"  response preview: {content[:500]}")

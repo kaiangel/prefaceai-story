@@ -2,11 +2,14 @@
 
 import asyncio
 import json
+import logging
 from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger("xuhua")
 from app.database import get_db, async_session_maker
 from app.models.project import Project
 from app.models.chapter import Chapter
@@ -40,15 +43,15 @@ async def create_project(
 
     # 1. Create project record
     # 埋点 6: 记录前端发来的参数
-    print(f"[CreateProject] 收到参数:")
-    print(f"  idea: {project_data.original_idea[:50]}{'...' if len(project_data.original_idea) > 50 else ''}")
-    print(f"  document_text: {'有 (' + str(len(project_data.document_text)) + '字)' if project_data.document_text else '无'}")
-    print(f"  style_preset: {project_data.style_preset}")
-    print(f"  aspect_ratio: {project_data.aspect_ratio}")
-    print(f"  duration: {project_data.chapter_duration_minutes}min, characters: {project_data.character_count}")
-    print(f"  custom_style: {'有' if project_data.custom_style_analysis else '无'}")
-    print(f"  char_refs: {len(project_data.character_refs_analysis) if project_data.character_refs_analysis else 0}个")
-    print(f"  scene_refs: {len(project_data.scene_refs_analysis) if project_data.scene_refs_analysis else 0}个")
+    logger.info("[CreateProject] 收到参数:")
+    logger.info(f"  idea: {project_data.original_idea[:50]}{'...' if len(project_data.original_idea) > 50 else ''}")
+    logger.info(f"  document_text: {'有 (' + str(len(project_data.document_text)) + '字)' if project_data.document_text else '无'}")
+    logger.info(f"  style_preset: {project_data.style_preset}")
+    logger.info(f"  aspect_ratio: {project_data.aspect_ratio}")
+    logger.info(f"  duration: {project_data.chapter_duration_minutes}min, characters: {project_data.character_count}")
+    logger.info(f"  custom_style: {'有' if project_data.custom_style_analysis else '无'}")
+    logger.info(f"  char_refs: {len(project_data.character_refs_analysis) if project_data.character_refs_analysis else 0}个")
+    logger.info(f"  scene_refs: {len(project_data.scene_refs_analysis) if project_data.scene_refs_analysis else 0}个")
 
     # 如果有文档文本，拼接到 original_idea
     idea = project_data.original_idea.strip()
@@ -213,12 +216,12 @@ async def generate_outline(
     _char_refs = json.loads(project.character_refs_analysis_json) if project.character_refs_analysis_json else None
     _scene_refs = json.loads(project.scene_refs_analysis_json) if project.scene_refs_analysis_json else None
     _style_name = json.loads(project.custom_style_analysis_json).get("style_display_name") if project.custom_style_analysis_json else None
-    print(f"[GenerateOutline] 传给 LLM:")
-    print(f"  idea: {project.original_idea[:50]}...")
-    print(f"  style: {project.style_preset}")
-    print(f"  char_refs: {len(_char_refs) if _char_refs else 0}个")
-    print(f"  scene_refs: {len(_scene_refs) if _scene_refs else 0}个")
-    print(f"  custom_style: {_style_name or '无'}")
+    logger.info("[GenerateOutline] 传给 LLM:")
+    logger.info(f"  idea: {project.original_idea[:50]}...")
+    logger.info(f"  style: {project.style_preset}")
+    logger.info(f"  char_refs: {len(_char_refs) if _char_refs else 0}个")
+    logger.info(f"  scene_refs: {len(_scene_refs) if _scene_refs else 0}个")
+    logger.info(f"  custom_style: {_style_name or '无'}")
 
     # 3. Call StoryOutlineGenerator
     generator = StoryOutlineGenerator()
