@@ -8,8 +8,8 @@
 ## 当前状态
 
 ```
-殡仪馆重测 ✅ (JSON 修复确认)
-→ LOGGING-FIX @Backend + DevOps push
+LOGGING-FIX ✅ → DevOps push + VPS 部署
+待办: Frontend 接入 confirm-outline
 ```
 
 ---
@@ -20,9 +20,9 @@
 
 ---
 
-## @Backend — 🔄 TASK-LOGGING-FIX
+## @Backend — ✅ TASK-LOGGING-FIX 完成
 
-TeeStream 在 uvicorn 多进程下不生效。换成 Python `logging` 模块 + 关键 print → logger.info。详见 TEAM_CHAT。
+PM Review PASS (6/6)。
 
 ---
 
@@ -44,7 +44,9 @@ PM Review PASS (8/8)。自定义风格优先 + loading + OCR 提示。
 
 ---
 
-## @DevOps — 🔄 push 最新代码 (REPAIR-V2 + PERSISTENT-LOG + LOGGING-FIX 完成后)
+## @DevOps — 🔄 push LOGGING-FIX + VPS 部署
+
+⚠️ 新规则: 以后 push 必须同时部署 VPS。
 
 ---
 

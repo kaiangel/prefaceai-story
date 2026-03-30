@@ -7,6 +7,12 @@
 
 ## 刚完成
 
+### ✅ TASK-LOGGING-FIX (2026-03-30)
+
+- `main.py`: TeeStream → `logging.basicConfig` (StreamHandler + FileHandler)
+- `projects.py` / `utils.py` / `story_outline_generator.py`: print→logger.info (26 处)
+- 零残留 ✅ + syntax 4/4 ✅
+
 ### ✅ TASK-JSON-REPAIR-V2 + TASK-PERSISTENT-LOG (2026-03-29)
 
 - V2: 正则 +`\uff00-\uffef` (全角标点) + `{1,50}` (长对话)

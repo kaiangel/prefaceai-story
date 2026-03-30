@@ -1,7 +1,7 @@
 # PM Agent - 当前任务
 
-> **最后更新**: 2026-03-29
-> **状态**: 殡仪馆重测 ✅ + TASK-LOGGING-FIX @Backend + DevOps push
+> **最后更新**: 2026-03-30
+> **状态**: LOGGING-FIX ✅ → DevOps push + VPS 部署
 
 ---
 
@@ -80,8 +80,10 @@
 | 43 | ~~TASK-JSON-REPAIR-V2~~ | ~~@Backend~~ ✅ (6/6) |
 | 44 | ~~TASK-PERSISTENT-LOG~~ | ~~@Backend~~ ✅ (5/5) |
 | 45 | ~~Founder 重测殡仪馆~~ | ✅ JSON 修复确认 |
-| 46 | **TASK-LOGGING-FIX** (TeeStream → logging 模块) | **@Backend** |
-| 47 | **DevOps push** | **@DevOps** |
+| 46 | ~~TASK-LOGGING-FIX~~ | ~~@Backend~~ ✅ (6/6) |
+| 47 | **DevOps push + VPS 部署** | **@DevOps** |
+| — | **=== 待办 ===** | |
+| 48 | Frontend 接入 confirm-outline (Ben 反馈) | 待派发 |
 | — | **=== Phase 2 (文件上传) ===** | |
 | 22 | 文件上传基础设施 + #8 自定义风格 + #9 角色参考 + #10 场景参考 | @AI-ML + @Backend + @Frontend |
 | — | **=== Phase 3 (独立) ===** | |
@@ -139,7 +141,9 @@ Founder 终审:                                                  ⏳
 | 时间 | 更新内容 |
 |------|----------|
 | 2026-03-29 | TASK-DOC-ONLY-FIX Review PASS (6/6) → 重启后端 → Founder 联调 |
-| 2026-03-29 | Founder 殡仪馆重测 ✅ (JSON 修复确认) + LOGGING-FIX @Backend + DevOps push |
+| 2026-03-30 | Ben 生产反馈 (raw/confirmed 为空) + 新规则 (push+部署不分批) + confirm-outline 待办记录 |
+| 2026-03-30 | LOGGING-FIX Review PASS (6/6) → DevOps push + VPS 部署 |
+| 2026-03-29 | 殡仪馆重测 ✅ + LOGGING-FIX @Backend + DevOps push |
 | 2026-03-29 | REPAIR-V2 + PERSISTENT-LOG Review PASS |
 | 2026-03-29 | 殡仪馆中篇 JSON 失败 → 正则 2 缺陷 → REPAIR-V2 + PERSISTENT-LOG @Backend |
 | 2026-03-29 | 联调全链路通过 → DevOps push ✅ |

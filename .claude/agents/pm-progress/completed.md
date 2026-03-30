@@ -14,6 +14,24 @@
 
 ---
 
+### 2026-03-30 — Ben 生产反馈 + 新规则 + LOGGING-FIX PASS
+
+- Ben 反馈: 生产 raw_outline_json/confirmed_outline_json 为空
+- 原因: 生产没部署最新代码 + confirm-outline 前端没接
+- 新规则: push + VPS 部署一起做，不分批，不跳过部署
+- confirm-outline 待办已记录到 memory
+- LOGGING-FIX Review PASS (6/6)
+
+---
+
+### 2026-03-30 — TASK-LOGGING-FIX Review PASS (6/6)
+
+- TeeStream 删除 + logging.basicConfig (StreamHandler + FileHandler) ✅
+- 3 文件 logger.getLogger("xuhua") + 15 处 print→logger.info ✅
+- 旧 print 零残留 ✅
+
+---
+
 ### 2026-03-29 — Founder 殡仪馆重测 ✅ + LOGGING-FIX 派发
 
 - 殡仪馆故事 JSON 7920 chars 解析成功（上次同故事 10469 chars 失败）→ REPAIR-V2 正则修复确认

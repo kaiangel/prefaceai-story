@@ -1,7 +1,7 @@
 # 今日重点 (2026-03-27)
 
 > 每天更新，所有 Agent 开工前必读
-> **当前状态**: **殡仪馆 ✅ → LOGGING-FIX @Backend + DevOps push**
+> **当前状态**: **LOGGING-FIX ✅ → DevOps push + VPS 部署**
 > **⚠️ 文档更新协议**: 共享文档由PM统一更新，详见 `.team-brain/TEAM_PROTOCOL.md`
 
 ---
@@ -37,12 +37,12 @@ Phase 1 第 2 步 (集成 13 新风格):                                ✅ PM R
 
 | Agent | 状态 | 说明 |
 |-------|------|------|
-| @pm | ✅ 殡仪馆重测 PASS | LOGGING-FIX 派发 |
+| @pm | ✅ LOGGING-FIX PASS | DevOps push |
 | @ai-ml | ✅ | — |
-| @backend | 🔄 TASK-LOGGING-FIX | TeeStream → logging |
+| @backend | ✅ LOGGING-FIX 完成 | — |
 | @tester | ✅ 空闲 | — |
 | @frontend | ✅ | — |
-| @devops | 🔄 push | 等 LOGGING-FIX |
+| @devops | 🔄 push + VPS 部署 | PM PASS |
 | @resonance | 🆕 Phase 0 | 蓄水期 |
 
 ### Ben 团队

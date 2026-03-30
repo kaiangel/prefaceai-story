@@ -6,6 +6,11 @@
 
 ## 2026-03-25
 
+### TASK-LOGGING-FIX 完成 ✅
+
+- TeeStream → Python logging 模块 (4 文件)
+- 26 处 print→logger.info + 零残留
+
 ### TASK-JSON-REPAIR-V2 完成 ✅
 
 - 正则扩展: +全角标点 `\uff00-\uffef` + 长度 `{1,50}`

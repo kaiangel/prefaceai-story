@@ -32382,3 +32382,53 @@ logger = logging.getLogger("xuhua")
 都是后端改动，与你的代码不重叠。git pull 即可。
 
 ---
+
+#### @backend (2026-03-30)
+
+### ✅ TASK-LOGGING-FIX 完成 — TeeStream → Python logging (4 文件)
+
+| 文件 | 改动 |
+|------|------|
+| `app/main.py` | TeeStream 删除 → `logging.basicConfig(handlers=[StreamHandler, FileHandler])` |
+| `app/api/projects.py` | +`import logging` + `logger` + 11 处 print→logger.info |
+| `app/api/utils.py` | +`import logging` + `logger` + 11 处 print→logger.info |
+| `app/services/story_outline_generator.py` | +`import logging` + `logger` + 4 处 print→logger.info |
+
+**零残留**: `print(f"[XXX]")` 前缀在 `app/` 下 0 匹配 ✅
+
+syntax 4/4 ✅。@pm 完成。
+
+---
+
+#### @pm (2026-03-30)
+
+### ✅ PM Review PASS — TASK-LOGGING-FIX (6/6)
+
+TeeStream 删除 ✅ + logging.basicConfig ✅ + 3 文件 logger ✅ + 15 处 print→logger.info ✅ + 旧 print 零残留 ✅。
+
+**@devops**: 请 push TASK-LOGGING-FIX **+ 部署到 VPS (prefaceai.mov)**。
+
+⚠️ **新规则（Founder 2026-03-30 起）**: 以后所有代码改动完成后，DevOps 一次性 push + VPS 部署，不分批 push，不跳过部署。Ben 在生产测试发现代码落后太多。
+
+---
+
+#### @pm (2026-03-30)
+
+### 📋 Ben 生产环境测试反馈 — 记录待办
+
+**Ben 发现**: 生产环境 `raw_outline_json` 和 `confirmed_outline_json` 都为空。
+
+| 问题 | 原因 | 处理 |
+|------|------|------|
+| `raw_outline_json` 为空 | 生产还是旧代码，没部署最新的 TASK-OUTLINE-STORAGE | DevOps 这次 push + 部署后解决 |
+| `confirmed_outline_json` 为空 | 前端 StageB "确认并开始生成"没调 `POST /confirm-outline` — 后端端点建了但前端没接 | 待后续 Frontend 接入，已记录到 memory |
+
+**@devops 补充**: push + 部署的正确流程（Ben 也有代码推送，需要先融合）：
+
+1. `git pull origin main` — 拉 Ben 最新代码
+2. 检查有无冲突（特别是 `app/api/projects.py`，双方都改过）— 有冲突先解决
+3. `git push` — 推送融合后的全部代码
+4. VPS 部署: rsync + Docker rebuild（api + frontend）
+5. 验证: `https://prefaceai.mov/api/health` 返回 healthy
+
+---
