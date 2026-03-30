@@ -1,7 +1,6 @@
 """Chapters API"""
 
 import json
-import uuid
 import asyncio
 from datetime import datetime
 from typing import Optional
@@ -18,6 +17,17 @@ from app.schemas.chapter import ChapterStatus, ChapterStory, ChapterResponse
 from app.api.projects import verify_user
 
 router = APIRouter(prefix="/api/projects/{project_id}/chapters", tags=["chapters"])
+
+
+def serialize_chapter_response(chapter: Chapter, project_uuid: str) -> ChapterResponse:
+    return ChapterResponse(
+        id=chapter.uuid,
+        project_id=project_uuid,
+        chapter_number=chapter.chapter_number,
+        status=chapter.status,
+        created_at=chapter.created_at,
+        updated_at=chapter.updated_at,
+    )
 
 
 # Pydantic models for image generation
@@ -45,31 +55,32 @@ class RegenerateRequest(BaseModel):
 @router.get("/", response_model=list[ChapterResponse])
 async def list_chapters(
     project_id: str,
-    user_id: str = Depends(verify_user),
+    user_id: int = Depends(verify_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List all chapters for a project"""
     # Verify project ownership
     project_result = await db.execute(
-        select(Project).where(Project.id == project_id, Project.user_id == user_id)
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
     )
-    if not project_result.scalar_one_or_none():
+    project = project_result.scalar_one_or_none()
+    if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
 
     result = await db.execute(
         select(Chapter)
-        .where(Chapter.project_id == project_id)
+        .where(Chapter.project_id == project.id)
         .order_by(Chapter.chapter_number)
     )
     chapters = result.scalars().all()
-    return [ChapterResponse.model_validate(c) for c in chapters]
+    return [serialize_chapter_response(c, project.uuid) for c in chapters]
 
 
 @router.get("/{chapter_number}/status", response_model=ChapterStatus)
 async def get_generation_status(
     project_id: str,
     chapter_number: int,
-    user_id: str = Depends(verify_user),
+    user_id: int = Depends(verify_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -77,15 +88,17 @@ async def get_generation_status(
     """
     # Verify project ownership
     project_result = await db.execute(
-        select(Project).where(Project.id == project_id, Project.user_id == user_id)
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
     )
-    if not project_result.scalar_one_or_none():
+    project = project_result.scalar_one_or_none()
+    if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
 
     # Get chapter
     chapter_result = await db.execute(
         select(Chapter).where(
-            Chapter.project_id == project_id, Chapter.chapter_number == chapter_number
+            Chapter.project_id == project.id,
+            Chapter.chapter_number == chapter_number,
         )
     )
     chapter = chapter_result.scalar_one_or_none()
@@ -124,7 +137,7 @@ async def get_generation_status(
 async def get_chapter_story(
     project_id: str,
     chapter_number: int,
-    user_id: str = Depends(verify_user),
+    user_id: int = Depends(verify_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -132,15 +145,16 @@ async def get_chapter_story(
     """
     # Verify project ownership
     project_result = await db.execute(
-        select(Project).where(Project.id == project_id, Project.user_id == user_id)
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
     )
-    if not project_result.scalar_one_or_none():
+    project = project_result.scalar_one_or_none()
+    if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
 
     # Get chapter
     chapter_result = await db.execute(
         select(Chapter).where(
-            Chapter.project_id == project_id, Chapter.chapter_number == chapter_number
+            Chapter.project_id == project.id, Chapter.chapter_number == chapter_number
         )
     )
     chapter = chapter_result.scalar_one_or_none()
@@ -187,20 +201,21 @@ async def get_chapter_story(
 async def get_chapter(
     project_id: str,
     chapter_number: int,
-    user_id: str = Depends(verify_user),
+    user_id: int = Depends(verify_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get basic chapter info"""
     # Verify project ownership
     project_result = await db.execute(
-        select(Project).where(Project.id == project_id, Project.user_id == user_id)
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
     )
-    if not project_result.scalar_one_or_none():
+    project = project_result.scalar_one_or_none()
+    if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
 
     chapter_result = await db.execute(
         select(Chapter).where(
-            Chapter.project_id == project_id, Chapter.chapter_number == chapter_number
+            Chapter.project_id == project.id, Chapter.chapter_number == chapter_number
         )
     )
     chapter = chapter_result.scalar_one_or_none()
@@ -208,7 +223,7 @@ async def get_chapter(
     if not chapter:
         raise HTTPException(status_code=404, detail="章节不存在")
 
-    return ChapterResponse.model_validate(chapter)
+    return serialize_chapter_response(chapter, project.uuid)
 
 
 # ============ Phase 2: 图像生成端点 ============
@@ -218,7 +233,7 @@ async def generate_chapter_images(
     project_id: str,
     chapter_number: int,
     background_tasks: BackgroundTasks,
-    user_id: str = Depends(verify_user),
+    user_id: int = Depends(verify_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -228,7 +243,7 @@ async def generate_chapter_images(
     """
     # 1. 验证项目所有权
     project_result = await db.execute(
-        select(Project).where(Project.id == project_id, Project.user_id == user_id)
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
     )
     project = project_result.scalar_one_or_none()
     if not project:
@@ -237,7 +252,7 @@ async def generate_chapter_images(
     # 2. 获取章节
     chapter_result = await db.execute(
         select(Chapter).where(
-            Chapter.project_id == project_id, Chapter.chapter_number == chapter_number
+            Chapter.project_id == project.id, Chapter.chapter_number == chapter_number
         )
     )
     chapter = chapter_result.scalar_one_or_none()
@@ -266,9 +281,7 @@ async def generate_chapter_images(
         raise HTTPException(status_code=400, detail="没有可生成图像的场景")
 
     # 4. 创建图像生成任务
-    job_id = str(uuid.uuid4())
     job = GenerationJob(
-        id=job_id,
         chapter_id=chapter.id,
         status="queued",
         current_stage="image_generation",
@@ -277,6 +290,8 @@ async def generate_chapter_images(
         created_at=datetime.utcnow(),
     )
     db.add(job)
+    await db.flush()
+    job_id = job.id
 
     # 更新章节状态
     chapter.status = "generating_images"
@@ -294,7 +309,7 @@ async def generate_chapter_images(
     )
 
     return ImageGenerationResponse(
-        job_id=job_id,
+        job_id=job.uuid,
         status="generating_images",
         message="图像生成已开始",
         total_scenes=len(scenes)
@@ -305,7 +320,7 @@ async def generate_chapter_images(
 async def get_chapter_images(
     project_id: str,
     chapter_number: int,
-    user_id: str = Depends(verify_user),
+    user_id: int = Depends(verify_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -313,15 +328,16 @@ async def get_chapter_images(
     """
     # 1. 验证项目
     project_result = await db.execute(
-        select(Project).where(Project.id == project_id, Project.user_id == user_id)
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
     )
-    if not project_result.scalar_one_or_none():
+    project = project_result.scalar_one_or_none()
+    if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
 
     # 2. 获取章节
     chapter_result = await db.execute(
         select(Chapter).where(
-            Chapter.project_id == project_id, Chapter.chapter_number == chapter_number
+            Chapter.project_id == project.id, Chapter.chapter_number == chapter_number
         )
     )
     chapter = chapter_result.scalar_one_or_none()
@@ -386,7 +402,7 @@ async def regenerate_scene_image(
     scene_id: int,
     background_tasks: BackgroundTasks,
     request: RegenerateRequest = None,
-    user_id: str = Depends(verify_user),
+    user_id: int = Depends(verify_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -396,7 +412,7 @@ async def regenerate_scene_image(
     """
     # 1. 验证项目
     project_result = await db.execute(
-        select(Project).where(Project.id == project_id, Project.user_id == user_id)
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
     )
     project = project_result.scalar_one_or_none()
     if not project:
@@ -405,7 +421,7 @@ async def regenerate_scene_image(
     # 2. 获取章节
     chapter_result = await db.execute(
         select(Chapter).where(
-            Chapter.project_id == project_id, Chapter.chapter_number == chapter_number
+            Chapter.project_id == project.id, Chapter.chapter_number == chapter_number
         )
     )
     chapter = chapter_result.scalar_one_or_none()
@@ -455,9 +471,9 @@ async def regenerate_scene_image(
 # ============ 后台任务函数 ============
 
 async def generate_images_task(
-    job_id: str,
-    chapter_id: str,
-    project_id: str,
+    job_id: int,
+    chapter_id: int,
+    project_id: int,
     style_preset: str
 ):
     """
@@ -538,8 +554,6 @@ async def generate_images_task(
                 )
 
                 # 保存结果
-                scene_image_id = str(uuid.uuid4())
-
                 if result["success"]:
                     # 保存图像文件
                     saved = await storage.save_image(
@@ -551,7 +565,6 @@ async def generate_images_task(
 
                     # 保存到数据库
                     scene_image = SceneImage(
-                        id=scene_image_id,
                         chapter_id=chapter_id,
                         scene_id=scene_board["scene_id"],
                         image_prompt=scene_board["image_prompt"],
@@ -570,7 +583,6 @@ async def generate_images_task(
                 else:
                     # 记录失败
                     scene_image = SceneImage(
-                        id=scene_image_id,
                         chapter_id=chapter_id,
                         scene_id=scene_board["scene_id"],
                         image_prompt=scene_board["image_prompt"],
@@ -610,8 +622,8 @@ async def generate_images_task(
 
 
 async def regenerate_single_image_task(
-    chapter_id: str,
-    project_id: str,
+    chapter_id: int,
+    project_id: int,
     scene_id: int,
     style_preset: str,
     prompt_override: str = None
@@ -673,8 +685,6 @@ async def regenerate_single_image_task(
 
             # 4. 保存结果
             storage = ImageStorageService(settings.IMAGE_STORAGE_PATH)
-            scene_image_id = str(uuid.uuid4())
-
             if result["success"]:
                 saved = await storage.save_image(
                     image_data=result["image_data"],
@@ -683,7 +693,6 @@ async def regenerate_single_image_task(
                     scene_id=scene_id
                 )
                 scene_image = SceneImage(
-                    id=scene_image_id,
                     chapter_id=chapter_id,
                     scene_id=scene_id,
                     image_prompt=image_prompt,
@@ -700,7 +709,6 @@ async def regenerate_single_image_task(
                 )
             else:
                 scene_image = SceneImage(
-                    id=scene_image_id,
                     chapter_id=chapter_id,
                     scene_id=scene_id,
                     image_prompt=image_prompt,
@@ -746,7 +754,7 @@ async def generate_chapter_audio(
     chapter_number: int,
     request: AudioGenerationRequest,
     background_tasks: BackgroundTasks,
-    user_id: str = Depends(verify_user),
+    user_id: int = Depends(verify_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -765,7 +773,7 @@ async def generate_chapter_audio(
     """
     # 1. 验证项目所有权
     project_result = await db.execute(
-        select(Project).where(Project.id == project_id, Project.user_id == user_id)
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
     )
     project = project_result.scalar_one_or_none()
     if not project:
@@ -774,7 +782,7 @@ async def generate_chapter_audio(
     # 2. 获取章节
     chapter_result = await db.execute(
         select(Chapter).where(
-            Chapter.project_id == project_id, Chapter.chapter_number == chapter_number
+            Chapter.project_id == project.id, Chapter.chapter_number == chapter_number
         )
     )
     chapter = chapter_result.scalar_one_or_none()
@@ -799,9 +807,7 @@ async def generate_chapter_audio(
         raise HTTPException(status_code=500, detail="场景数据解析失败")
 
     # 4. 创建音频生成任务
-    job_id = str(uuid.uuid4())
     job = GenerationJob(
-        id=job_id,
         chapter_id=chapter.id,
         status="queued",
         current_stage="audio_generation",
@@ -810,6 +816,8 @@ async def generate_chapter_audio(
         created_at=datetime.utcnow(),
     )
     db.add(job)
+    await db.flush()
+    job_id = job.id
 
     # 更新章节状态
     chapter.status = "generating_audio"
@@ -829,7 +837,7 @@ async def generate_chapter_audio(
     )
 
     return AudioGenerationResponse(
-        job_id=job_id,
+        job_id=job.uuid,
         status="generating_audio",
         message="音频生成已开始"
     )
@@ -839,7 +847,7 @@ async def generate_chapter_audio(
 async def get_chapter_timeline(
     project_id: str,
     chapter_number: int,
-    user_id: str = Depends(verify_user),
+    user_id: int = Depends(verify_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -849,15 +857,16 @@ async def get_chapter_timeline(
     """
     # 1. 验证项目
     project_result = await db.execute(
-        select(Project).where(Project.id == project_id, Project.user_id == user_id)
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
     )
-    if not project_result.scalar_one_or_none():
+    project = project_result.scalar_one_or_none()
+    if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
 
     # 2. 获取章节
     chapter_result = await db.execute(
         select(Chapter).where(
-            Chapter.project_id == project_id, Chapter.chapter_number == chapter_number
+            Chapter.project_id == project.id, Chapter.chapter_number == chapter_number
         )
     )
     chapter = chapter_result.scalar_one_or_none()
@@ -906,7 +915,7 @@ async def get_chapter_timeline(
 async def get_chapter_audio_info(
     project_id: str,
     chapter_number: int,
-    user_id: str = Depends(verify_user),
+    user_id: int = Depends(verify_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -914,15 +923,16 @@ async def get_chapter_audio_info(
     """
     # 1. 验证项目
     project_result = await db.execute(
-        select(Project).where(Project.id == project_id, Project.user_id == user_id)
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
     )
-    if not project_result.scalar_one_or_none():
+    project = project_result.scalar_one_or_none()
+    if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
 
     # 2. 获取章节
     chapter_result = await db.execute(
         select(Chapter).where(
-            Chapter.project_id == project_id, Chapter.chapter_number == chapter_number
+            Chapter.project_id == project.id, Chapter.chapter_number == chapter_number
         )
     )
     chapter = chapter_result.scalar_one_or_none()
@@ -946,7 +956,7 @@ async def get_chapter_audio_info(
 async def get_available_voices(
     project_id: str,
     chapter_number: int,
-    user_id: str = Depends(verify_user),
+    user_id: int = Depends(verify_user),
 ):
     """
     获取可用的音色列表
@@ -965,9 +975,9 @@ async def get_available_voices(
 # ============ Phase 3 后台任务 ============
 
 async def generate_audio_and_align_task(
-    job_id: str,
-    chapter_id: str,
-    project_id: str,
+    job_id: int,
+    chapter_id: int,
+    project_id: int,
     voice_preset: str,
     speed_ratio: float = 1.0
 ):

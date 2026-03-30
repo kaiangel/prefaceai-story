@@ -2,15 +2,16 @@
 
 import asyncio
 import json
-from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db, async_session_maker
 from app.models.project import Project
 from app.models.chapter import Chapter
 from app.models.job import GenerationJob
+from app.models.audio_segment import AudioSegment
+from app.models.scene_image import SceneImage, CharacterReference
 from app.schemas.project import ProjectCreate, ProjectResponse, ProjectDetail
 from app.services.job_manager import JobManager, run_story_generation_task
 from app.services.story_outline_generator import StoryOutlineGenerator
@@ -18,6 +19,23 @@ from app.api.auth import get_current_user
 from app.models.user import User
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
+
+
+def serialize_project_detail(project: Project) -> ProjectDetail:
+    return ProjectDetail(
+        id=project.uuid,
+        user_id=project.user_id,
+        title=project.title,
+        original_idea=project.original_idea,
+        style_preset=project.style_preset,
+        total_chapters=project.total_chapters,
+        chapter_duration_minutes=project.chapter_duration_minutes,
+        character_count=project.character_count,
+        language=project.language,
+        voice_preset=project.voice_preset,
+        created_at=project.created_at,
+        updated_at=project.updated_at,
+    )
 
 
 async def verify_user(user: User = Depends(get_current_user)) -> int:
@@ -59,9 +77,7 @@ async def create_project(
         else:
             idea = doc
 
-    project_id = str(uuid4())
     project = Project(
-        id=project_id,
         user_id=user_id,
         title="未命名项目",  # Will be updated after story generation
         original_idea=idea,
@@ -77,21 +93,23 @@ async def create_project(
         scene_refs_analysis_json=json.dumps(project_data.scene_refs_analysis, ensure_ascii=False) if project_data.scene_refs_analysis else None,
     )
     db.add(project)
+    await db.flush()
+    project_id = project.id
+    project_uuid = project.uuid
 
     # 2. Create first chapter record
-    chapter_id = str(uuid4())
     chapter = Chapter(
-        id=chapter_id,
         project_id=project_id,
         chapter_number=1,
         status="generating_story",
     )
     db.add(chapter)
+    await db.flush()
+    chapter_id = chapter.id
+    chapter_uuid = chapter.uuid
 
     # 3. Create generation job
-    job_id = str(uuid4())
     job = GenerationJob(
-        id=job_id,
         chapter_id=chapter_id,
         status="queued",
         current_stage="story_generation",
@@ -99,6 +117,9 @@ async def create_project(
         stage_message="任务已创建，等待开始...",
     )
     db.add(job)
+    await db.flush()
+    job_id = job.id
+    job_uuid = job.uuid
 
     await db.commit()
 
@@ -118,17 +139,17 @@ async def create_project(
     )
 
     return ProjectResponse(
-        project_id=project_id,
-        chapter_id=chapter_id,
-        job_id=job_id,
+        project_id=project_uuid,
+        chapter_id=chapter_uuid,
+        job_id=job_uuid,
         status="generating_story",
         message="故事生成已开始",
     )
 
 
 async def _run_generation_in_background(
-    job_id: str,
-    chapter_id: str,
+    job_id: int,
+    chapter_id: int,
     idea: str,
     style: str,
     chapter_number: int,
@@ -169,7 +190,7 @@ async def list_projects(
         .order_by(Project.created_at.desc())
     )
     projects = result.scalars().all()
-    return [ProjectDetail.model_validate(p) for p in projects]
+    return [serialize_project_detail(p) for p in projects]
 
 
 @router.get("/{project_id}", response_model=ProjectDetail)
@@ -180,14 +201,14 @@ async def get_project(
 ):
     """Get project details"""
     result = await db.execute(
-        select(Project).where(Project.id == project_id, Project.user_id == user_id)
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
     )
     project = result.scalar_one_or_none()
 
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
 
-    return ProjectDetail.model_validate(project)
+    return serialize_project_detail(project)
 
 
 @router.post("/{project_id}/generate-outline")
@@ -199,7 +220,7 @@ async def generate_outline(
     """Generate story outline for a project using Stage 1 (StoryOutlineGenerator)"""
     # 1. Verify project exists and belongs to current user
     result = await db.execute(
-        select(Project).where(Project.id == project_id, Project.user_id == user_id)
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
     )
     project = result.scalar_one_or_none()
     if not project:
@@ -294,7 +315,7 @@ async def confirm_outline(
 ):
     """Store user-confirmed outline after StageB edits"""
     result = await db.execute(
-        select(Project).where(Project.id == project_id, Project.user_id == user_id)
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
     )
     project = result.scalar_one_or_none()
     if not project:
@@ -315,13 +336,36 @@ async def delete_project(
 ):
     """Delete a project and all its chapters"""
     result = await db.execute(
-        select(Project).where(Project.id == project_id, Project.user_id == user_id)
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
     )
     project = result.scalar_one_or_none()
 
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
 
+    internal_project_id = project.id
+    chapter_ids_result = await db.execute(
+        select(Chapter.id).where(Chapter.project_id == internal_project_id)
+    )
+    chapter_ids = list(chapter_ids_result.scalars().all())
+
+    if chapter_ids:
+        await db.execute(
+            delete(SceneImage).where(SceneImage.chapter_id.in_(chapter_ids))
+        )
+        await db.execute(
+            delete(AudioSegment).where(AudioSegment.chapter_id.in_(chapter_ids))
+        )
+        await db.execute(
+            delete(GenerationJob).where(GenerationJob.chapter_id.in_(chapter_ids))
+        )
+
+    await db.execute(
+        delete(CharacterReference).where(CharacterReference.project_id == internal_project_id)
+    )
+    await db.execute(
+        delete(Chapter).where(Chapter.project_id == internal_project_id)
+    )
     await db.delete(project)
     await db.commit()
 
