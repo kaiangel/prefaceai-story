@@ -17,21 +17,26 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 
 ## 最近操作 (2026-03-24)
 
-### REPAIR-V2 + PERSISTENT-LOG push ✅
+### 大纲生成全链路 push + Ben 融合 + VPS 部署 ✅
 
-3 commits pushed → `origin/main` (d54087e → 77ef5f9):
+3 commits pushed + merge → `origin/main` (9ca87bc → 8b5c36a):
 
 | Commit | 内容 |
 |--------|------|
-| `79d63f8` | fix(backend): JSON-REPAIR-V2 — fullwidth regex + longer quotes |
-| `df1f44d` | feat(backend): PERSISTENT-LOG — TeeStream to log file |
-| `77ef5f9` | docs: team-brain sync |
+| `56aa22b` | feat: 大纲生成全链路打通 — logging 标准化 + JSON 鲁棒性 + 诊断埋点 |
+| `c37d392` | docs: 大纲生成里程碑 — LOGGING-FIX + Ben 反馈 + team-brain sync |
+| `8b5c36a` | merge: 融合 Ben int-id+uuid 重构 |
 
-**VPS**: 不需要部署。
+**VPS 部署**:
+- rsync → Docker rebuild (api + frontend) → force-recreate
+- `.env.production` 真实 API Key 已填入（Gemini + Anthropic + OpenAI + 火山引擎）
+- DB 驱动: `asyncmy`（与 Ben 一致）
+- `https://prefaceai.mov` 前端 200 ✅ + API `/health` healthy ✅
+- Founder + Ben 可直接在线联调
 
-### 6 TASK push ✅ (earlier today)
+### Earlier (2026-03-29): 6 TASK + REPAIR-V2 + PERSISTENT-LOG
 
-6 commits pushed → `origin/main` (faf594f → 0ed98de):
+Multiple pushes — 10 commits total (faf594f → 77ef5f9)
 
 | Commit | 内容 |
 |--------|------|
@@ -146,7 +151,7 @@ Multiple pushes — Stage 1 E2E 联调通过。
 ```
 远程仓库: https://github.com/kaiangel/prefaceai-story (private)
 分支: main (tracked → origin/main)
-最新 commit: 77ef5f9 docs: REPAIR-V2 + PERSISTENT-LOG + Founder retest pass + team-brain sync
+最新 commit: 8b5c36a merge: 融合 Ben int-id+uuid 重构
 ```
 
 ---

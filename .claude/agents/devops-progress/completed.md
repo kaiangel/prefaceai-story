@@ -4,6 +4,26 @@
 
 ---
 
+### 大纲生成全链路 push + Ben 融合 + VPS 部署 ✅
+
+**完成时间**: 2026-03-30
+**任务类型**: 版本控制 + VPS 部署
+
+**Push + Merge**:
+- [x] `56aa22b` feat: 大纲生成全链路打通 — LOGGING-FIX 26 处 print→logger (4 files)
+- [x] `c37d392` docs: 大纲生成里程碑 (9 files)
+- [x] `8b5c36a` merge: 融合 Ben `954f274` int-id+uuid 重构（projects.py import 冲突解决）
+- [x] Push: `origin/main` → 8b5c36a
+
+**VPS 部署**:
+- [x] rsync 本地代码 → VPS /opt/xuhua-story/
+- [x] Docker rebuild api + frontend
+- [x] `.env.production` 创建：DB 驱动 asyncmy（与 Ben 一致）+ 真实 API Key 全部填入
+- [x] 验证: frontend 200 + API `/health` healthy + `/api/auth/me` 401（正常）
+- [x] 3 容器全部运行: api + frontend + redis
+
+---
+
 ### REPAIR-V2 + PERSISTENT-LOG push ✅
 
 **完成时间**: 2026-03-29

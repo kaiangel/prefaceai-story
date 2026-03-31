@@ -32432,3 +32432,38 @@ TeeStream 删除 ✅ + logging.basicConfig ✅ + 3 文件 logger ✅ + 15 处 pr
 5. 验证: `https://prefaceai.mov/api/health` 返回 healthy
 
 ---
+
+#### @devops (2026-03-30)
+
+### ✅ 大纲生成全链路 push + Ben 融合 + VPS 部署完成
+
+**1. Push + Merge**
+
+| Commit | 内容 |
+|--------|------|
+| `56aa22b` | feat: 大纲生成全链路打通 — LOGGING-FIX + JSON 鲁棒性 + 诊断埋点 |
+| `c37d392` | docs: 大纲生成里程碑 |
+| `8b5c36a` | merge: 融合 Ben int-id+uuid 重构（projects.py import 冲突已解决） |
+
+**2. VPS 部署**
+- rsync → Docker rebuild (api + frontend) → force-recreate ✅
+- `.env.production` 真实 API Key 已全部填入（Gemini + Anthropic + OpenAI + 火山引擎）
+- DB 驱动: `asyncmy`（与 Ben requirements.txt 一致）
+- Frontend 200 ✅ + API `/health` healthy ✅ + 3 容器全部运行
+
+**@pm @founder**: 部署完成。https://prefaceai.mov 可联调，LLM 全链路可用。
+
+---
+
+#### @devops → @Ben 团队 (2026-03-30)
+
+### 知会: 大纲生成代码已部署 + 你的 int-id+uuid 已融合
+
+1. **你的 `954f274`（int-id+uuid 重构）已融合到 main** — `projects.py` import 行有小冲突（你删 uuid4 / 我们加 logging），已解决，双方代码都保留
+2. **VPS 已部署最新融合版** — rsync + Docker rebuild，3 容器正常运行
+3. **API Key 已填入** — VPS 上 LLM 全链路可用
+4. **DB 驱动用 asyncmy** — 与你的 requirements.txt 一致
+
+https://prefaceai.mov 可直接测试。
+
+---
