@@ -4,6 +4,23 @@
 
 ---
 
+### TASK-UPLOADER-ENV-FIX push + VPS 前端部署 ✅
+
+**完成时间**: 2026-04-01
+**任务类型**: 版本控制 + VPS 部署（仅前端）
+
+**Push**:
+- [x] `f292bee` fix(frontend): 5 个 Uploader 统一 API_BASE (5 files)
+- [x] `ceb2ba5` docs: agent progress + team-brain sync (10 files)
+- [x] Push: `origin/main` 0ed365e → ceb2ba5
+
+**VPS 部署**:
+- [x] SCP 5 个 Uploader 文件到 VPS
+- [x] Docker rebuild frontend → force-recreate（API 容器不动）
+- [x] 验证: frontend 200 + API `/health` healthy + 3 容器运行
+
+---
+
 ### REPAIR-V3 + OUTLINE-PROGRESS + LOGGING-FIX push + VPS 部署 ✅
 
 **完成时间**: 2026-04-01

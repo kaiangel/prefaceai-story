@@ -1,11 +1,26 @@
 # DevOps Agent - 当前任务
 
 > **最后更新**: 2026-04-01
-> **状态**: ✅ REPAIR-V3 + OUTLINE-PROGRESS + LOGGING-FIX push + VPS 部署完成
+> **状态**: ✅ UPLOADER-ENV-FIX push + VPS 前端部署完成
 
 ---
 
 ## 刚完成
+
+**TASK-UPLOADER-ENV-FIX — push + VPS 前端部署**
+
+### 执行内容
+
+1. **Git 提交 (2 commits)**:
+   - `f292bee` fix(frontend): TASK-UPLOADER-ENV-FIX — 5 个 Uploader 统一 API_BASE (5 files)
+   - `ceb2ba5` docs: agent progress + team-brain sync (10 files)
+2. **Push**: `origin/main` 0ed365e → ceb2ba5
+3. **VPS 部署**: SCP 5 文件 + Docker rebuild frontend + force-recreate（仅前端，API 不动）
+4. **验证**: frontend 200 ✅ + API `/health` healthy ✅ + 3 容器运行
+
+---
+
+## 上次完成
 
 **REPAIR-V3 + OUTLINE-PROGRESS + LOGGING-FIX — push + VPS 部署**
 
@@ -158,6 +173,7 @@
 
 | 时间 | 更新内容 |
 |------|----------|
+| 2026-04-01 | UPLOADER-ENV-FIX push (f292bee+ceb2ba5) + VPS frontend rebuild |
 | 2026-04-01 | REPAIR-V3 + OUTLINE-PROGRESS + LOGGING-FIX push (2520fc5+029841a+d7eb28c) + VPS 部署 (SCP + Docker rebuild api+frontend) |
 | 2026-03-30 | 大纲生成全链路 push (56aa22b+c37d392) + Ben 融合 merge (8b5c36a) + VPS 部署 (rsync + Docker rebuild + API Key 填入) |
 | 2026-03-29 | REPAIR-V2 + PERSISTENT-LOG push (3 commits: 79d63f8+df1f44d+77ef5f9), d54087e→77ef5f9 |

@@ -17,7 +17,21 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 
 ## 最近操作 (2026-04-01)
 
-### REPAIR-V3 + OUTLINE-PROGRESS + LOGGING-FIX push + VPS 部署 ✅
+### TASK-UPLOADER-ENV-FIX push + VPS 前端部署 ✅
+
+2 commits pushed → `origin/main` (0ed365e → ceb2ba5):
+
+| Commit | 内容 |
+|--------|------|
+| `f292bee` | fix(frontend): 5 个 Uploader 统一 API_BASE（生产 env 修复） |
+| `ceb2ba5` | docs: agent progress + team-brain sync |
+
+**VPS 部署**:
+- SCP 5 文件 + Docker rebuild frontend → force-recreate（仅前端）
+- `https://prefaceai.mov` 前端 200 ✅ + API `/health` healthy ✅
+- 自定义风格/角色/场景上传在生产环境应恢复正常
+
+### Earlier: REPAIR-V3 + OUTLINE-PROGRESS + LOGGING-FIX push + VPS 部署 ✅
 
 3 commits pushed → `origin/main` (3a437bd → d7eb28c):
 

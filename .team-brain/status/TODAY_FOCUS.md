@@ -41,8 +41,8 @@ Phase 1 第 2 步 (集成 13 新风格):                                ✅ PM R
 | @ai-ml | ✅ | — |
 | @backend | ✅ V3 + 4a/4b/4c 完成 | — |
 | @tester | ✅ 空闲 | — |
-| @frontend | 🔄 TASK-UPLOADER-ENV-FIX | 3 Uploader env var 修复 |
-| @devops | ⏳ 等 ENV-FIX 后 push + VPS | — |
+| @frontend | ✅ UPLOADER-ENV-FIX 完成 (5 文件) | — |
+| @devops | ✅ push + VPS 前端部署完成 | ceb2ba5 |
 | @resonance | 🆕 Phase 0 | 蓄水期 |
 
 ### Ben 团队

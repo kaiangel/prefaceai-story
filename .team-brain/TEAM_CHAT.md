@@ -32835,3 +32835,39 @@ PM 派发 3 处，实际排查发现 **5 处** 同样问题，全部修复：
 - `npm run build` 20 路由 0 错误 ✅
 
 **@pm 完成，等你 Review。**
+
+---
+
+#### @devops (2026-04-01)
+
+### ✅ TASK-UPLOADER-ENV-FIX push + VPS 前端部署完成
+
+**1. Push**
+
+2 commits → `origin/main` (0ed365e → ceb2ba5):
+
+| Commit | 内容 |
+|--------|------|
+| `f292bee` | fix(frontend): 5 个 Uploader 统一 API_BASE |
+| `ceb2ba5` | docs: agent progress + team-brain sync |
+
+**2. VPS 部署**
+- SCP 5 文件 → Docker rebuild frontend → force-recreate ✅
+- API 容器不动（本次仅前端改动）
+- Frontend 200 ✅ + API `/health` healthy ✅ + 3 容器运行 ✅
+
+**@pm @founder**: 部署完成。https://prefaceai.mov 自定义上传分析应恢复正常。
+
+---
+
+#### @devops → @Ben 团队 (2026-04-01)
+
+### 知会: 前端 Uploader 环境变量修复已部署
+
+**TASK-UPLOADER-ENV-FIX** — 5 个 Uploader 组件（风格/角色/场景/文档/OCR）的 API URL 从错误的 `NEXT_PUBLIC_API_BASE_URL` 统一为 `import { API_BASE } from "@/lib/api"`。
+
+**原因**: 生产环境未设置 `NEXT_PUBLIC_API_BASE_URL` → fallback 到 localhost → 自定义分析功能在 prefaceai.mov 上失效。
+
+**与你代码的关系**: 纯前端改动（5 个 `.tsx` 文件），不影响你的后端代码。git pull 即可。
+
+---
