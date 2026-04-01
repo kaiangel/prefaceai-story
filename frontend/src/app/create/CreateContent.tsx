@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, AlertCircle } from "lucide-react";
+import { Sparkles, AlertCircle, Loader2 } from "lucide-react";
 import { useCreate } from "@/contexts/CreateContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch, getStoredToken } from "@/lib/api";
@@ -28,19 +28,64 @@ const LENGTH_PARAMS: Record<StoryLength, { duration: number; characters: number 
   epic: { duration: 6, characters: 4 },
 };
 
+const OUTLINE_STAGES = [
+  { time: 0, progress: 5, text: "正在创建项目...", sub: "初始化故事参数" },
+  { time: 5, progress: 15, text: "正在分析你的故事创意...", sub: "理解故事方向和情感" },
+  { time: 15, progress: 35, text: "正在设计角色和场景...", sub: "Claude 正在为你的故事构思完整大纲" },
+  { time: 35, progress: 60, text: "正在构思情节走向...", sub: "设计起承转合和关键冲突" },
+  { time: 55, progress: 80, text: "正在打磨故事大纲...", sub: "优化角色弧线和情感节奏" },
+  { time: 75, progress: 90, text: "即将完成，请稍候...", sub: "最终整理输出" },
+];
+
 function StageA() {
   const { state, dispatch } = useCreate();
   const { isLoggedIn } = useAuth();
   const [ideaError, setIdeaError] = useState("");
   const [apiError, setApiError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [generatingOutline, setGeneratingOutline] = useState(false);
+  const [outlineProgress, setOutlineProgress] = useState(0);
+  const [outlineStageIdx, setOutlineStageIdx] = useState(0);
+  const [elapsedTime, setElapsedTime] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearTimers = useCallback(() => {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    if (progressRef.current) { clearInterval(progressRef.current); progressRef.current = null; }
+  }, []);
 
   useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
+    return () => clearTimers();
+  }, [clearTimers]);
+
+  // Progress timer during outline generation
+  useEffect(() => {
+    if (!generatingOutline) return;
+    const startTime = Date.now();
+    progressRef.current = setInterval(() => {
+      const elapsed = (Date.now() - startTime) / 1000;
+      setElapsedTime(Math.floor(elapsed));
+      // Find current stage
+      let idx = 0;
+      for (let i = OUTLINE_STAGES.length - 1; i >= 0; i--) {
+        if (elapsed >= OUTLINE_STAGES[i].time) { idx = i; break; }
+      }
+      setOutlineStageIdx(idx);
+      // Smooth progress interpolation
+      const stage = OUTLINE_STAGES[idx];
+      const nextStage = OUTLINE_STAGES[idx + 1];
+      if (nextStage) {
+        const stageElapsed = elapsed - stage.time;
+        const stageDuration = nextStage.time - stage.time;
+        const fraction = Math.min(stageElapsed / stageDuration, 1);
+        setOutlineProgress(stage.progress + (nextStage.progress - stage.progress) * fraction);
+      } else {
+        setOutlineProgress(stage.progress);
+      }
+    }, 200);
+    return () => { if (progressRef.current) clearInterval(progressRef.current); };
+  }, [generatingOutline]);
 
   const handleSubmit = async () => {
     if (!state.idea.trim() && !state.documentText?.trim()) {
@@ -54,16 +99,24 @@ function StageA() {
     setIdeaError("");
     setApiError("");
     setLoading(true);
+    setGeneratingOutline(true);
+    setOutlineProgress(0);
+    setOutlineStageIdx(0);
+    setElapsedTime(0);
 
     const token = getStoredToken();
 
     // If not logged in or no token, use mock data
     if (!isLoggedIn || !token) {
       timerRef.current = setTimeout(() => {
-        dispatch({ type: "SET_OUTLINE", payload: mockOutline });
-        dispatch({ type: "SET_STAGE", payload: "confirm" });
-        setLoading(false);
-      }, 1500);
+        setOutlineProgress(100);
+        setTimeout(() => {
+          dispatch({ type: "SET_OUTLINE", payload: mockOutline });
+          dispatch({ type: "SET_STAGE", payload: "confirm" });
+          setLoading(false);
+          setGeneratingOutline(false);
+        }, 500);
+      }, 3000);
       return;
     }
 
@@ -103,6 +156,9 @@ function StageA() {
         token
       );
 
+      // Success: jump to 100% then transition
+      setOutlineProgress(100);
+      await new Promise((r) => setTimeout(r, 500));
       dispatch({ type: "SET_OUTLINE", payload: outline });
       dispatch({ type: "SET_STAGE", payload: "confirm" });
     } catch (err) {
@@ -110,6 +166,7 @@ function StageA() {
       setApiError(message);
     } finally {
       setLoading(false);
+      setGeneratingOutline(false);
     }
   };
 
@@ -117,6 +174,78 @@ function StageA() {
     dispatch({ type: "SET_IDEA", payload: value });
     if (ideaError) setIdeaError("");
   };
+
+  // ============ Outline Generation Progress View ============
+  if (generatingOutline) {
+    const currentStage = OUTLINE_STAGES[outlineStageIdx];
+    return (
+      <main className="container-lg py-8 pb-24">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="max-w-lg mx-auto text-center"
+        >
+          {/* Error state */}
+          {apiError ? (
+            <>
+              <AlertCircle className="w-16 h-16 text-error mx-auto mb-6" />
+              <h1 className="text-2xl font-bold mb-2">生成遇到问题</h1>
+              <p className="text-text-tertiary text-sm mb-4">{apiError}</p>
+              <button
+                onClick={() => { setGeneratingOutline(false); setLoading(false); setApiError(""); }}
+                className="btn-primary px-8"
+              >
+                返回重试
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Animated icon */}
+              <motion.div
+                className="mb-8"
+                animate={{ scale: [1, 1.05, 1] }}
+                transition={{ repeat: Infinity, duration: 2 }}
+              >
+                <Loader2 className="w-16 h-16 text-brand-primary mx-auto animate-spin" />
+              </motion.div>
+
+              {/* Stage text */}
+              <motion.h1
+                key={currentStage.text}
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-xl font-bold mb-2"
+              >
+                {currentStage.text}
+              </motion.h1>
+              <p className="text-text-tertiary text-sm mb-8">{currentStage.sub}</p>
+
+              {/* Progress bar */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-text-muted">进度</span>
+                  <span className="text-xs text-text-muted">{Math.round(outlineProgress)}%</span>
+                </div>
+                <div className="w-full h-2 bg-bg-secondary rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-brand-primary to-purple-500 rounded-full"
+                    animate={{ width: `${outlineProgress}%` }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                  />
+                </div>
+              </div>
+
+              {/* Elapsed time */}
+              <p className="text-xs text-text-muted">
+                已等待 {elapsedTime} 秒
+              </p>
+            </>
+          )}
+        </motion.div>
+      </main>
+    );
+  }
 
   return (
     <main className="container-lg py-8 pb-24">
