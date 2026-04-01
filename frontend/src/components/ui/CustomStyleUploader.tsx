@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Palette, X, Loader2, Sparkles } from "lucide-react";
-import { getStoredToken } from "@/lib/api";
+import { API_BASE, getStoredToken } from "@/lib/api";
 
 interface StyleAnalysisResult {
   style_display_name: string;
@@ -39,7 +39,7 @@ export default function CustomStyleUploader({ image, imageUrl, keywords, onUploa
       formData.append("file", file);
 
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api"}/utils/analyze-style`,
+        `${API_BASE}/utils/analyze-style`,
         {
           method: "POST",
           headers: token ? { Authorization: `Bearer ${token}` } : {},

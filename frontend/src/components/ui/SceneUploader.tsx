@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ImagePlus, MapPin, Loader2 } from "lucide-react";
 import type { SceneRef, StoryLength } from "@/types/create";
-import { getStoredToken } from "@/lib/api";
+import { API_BASE, getStoredToken } from "@/lib/api";
 
 const SCENE_RECOMMEND: Record<StoryLength, { min: number; max: number }> = {
   flash: { min: 2, max: 3 },
@@ -41,7 +41,7 @@ export default function SceneUploader({ scenes, storyLength, onAdd, onRemove }: 
       formData.append("file", file);
 
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api"}/utils/analyze-scene`,
+        `${API_BASE}/utils/analyze-scene`,
         {
           method: "POST",
           headers: token ? { Authorization: `Bearer ${token}` } : {},

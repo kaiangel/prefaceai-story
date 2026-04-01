@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { UserPlus, X, Loader2, ImagePlus } from "lucide-react";
 import type { CharacterRef, StoryLength } from "@/types/create";
-import { getStoredToken } from "@/lib/api";
+import { API_BASE, getStoredToken } from "@/lib/api";
 
 const CHAR_RECOMMEND: Record<StoryLength, { min: number; max: number }> = {
   flash: { min: 2, max: 2 },
@@ -41,7 +41,7 @@ export default function CharacterUploader({ characters, storyLength, onAdd, onRe
       formData.append("file", file);
 
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api"}/utils/analyze-character`,
+        `${API_BASE}/utils/analyze-character`,
         {
           method: "POST",
           headers: token ? { Authorization: `Bearer ${token}` } : {},

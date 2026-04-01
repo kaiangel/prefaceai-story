@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from "react";
 import { ImagePlus, Mic, MicOff, X, Lightbulb, HelpCircle } from "lucide-react";
-import { getStoredToken } from "@/lib/api";
+import { API_BASE, getStoredToken } from "@/lib/api";
 import DocumentUploader from "./DocumentUploader";
 
 const MOCK_VOICE_TEXT = "雨夜公交站，一个加班族和一个失恋女孩因为同一把伞产生交集的温暖故事";
@@ -78,7 +78,7 @@ export default function StoryIdeaInput({
       ocrTimerRef.current = setTimeout(() => controller.abort(), 15000) as unknown as ReturnType<typeof setTimeout>;
 
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api"}/utils/ocr`,
+        `${API_BASE}/utils/ocr`,
         {
           method: "POST",
           headers: token ? { Authorization: `Bearer ${token}` } : {},

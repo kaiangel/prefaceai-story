@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { FileText, X, Upload } from "lucide-react";
-import { getStoredToken } from "@/lib/api";
+import { API_BASE, getStoredToken } from "@/lib/api";
 
 interface DocumentUploaderProps {
   file: File | null;
@@ -24,7 +24,7 @@ export default function DocumentUploader({ file, onUpload }: DocumentUploaderPro
         const formData = new FormData();
         formData.append("file", f);
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api"}/utils/parse-document`,
+          `${API_BASE}/utils/parse-document`,
           {
             method: "POST",
             headers: token ? { Authorization: `Bearer ${token}` } : {},
