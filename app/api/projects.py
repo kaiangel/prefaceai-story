@@ -96,9 +96,14 @@ async def create_project(
         scene_refs_analysis_json=json.dumps(project_data.scene_refs_analysis, ensure_ascii=False) if project_data.scene_refs_analysis else None,
     )
     db.add(project)
-    await db.flush()
+    try:
+        await db.flush()
+    except Exception as e:
+        logger.error(f"[CreateProject] ❌ DB 写入失败: {e}")
+        raise
     project_id = project.id
     project_uuid = project.uuid
+    logger.info(f"[CreateProject] ✅ 项目创建成功: id={project_id}")
 
     # 2. Create first chapter record
     chapter = Chapter(
@@ -258,6 +263,7 @@ async def generate_outline(
             custom_style_name=json.loads(project.custom_style_analysis_json).get("style_display_name") if project.custom_style_analysis_json else None,
         )
     except Exception as e:
+        logger.error(f"[GenerateOutline] ❌ 失败: {e}")
         raise HTTPException(status_code=500, detail=f"大纲生成失败: {str(e)}")
 
     # 4. Store raw LLM outline + update project title

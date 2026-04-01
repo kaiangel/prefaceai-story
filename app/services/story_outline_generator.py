@@ -147,9 +147,9 @@ class StoryOutlineGenerator:
             prompt = prompt.rstrip() + "\n\n现在开始生成故事大纲："
 
         logger.info(f"[StoryOutlineGenerator] 生成故事大纲...")
-        print(f"  idea: {idea}")
-        print(f"  style: {style_preset}")
-        print(f"  target: {target_duration_minutes}分钟, ≥{min_shots} shots")
+        logger.info(f"  idea: {idea[:80]}{'...' if len(idea) > 80 else ''}")
+        logger.info(f"  style: {style_preset}")
+        logger.info(f"  target: {target_duration_minutes}分钟, ≥{min_shots} shots")
 
         content = None
         provider = None
@@ -169,7 +169,7 @@ Critical rules:
         # 优先使用 Claude Sonnet 4.6
         if self.claude_client:
             try:
-                print(f"  [尝试 Claude Sonnet 4.6]")
+                logger.info(f"  [尝试 Claude Sonnet 4.6]")
                 response = await self.claude_client.messages.create(
                     model=self.claude_model,
                     max_tokens=16384,
@@ -181,12 +181,12 @@ Critical rules:
                 content = response.content[0].text
                 provider = "claude"
             except Exception as e:
-                print(f"  [Claude失败: {e}，尝试Gemini备用]")
+                logger.info(f"  [Claude失败: {e}，尝试Gemini备用]")
 
         # Fallback到Gemini 3 Flash
         if content is None and self.gemini_client:
             try:
-                print(f"  [尝试 Gemini 3 Flash]")
+                logger.info(f"  [尝试 Gemini 3.1 Flash Lite]")
                 response = await self.gemini_client.aio.models.generate_content(
                     model=self.gemini_model,
                     contents=prompt,
@@ -208,16 +208,16 @@ Critical rules:
             # 验证必要字段
             self._validate_outline(outline, min_shots)
             logger.info(f"[StoryOutlineGenerator] ✅ 大纲生成成功 (via {provider})")
-            print(f"  title: {outline.get('title', 'N/A')}")
-            print(f"  characters: {len(outline.get('characters_overview', []))}个")
-            print(f"  plot_points: {len(outline.get('plot_points', []))}个")
-            print(f"  locations: {len(outline.get('unique_locations', []))}个")
+            logger.info(f"  title: {outline.get('title', 'N/A')}")
+            logger.info(f"  characters: {len(outline.get('characters_overview', []))}个")
+            logger.info(f"  plot_points: {len(outline.get('plot_points', []))}个")
+            logger.info(f"  locations: {len(outline.get('unique_locations', []))}个")
             return outline
         else:
             logger.info(f"[StoryOutlineGenerator] ❌ JSON提取失败")
-            print(f"  provider: {provider}")
-            print(f"  response length: {len(content)} chars")
-            print(f"  response preview: {content[:500]}")
+            logger.info(f"  provider: {provider}")
+            logger.info(f"  response length: {len(content)} chars")
+            logger.info(f"  response preview: {content[:500]}")
             raise ValueError("无法从LLM响应中提取JSON")
 
     def _build_prompt(
@@ -418,21 +418,65 @@ Review all family_relationships entries together. For each person mentioned:
 
     @staticmethod
     def _fix_unescaped_quotes(text: str) -> str:
-        """修复 JSON 字符串内部未转义的 ASCII 双引号。
+        """修复 JSON 字符串内部未转义的 ASCII 双引号（状态机方案）。
 
-        策略: 将 JSON 值内部的孤立 " 替换为中文引号 ""
-        只处理明显在字符串值中间的引号（前后都是中文/日文/韩文字符）
+        逐字符遍历，跟踪 in_string 状态。遇到 " 时用前瞻判断：
+        - 跳过空白后下一个字符是 : , } ] 之一 → JSON 结构引号，保留
+        - 否则 → 字符串内容引号，替换为中文弯引号
         """
-        import re
-        # 匹配: 中文字符/全角标点 + " + 1-50个非引号字符 + " + 中文字符/全角标点
-        # 例如: 她的"校霸"如今 → 她的\u201c校霸\u201d如今
-        # 覆盖: 全角逗号句号等 (U+FF00-FFEF) + 较长对话 (≤50字)
-        result = re.sub(
-            r'([\u4e00-\u9fff\u3000-\u303f\uff00-\uffef])"([^"]{1,50})"([\u4e00-\u9fff\u3000-\u303f\uff00-\uffef])',
-            '\\1\u201c\\2\u201d\\3',
-            text
-        )
-        return result
+        result = []
+        i = 0
+        in_string = False
+        n = len(text)
+
+        while i < n:
+            ch = text[i]
+
+            # 处理转义序列：\x 原样保留
+            if in_string and ch == '\\' and i + 1 < n:
+                result.append(ch)
+                result.append(text[i + 1])
+                i += 2
+                continue
+
+            if ch == '"':
+                if not in_string:
+                    # 进入字符串
+                    in_string = True
+                    result.append(ch)
+                else:
+                    # 在字符串内遇到 " — 前瞻判断是否为 JSON 结构关闭引号
+                    j = i + 1
+                    while j < n and text[j] in ' \t\r\n':
+                        j += 1
+                    next_ch = text[j] if j < n else ''
+
+                    if next_ch in ':,}]' or j >= n:
+                        # JSON 结构引号（后跟 : , } ] 或到末尾）→ 关闭字符串
+                        in_string = False
+                        result.append(ch)
+                    else:
+                        # 字符串内容引号 → 替换为左弯引号，找配对的右弯
+                        result.append('\u201c')
+                        # 向前找下一个 " 作为配对右弯引号
+                        k = i + 1
+                        while k < n and text[k] != '"':
+                            result.append(text[k])
+                            k += 1
+                        if k < n:
+                            # 找到配对 " → 替换为右弯引号
+                            result.append('\u201d')
+                            i = k + 1
+                            continue
+                        # 没找到配对 → 跳过已扫描的部分，避免二次追加
+                        i = k
+                        continue
+            else:
+                result.append(ch)
+
+            i += 1
+
+        return ''.join(result)
 
     def _extract_json(self, content: str) -> Optional[dict]:
         """从LLM响应中提取JSON"""

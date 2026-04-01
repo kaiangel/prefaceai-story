@@ -21,14 +21,20 @@ install_log_sanitizer()
 import logging
 
 os.makedirs("storage/logs", exist_ok=True)
+_file_handler = logging.FileHandler("storage/logs/backend.log", encoding="utf-8")
+_file_handler.setLevel(logging.INFO)
+_file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(message)s",
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("storage/logs/backend.log", encoding="utf-8"),
+        _file_handler,
     ],
 )
+# 让 uvicorn 的 HTTP 日志也写到文件
+logging.getLogger("uvicorn.access").addHandler(_file_handler)
+logging.getLogger("uvicorn.error").addHandler(_file_handler)
 
 
 @asynccontextmanager
