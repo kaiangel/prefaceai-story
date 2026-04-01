@@ -591,6 +591,21 @@ Step 10: PM 独立深度审查                                       ✅ 同意 
 | **Frontend 集成** | ✅ 15 张压缩 (1024×1024 PNG → 400×400 JPEG, 27MB→1MB) → `frontend/public/styles/` |
 | **状态** | ✅ 已完成并部署 |
 
+### TASK-JSON-REPAIR-V3 — ✅ PM Review PASS (24/24) → 🔄 4a/4b/4c 修复中
+
+| 字段 | 内容 |
+|------|------|
+| **优先级** | P0 — 阻塞 Founder 测试 |
+| **指派** | @Backend |
+| **来源** | Founder localhost 测试，PM 根因分析 |
+| **目标** | `_fix_unescaped_quotes()` 正则 → 状态机，通过 10 个测试用例 |
+| **文件** | `app/services/story_outline_generator.py` |
+| **详情** | TEAM_CHAT 2026-04-01 00:45 任务描述 |
+| **V3 状态机** | ✅ PM Review PASS — 10 指定 + 14 额外 = 24/24 全 PASS |
+| **4a/4b/4c** | 🔄 @Backend 修复中 (文档日期 + L454 冗余 + L471 回退) → 完成后 @DevOps push + VPS |
+
+---
+
 ### TASK-STYLE-EXPANSION — 📝 暂缓 (P1，备忘)
 
 | 字段 | 内容 |

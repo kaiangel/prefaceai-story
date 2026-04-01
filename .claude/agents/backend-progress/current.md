@@ -1,11 +1,17 @@
 # Backend Agent - 当前任务
 
-> **最后更新**: 2026-03-28
-> **状态**: ✅ TASK-DEBUG-LOGGING 完成，等 Founder 联调
+> **最后更新**: 2026-04-01
+> **状态**: ✅ TASK-JSON-REPAIR-V3 完成 (24/24 PASS)，等 DevOps push + VPS
 
 ---
 
 ## 刚完成
+
+### ✅ TASK-JSON-REPAIR-V3 (2026-04-01)
+
+- `_fix_unescaped_quotes()` 正则 → 状态机：逐字符遍历 + in_string + 前瞻判断
+- 10/10 测试全 PASS（含 EM DASH / 省略号 / 感叹号 / 多对引号 / 正常 JSON 不变）
+- syntax ✅
 
 ### ✅ TASK-LOGGING-FIX (2026-03-30)
 

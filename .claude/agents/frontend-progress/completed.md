@@ -4,6 +4,19 @@
 
 ---
 
+## 2026-04-01
+
+### TASK-OUTLINE-PROGRESS ✅
+
+**完成时间**: 2026-04-01
+
+- [x] CreateContent.tsx: 大纲生成进度视图（6 阶段时间模拟 + 非线性插值 + 已等待时间）
+- [x] API 返回才 100% → 0.5s 跳 StageB；错误 → 返回重试
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
 ## 2026-03-29
 
 ### TASK-STYLE-PRIORITY ✅

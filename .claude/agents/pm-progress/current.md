@@ -1,7 +1,7 @@
 # PM Agent - 当前任务
 
-> **最后更新**: 2026-03-30
-> **状态**: LOGGING-FIX ✅ → DevOps push + VPS 部署
+> **最后更新**: 2026-04-01
+> **状态**: ✅ V3 Review PASS (24/24) → Backend 修 4a/4b/4c → DevOps push + VPS
 
 ---
 
@@ -81,9 +81,13 @@
 | 44 | ~~TASK-PERSISTENT-LOG~~ | ~~@Backend~~ ✅ (5/5) |
 | 45 | ~~Founder 重测殡仪馆~~ | ✅ JSON 修复确认 |
 | 46 | ~~TASK-LOGGING-FIX~~ | ~~@Backend~~ ✅ (6/6) |
-| 47 | **DevOps push + VPS 部署** | **@DevOps** |
+| 47 | ~~DevOps push + VPS 部署~~ | ~~@DevOps~~ ✅ |
+| 48 | ~~TASK-OUTLINE-PROGRESS~~ | ~~@Frontend~~ ✅ (16/16) |
+| 50 | ~~TASK-JSON-REPAIR-V3~~ (状态机修复) | ~~@Backend~~ ✅ PM Review PASS (24/24) |
+| 51 | **V3 修复 4a/4b/4c** (日期+冗余+回退) | **@Backend** |
+| — | DevOps push + VPS 部署 (等 4a/4b/4c 完成) | @DevOps |
 | — | **=== 待办 ===** | |
-| 48 | Frontend 接入 confirm-outline (Ben 反馈) | 待派发 |
+| 49 | Frontend 接入 confirm-outline (Ben 反馈) | 待派发 |
 | — | **=== Phase 2 (文件上传) ===** | |
 | 22 | 文件上传基础设施 + #8 自定义风格 + #9 角色参考 + #10 场景参考 | @AI-ML + @Backend + @Frontend |
 | — | **=== Phase 3 (独立) ===** | |
@@ -141,7 +145,10 @@ Founder 终审:                                                  ⏳
 | 时间 | 更新内容 |
 |------|----------|
 | 2026-03-29 | TASK-DOC-ONLY-FIX Review PASS (6/6) → 重启后端 → Founder 联调 |
-| 2026-03-30 | Ben 生产反馈 (raw/confirmed 为空) + 新规则 (push+部署不分批) + confirm-outline 待办记录 |
+| 2026-04-01 | Founder 测试 JSON 引号 bug → PM 根因分析 → TASK-JSON-REPAIR-V3 @Backend |
+| 2026-04-01 | OUTLINE-PROGRESS Review PASS (16/16) → DevOps push + VPS |
+| 2026-03-31 | VPS 审查 PASS + OUTLINE-PROGRESS 派发 |
+| 2026-03-30 | Ben 反馈 + 新规则 + confirm-outline 待办 |
 | 2026-03-30 | LOGGING-FIX Review PASS (6/6) → DevOps push + VPS 部署 |
 | 2026-03-29 | 殡仪馆重测 ✅ + LOGGING-FIX @Backend + DevOps push |
 | 2026-03-29 | REPAIR-V2 + PERSISTENT-LOG Review PASS |

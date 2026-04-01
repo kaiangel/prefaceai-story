@@ -4,7 +4,12 @@
 
 ---
 
-## 2026-03-25
+## 2026-04-01
+
+### TASK-JSON-REPAIR-V3 完成 ✅
+
+- `_fix_unescaped_quotes()` 正则 → 状态机（逐字符 + in_string + 前瞻）
+- 10/10 测试全 PASS
 
 ### TASK-LOGGING-FIX 完成 ✅
 

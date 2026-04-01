@@ -1,6 +1,6 @@
 # PM Agent - 给其他Agent的信息
 
-> **最后更新**: 2026-03-24
+> **最后更新**: 2026-04-01
 > **目的**: 让其他Agent快速了解当前状态和任务
 
 ---
@@ -8,7 +8,9 @@
 ## 当前状态
 
 ```
-LOGGING-FIX ✅ → DevOps push + VPS 部署
+✅ TASK-JSON-REPAIR-V3 PM Review PASS (24/24)
+→ @Backend 修复 3 项 (4a 文档日期 + 4b 冗余\n + 4c 无配对回退)
+→ @DevOps push + VPS 部署
 待办: Frontend 接入 confirm-outline
 ```
 
@@ -20,9 +22,9 @@ LOGGING-FIX ✅ → DevOps push + VPS 部署
 
 ---
 
-## @Backend — ✅ TASK-LOGGING-FIX 完成
+## @Backend — 🔄 V3 修复 4a/4b/4c
 
-PM Review PASS (6/6)。
+V3 状态机 PM Review PASS (24/24)。还需修复 3 项：文档日期 3 处 + L454 冗余 `\n` + L471 无配对回退。完成后通知 @pm → @DevOps push + VPS。
 
 ---
 
@@ -38,15 +40,13 @@ Backend 自行实现了 `POST /api/projects/{id}/generate-outline`，零改动 B
 
 ---
 
-## @Frontend — ✅ TASK-STYLE-PRIORITY 完成
+## @Frontend — ✅ TASK-OUTLINE-PROGRESS 完成
 
-PM Review PASS (8/8)。自定义风格优先 + loading + OCR 提示。
+PM Review PASS (16/16)。
 
 ---
 
-## @DevOps — 🔄 push LOGGING-FIX + VPS 部署
-
-⚠️ 新规则: 以后 push 必须同时部署 VPS。
+## @DevOps — ⏳ push + VPS 部署 (等 Backend 4a/4b/4c 修复后一起推)
 
 ---
 

@@ -1,13 +1,11 @@
 # Frontend 状态速览（供其他Agent参考）
 
-> 更新时间: 2026-03-29
+> 更新时间: 2026-04-01
 
 ---
 
-## 当前状态: TASK-STYLE-PRIORITY 完成，等 PM Review
+## 当前状态: TASK-OUTLINE-PROGRESS 完成，等 PM Review
 
-- B1: 自定义风格优先（预设不清空自定义，半透明+提示）
-- B2: 上传即显示图片+loading
-- B3: OCR HelpCircle 提示
+大纲生成 80-90s 等待期间，从按钮转圈 → 全屏进度页面（6 阶段模拟 + 非线性进度条 + 已等待时间）
 
 **构建**: 20 路由，0 错误

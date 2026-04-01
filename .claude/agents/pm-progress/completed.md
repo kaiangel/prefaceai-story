@@ -4,6 +4,27 @@
 
 ---
 
+### 2026-04-01 — TASK-JSON-REPAIR-V3 PM Review PASS (24/24)
+
+- **审查范围**: `story_outline_generator.py` L419-477 `_fix_unescaped_quotes()` 正则→状态机重写
+- **PM 独立测试**: 10 指定用例 + 14 额外边界用例 = 24/24 全 PASS
+- **发现 3 项 (非阻塞)**: 4a 文档日期 3 处错误 + 4b L454 冗余 `\n` + 4c L471 无配对回退双追加 bug
+- **处置**: 通知 @Backend 修复 → 修复后 @DevOps push + VPS 部署
+
+---
+
+### 2026-04-01 — Founder 测试 JSON 引号 bug → PM 根因分析 → TASK-JSON-REPAIR-V3 派发
+
+- **Bug**: 进度条到 ~90% 跳回，`大纲生成失败: 无法从LLM响应中提取JSON`
+- **PM 分析**: Claude 返回 9851 字符完整 JSON，但字符串值内含未转义引号 `"慧茹"——她`
+- **根因**: `_fix_unescaped_quotes()` 正则白名单遗漏 EM DASH (U+2014) 等非 CJK 标点
+- **PM 判断**: 正则方案已到极限（白名单补不完，黑名单误伤 JSON 结构），需状态机方案
+- **附带修复**: 6 处 `print()` → `logger.info()` (LOGGING-FIX 遗漏) + uvicorn 日志写入文件
+- **教训**: PM 不应该自己动手改代码（被 Founder 指出），应派发给 Backend
+- **派发**: TASK-JSON-REPAIR-V3 @Backend（状态机 + 10 测试用例）
+
+---
+
 ### 2026-03-29 — Stage 1 E2E 通了 + 日志全链路审查 + 4 项改进派发
 
 - **联调成功**: 全部 200 OK，"爷爷的老照片" 3 角色 6 情节点
@@ -11,6 +32,22 @@
 - **Founder UX 反馈**: ③ 自定义风格上传无 loading 动效 ④ OCR 图标提示太隐晦
 - **根因深挖**: StyleSelector L33-36 `handlePresetClick` 调 `onCustomStyleChange(null,null,[])` 清空了自定义
 - **派发**: A-Backend TASK-DOC-FORMAT + B-Frontend TASK-STYLE-PRIORITY (3 改动)
+
+---
+
+### 2026-04-01 — TASK-OUTLINE-PROGRESS Review PASS (16/16)
+
+- 6 阶段时间模拟 + 非线性插值 + 进度条 + 阶段文字动画 + 已等待时间 ✅
+- API 返回才 100% → 0.5s → StageB ✅
+- 错误时显示错误 + "返回重试" ✅
+- mock 路径 3s 完成 ✅
+
+---
+
+### 2026-03-31 — DevOps push+VPS 审查 PASS + OUTLINE-PROGRESS 派发
+
+- DevOps 审查 (9/9): Frontend 200 + API healthy + 3 容器 + 3 API Key + asyncmy + Ben 融合
+- TASK-OUTLINE-PROGRESS 派发 @Frontend: 大纲生成 80-90s 等待 → 时间模拟进度页面 (6 阶段 + 非线性进度条)
 
 ---
 
