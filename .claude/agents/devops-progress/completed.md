@@ -4,6 +4,25 @@
 
 ---
 
+### REPAIR-V3 + OUTLINE-PROGRESS + LOGGING-FIX push + VPS 部署 ✅
+
+**完成时间**: 2026-04-01
+**任务类型**: 版本控制 + VPS 部署
+
+**Push**:
+- [x] `2520fc5` feat(backend): TASK-JSON-REPAIR-V3 状态机 + LOGGING-FIX 增强 (3 files)
+- [x] `029841a` feat(frontend): TASK-OUTLINE-PROGRESS 大纲生成进度页面 (1 file)
+- [x] `d7eb28c` docs: agent progress + team-brain sync (14 files)
+- [x] Push: `origin/main` 3a437bd → d7eb28c
+
+**VPS 部署**:
+- [x] SCP 4 个关键代码文件到 VPS
+- [x] Docker alpine 修复 /opt/xuhua-story/ 文件所有权 (uid 501 → trader 1000)
+- [x] Docker rebuild api + frontend → force-recreate
+- [x] 验证: frontend 200 + API `/health` healthy + 3 容器运行
+
+---
+
 ### 大纲生成全链路 push + Ben 融合 + VPS 部署 ✅
 
 **完成时间**: 2026-03-30

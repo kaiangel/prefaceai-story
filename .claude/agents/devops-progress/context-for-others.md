@@ -1,13 +1,13 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-03-19
+> **最后更新**: 2026-04-01
 
 ---
 
 ## 当前状态速览
 
-状态: ✅ **Frontend Batch 1A-4 全部 push 完成**（两人直接 push main，无分支保护）
+状态: ✅ **REPAIR-V3 + OUTLINE-PROGRESS + LOGGING-FIX push + VPS 部署完成**
 域名: `https://prefaceai.mov` 已上线（前端 + API + 新 logo + V2 品牌宣言）
 服务器: 107.148.1.199 (8C/16GB/200GB, Ubuntu 20.04)
 容器: 3 个运行中 — api (healthy) + frontend (up) + redis (healthy)
@@ -15,9 +15,25 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 
 ---
 
-## 最近操作 (2026-03-24)
+## 最近操作 (2026-04-01)
 
-### 大纲生成全链路 push + Ben 融合 + VPS 部署 ✅
+### REPAIR-V3 + OUTLINE-PROGRESS + LOGGING-FIX push + VPS 部署 ✅
+
+3 commits pushed → `origin/main` (3a437bd → d7eb28c):
+
+| Commit | 内容 |
+|--------|------|
+| `2520fc5` | feat(backend): TASK-JSON-REPAIR-V3 状态机 + LOGGING-FIX 增强 |
+| `029841a` | feat(frontend): TASK-OUTLINE-PROGRESS 大纲生成进度页面 |
+| `d7eb28c` | docs: agent progress + team-brain sync |
+
+**VPS 部署**:
+- SCP 关键代码文件 + Docker rebuild (api + frontend) → force-recreate
+- 权限修复: Docker alpine 容器修复文件所有权
+- `https://prefaceai.mov` 前端 200 ✅ + API `/health` healthy ✅
+- DB 驱动: `asyncmy`（不变）
+
+### Earlier (2026-03-30): 大纲生成全链路 push + Ben 融合 + VPS 部署 ✅
 
 3 commits pushed + merge → `origin/main` (9ca87bc → 8b5c36a):
 

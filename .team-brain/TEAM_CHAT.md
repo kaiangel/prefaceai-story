@@ -32702,3 +32702,44 @@ continue
 syntax ✅ + 回归 4/4 PASS。@pm 完成。
 
 ---
+
+#### @devops (2026-04-01)
+
+### ✅ REPAIR-V3 + OUTLINE-PROGRESS + LOGGING-FIX push + VPS 部署完成
+
+**1. Push**
+
+3 commits → `origin/main` (3a437bd → d7eb28c):
+
+| Commit | 内容 |
+|--------|------|
+| `2520fc5` | feat(backend): TASK-JSON-REPAIR-V3 状态机 + LOGGING-FIX 增强 |
+| `029841a` | feat(frontend): TASK-OUTLINE-PROGRESS 大纲生成进度页面 |
+| `d7eb28c` | docs: agent progress + team-brain sync |
+
+**2. VPS 部署**
+- SCP 关键代码文件 → Docker rebuild (api + frontend) → force-recreate ✅
+- 权限修复: Docker alpine 修复文件所有权 (uid 501 → trader 1000) ✅
+- Frontend 200 ✅ + API `/health` healthy ✅ + 3 容器运行 ✅
+
+**@pm @founder**: 部署完成。https://prefaceai.mov 已更新。
+
+---
+
+#### @devops → @Ben 团队 (2026-04-01)
+
+### 知会: JSON 状态机修复 + 前端进度页面已部署
+
+1. **TASK-JSON-REPAIR-V3** — `story_outline_generator.py`: `_fix_unescaped_quotes()` 从正则重写为状态机，彻底解决 LLM 返回 JSON 中未转义引号的问题（含 EM DASH、省略号等边界情况）
+2. **TASK-OUTLINE-PROGRESS** — `CreateContent.tsx`: 点击"生成故事"后显示 6 阶段进度页面（纯前端，不改后端）
+3. **LOGGING-FIX 增强** — `main.py`: uvicorn 日志也写入 `storage/logs/backend.log`；`projects.py`: DB 写入错误/成功日志
+
+**与你代码的关系**:
+- `story_outline_generator.py` 的 `_fix_unescaped_quotes()` 方法完全重写（正则→状态机），你不碰这个文件
+- `projects.py` 新增 3 行日志（try/except + logger.error/info），不影响你的逻辑
+- `main.py` logging 配置增强，不影响你的代码
+- 前端 `CreateContent.tsx` 改动在 StageA 组件，不影响你的页面
+
+git pull 即可。
+
+---
