@@ -1,7 +1,7 @@
 # PM Agent - 当前任务
 
 > **最后更新**: 2026-04-01
-> **状态**: ✅ V3 Review PASS (24/24) → Backend 修 4a/4b/4c → DevOps push + VPS
+> **状态**: DevOps 部署 PASS → 🐛 自定义分析 env bug → TASK-UPLOADER-ENV-FIX @Frontend
 
 ---
 
@@ -84,8 +84,10 @@
 | 47 | ~~DevOps push + VPS 部署~~ | ~~@DevOps~~ ✅ |
 | 48 | ~~TASK-OUTLINE-PROGRESS~~ | ~~@Frontend~~ ✅ (16/16) |
 | 50 | ~~TASK-JSON-REPAIR-V3~~ (状态机修复) | ~~@Backend~~ ✅ PM Review PASS (24/24) |
-| 51 | **V3 修复 4a/4b/4c** (日期+冗余+回退) | **@Backend** |
-| — | DevOps push + VPS 部署 (等 4a/4b/4c 完成) | @DevOps |
+| 51 | ~~V3 修复 4a/4b/4c~~ | ~~@Backend~~ ✅ PM 确认 PASS |
+| — | ~~DevOps push + VPS 部署~~ | ~~@DevOps~~ ✅ 4 commits + VPS 部署完成 |
+| 52 | **TASK-UPLOADER-ENV-FIX** (3 Uploader 环境变量修复) | **@Frontend** |
+| — | DevOps push + VPS 部署 (等 ENV-FIX) | @DevOps |
 | — | **=== 待办 ===** | |
 | 49 | Frontend 接入 confirm-outline (Ben 反馈) | 待派发 |
 | — | **=== Phase 2 (文件上传) ===** | |

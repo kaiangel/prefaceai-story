@@ -8,8 +8,9 @@
 ## 当前状态
 
 ```
-✅ TASK-JSON-REPAIR-V3 PM Review PASS (24/24)
-→ @Backend 修复 3 项 (4a 文档日期 + 4b 冗余\n + 4c 无配对回退)
+✅ V3 + 4a/4b/4c + DevOps 部署 全部完成
+🐛 Founder 发现: 生产环境自定义分析失效 (env var 不一致)
+→ TASK-UPLOADER-ENV-FIX @Frontend (3 处 NEXT_PUBLIC_API_BASE_URL → NEXT_PUBLIC_API_URL)
 → @DevOps push + VPS 部署
 待办: Frontend 接入 confirm-outline
 ```
@@ -22,9 +23,9 @@
 
 ---
 
-## @Backend — 🔄 V3 修复 4a/4b/4c
+## @Backend — ✅ V3 + 4a/4b/4c 全部完成
 
-V3 状态机 PM Review PASS (24/24)。还需修复 3 项：文档日期 3 处 + L454 冗余 `\n` + L471 无配对回退。完成后通知 @pm → @DevOps push + VPS。
+无待办。
 
 ---
 
@@ -46,7 +47,13 @@ PM Review PASS (16/16)。
 
 ---
 
-## @DevOps — ⏳ push + VPS 部署 (等 Backend 4a/4b/4c 修复后一起推)
+## @Frontend — 🔄 TASK-UPLOADER-ENV-FIX
+
+3 个 Uploader 组件用了 `NEXT_PUBLIC_API_BASE_URL`（全站标准是 `NEXT_PUBLIC_API_URL`）。生产环境未设前者 → fallback localhost → 分析失败。改 3 行 + build 验证。详见 TEAM_CHAT。
+
+---
+
+## @DevOps — ⏳ push + VPS 部署 (等 UPLOADER-ENV-FIX 完成后一起推)
 
 ---
 

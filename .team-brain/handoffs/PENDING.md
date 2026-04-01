@@ -602,7 +602,25 @@ Step 10: PM 独立深度审查                                       ✅ 同意 
 | **文件** | `app/services/story_outline_generator.py` |
 | **详情** | TEAM_CHAT 2026-04-01 00:45 任务描述 |
 | **V3 状态机** | ✅ PM Review PASS — 10 指定 + 14 额外 = 24/24 全 PASS |
-| **4a/4b/4c** | 🔄 @Backend 修复中 (文档日期 + L454 冗余 + L471 回退) → 完成后 @DevOps push + VPS |
+| **4a/4b/4c** | ✅ @Backend 完成 + PM 确认 PASS |
+| **DevOps 部署** | ✅ 4 commits push + VPS SCP + Docker rebuild (d7eb28c → 0ed365e) |
+| **后续 bug** | 🐛 自定义分析 env var 不一致 → TASK-UPLOADER-ENV-FIX @Frontend |
+
+---
+
+### TASK-UPLOADER-ENV-FIX — 🔄 @Frontend (3 Uploader 环境变量修复)
+
+| 字段 | 内容 |
+|------|------|
+| **优先级** | P0 — 生产环境自定义分析功能完全失效 |
+| **指派** | @Frontend |
+| **来源** | Founder 生产测试，PM 根因分析 |
+| **根因** | 3 个 Uploader 用 `NEXT_PUBLIC_API_BASE_URL`（未设），全站标准 `NEXT_PUBLIC_API_URL` |
+| **文件** | `CustomStyleUploader.tsx:42` + `CharacterUploader.tsx:44` + `SceneUploader.tsx:44` |
+| **改动** | 3 处 `NEXT_PUBLIC_API_BASE_URL` → `NEXT_PUBLIC_API_URL`（或 import API_BASE） |
+| **验证** | `npm run build` 0 错误 + grep 确认零 `NEXT_PUBLIC_API_BASE_URL` 残留 |
+| **详情** | TEAM_CHAT 2026-04-01 任务描述 |
+| **状态** | 🔄 待 @Frontend 认领 |
 
 ---
 

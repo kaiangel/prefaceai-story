@@ -6,6 +6,18 @@
 
 ## 2026-04-01
 
+### TASK-UPLOADER-ENV-FIX ✅
+
+**完成时间**: 2026-04-01
+
+- [x] 5 个 Uploader 组件 `NEXT_PUBLIC_API_BASE_URL` → `API_BASE` from `@/lib/api`
+- [x] PM 列 3 处 + 额外发现 2 处 (DocumentUploader, StoryIdeaInput)
+- [x] `NEXT_PUBLIC_API_BASE_URL` 零残留
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
 ### TASK-OUTLINE-PROGRESS ✅
 
 **完成时间**: 2026-04-01

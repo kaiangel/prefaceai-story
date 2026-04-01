@@ -32743,3 +32743,95 @@ syntax ✅ + 回归 4/4 PASS。@pm 完成。
 git pull 即可。
 
 ---
+
+#### @pm (2026-04-01)
+
+### ✅ PM Review — DevOps 部署 PASS + 🐛 生产环境自定义分析 bug 发现
+
+**DevOps 部署审查**:
+- Push: 4 commits (2520fc5 + 029841a + d7eb28c + 0ed365e) ✅
+- VPS: SCP + Docker rebuild (api + frontend) + force-recreate ✅
+- 验证: frontend 200 + API /health + 3 容器 ✅
+- Ben 知会 ✅
+- asyncmy 不变 ✅
+- **DevOps 无责，部署本身正确。**
+
+---
+
+### 🐛 Founder 发现: 生产环境自定义风格/角色/场景 LLM 分析失效
+
+**现象**: prefaceai.mov/create 上传自定义图片后：
+- 自定义风格: 只显示 `自定义风格` 标签，无 AI 分析标签（本地显示 `复古氛围` `暖色调光影` 等）
+- 角色参考图: `未命名角色`（本地显示 `干练职场男`）
+- 场景参考图: `场景 1`（本地显示 `深山茅舍`）
+
+**PM 根因分析**:
+
+| 文件 | 环境变量 | 说明 |
+|------|----------|------|
+| `api.ts:10` | `NEXT_PUBLIC_API_URL` | ✅ 全站标准 |
+| `CustomStyleUploader.tsx:42` | `NEXT_PUBLIC_API_BASE_URL` | ❌ 错误变量名 |
+| `CharacterUploader.tsx:44` | `NEXT_PUBLIC_API_BASE_URL` | ❌ 错误变量名 |
+| `SceneUploader.tsx:44` | `NEXT_PUBLIC_API_BASE_URL` | ❌ 错误变量名 |
+
+**根因**: 3 个 Uploader 组件使用 `NEXT_PUBLIC_API_BASE_URL`（未设置），全站其他 API 用 `NEXT_PUBLIC_API_URL`（已设置）。生产环境未设置前者 → fallback 到 `http://127.0.0.1:8000/api` → 浏览器在用户端尝试连 localhost → 失败 → 静默 fallback 到默认值。本地两个变量都未设置，都 fallback 到 localhost，本地后端在跑所以正常。
+
+---
+
+### 📋 任务: TASK-UPLOADER-ENV-FIX — 统一 3 个 Uploader 环境变量
+
+**2026-04-01** · **@pm** → **@frontend**
+
+**目标**: 将 3 个 Uploader 组件的 API URL 统一为全站标准。
+
+**改动（3 处，每处改 1 行）**:
+
+```
+CustomStyleUploader.tsx:42
+  - ${process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api"}
+  + ${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api"}
+
+CharacterUploader.tsx:44
+  - ${process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api"}
+  + ${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api"}
+
+SceneUploader.tsx:44
+  - ${process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api"}
+  + ${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api"}
+```
+
+**更好的做法**: 直接 import `API_BASE` from `@/lib/api`，与全站一致：
+```typescript
+import { API_BASE } from "@/lib/api";
+// 然后用 `${API_BASE}/utils/analyze-style`
+```
+
+**验证**: `npm run build` 0 错误 + 确认 3 个文件不再引用 `NEXT_PUBLIC_API_BASE_URL`。
+
+完成后通知 @pm → @devops push + VPS 部署。
+
+---
+
+---
+
+#### @frontend (2026-04-01)
+
+### ✅ TASK-UPLOADER-ENV-FIX 完成 — 5 个 Uploader 统一 API_BASE
+
+PM 派发 3 处，实际排查发现 **5 处** 同样问题，全部修复：
+
+| 文件 | 端点 | 改动 |
+|------|------|------|
+| `CustomStyleUploader.tsx` | `/utils/analyze-style` | `NEXT_PUBLIC_API_BASE_URL` → `API_BASE` from `@/lib/api` |
+| `CharacterUploader.tsx` | `/utils/analyze-character` | 同上 |
+| `SceneUploader.tsx` | `/utils/analyze-scene` | 同上 |
+| `DocumentUploader.tsx` | `/utils/parse-document` | 同上（PM 未列出，额外发现） |
+| `StoryIdeaInput.tsx` | `/utils/ocr` | 同上（PM 未列出，额外发现） |
+
+**做法**: 不是简单换 env var 名，而是 `import { API_BASE } from "@/lib/api"` 直接复用全站统一常量，彻底消除 env var 名不一致风险。
+
+**验证**:
+- `grep -r "NEXT_PUBLIC_API_BASE_URL" frontend/src/` = 0 匹配 ✅
+- `npm run build` 20 路由 0 错误 ✅
+
+**@pm 完成，等你 Review。**

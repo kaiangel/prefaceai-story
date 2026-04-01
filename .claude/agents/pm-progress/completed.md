@@ -4,6 +4,15 @@
 
 ---
 
+### 2026-04-01 — DevOps 部署审查 PASS + 自定义分析 env bug 发现 → TASK-UPLOADER-ENV-FIX 派发
+
+- **DevOps 审查**: 4 commits push + VPS SCP + Docker rebuild + Ben 知会，全部正确，DevOps 无责
+- **Founder 发现**: prefaceai.mov 自定义风格/角色/场景上传后无 AI 分析标签
+- **PM 根因**: 3 个 Uploader 组件用 `NEXT_PUBLIC_API_BASE_URL`（未设置），全站标准是 `NEXT_PUBLIC_API_URL` → 生产 fallback localhost → 静默失败
+- **派发**: TASK-UPLOADER-ENV-FIX @Frontend（3 处改 1 行）
+
+---
+
 ### 2026-04-01 — TASK-JSON-REPAIR-V3 PM Review PASS (24/24)
 
 - **审查范围**: `story_outline_generator.py` L419-477 `_fix_unescaped_quotes()` 正则→状态机重写

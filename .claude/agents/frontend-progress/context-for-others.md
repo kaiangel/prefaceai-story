@@ -4,8 +4,8 @@
 
 ---
 
-## 当前状态: TASK-OUTLINE-PROGRESS 完成，等 PM Review
+## 当前状态: TASK-UPLOADER-ENV-FIX 完成，等 PM Review
 
-大纲生成 80-90s 等待期间，从按钮转圈 → 全屏进度页面（6 阶段模拟 + 非线性进度条 + 已等待时间）
+5 个 Uploader 组件的 `NEXT_PUBLIC_API_BASE_URL` → `API_BASE` from `@/lib/api`（PM 列 3 处，额外发现 2 处）
 
 **构建**: 20 路由，0 错误
