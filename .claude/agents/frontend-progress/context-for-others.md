@@ -1,11 +1,15 @@
 # Frontend 状态速览（供其他Agent参考）
 
-> 更新时间: 2026-04-01
+> 更新时间: 2026-04-03
 
 ---
 
-## 当前状态: TASK-UPLOADER-ENV-FIX 完成，等 PM Review
+## 当前状态: TASK-PLOTPOINT-REORDER-FIX 完成，等 PM Review
 
-5 个 Uploader 组件的 `NEXT_PUBLIC_API_BASE_URL` → `API_BASE` from `@/lib/api`（PM 列 3 处，额外发现 2 处）
+StageB confirm-outline 的 plot_points 格式变更：
+- 旧: `["描述1", "描述2", ...]`
+- 新: `[{ description: "描述1", original_index: 0 }, ...]`
+
+后端据 original_index 从原始 plot_points 取完整 dict（含 mood/setting/characters_involved）重排。
 
 **构建**: 20 路由，0 错误

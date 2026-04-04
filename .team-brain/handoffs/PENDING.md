@@ -608,19 +608,57 @@ Step 10: PM 独立深度审查                                       ✅ 同意 
 
 ---
 
-### TASK-UPLOADER-ENV-FIX — 🔄 @Frontend (3 Uploader 环境变量修复)
+### TASK-UPLOADER-ENV-FIX — ✅ 已完成并部署
 
 | 字段 | 内容 |
 |------|------|
 | **优先级** | P0 — 生产环境自定义分析功能完全失效 |
 | **指派** | @Frontend |
 | **来源** | Founder 生产测试，PM 根因分析 |
-| **根因** | 3 个 Uploader 用 `NEXT_PUBLIC_API_BASE_URL`（未设），全站标准 `NEXT_PUBLIC_API_URL` |
-| **文件** | `CustomStyleUploader.tsx:42` + `CharacterUploader.tsx:44` + `SceneUploader.tsx:44` |
-| **改动** | 3 处 `NEXT_PUBLIC_API_BASE_URL` → `NEXT_PUBLIC_API_URL`（或 import API_BASE） |
-| **验证** | `npm run build` 0 错误 + grep 确认零 `NEXT_PUBLIC_API_BASE_URL` 残留 |
-| **详情** | TEAM_CHAT 2026-04-01 任务描述 |
-| **状态** | 🔄 待 @Frontend 认领 |
+| **根因** | 5 个 Uploader 用 `NEXT_PUBLIC_API_BASE_URL`（未设），全站标准 `NEXT_PUBLIC_API_URL` |
+| **改动** | 5 文件 `import { API_BASE } from "@/lib/api"` + 零残留 |
+| **Frontend** | ✅ PM Review 5/5 (含额外发现 DocumentUploader + StoryIdeaInput) |
+| **DevOps** | ✅ PM Review PASS — 2 commits push + VPS frontend rebuild + rsync 补全 |
+| **状态** | ✅ 已完成并部署 (2026-04-01) |
+
+---
+
+### TASK-CONFIRM-OUTLINE-WIRE — 🔄 @Frontend + @Backend (StageB 接通 Pipeline)
+
+| 字段 | 内容 |
+|------|------|
+| **优先级** | P0 — 产品核心体验断裂（StageB 用户编辑全部丢弃） |
+| **指派** | Step 1 @Frontend + Step 2 @Backend |
+| **来源** | Founder 生产测试 + PM 架构审计 |
+| **问题** | StageB 6 个可编辑字段（标题/角色/情节/结局/情绪）确认后全部丢弃，Pipeline 重新生成 |
+| **方案** | ① 前端调 confirm-outline + start-generation ② 后端 pipeline 用 confirmed outline 跳过 Stage 1 |
+| **详情** | TEAM_CHAT 2026-04-03 完整设计方案 |
+| **Step 1** | ✅ @Frontend PM Review 9/9 |
+| **Step 2** | ✅ @Backend PM Review 7/7 + 链路修复 7/7 |
+| **状态** | ✅ Review PASS + Tester 39/39 → **@DevOps 部署中** (Ben 已在 DB 中看到旧代码脏数据) |
+
+---
+
+### TASK-CONFIRM-OUTLINE-TEST — ✅ 完成 (37/37 PASS, PM 独立确认)
+
+| 字段 | 内容 |
+|------|------|
+| **状态** | ✅ 完成 (2026-04-03) |
+
+---
+
+### TASK-PLOTPOINT-REORDER-FIX — 🔄 @Frontend + @Backend + @Tester 并行
+
+| 字段 | 内容 |
+|------|------|
+| **优先级** | P1 — 情节拖拽元数据跟随优化 |
+| **指派** | @Frontend + @Backend + @Tester（并行） |
+| **问题** | 情节重排序时 description 跟随移动但 mood/setting/characters_involved 留在原位 |
+| **Frontend** | StageB.tsx L102-104: plot_points 改为 `{description, original_index}` |
+| **Backend** | projects.py confirm-outline: 按 original_index 整体移动 dict |
+| **Tester** | 测试脚本更新 + 新增 mood 跟随断言 |
+| **详情** | TEAM_CHAT 2026-04-03 任务描述 |
+| **状态** | ✅ 三方完成 + PM Review PASS + 39/39 (2026-04-03) |
 
 ---
 

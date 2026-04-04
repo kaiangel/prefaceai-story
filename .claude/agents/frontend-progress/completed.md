@@ -4,6 +4,31 @@
 
 ---
 
+## 2026-04-03
+
+### TASK-PLOTPOINT-REORDER-FIX ✅
+
+**完成时间**: 2026-04-03
+
+- [x] StageB.tsx: plot_points 从纯字符串改为 `{ description, original_index }` 对象数组
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
+### TASK-CONFIRM-OUTLINE-WIRE Step 1 ✅
+
+**完成时间**: 2026-04-03
+
+- [x] types/create.ts: CreateState 新增 projectId + CreateAction 新增 SET_PROJECT_ID
+- [x] CreateContext.tsx: initialState + reducer
+- [x] CreateContent.tsx: StageA POST /projects/ 后 dispatch SET_PROJECT_ID
+- [x] StageB.tsx: 删除重复 POST /projects/，改为 confirm-outline + start-generation
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
 ## 2026-04-01
 
 ### TASK-UPLOADER-ENV-FIX ✅

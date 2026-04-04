@@ -4,6 +4,42 @@
 
 ---
 
+## 2026-04-03: TASK-PLOTPOINT-REORDER-FIX — 测试脚本更新 (情节元数据跟随重排)
+
+**结果**: 39/39 PASS（在 CONFIRM-OUTLINE-TEST 37/37 基础上 +2 新断言）
+
+**改动**: 4 处
+1. USER_EDITS plot_points 从纯字符串 → `{description, original_index}` dict
+2. merge_outline() 更新为 original_index 重排逻辑
+3. 新增 T4b: mood 跟随断言 (`"好奇"`)
+4. JSON 完整性: mood/setting 跟随断言更新
+
+**Frontend+Backend 代码验证**: StageB.tsx L106 + projects.py L317-331 均已修改到位 ✅
+
+**测试脚本**: `tests/test_confirm_outline_wire.py`
+**报告**: `test_output/manualtest/confirm_outline_20260403_013321/wire_test_report.md`
+
+---
+
+## 2026-04-03: TASK-CONFIRM-OUTLINE-TEST — confirm-outline 全链路自动化验证
+
+**结果**: 37/37 PASS（合并逻辑 10 + JSON 完整性 8 + Pipeline 跳过 8 + 代码一致性 11）
+
+**方法**: 纯本地 Python，零 LLM/API 成本。构造 mock 数据复现合并逻辑 + 代码静态验证。
+
+**数据源**: "逆行的时光" 钟表匠故事（3 角色, 6 情节, 3 结局）
+
+**4 组测试**:
+- 合并逻辑: PM 8 断言 (title/logline/角色/情节/结局/情绪) + 2 LLM 字段保留 — 10/10 ✅
+- JSON 完整性: 序列化 + 角色/情节数量 + 未编辑字段保留 — 8/8 ✅
+- Pipeline 跳过: run() 参数 + if 分支 + 日志 + job_manager 透传 — 8/8 ✅
+- 代码一致性: confirm-outline/start-generation 端点 + 合并关键行 + create_project 无 pipeline — 11/11 ✅
+
+**测试脚本**: `tests/test_confirm_outline_wire.py`
+**报告**: `test_output/manualtest/confirm_outline_20260403_010812/wire_test_report.md`
+
+---
+
 ## 2026-03-17: TASK-SAFE-DRYRUN — 3 条 Prompt 安全改写链路 Dry-run 验证
 
 **结果**: 7/7 PASS（代码验证 + 3 条链路 + 3 项日志完整性）

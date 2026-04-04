@@ -1,66 +1,37 @@
 # Backend Agent - 当前任务
 
-> **最后更新**: 2026-04-01
-> **状态**: ✅ TASK-JSON-REPAIR-V3 完成 (24/24 PASS)，等 DevOps push + VPS
+> **最后更新**: 2026-04-03
+> **状态**: ✅ TASK-CONFIRM-OUTLINE-WIRE Step 2 完成，等 PM Review
 
 ---
 
 ## 刚完成
 
-### ✅ TASK-JSON-REPAIR-V3 (2026-04-01)
+### ✅ TASK-CONFIRM-OUTLINE-WIRE Step 2 (2026-04-03)
 
-- `_fix_unescaped_quotes()` 正则 → 状态机：逐字符遍历 + in_string + 前瞻判断
-- 10/10 测试全 PASS（含 EM DASH / 省略号 / 感叹号 / 多对引号 / 正常 JSON 不变）
+5 子项:
+- 2a: `POST /projects/` 去掉 pipeline 触发（仅创建 Project）
+- 2b: `confirm-outline` 合并 raw + 用户编辑 6 字段
+- 2c: 新增 `POST /projects/{id}/start-generation`
+- 2d: `_run_generation_in_background` + `run_story_generation_task` 透传 `confirmed_outline`
+- 2e: `pipeline_orchestrator.run()` 有 confirmed_outline 时跳过 Stage 1
+
+改动 3 文件: `projects.py` + `pipeline_orchestrator.py` + `job_manager.py`
+验证: 3/3 syntax ✅
+
+**PM Review 发现链路断裂修复**:
+- `job_manager.py`: 有 `confirmed_outline` 时用 `Phase2PipelineOrchestrator.run()` 替代 `StoryGenerator`
+- 完整链路打通: start-generation → job_manager → pipeline(skip Stage 1) ✅
+
+---
+
+### ✅ TASK-PLOTPOINT-REORDER-FIX Backend (2026-04-03)
+
+- `projects.py`: confirm-outline plot_points 按 `original_index` 整体移动 dict + `.copy()` + 向后兼容
 - syntax ✅
-
-### ✅ TASK-LOGGING-FIX (2026-03-30)
-
-- `main.py`: TeeStream → `logging.basicConfig` (StreamHandler + FileHandler)
-- `projects.py` / `utils.py` / `story_outline_generator.py`: print→logger.info (26 处)
-- 零残留 ✅ + syntax 4/4 ✅
-
-### ✅ TASK-JSON-REPAIR-V2 + TASK-PERSISTENT-LOG (2026-03-29)
-
-- V2: 正则 +`\uff00-\uffef` (全角标点) + `{1,50}` (长对话)
-- LOG: `main.py` TeeStream → `storage/logs/backend.log`
-- syntax 2/2 ✅ + 测试 3/3 ✅
-
-### ✅ TASK-DOC-FORMAT (2026-03-29)
-
-- `app/api/projects.py`: idea 为空时直接用 doc 文本，不加多余前缀
-- syntax ✅
-
-### ✅ TASK-DOC-ONLY-FIX Backend (2026-03-29)
-
-- `app/schemas/project.py`: `original_idea` 允许空字符串 (`min_length=1` 移除)
-- `app/api/projects.py`: idea+doc 都空时返回 400
-- syntax 2/2 ✅
-
-### ✅ TASK-JSON-REPAIR (2026-03-29)
-
-- `story_outline_generator.py`: 新增 `_fix_unescaped_quotes()` 静态方法 + `_extract_json()` 开头调用预处理
-- 修复 Claude 在中文 JSON 里输出未转义 ASCII 双引号导致 JSON 解析失败
-- 测试: 3/3 ✅
-
-### ✅ TASK-DEBUG-LOGGING — 7 个日志埋点 (2026-03-28)
-
-- `app/api/utils.py`: 5 个端点各加成功日志 (OCR/DocParse/Style/Char/Scene)
-- `app/api/projects.py`: create_project 参数日志 + generate_outline LLM 参数日志
-- 只加 print，零逻辑改动
-- 验证: 2/2 syntax ✅
 
 ---
 
 ## 待处理队列
 
-- 无。等 Founder 联调。
-
----
-
-## 更新记录
-
-| 时间 | 更新内容 |
-|------|----------|
-| 2026-03-28 | ✅ TASK-DEBUG-LOGGING (7 埋点) |
-| 2026-03-26 | ✅ TASK-PHASE2-PIPELINE (含 ProjectStyleConfig fix) |
-| 2026-03-25 | ✅ TASK-PHASE2-INTEGRATE + INFRA + Phase 1 全部 |
+- 无。等 PM Review。

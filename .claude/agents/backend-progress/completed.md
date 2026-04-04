@@ -6,6 +6,16 @@
 
 ## 2026-04-01
 
+### TASK-PLOTPOINT-REORDER-FIX Backend 完成 ✅
+
+- `projects.py`: plot_points 按 original_index 整体移动 dict（mood/setting 跟随排序）
+
+### TASK-CONFIRM-OUTLINE-WIRE Step 2 完成 ✅
+
+- `projects.py`: POST /projects/ 去 pipeline + confirm-outline 合并逻辑 + 新增 start-generation
+- `pipeline_orchestrator.py`: run() +confirmed_outline → 有则跳过 Stage 1
+- `job_manager.py`: run_story_generation_task +confirmed_outline → 有则用 PipelineOrchestrator 替代 StoryGenerator
+
 ### TASK-JSON-REPAIR-V3 完成 ✅
 
 - `_fix_unescaped_quotes()` 正则 → 状态机（逐字符 + in_string + 前瞻）

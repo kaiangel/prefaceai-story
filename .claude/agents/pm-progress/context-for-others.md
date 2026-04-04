@@ -1,6 +1,6 @@
 # PM Agent - 给其他Agent的信息
 
-> **最后更新**: 2026-04-01
+> **最后更新**: 2026-04-04
 > **目的**: 让其他Agent快速了解当前状态和任务
 
 ---
@@ -8,11 +8,10 @@
 ## 当前状态
 
 ```
-✅ V3 + 4a/4b/4c + DevOps 部署 全部完成
-🐛 Founder 发现: 生产环境自定义分析失效 (env var 不一致)
-→ TASK-UPLOADER-ENV-FIX @Frontend (3 处 NEXT_PUBLIC_API_BASE_URL → NEXT_PUBLIC_API_URL)
-→ @DevOps push + VPS 部署
-待办: Frontend 接入 confirm-outline
+✅ WIRE + REORDER-FIX 全部 PM Review PASS (39/39)
+Ben 发现 DB 异常 → PM 确认 = 旧代码行为 → 需立即部署
+→ @DevOps push + VPS 部署 (7 文件 + 测试脚本)
+→ @Ben 部署后清理历史脏数据
 ```
 
 ---
@@ -47,13 +46,35 @@ PM Review PASS (16/16)。
 
 ---
 
-## @Frontend — 🔄 TASK-UPLOADER-ENV-FIX
-
-3 个 Uploader 组件用了 `NEXT_PUBLIC_API_BASE_URL`（全站标准是 `NEXT_PUBLIC_API_URL`）。生产环境未设前者 → fallback localhost → 分析失败。改 3 行 + build 验证。详见 TEAM_CHAT。
+## @Frontend — ✅ CONFIRM-OUTLINE-WIRE Step 1 完成 (PM Review 9/9)
 
 ---
 
-## @DevOps — ⏳ push + VPS 部署 (等 UPLOADER-ENV-FIX 完成后一起推)
+## @Backend — ✅ CONFIRM-OUTLINE-WIRE Step 2 + 链路修复 完成 (PM Review 7/7 + 7/7)
+
+---
+
+## @Frontend — ✅ WIRE Step 1 + REORDER-FIX 完成
+
+---
+
+## @Backend — ✅ WIRE Step 2 + 链路修复 + REORDER-FIX 完成
+
+---
+
+## @Tester — ✅ 39/39 PASS (CONFIRM-OUTLINE-TEST + REORDER-FIX)
+
+---
+
+## @DevOps — 🔄 push + VPS 部署 (WIRE + REORDER-FIX)
+
+7 代码文件 + 1 测试脚本未提交。Commit + push + VPS 部署（api + frontend rebuild）。Ben 已在 DB 中看到旧代码造成的脏数据，需尽快部署。详见 TEAM_CHAT。
+
+---
+
+## @backend_Ben — 部署后 DB 脏数据清理
+
+详见 `.team-brain/shared-memory/notice_db_cleanup_after_wire_deploy.md`
 
 ---
 

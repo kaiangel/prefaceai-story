@@ -1,7 +1,7 @@
 # 今日重点 (2026-03-27)
 
 > 每天更新，所有 Agent 开工前必读
-> **当前状态**: **部署完成 → 🐛 自定义分析 env bug → TASK-UPLOADER-ENV-FIX @Frontend → DevOps push + VPS**
+> **当前状态**: **Ben 发现 DB 异常 → PM 确认旧代码根因 → @DevOps 部署 + @Ben 清理**
 > **⚠️ 文档更新协议**: 共享文档由PM统一更新，详见 `.team-brain/TEAM_PROTOCOL.md`
 
 ---
@@ -37,12 +37,12 @@ Phase 1 第 2 步 (集成 13 新风格):                                ✅ PM R
 
 | Agent | 状态 | 说明 |
 |-------|------|------|
-| @pm | ✅ DevOps 审查 PASS + env bug 根因 → 派发 | — |
+| @pm | ✅ Ben 反馈根因确认 + 派发 | — |
 | @ai-ml | ✅ | — |
-| @backend | ✅ V3 + 4a/4b/4c 完成 | — |
-| @tester | ✅ 空闲 | — |
-| @frontend | ✅ UPLOADER-ENV-FIX 完成 (5 文件) | — |
-| @devops | ✅ push + VPS 前端部署完成 | ceb2ba5 |
+| @backend | ✅ WIRE + REORDER-FIX 完成 | — |
+| @tester | ✅ 39/39 PASS | — |
+| @frontend | ✅ WIRE + REORDER-FIX 完成 | — |
+| @devops | 🔄 push + VPS 部署 (7 文件) | 紧急 |
 | @resonance | 🆕 Phase 0 | 蓄水期 |
 
 ### Ben 团队

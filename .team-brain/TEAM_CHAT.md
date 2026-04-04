@@ -32871,3 +32871,800 @@ PM 派发 3 处，实际排查发现 **5 处** 同样问题，全部修复：
 **与你代码的关系**: 纯前端改动（5 个 `.tsx` 文件），不影响你的后端代码。git pull 即可。
 
 ---
+
+#### @pm (2026-04-02)
+
+### ✅ PM Review PASS — TASK-UPLOADER-ENV-FIX 全链路闭环
+
+**Frontend Review (5/5)**:
+- 5 文件全部 `import { API_BASE } from "@/lib/api"` ✅
+- `NEXT_PUBLIC_API_BASE_URL` 全站零残留 ✅
+- `npm run build` 20 路由 0 错误 ✅
+- Frontend 额外发现 PM 遗漏的 2 文件（DocumentUploader + StoryIdeaInput）👍
+
+**DevOps Review PASS**:
+- Push 2 commits + VPS SCP 5 文件 + Docker rebuild frontend only ✅
+- API 容器正确未动 + 后台 full rsync 补全 ✅
+- Ben 知会 ✅
+
+**2026-04-01 全日闭环**:
+| 任务 | 结果 |
+|------|------|
+| TASK-JSON-REPAIR-V3 (Backend 状态机) | ✅ PM Review 24/24 |
+| V3 4a/4b/4c 修复 (Backend) | ✅ PM 确认 |
+| 第 1 次 DevOps 部署 (V3+PROGRESS+LOGGING) | ✅ PM Review PASS |
+| TASK-UPLOADER-ENV-FIX (Frontend 5 文件) | ✅ PM Review 5/5 |
+| 第 2 次 DevOps 部署 (ENV-FIX) | ✅ PM Review PASS |
+
+**当前零阻塞，零待办（除 confirm-outline 待派发）。Founder 可测试 prefaceai.mov。**
+
+---
+
+#### @pm (2026-04-03)
+
+### 🚨 PM 架构审计: StageB 用户编辑完全断联 — TASK-CONFIRM-OUTLINE-WIRE
+
+**Founder 在生产环境测试大纲生成成功**（"逆行的时光"，钟表匠故事），StageB 页面显示齐全。PM 随即追踪全链路数据流，发现 **产品核心体验断裂**。
+
+**审计结论**：StageB 所有用户编辑是纯装饰性的。用户精心调整的标题、角色、情节、结局选择、情绪基调——点击确认后全部丢弃，系统从头重新生成。
+
+**三层断裂**：
+
+```
+1. 前端: StageB.handleConfirm() 调用 POST /projects/ 创建新项目
+   → 不调用 /confirm-outline → 用户编辑留在 React state 中丢失
+
+2. 架构: StageA 已创建项目 #1 + 启动 pipeline #1
+   → StageB 再创建项目 #2 + 启动 pipeline #2 → 重复创建
+
+3. Pipeline: run() 从 original_idea 重新调 Stage 1 生成大纲
+   → 完全无视 confirmed_outline_json → Stage 2-4 用的是全新大纲
+```
+
+**6 个用户可编辑字段全部断联**：
+
+| 字段 | StageB 可编辑 | 传入后端 | Pipeline 使用 |
+|------|:-:|:-:|:-:|
+| 故事标题 | ✅ | ❌ | ❌ |
+| 故事简介 | ✅ | ❌ | ❌ |
+| 角色名字/描述/性格 | ✅ | ❌ | ❌ |
+| 情节走向（拖拽/增删） | ✅ | ❌ | ❌ |
+| 结局选择（3 选 1） | ✅ | ❌ | ❌ |
+| 情绪基调 | ✅ | ❌ | ❌ |
+
+---
+
+### 📋 TASK-CONFIRM-OUTLINE-WIRE — 接通 StageB 到 Pipeline
+
+**2026-04-03** · **@pm** → **@frontend + @backend**
+
+**目标**: 用户在 StageB 的所有编辑（标题、角色、情节、结局、情绪）必须传入 Pipeline 并被 Stage 2-4 使用。
+
+---
+
+#### 目标流程（当前 vs 修复后）
+
+**当前（断裂）**:
+```
+StageA: POST /projects/ [创建项目 #1 + 启动 pipeline #1] ← 不应启动
+StageA: POST /projects/{id}/generate-outline [同步大纲]
+StageB: POST /projects/ [创建项目 #2 + 启动 pipeline #2] ← 重复创建
+→ 两个项目，两条 pipeline，用户编辑丢失
+```
+
+**修复后**:
+```
+StageA: POST /projects/ [仅创建项目，不启动 pipeline]
+StageA: POST /projects/{id}/generate-outline [同步大纲 → StageB 预览]
+StageA: 保存 project_id 到 state
+
+StageB: 用户查看/编辑大纲
+StageB: POST /projects/{id}/confirm-outline [保存用户编辑]
+StageB: POST /projects/{id}/start-generation [启动 pipeline，使用 confirmed 大纲]
+→ 一个项目，一条 pipeline，用户编辑被尊重
+```
+
+---
+
+#### Step 1 — @Frontend
+
+**文件**: `CreateContent.tsx` + `StageB.tsx` + `CreateContext.tsx`
+
+**1a. CreateContext.tsx — 新增 projectId 状态**:
+- `CreateState` 新增 `projectId: string | null`
+- Reducer 新增 `SET_PROJECT_ID` action
+
+**1b. CreateContent.tsx (StageA) — 保存 projectId**:
+- L127 `POST /projects/` 返回后，`dispatch({ type: "SET_PROJECT_ID", payload: project.project_id })`
+- 其余不变
+
+**1c. StageB.tsx — 重写 handleConfirm()**:
+```typescript
+const handleConfirm = async () => {
+  // 1. 从 state 读 projectId（StageA 已创建）
+  const projectId = state.projectId;
+
+  // 2. 调用 confirm-outline，保存用户编辑
+  await apiFetch(`/projects/${projectId}/confirm-outline`, {
+    method: "POST",
+    body: JSON.stringify({
+      outline: {
+        title: outline.title,
+        title_en: outline.titleEn,
+        summary: outline.summary,
+        characters: outline.characters.map(c => ({
+          name: c.name,
+          name_en: c.nameEn,
+          description: c.description,
+          personality: c.personality,
+        })),
+        plot_points: outline.plotPoints
+          .sort((a, b) => a.order - b.order)
+          .map(p => p.description),
+        selected_ending: outline.endings.find(e => e.isSelected)?.description || "",
+        mood: outline.mood,
+      }
+    }),
+  }, token);
+
+  // 3. 触发 pipeline 生成
+  await apiFetch(`/projects/${projectId}/start-generation`, {
+    method: "POST",
+  }, token);
+
+  // 4. 跳转 StageC
+  dispatch({ type: "CONFIRM_OUTLINE" });
+  dispatch({ type: "SET_STAGE", payload: "generate" });
+};
+```
+
+**要删除的**:
+- StageB.tsx 中的 `POST /projects/` 调用（L102-112）全部移除
+
+**验证**: `npm run build` 0 错误。
+
+---
+
+#### Step 2 — @Backend
+
+**文件**: `projects.py` + `pipeline_orchestrator.py`
+
+**2a. projects.py — POST /projects/ 去掉 pipeline 触发**:
+- 移除 L119-147（Chapter + GenerationJob 创建 + asyncio.create_task）
+- 只保留项目创建（Project 记录）
+- 返回 `{ project_id: uuid }` 即可
+
+**2b. projects.py — POST /confirm-outline 增强合并逻辑**:
+```python
+@router.post("/{project_id}/confirm-outline")
+async def confirm_outline(project_id, req, user_id, db):
+    project = ...  # 查询项目
+
+    # 读取 raw_outline（LLM 完整输出）
+    raw = json.loads(project.raw_outline_json) if project.raw_outline_json else {}
+
+    # 用户编辑覆盖
+    user = req.outline
+    raw["title"] = user.get("title", raw.get("title"))
+    raw["title_en"] = user.get("title_en", raw.get("title_en"))
+    raw["logline"] = user.get("summary", raw.get("logline"))
+
+    # 角色: 按名字匹配，更新描述/性格
+    if user.get("characters"):
+        for i, uc in enumerate(user["characters"]):
+            if i < len(raw.get("characters_overview", [])):
+                raw["characters_overview"][i]["name"] = uc["name"]
+                raw["characters_overview"][i]["name_en"] = uc.get("name_en", "")
+                raw["characters_overview"][i]["brief_description"] = uc["description"]
+                raw["characters_overview"][i]["personality"] = uc.get("personality", "")
+
+    # 情节: 用用户排序后的描述替换
+    if user.get("plot_points"):
+        for i, desc in enumerate(user["plot_points"]):
+            if i < len(raw.get("plot_points", [])):
+                raw["plot_points"][i]["event"] = desc
+
+    # 结局选择: 记录到大纲
+    if user.get("selected_ending"):
+        raw["selected_ending"] = user["selected_ending"]
+
+    # 情绪: 更新 visual_tone
+    if user.get("mood"):
+        if "visual_tone" not in raw:
+            raw["visual_tone"] = {}
+        raw["visual_tone"]["overall_mood"] = user["mood"]
+
+    project.confirmed_outline_json = json.dumps(raw, ensure_ascii=False)
+    await db.commit()
+    return {"success": True}
+```
+
+**2c. projects.py — 新增 POST /projects/{id}/start-generation**:
+```python
+@router.post("/{project_id}/start-generation")
+async def start_generation(project_id, user_id, db):
+    project = ...  # 查询项目
+
+    # 读取确认后的大纲（优先），否则用原始大纲
+    outline_json = project.confirmed_outline_json or project.raw_outline_json
+    confirmed_outline = json.loads(outline_json) if outline_json else None
+
+    # 创建 Chapter + GenerationJob
+    chapter = Chapter(project_id=project.id, ...)
+    job = GenerationJob(chapter_id=chapter.id, ...)
+    await db.commit()
+
+    # 启动 pipeline，传入 confirmed_outline
+    asyncio.create_task(_run_generation_in_background(
+        job_id=job.id,
+        chapter_id=chapter.id,
+        idea=project.original_idea,
+        style=project.style_preset,
+        ...,
+        confirmed_outline=confirmed_outline,  # 新参数
+    ))
+    return ProjectResponse(...)
+```
+
+**2d. _run_generation_in_background — 透传 confirmed_outline**:
+- 新增 `confirmed_outline: dict = None` 参数
+- 传给 `run_story_generation_task()`
+
+**2e. pipeline_orchestrator.py — run() 使用 confirmed_outline**:
+```python
+async def run(self, idea, ..., confirmed_outline=None):
+    # Stage 1: 如果有 confirmed_outline，跳过
+    if confirmed_outline:
+        outline = confirmed_outline
+        # 处理 selected_ending: 将选中的结局融入最后一个 plot_point
+        if confirmed_outline.get("selected_ending"):
+            outline.setdefault("plot_points", [])
+            # 确保最后一个情节点反映用户选择的结局
+    else:
+        outline = await self.outline_generator.generate(idea=idea, ...)
+
+    self.stage_results["outline"] = outline
+
+    # Stage 2-4: 正常执行（它们读的是 outline，现在是用户确认版）
+    characters = await self.character_designer.design(outline)
+    ...
+```
+
+**验证**:
+- Python syntax 全 PASS
+- 本地测试: 创建项目 → 生成大纲 → 编辑角色名 → 确认 → Pipeline 用的是编辑后的角色名
+
+---
+
+#### 数据格式映射（前端 → 后端合并）
+
+| 前端字段 | 后端字段 | 合并策略 |
+|---------|---------|---------|
+| `title` | `title` | 直接覆盖 |
+| `titleEn` | `title_en` | 直接覆盖 |
+| `summary` | `logline` | 直接覆盖 |
+| `characters[].name` | `characters_overview[].name` | 按索引匹配覆盖 |
+| `characters[].description` | `characters_overview[].brief_description` | 按索引匹配覆盖 |
+| `characters[].personality` | `characters_overview[].personality` | 按索引匹配覆盖 |
+| `plotPoints[].description` | `plot_points[].event` | 按用户排序覆盖 |
+| `endings[isSelected].description` | `selected_ending`（新字段） | 新增到大纲 |
+| `mood` | `visual_tone.overall_mood` | 覆盖 |
+| *(不在前端)* | `emotional_arc`, `narrative_pace`, `unique_locations`, `color_palette` 等 | 保留 LLM 原始值 |
+
+---
+
+**完成标准**:
+
+Step 1 (@Frontend):
+- `npm run build` 0 错误
+- StageB 不再创建重复项目
+- confirm-outline 调用成功 (200)
+- start-generation 调用成功 (200)
+
+Step 2 (@Backend):
+- Python syntax 全 PASS
+- POST /projects/ 不再启动 pipeline
+- /confirm-outline 正确合并 raw + 用户编辑
+- /start-generation 用 confirmed_outline 启动 pipeline
+- Pipeline 跳过 Stage 1，Stage 2-4 使用确认后的大纲
+
+完成后通知 @pm Review。
+
+---
+
+---
+
+#### @frontend (2026-04-03)
+
+### ✅ TASK-CONFIRM-OUTLINE-WIRE Step 1 完成 — StageB 接通 confirm-outline + start-generation
+
+**4 文件改动**:
+
+| 文件 | 改动 |
+|------|------|
+| `types/create.ts` | `CreateState` 新增 `projectId: string \| null`，`CreateAction` 新增 `SET_PROJECT_ID` |
+| `CreateContext.tsx` | `initialState.projectId = null`，reducer 新增 `SET_PROJECT_ID` case |
+| `CreateContent.tsx` | StageA `POST /projects/` 返回后 `dispatch({ type: "SET_PROJECT_ID", payload: project.project_id })` |
+| `StageB.tsx` | **重写 handleConfirm()**: 删除 `POST /projects/` 重复创建，改为 `confirm-outline` + `start-generation` |
+
+**StageB.tsx 关键变化**:
+- ❌ 删除: `POST /projects/` 调用（L102-112）、`BACKEND_STYLE_MAP` 常量、`useAuth` / `refreshStories` 依赖
+- ✅ 新增: 从 `state.projectId` 读取 StageA 已创建的项目 ID
+- ✅ 新增: `POST /projects/{projectId}/confirm-outline` — 发送用户编辑的 6 个字段（title, title_en, summary, characters, plot_points, selected_ending, mood）
+- ✅ 新增: `POST /projects/{projectId}/start-generation` — 触发 pipeline
+- ✅ 防守: projectId 为空时显示错误提示
+
+**confirm-outline request body 格式**:
+```json
+{
+  "outline": {
+    "title": "...",
+    "title_en": "...",
+    "summary": "...",
+    "characters": [{"name": "...", "name_en": "...", "description": "...", "personality": "..."}],
+    "plot_points": ["情节1描述", "情节2描述", ...],
+    "selected_ending": "用户选中的结局描述",
+    "mood": "温馨"
+  }
+}
+```
+
+**验证**: `npm run build` 20 路由 0 错误 ✅
+
+**@pm 完成，等你 Review。**
+
+#### @backend (2026-04-03)
+
+### ✅ TASK-CONFIRM-OUTLINE-WIRE Step 2 Backend 完成 — 5 子项
+
+| # | 子项 | 文件 | 改动 |
+|---|------|------|------|
+| 2a | POST /projects/ 去 pipeline | `projects.py` | 删 Chapter+Job 创建 + asyncio.create_task，仅创建 Project |
+| 2b | confirm-outline 合并逻辑 | `projects.py` | raw + 用户编辑覆盖（title/summary/characters/plotPoints/ending/mood） |
+| 2c | 新增 start-generation | `projects.py` | 读 confirmed(优先)/raw 大纲 → Chapter+Job → pipeline 传 confirmed_outline |
+| 2d | 透传 confirmed_outline | `projects.py` | `_run_generation_in_background` +参数 → `run_story_generation_task` |
+| 2e | pipeline 跳过 Stage 1 | `pipeline_orchestrator.py` + `job_manager.py` | `run()` +confirmed_outline → 有则跳过 Stage 1 |
+
+**验证**: 3/3 syntax ✅
+
+@pm Step 2 Backend 完成，等 Review。
+
+---
+
+#### @backend (2026-04-03)
+
+✅ **链路断裂修复** — `job_manager.py` L124
+
+有 `confirmed_outline` 时改用 `Phase2PipelineOrchestrator.run(confirmed_outline=...)` 替代 `StoryGenerator.generate_story()`。
+
+完整链路:
+```
+start-generation → _run_generation_in_background(confirmed_outline=✅)
+→ run_story_generation_task(confirmed_outline=✅)
+→ Phase2PipelineOrchestrator.run(confirmed_outline=✅)  ← 修复
+→ Stage 1 跳过，Stage 2-4 使用用户确认大纲 ✅
+```
+
+syntax ✅。@pm 修完了。
+
+---
+
+#### @pm (2026-04-03)
+
+### ✅ PM Review PASS — TASK-CONFIRM-OUTLINE-WIRE 全链路
+
+**Frontend Step 1 (9/9)**: projectId state + StageB confirm-outline + start-generation + 无重复创建 + build PASS ✅
+
+**Backend Step 2 (7/7)**: POST /projects/ 去 pipeline + confirm-outline 合并 + start-generation + 透传 + pipeline skip Stage 1 ✅
+
+**Backend 链路修复 (7/7)**: job_manager.py L124 分支 → Phase2PipelineOrchestrator.run(confirmed_outline) → 6 跳全通 ✅
+
+**完整链路确认**:
+```
+Frontend StageB confirm → POST /confirm-outline (合并 raw+编辑) → POST /start-generation
+→ _run_generation_in_background(confirmed_outline)
+→ run_story_generation_task → if confirmed: PipelineOrchestrator.run(confirmed_outline)
+→ Stage 1 跳过 → Stage 2-4 使用用户确认大纲 ✅
+```
+
+**Founder 本地测试后 → @DevOps push + VPS 部署。**
+
+---
+
+### 📋 任务: TASK-CONFIRM-OUTLINE-TEST — 自动化验证 confirm-outline 全链路
+
+**2026-04-03** · **@pm** → **@tester**
+
+**目标**: 写一个零 LLM 成本的自动化测试脚本，验证 TASK-CONFIRM-OUTLINE-WIRE 的 6 条合并代码路径 + Pipeline Stage 1 跳过逻辑。
+
+**方法**: 纯本地 Python 脚本，不启动服务器，不调 LLM API。直接构造 mock 数据，调用合并逻辑，断言结果。
+
+---
+
+#### 测试用例设计（6 个编辑 + 2 个保留 = 8 个断言）
+
+**模拟 raw_outline（LLM 原始输出）**:
+- title: `"逆行的时光"`
+- title_en: `"Reverse Time"`
+- logline: `"年迈的钟表匠贺守时..."`
+- characters_overview: 3 个角色（贺守时/贺安/宋念慈），各有 name_suggestion, name_en, description, personality
+- plot_points: 6 个 dict，各有 description, characters_involved, setting, mood
+- ending_options: 3 个结局
+- visual_tone: `{ "overall_mood": "治愈", "color_palette": [...], "lighting_style": "..." }`
+- emotional_arc: `{ "opening": "...", "midpoint": "...", "climax": "...", "resolution": "..." }`
+- unique_locations: `[...]`
+- narrative_pace: `"..."`
+
+**模拟用户编辑（前端 StageB 发送）**:
+```python
+user_edits = {
+    "title": "逆行的时光_TEST",                          # T1: 改标题
+    "title_en": "Reverse Time_TEST",
+    "summary": "年迈的钟表匠贺守时..._PM测试",            # T2: 改简介
+    "characters": [
+        {"name": "贺老师", "name_en": "He Laoshi",        # T3: 改角色名+描述+性格
+         "description": "七十余岁老人（测试）",
+         "personality": "沉默寡言_测试标记"},
+        {"name": "贺安", "name_en": "He An",
+         "description": "约十岁小男孩", "personality": "好奇心旺盛"},
+        {"name": "宋念慈", "name_en": "Song Nianci",
+         "description": "六十余岁邻居老妇", "personality": "温柔健谈"},
+    ],
+    "plot_points": ["原第3个情节", "原第1个情节",          # T4: 情节重排序
+                    "原第2个情节", "原第4个情节",
+                    "原第5个情节", "原第6个情节"],
+    "selected_ending": "圆窗后的秘密揭示时光从未真正倒流", # T5: 选第3个结局
+    "mood": "紧张",                                       # T6: 改情绪
+}
+```
+
+**8 个断言**:
+
+| # | 断言 | JSON 路径 | 期望 |
+|---|------|-----------|------|
+| T1 | 标题覆盖 | `$.title` | `逆行的时光_TEST` |
+| T2 | 简介→logline 映射 | `$.logline` | 末尾含 `_PM测试` |
+| T3a | 角色名覆盖 | `$.characters_overview[0].name_suggestion` | `贺老师` |
+| T3b | 角色描述覆盖 | `$.characters_overview[0].description` | 含 `（测试）` |
+| T3c | 角色性格覆盖 | `$.characters_overview[0].personality` | 含 `测试标记` |
+| T4 | 情节重排序 | `$.plot_points[0].description` | `原第3个情节` |
+| T5 | 结局选择 | `$.selected_ending` | 含 `圆窗` |
+| T6 | 情绪覆盖 | `$.visual_tone.overall_mood` | `紧张` |
+| T7 | LLM 字段保留 | `$.emotional_arc` | 存在且非空 |
+| T8 | LLM 字段保留 | `$.unique_locations` | 存在且非空 |
+
+**额外: Pipeline 跳过测试**:
+- 构造 `Phase2PipelineOrchestrator`，传入 `confirmed_outline`
+- 断言: 不调用 `outline_generator.generate()`，直接使用 confirmed_outline
+- 可以 mock `outline_generator.generate` 并断言它**没有被调用**
+
+**脚本位置**: `tests/test_confirm_outline_wire.py`
+
+**验证**: `python tests/test_confirm_outline_wire.py` → 全 PASS + 零 API 调用
+
+完成后通知 @pm。
+
+---
+
+#### @tester (2026-04-03)
+
+### ✅ TASK-CONFIRM-OUTLINE-TEST 完成 — 37/37 PASS
+
+**方法**: 纯本地 Python，零 LLM/API 成本。构造 "逆行的时光" mock 数据，复现 projects.py 合并逻辑。
+
+**4 组测试**:
+
+| # | 测试组 | 子项 | 结果 |
+|---|--------|------|------|
+| 1 | 合并逻辑 (PM 8 断言 + 2 LLM 保留) | 10 | ✅ PASS |
+| 2 | JSON 完整性 | 8 | ✅ PASS |
+| 3 | Pipeline Stage 1 跳过 | 8 | ✅ PASS |
+| 4 | 代码一致性 (projects.py) | 11 | ✅ PASS |
+
+**PM 8 断言逐项**:
+
+| # | 断言 | 结果 |
+|---|------|------|
+| T1 | title = "逆行的时光_TEST" | ✅ |
+| T2 | logline 末尾 "_PM测试" | ✅ |
+| T3a | name_suggestion = "贺老师" | ✅ |
+| T3b | description 含 "（测试）" | ✅ |
+| T3c | personality 含 "测试标记" | ✅ |
+| T4 | plot_points[0] = 原第 3 个情节 | ✅ |
+| T5 | selected_ending 含 "圆窗" | ✅ |
+| T6 | visual_tone.overall_mood = "紧张" | ✅ |
+| T7 | emotional_arc 保留 | ✅ |
+| T8 | unique_locations 保留 | ✅ |
+
+**Pipeline 跳过验证 (8/8)**:
+- `run()` 含 confirmed_outline 参数 ✅
+- `if confirmed_outline:` 分支 ✅ + "跳过 LLM 生成" 日志 ✅
+- `outline = confirmed_outline` 赋值 ✅
+- job_manager 透传 confirmed_outline → Phase2PipelineOrchestrator ✅
+- `pipeline.run(confirmed_outline=confirmed_outline)` ✅
+
+**代码一致性 (11/11)**:
+- confirm-outline + start-generation 端点存在 ✅
+- summary→logline / name_suggestion / plot_points dict / selected_ending / visual_tone 合并关键行 ✅
+- start-generation 优先读 confirmed_outline_json ✅
+- **create_project 不再启动 pipeline** ✅
+
+**观察**: 情节重排序时，合并逻辑按索引替换 description，底层 dict 的 mood/setting/characters_involved 保持原位。用户重排的是描述文字，元数据不跟随移动。
+
+**测试脚本**: `tests/test_confirm_outline_wire.py`
+**报告**: `test_output/manualtest/confirm_outline_20260403_010812/wire_test_report.md`
+
+**@pm** TASK-CONFIRM-OUTLINE-TEST 完成，37/37 全 PASS。
+
+---
+
+#### @pm (2026-04-03)
+
+### ✅ PM Review PASS — TASK-CONFIRM-OUTLINE-TEST (37/37)
+
+PM 独立跑测试确认 37/37 PASS。Tester 测试脚本质量高，覆盖合并逻辑 + JSON 完整性 + Pipeline 跳过 + 代码一致性。
+
+**Tester 观察 PM 采纳**: 情节重排序时元数据不跟随移动是已知设计限制，非 bug。Founder 决定顺手优化 → 下方派发。
+
+---
+
+### 📋 任务: TASK-PLOTPOINT-REORDER-FIX — 情节拖拽元数据跟随
+
+**2026-04-03** · **@pm** → **@frontend + @backend + @tester**（可并行）
+
+**问题**: 用户在 StageB 拖拽情节 #3 到 #1 位置时，description 跟着移动了，但 mood/setting/characters_involved 仍留在原位。
+
+**根因**: 前端发送 `plot_points` 为纯字符串数组 `["描述1", "描述2", ...]`，后端只能按索引替换 description，无法整体移动 dict。
+
+**修复**: 前端发送带 `original_index` 的对象数组，后端按 original_index 从原始 plot_points 取出完整 dict 后重排。
+
+---
+
+#### @Frontend — StageB.tsx 1 处改动
+
+**文件**: `StageB.tsx` L102-104
+
+```typescript
+// 当前:
+plot_points: outline.plotPoints
+  .sort((a, b) => a.order - b.order)
+  .map(p => p.description),
+
+// 改为:
+plot_points: outline.plotPoints
+  .sort((a, b) => a.order - b.order)
+  .map(p => ({
+    description: p.description,
+    original_index: parseInt(p.id.replace("pp_", "")) - 1,
+  })),
+```
+
+**说明**: `pp_3` → `original_index: 2`（0-based）。id 是 generate-outline 端点按 `pp_1, pp_2, ...` 生成的，不会被用户操作修改。
+
+**验证**: `npm run build` 0 错误。
+
+---
+
+#### @Backend — projects.py confirm-outline 合并逻辑 1 处改动
+
+**文件**: `projects.py` L317-324
+
+```python
+# 当前:
+if user.get("plot_points"):
+    for i, desc in enumerate(user["plot_points"]):
+        if i < len(raw.get("plot_points", [])):
+            if isinstance(raw["plot_points"][i], dict):
+                raw["plot_points"][i]["description"] = desc
+            else:
+                raw["plot_points"][i] = desc
+
+# 改为:
+if user.get("plot_points"):
+    original = raw.get("plot_points", [])
+    reordered = []
+    for item in user["plot_points"]:
+        if isinstance(item, dict):
+            idx = item.get("original_index", 0)
+            desc = item.get("description", "")
+            if idx < len(original):
+                entry = original[idx].copy() if isinstance(original[idx], dict) else {"description": original[idx]}
+                entry["description"] = desc
+                reordered.append(entry)
+        else:
+            # 向后兼容: 如果收到纯字符串（旧前端），走原逻辑
+            reordered.append({"description": item})
+    if reordered:
+        raw["plot_points"] = reordered
+```
+
+**关键**: `.copy()` 避免修改原始数组 + 向后兼容纯字符串。
+
+**验证**: Python syntax PASS。
+
+---
+
+#### @Tester — 更新测试脚本
+
+**文件**: `tests/test_confirm_outline_wire.py`
+
+1. 更新 `USER_EDITS["plot_points"]` 从纯字符串改为带 original_index 的 dict
+2. 更新 `merge_outline()` 函数为新逻辑
+3. **新增断言**: `plot_points[0].mood == "好奇"`（原 #3 的 mood 现在跟随到 #1 位置）
+4. 修正原 `情节非编辑字段保留 (mood)` 断言预期为 `"好奇"` 而非 `"神秘"`
+
+**验证**: `python tests/test_confirm_outline_wire.py` → 全 PASS。
+
+---
+
+**三方可并行**。完成后通知 @pm。
+
+---
+
+---
+
+#### @frontend (2026-04-03)
+
+### ✅ TASK-PLOTPOINT-REORDER-FIX 完成 — plot_points 发送 original_index
+
+**文件**: `StageB.tsx` L102-106
+
+```typescript
+// 改前:
+plot_points: outline.plotPoints
+  .sort((a, b) => a.order - b.order)
+  .map(p => p.description),
+
+// 改后:
+plot_points: outline.plotPoints
+  .sort((a, b) => a.order - b.order)
+  .map(p => ({
+    description: p.description,
+    original_index: parseInt(p.id.replace("pp_", "")) - 1,
+  })),
+```
+
+`pp_3` → `original_index: 2`（0-based），后端可据此从原始 plot_points 取完整 dict 重排。
+
+**验证**: `npm run build` 20 路由 0 错误 ✅
+
+**@pm 完成，等你 Review。**
+
+#### @backend (2026-04-03)
+
+✅ **TASK-PLOTPOINT-REORDER-FIX Backend 完成** — `projects.py` confirm-outline 合并逻辑
+
+按 `original_index` 从原始 `plot_points` 取完整 dict + `.copy()` + 更新 `description` → 元数据跟随排序。向后兼容纯字符串。
+
+syntax ✅。@pm 完成。
+
+---
+
+#### @tester (2026-04-03)
+
+### ✅ TASK-PLOTPOINT-REORDER-FIX Tester 部分完成 — 39/39 PASS
+
+**测试脚本更新 4 处**:
+
+| # | 改动 | 说明 |
+|---|------|------|
+| 1 | USER_EDITS plot_points 格式 | 纯字符串 → `{description, original_index}` dict |
+| 2 | merge_outline() 合并逻辑 | 按 original_index 取原始 dict + .copy() + 重排 |
+| 3 | 新增 T4b 断言 | `plot_points[0].mood == "好奇"` (原 #3 mood 跟随) |
+| 4 | JSON 完整性断言 | mood 跟随 "好奇" + setting 跟随 "钟表店" |
+
+**REORDER-FIX 关键验证**:
+
+| 断言 | 结果 |
+|------|------|
+| T4b: mood 跟随重排 ("好奇") | ✅ |
+| setting 跟随重排 ("钟表店") | ✅ |
+| 情节数量仍为 6 | ✅ |
+
+**Frontend + Backend 代码确认**:
+- `StageB.tsx:106` — `original_index: parseInt(p.id.replace("pp_", "")) - 1` ✅
+- `projects.py:317-331` — original_index 重排 + .copy() + 向后兼容 ✅
+
+**全量结果**: 39/39 ALL PASS（合并逻辑 11 + JSON 9 + Pipeline 8 + 代码一致性 11）
+
+**报告**: `test_output/manualtest/confirm_outline_20260403_013321/wire_test_report.md`
+
+**@pm** TASK-PLOTPOINT-REORDER-FIX Tester 部分完成。三方全部就绪。
+
+---
+
+#### @pm (2026-04-03)
+
+### ✅ PM Review PASS — TASK-PLOTPOINT-REORDER-FIX 三方闭环
+
+**Frontend**: `StageB.tsx` L102-107 `{description, original_index}` 格式 + build PASS ✅
+**Backend**: `projects.py` L317-333 original_index 重排 + `.copy()` + 向后兼容 + syntax PASS ✅
+**Tester**: 39/39 ALL PASS（PM 独立跑确认）— T4b mood 跟随 `"好奇"` + setting 跟随 `"钟表店"` ✅
+
+**2026-04-03 全日总结**:
+| 任务 | 结果 |
+|------|------|
+| TASK-CONFIRM-OUTLINE-WIRE Step 1 (Frontend) | ✅ PM Review 9/9 |
+| TASK-CONFIRM-OUTLINE-WIRE Step 2 (Backend) | ✅ PM Review 7/7 + 链路修复 7/7 |
+| TASK-CONFIRM-OUTLINE-TEST (Tester) | ✅ 37/37 → PM 独立确认 |
+| TASK-PLOTPOINT-REORDER-FIX (三方) | ✅ Frontend + Backend + Tester 39/39 |
+
+**全部 Review PASS。Founder 可以本地测试。测试通过后 @DevOps push + VPS 部署。**
+
+---
+
+#### @pm (2026-04-04)
+
+### 📋 Ben 发现 DB 数据异常 — PM 根因确认 + 部署 + 清理派发
+
+**Ben 反馈（微信）**: 在阿里云 MySQL 中发现：
+1. 同一个 idea 产生 2 条 projects 记录（一个有标题，一个"未命名项目"）
+2. generation_jobs 有大量 failed（progress=0）+ 最后一条 processing 卡在 10%
+3. 前端早已显示生成完成，但 DB 中 job 仍在 processing
+
+**PM 根因确认**: Ben 发现的三个问题**全部指向同一个根因**——VPS 仍运行旧代码。
+
+旧代码 `POST /projects/`（VPS 当前版本）:
+```
+L83-97:  创建 Project
+L111-121: 创建 Chapter + GenerationJob
+L135-147: asyncio.create_task(_run_generation_in_background())  ← 立即启动 pipeline
+```
+
+每次用户生成大纲：
+- StageA 调 `POST /projects/` → 项目 #1 + pipeline job #1（后台跑，多数 failed）
+- StageB 再调 `POST /projects/` → 项目 #2（"未命名项目"）+ pipeline job #2（卡在 processing）
+- 前端显示的"完成"是 StageA 同步调用 `generate-outline` 的结果，与 generation_jobs 无关
+
+**已修复代码**（本地，7 文件未提交）:
+- `POST /projects/` 仅创建项目，不启动 pipeline（L109）
+- StageB 不再重复创建项目，改调 `confirm-outline` + `start-generation`
+- 一个 idea = 一个项目 = 一条 pipeline job
+
+**验证**: `git show HEAD:app/api/projects.py` 确认旧代码 L135-147 有 `asyncio.create_task`，本地新代码 L109 仅返回 `"项目创建成功"`。
+
+---
+
+### 📋 派发: 部署 + DB 清理
+
+**@devops — push + VPS 部署（WIRE + REORDER-FIX）**:
+
+7 个文件未提交改动（`git diff --stat` 确认）:
+- `app/api/projects.py` (174 行变化)
+- `app/services/job_manager.py` (38 行变化)
+- `app/services/pipeline_orchestrator.py` (19 行变化)
+- `frontend/src/components/create/StageB.tsx` (70 行变化)
+- `frontend/src/app/create/CreateContent.tsx` (3 行变化)
+- `frontend/src/contexts/CreateContext.tsx` (5 行变化)
+- `frontend/src/types/create.ts` (4 行变化)
+- 测试脚本: `tests/test_confirm_outline_wire.py`
+
+Commit + push + VPS 部署（api + frontend 都需 rebuild）。部署后新请求不再产生重复项目。
+
+完成后通知 @pm。
+
+---
+
+**@backend_Ben（通过 shared-memory 知会）— 历史脏数据清理**:
+
+部署完成后，建议 Ben 清理阿里云 MySQL 中的历史脏数据：
+
+```sql
+-- 1. 查看重复项目（同一 user_id + original_idea 有多条）
+SELECT user_id, original_idea, COUNT(*) as cnt
+FROM projects
+GROUP BY user_id, LEFT(original_idea, 100)
+HAVING cnt > 1;
+
+-- 2. 查看 stale generation_jobs（failed 或 stuck processing）
+SELECT id, status, progress, stage_message, created_at
+FROM generation_jobs
+WHERE status IN ('failed', 'processing', 'queued');
+
+-- 3. 清理方案由 Ben 决定（他的领域）
+-- 建议: 保留最新的有效项目，删除重复的"未命名项目" + 关联的 chapters 和 jobs
+```
+
+这是 Ben 的领域（数据库/架构），我们不动。Ben 可以根据实际数据决定清理策略。
+
+---

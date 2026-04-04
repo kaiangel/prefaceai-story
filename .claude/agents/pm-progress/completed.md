@@ -4,6 +4,50 @@
 
 ---
 
+### 2026-04-04 — Ben DB 异常根因确认 + 部署/清理派发
+
+- **Ben 反馈**: 同一 idea 产生 2 条 projects + generation_jobs 大量 failed + processing 卡住
+- **PM 根因**: VPS 旧代码 `POST /projects/` 每次创建 Project + Chapter + Job + 启动 pipeline，StageA/B 各调一次 = 重复
+- **验证**: `git show HEAD:app/api/projects.py` L135-147 有 `asyncio.create_task`，本地新代码 L109 已移除
+- **派发**: @DevOps 部署 + @backend_Ben DB 清理 + shared-memory 通知
+
+---
+
+### 2026-04-03 — TASK-PLOTPOINT-REORDER-FIX 三方 Review PASS (39/39)
+
+- **Frontend**: StageB plot_points `{description, original_index}` 格式 + build PASS
+- **Backend**: projects.py original_index 重排 + .copy() + 向后兼容 + syntax PASS
+- **Tester**: 39/39 ALL PASS — PM 独立跑确认，T4b mood 跟随 ✅
+
+---
+
+### 2026-04-03 — TASK-CONFIRM-OUTLINE-TEST PM Review PASS (37/37) + PLOTPOINT-REORDER-FIX 派发
+
+- **Tester 测试**: 37/37 ALL PASS（合并 10 + JSON 8 + Pipeline 8 + 代码一致性 11）
+- **PM 独立跑测试**: 37/37 确认
+- **Tester 观察采纳**: 情节元数据不跟随排序 → Founder 决定优化
+- **派发**: TASK-PLOTPOINT-REORDER-FIX @Frontend + @Backend + @Tester 并行
+
+---
+
+### 2026-04-03 — TASK-CONFIRM-OUTLINE-WIRE 全链路 Review PASS
+
+- **架构审计**: StageB 6 字段全断联，三层断裂（前端/架构/Pipeline）
+- **方案设计**: 2 步 — Frontend 接通 API + Backend pipeline 集成
+- **Frontend Review**: 9/9 PASS — projectId state + confirm-outline + start-generation + 无重复创建
+- **Backend Review**: 7/7 PASS — POST /projects/ 去 pipeline + confirm 合并 + start-generation + pipeline skip Stage 1
+- **Backend 链路修复**: 7/7 PASS — job_manager 分支 → PipelineOrchestrator.run(confirmed_outline)
+
+---
+
+### 2026-04-02 — TASK-UPLOADER-ENV-FIX 全链路闭环 (Frontend 5/5 + DevOps PASS)
+
+- **Frontend Review**: 5 文件全部 `import { API_BASE }` + 零残留 + build 通过 + 额外发现 PM 遗漏 2 文件
+- **DevOps Review**: 2 commits push + SCP 5 文件 + frontend rebuild only + 后台 rsync 补全 + Ben 知会
+- **2026-04-01 全日闭环**: V3(24/24) + 4a/4b/4c + 第1次部署 + ENV-FIX(5/5) + 第2次部署
+
+---
+
 ### 2026-04-01 — DevOps 部署审查 PASS + 自定义分析 env bug 发现 → TASK-UPLOADER-ENV-FIX 派发
 
 - **DevOps 审查**: 4 commits push + VPS SCP + Docker rebuild + Ben 知会，全部正确，DevOps 无责

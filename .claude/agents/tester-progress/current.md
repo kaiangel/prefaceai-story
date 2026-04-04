@@ -1,47 +1,43 @@
 # Tester Agent - 当前任务
 
-> **最后更新**: 2026-03-17 14:53
-> **状态**: ✅ TASK-SAFE-DRYRUN 完成 (7/7 PASS) — 等 PM 确认 + DevOps 部署
+> **最后更新**: 2026-04-03 01:33
+> **状态**: ✅ TASK-PLOTPOINT-REORDER-FIX (Tester 部分) 完成 (39/39 PASS) — 等 PM 确认
 
 ---
 
 ## 刚完成
 
-### TASK-SAFE-DRYRUN — 3 条 Prompt 安全改写链路 Dry-run 验证 (7/7 PASS)
+### TASK-PLOTPOINT-REORDER-FIX — 测试脚本更新 (39/39 PASS)
 
-**目标**: 验证 TASK-REWRITER-CLEANUP 后 `phase2_safe()` 的 3 条链路逻辑正确。
+**目标**: 更新 test_confirm_outline_wire.py 以验证情节拖拽元数据跟随移动。
 
-**方法**: Mock `generate_shot_image_phase2()` + Mock `PromptRewriter`，零 API 成本。
+**改动 4 处**:
+1. `USER_EDITS["plot_points"]` 从纯字符串改为 `{description, original_index}` dict
+2. `merge_outline()` 更新为新逻辑（按 original_index 从原始 plot_points 取完整 dict 后重排）
+3. 新增断言 T4b: `plot_points[0].mood == "好奇"`（原 #3 的 mood 跟随到 #1 位置）
+4. 更新 JSON 完整性断言: mood 从 "神秘" 改为 "好奇" + 新增 setting 跟随断言
 
-**数据源**: R8 E2E (story_A, 28 shots, 4 角色, illustration 风格)
+**验证**: Frontend (StageB.tsx L106) + Backend (projects.py L317-331) 都已完成修改，39/39 全 PASS。
 
-| # | 验证项 | 结果 |
+| # | 测试组 | 结果 |
 |---|--------|------|
-| 1 | 代码验证: REWRITER-CLEANUP (6 项子检查) | ✅ PASS |
-| 2 | 链路 1: 正常路径 (Shot 1, 首次成功, 零额外开销) | ✅ PASS |
-| 3 | 链路 1: 日志完整性 ("安全生成开始" + "首次生成成功") | ✅ PASS |
-| 4 | 链路 2: CONTENT_SAFETY → Sonnet 改写 → 成功 (Shot 9) | ✅ PASS |
-| 5 | 链路 2: 日志完整性 (4 标记全匹配) | ✅ PASS |
-| 6 | 链路 3: CONTENT_SAFETY → Sonnet+Simple 均失败 (Shot 10, 3 次调用) | ✅ PASS |
-| 7 | 链路 3: 日志完整性 (5 标记全匹配) | ✅ PASS |
+| 1 | 合并逻辑 (PM 8 断言 + T4b mood 跟随 + 2 LLM 保留) | 11/11 ✅ |
+| 2 | JSON 完整性 (序列化 + 字段 + mood/setting 跟随) | 9/9 ✅ |
+| 3 | Pipeline Stage 1 跳过 | 8/8 ✅ |
+| 4 | 代码一致性 (original_index 逻辑) | 11/11 ✅ |
 
-**PM 非阻塞观察修复**: L304 检查逻辑已修正 — 排除注释行后检查 non-safe 实际调用 = 0。
+**测试脚本**: `tests/test_confirm_outline_wire.py`
+**报告**: `test_output/manualtest/confirm_outline_20260403_013321/wire_test_report.md`
 
-**代码验证 (REWRITER-CLEANUP 落地确认)**:
-- `pipeline_orchestrator.py:376` → `generate_shot_image_phase2_safe(` ✅
-- `prompt_rewriter.py` Haiku 零残留 ✅
-- `image_generator.py:1227` `rewrite_method = "sonnet"` ✅
-- `prompt_rewriter.py` 备用模型 `gemini-3.1-flash-preview` (3 处) ✅
-- `pipeline_orchestrator.py` 无 non-safe 实际调用 ✅
+---
 
-**测试脚本**: `tests/test_safe_dryrun.py`
-**报告**: `test_output/manualtest/safe_dryrun_20260317_145035/dryrun_report.md`
+### TASK-CONFIRM-OUTLINE-TEST ✅ 37/37 PASS (初版，已被 REORDER-FIX 版本覆盖)
 
 ---
 
 ## 历史完成
 
-### R8 全流程 Prompt 审计 ✅ (零 prompt 安全改写活动, phase2_safe 集成遗漏发现)
+### TASK-SAFE-DRYRUN ✅ 7/7 PASS (3 条链路, 零 API 成本)
 ### TASK-IMG-SAFETY-VERIFY ✅ 17/17 PASS
 ### TASK-E2E-REGRESSION-R8 ✅ 42/44 PASS (10/10 shots, 44 维度)
 ### TASK-E2E-REGRESSION-R7 ✅ 36/36 PASS (10/10 shots, 36 维度)
