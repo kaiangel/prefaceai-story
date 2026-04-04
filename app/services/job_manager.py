@@ -99,6 +99,7 @@ async def run_story_generation_task(
     language: str,
     previous_summary: str | None = None,
     characters_json: str | None = None,
+    confirmed_outline: dict | None = None,
 ):
     """
     Background task to generate story
@@ -120,17 +121,32 @@ async def run_story_generation_task(
         )
 
         # Generate story
-        result = await generator.generate_story(
-            idea=idea,
-            style=style,
-            chapter_number=chapter_number,
-            total_chapters=total_chapters,
-            duration_minutes=duration_minutes,
-            character_count=character_count,
-            language=language,
-            previous_summary=previous_summary,
-            characters_json=characters_json,
-        )
+        if confirmed_outline:
+            # 有用户确认大纲 → 用 PipelineOrchestrator（跳过 Stage 1）
+            from app.services.pipeline_orchestrator import Phase2PipelineOrchestrator
+            pipeline = Phase2PipelineOrchestrator()
+            pipeline_result = await pipeline.run(
+                idea=idea,
+                style_preset=style,
+                target_duration_minutes=duration_minutes,
+                language=language,
+                character_count=character_count,
+                generate_images=False,  # 先只生成文本，图像后续阶段处理
+                confirmed_outline=confirmed_outline,
+            )
+            result = {"success": True, "data": pipeline_result}
+        else:
+            result = await generator.generate_story(
+                idea=idea,
+                style=style,
+                chapter_number=chapter_number,
+                total_chapters=total_chapters,
+                duration_minutes=duration_minutes,
+                character_count=character_count,
+                language=language,
+                previous_summary=previous_summary,
+                characters_json=characters_json,
+            )
 
         if not result["success"]:
             # Update job as failed

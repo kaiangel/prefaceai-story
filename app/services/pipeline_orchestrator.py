@@ -79,6 +79,7 @@ class Phase2PipelineOrchestrator:
         custom_style_analysis: dict = None,
         character_seeds: dict = None,
         scene_seeds: dict = None,
+        confirmed_outline: dict = None,
     ) -> dict:
         """
         运行完整的5阶段生成流程
@@ -119,13 +120,17 @@ class Phase2PipelineOrchestrator:
             print(f"Stage 1: 生成故事大纲")
             print(f"{'='*40}")
 
-            outline = await self.outline_generator.generate(
-                idea=idea,
-                style_preset=style_preset,
-                target_duration_minutes=target_duration_minutes,
-                language=language,
-                character_count=character_count
-            )
+            if confirmed_outline:
+                print(f"  使用用户确认后的大纲（跳过 LLM 生成）")
+                outline = confirmed_outline
+            else:
+                outline = await self.outline_generator.generate(
+                    idea=idea,
+                    style_preset=style_preset,
+                    target_duration_minutes=target_duration_minutes,
+                    language=language,
+                    character_count=character_count
+                )
 
             self.stage_results["outline"] = outline
 

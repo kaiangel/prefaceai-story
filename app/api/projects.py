@@ -101,57 +101,18 @@ async def create_project(
     except Exception as e:
         logger.error(f"[CreateProject] ❌ DB 写入失败: {e}")
         raise
-    project_id = project.id
     project_uuid = project.uuid
-    logger.info(f"[CreateProject] ✅ 项目创建成功: id={project_id}")
-
-    # 2. Create first chapter record
-    chapter = Chapter(
-        project_id=project_id,
-        chapter_number=1,
-        status="generating_story",
-    )
-    db.add(chapter)
-    await db.flush()
-    chapter_id = chapter.id
-    chapter_uuid = chapter.uuid
-
-    # 3. Create generation job
-    job = GenerationJob(
-        chapter_id=chapter_id,
-        status="queued",
-        current_stage="story_generation",
-        progress=0,
-        stage_message="任务已创建，等待开始...",
-    )
-    db.add(job)
-    await db.flush()
-    job_id = job.id
-    job_uuid = job.uuid
+    logger.info(f"[CreateProject] ✅ 项目创建成功: id={project.id}")
 
     await db.commit()
 
-    # 4. Start background generation task
-    asyncio.create_task(
-        _run_generation_in_background(
-            job_id=job_id,
-            chapter_id=chapter_id,
-            idea=project_data.original_idea,
-            style=project_data.style_preset,
-            chapter_number=1,
-            total_chapters=project_data.total_chapters,
-            duration_minutes=project_data.chapter_duration_minutes,
-            character_count=project_data.character_count,
-            language=project_data.language,
-        )
-    )
-
+    # 仅创建项目，不启动 pipeline（等 StageB confirm → start-generation）
     return ProjectResponse(
         project_id=project_uuid,
-        chapter_id=chapter_uuid,
-        job_id=job_uuid,
-        status="generating_story",
-        message="故事生成已开始",
+        chapter_id="",
+        job_id="",
+        status="created",
+        message="项目创建成功",
     )
 
 
@@ -167,6 +128,7 @@ async def _run_generation_in_background(
     language: str,
     previous_summary: str | None = None,
     characters_json: str | None = None,
+    confirmed_outline: dict | None = None,
 ):
     """Run story generation in background with new database session"""
     async with async_session_maker() as db:
@@ -183,6 +145,7 @@ async def _run_generation_in_background(
             language=language,
             previous_summary=previous_summary,
             characters_json=characters_json,
+            confirmed_outline=confirmed_outline,
         )
 
 
@@ -322,7 +285,7 @@ async def confirm_outline(
     user_id: int = Depends(verify_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Store user-confirmed outline after StageB edits"""
+    """Store user-confirmed outline after StageB edits — 合并 raw + 用户编辑"""
     result = await db.execute(
         select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
     )
@@ -330,11 +293,128 @@ async def confirm_outline(
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
 
-    project.confirmed_outline_json = json.dumps(req.outline, ensure_ascii=False)
+    # 读取 raw_outline（LLM 完整输出）
+    raw = json.loads(project.raw_outline_json) if project.raw_outline_json else {}
+    user = req.outline
+
+    # 用户编辑覆盖
+    if user.get("title"):
+        raw["title"] = user["title"]
+    if user.get("title_en"):
+        raw["title_en"] = user["title_en"]
+    if user.get("summary"):
+        raw["logline"] = user["summary"]
+
+    # 角色: 按索引匹配，更新名字/描述/性格
+    if user.get("characters"):
+        for i, uc in enumerate(user["characters"]):
+            if i < len(raw.get("characters_overview", [])):
+                raw["characters_overview"][i]["name_suggestion"] = uc.get("name", "")
+                raw["characters_overview"][i]["name_en"] = uc.get("name_en", "")
+                raw["characters_overview"][i]["description"] = uc.get("description", "")
+                raw["characters_overview"][i]["personality"] = uc.get("personality", "")
+
+    # 情节: 按 original_index 整体移动 dict（元数据跟随排序）
+    if user.get("plot_points"):
+        original = raw.get("plot_points", [])
+        reordered = []
+        for item in user["plot_points"]:
+            if isinstance(item, dict):
+                idx = item.get("original_index", 0)
+                desc = item.get("description", "")
+                if idx < len(original):
+                    entry = original[idx].copy() if isinstance(original[idx], dict) else {"description": original[idx]}
+                    entry["description"] = desc
+                    reordered.append(entry)
+            else:
+                # 向后兼容: 纯字符串（旧前端）
+                reordered.append({"description": item})
+        if reordered:
+            raw["plot_points"] = reordered
+
+    # 结局选择
+    if user.get("selected_ending"):
+        raw["selected_ending"] = user["selected_ending"]
+
+    # 情绪
+    if user.get("mood"):
+        if "visual_tone" not in raw:
+            raw["visual_tone"] = {}
+        raw["visual_tone"]["overall_mood"] = user["mood"]
+
+    project.confirmed_outline_json = json.dumps(raw, ensure_ascii=False)
+    if user.get("title"):
+        project.title = user["title"]
     db.add(project)
     await db.commit()
 
     return {"success": True, "message": "大纲已确认"}
+
+
+@router.post("/{project_id}/start-generation")
+async def start_generation(
+    project_id: str,
+    user_id: int = Depends(verify_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Start pipeline generation using confirmed (or raw) outline"""
+    result = await db.execute(
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    # 读取确认后的大纲（优先），否则用原始大纲
+    outline_json = project.confirmed_outline_json or project.raw_outline_json
+    confirmed_outline = json.loads(outline_json) if outline_json else None
+
+    # 创建 Chapter + GenerationJob
+    chapter = Chapter(
+        project_id=project.id,
+        chapter_number=1,
+        status="generating_story",
+    )
+    db.add(chapter)
+    await db.flush()
+
+    job = GenerationJob(
+        chapter_id=chapter.id,
+        status="queued",
+        current_stage="story_generation",
+        progress=0,
+        stage_message="任务已创建，等待开始...",
+    )
+    db.add(job)
+    await db.flush()
+
+    await db.commit()
+
+    # 启动 pipeline，传入 confirmed_outline
+    asyncio.create_task(
+        _run_generation_in_background(
+            job_id=job.id,
+            chapter_id=chapter.id,
+            idea=project.original_idea,
+            style=project.style_preset,
+            chapter_number=1,
+            total_chapters=project.total_chapters,
+            duration_minutes=project.chapter_duration_minutes,
+            character_count=project.character_count,
+            language=project.language,
+            confirmed_outline=confirmed_outline,
+        )
+    )
+
+    logger.info(f"[StartGeneration] ✅ Pipeline 启动: project={project_id}, has_confirmed={'是' if project.confirmed_outline_json else '否'}")
+
+    return ProjectResponse(
+        project_id=project.uuid,
+        chapter_id=chapter.uuid,
+        job_id=job.uuid,
+        status="generating_story",
+        message="故事生成已开始",
+    )
 
 
 @router.delete("/{project_id}")
