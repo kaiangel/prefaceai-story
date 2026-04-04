@@ -149,6 +149,9 @@ function StageA() {
         token
       );
 
+      // Save projectId for StageB to use
+      dispatch({ type: "SET_PROJECT_ID", payload: project.project_id });
+
       // Step 2: Generate outline (synchronous, 10-30s)
       const outline = await apiFetch<StoryOutline>(
         `/projects/${project.project_id}/generate-outline`,

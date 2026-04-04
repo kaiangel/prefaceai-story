@@ -197,6 +197,9 @@ export interface CreateState {
   characters: CharacterRef[];
   scenes: SceneRef[];
 
+  // Stage A → B bridge
+  projectId: string | null;
+
   // Stage B: Outline
   outline: StoryOutline | null;
   outlineConfirmed: boolean;
@@ -240,6 +243,7 @@ export type CreateAction =
   | { type: "UPDATE_CHARACTER"; payload: { id: string; updates: Partial<CharacterRef> } }
   | { type: "ADD_SCENE"; payload: SceneRef }
   | { type: "REMOVE_SCENE"; payload: string }
+  | { type: "SET_PROJECT_ID"; payload: string }
   | { type: "SET_OUTLINE"; payload: StoryOutline }
   | { type: "CONFIRM_OUTLINE" }
   | { type: "UPDATE_OUTLINE_TITLE"; payload: string }

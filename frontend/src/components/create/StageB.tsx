@@ -14,28 +14,9 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCreate } from "@/contexts/CreateContext";
-import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch, getStoredToken } from "@/lib/api";
 import { MOOD_OPTIONS } from "@/types/create";
 import type { PlotPoint } from "@/types/create";
-
-const BACKEND_STYLE_MAP: Record<string, string> = {
-  pixar_3d: "illustration",
-  ghibli: "illustration",
-  illustration: "illustration",
-  ink: "ink",
-  slam_dunk: "manga",
-  korean_webtoon: "illustration",
-  oil_painting: "oil_painting",
-  cyberpunk: "cyberpunk",
-  realistic: "realistic",
-  cartoon: "cartoon",
-  anime: "manga",
-  watercolor: "watercolor",
-  children_book: "illustration",
-  manga: "manga",
-  pixel: "pixel",
-};
 
 function PlotPointItem({
   point,
@@ -80,7 +61,6 @@ function PlotPointItem({
 
 export default function StageB() {
   const { state, dispatch } = useCreate();
-  const { refreshStories } = useAuth();
   const router = useRouter();
   const { outline } = state;
   const [editingCharId, setEditingCharId] = useState<string | null>(null);
@@ -96,29 +76,53 @@ export default function StageB() {
       return;
     }
 
-    setSubmitting(true);
-    setSubmitError("");
-    try {
-      await apiFetch("/projects/", {
-        method: "POST",
-        body: JSON.stringify({
-          original_idea: state.idea,
-          style_preset: BACKEND_STYLE_MAP[state.stylePreset || "illustration"] || "illustration",
-          total_chapters: state.length === "epic" ? 3 : 1,
-          chapter_duration_minutes: state.length === "flash" ? 1 : state.length === "medium" ? 5 : 3,
-          character_count: Math.max(1, outline.characters.length || state.characters.length || 1),
-          language: "zh-CN",
-        }),
-      }, token);
-      await refreshStories();
-    } catch (error) {
-      setSubmitting(false);
-      setSubmitError(error instanceof Error ? error.message : "创建故事失败");
+    const projectId = state.projectId;
+    if (!projectId) {
+      setSubmitError("项目未创建，请返回重新输入创意");
       return;
     }
 
-    dispatch({ type: "CONFIRM_OUTLINE" });
-    dispatch({ type: "SET_STAGE", payload: "generate" });
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      // 1. Save user edits via confirm-outline
+      await apiFetch(`/projects/${projectId}/confirm-outline`, {
+        method: "POST",
+        body: JSON.stringify({
+          outline: {
+            title: outline.title,
+            title_en: outline.titleEn,
+            summary: outline.summary,
+            characters: outline.characters.map(c => ({
+              name: c.name,
+              name_en: c.nameEn,
+              description: c.description,
+              personality: c.personality,
+            })),
+            plot_points: outline.plotPoints
+              .sort((a, b) => a.order - b.order)
+              .map(p => ({
+                description: p.description,
+                original_index: parseInt(p.id.replace("pp_", "")) - 1,
+              })),
+            selected_ending: outline.endings.find(e => e.isSelected)?.description || "",
+            mood: outline.mood,
+          },
+        }),
+      }, token);
+
+      // 2. Trigger pipeline generation
+      await apiFetch(`/projects/${projectId}/start-generation`, {
+        method: "POST",
+      }, token);
+
+      // 3. Transition to StageC
+      dispatch({ type: "CONFIRM_OUTLINE" });
+      dispatch({ type: "SET_STAGE", payload: "generate" });
+    } catch (error) {
+      setSubmitting(false);
+      setSubmitError(error instanceof Error ? error.message : "确认大纲失败");
+    }
   };
 
   const handleBack = () => {

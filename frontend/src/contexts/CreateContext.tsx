@@ -18,6 +18,8 @@ const initialState: CreateState = {
   customStyleAnalysis: null,
   characters: [],
   scenes: [],
+  // Stage A → B bridge
+  projectId: null,
   // Stage B
   outline: null,
   outlineConfirmed: false,
@@ -107,6 +109,9 @@ function createReducer(state: CreateState, action: CreateAction): CreateState {
 
     case "REMOVE_SCENE":
       return { ...state, scenes: state.scenes.filter((s) => s.id !== action.payload) };
+
+    case "SET_PROJECT_ID":
+      return { ...state, projectId: action.payload };
 
     case "SET_OUTLINE":
       return { ...state, outline: action.payload, outlineConfirmed: false };
