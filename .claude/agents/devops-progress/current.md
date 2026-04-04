@@ -1,11 +1,28 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-04-01
-> **状态**: ✅ UPLOADER-ENV-FIX push + VPS 前端部署完成
+> **最后更新**: 2026-04-04
+> **状态**: ✅ WIRE + REORDER-FIX push + VPS 部署完成
 
 ---
 
 ## 刚完成
+
+**TASK-CONFIRM-OUTLINE-WIRE + REORDER-FIX — push + VPS 部署**
+
+### 执行内容
+
+1. **Git 提交 (4 commits)**:
+   - `066ef46` feat(backend): WIRE + REORDER-FIX — StageB 全链路接通 (3 files)
+   - `853a755` feat(frontend): WIRE + REORDER-FIX — StageB 接通 confirm + start-generation (4 files)
+   - `a55bb07` test: 39/39 合并逻辑 + Pipeline 跳过 (1 file)
+   - `708e362` docs: agent progress + team-brain sync + shared-memory 通知 (18 files)
+2. **Push**: `origin/main` 38f2505 → 708e362
+3. **VPS 部署**: SCP 7 文件 + Docker rebuild (api + frontend) + force-recreate
+4. **验证**: frontend 200 ✅ + API `/health` healthy ✅ + 3 容器运行
+
+---
+
+## 上次完成
 
 **TASK-UPLOADER-ENV-FIX — push + VPS 前端部署**
 
@@ -173,6 +190,7 @@
 
 | 时间 | 更新内容 |
 |------|----------|
+| 2026-04-04 | WIRE + REORDER-FIX push (066ef46+853a755+a55bb07+708e362) + VPS 部署 (api + frontend rebuild) |
 | 2026-04-01 | UPLOADER-ENV-FIX push (f292bee+ceb2ba5) + VPS frontend rebuild |
 | 2026-04-01 | REPAIR-V3 + OUTLINE-PROGRESS + LOGGING-FIX push (2520fc5+029841a+d7eb28c) + VPS 部署 (SCP + Docker rebuild api+frontend) |
 | 2026-03-30 | 大纲生成全链路 push (56aa22b+c37d392) + Ben 融合 merge (8b5c36a) + VPS 部署 (rsync + Docker rebuild + API Key 填入) |

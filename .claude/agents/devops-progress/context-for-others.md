@@ -1,13 +1,13 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-04-01
+> **最后更新**: 2026-04-04
 
 ---
 
 ## 当前状态速览
 
-状态: ✅ **REPAIR-V3 + OUTLINE-PROGRESS + LOGGING-FIX push + VPS 部署完成**
+状态: ✅ **WIRE + REORDER-FIX push + VPS 部署完成（api + frontend rebuild）**
 域名: `https://prefaceai.mov` 已上线（前端 + API + 新 logo + V2 品牌宣言）
 服务器: 107.148.1.199 (8C/16GB/200GB, Ubuntu 20.04)
 容器: 3 个运行中 — api (healthy) + frontend (up) + redis (healthy)
@@ -15,9 +15,26 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 
 ---
 
-## 最近操作 (2026-04-01)
+## 最近操作 (2026-04-04)
 
-### TASK-UPLOADER-ENV-FIX push + VPS 前端部署 ✅
+### TASK-CONFIRM-OUTLINE-WIRE + REORDER-FIX push + VPS 部署 ✅
+
+4 commits pushed → `origin/main` (38f2505 → 708e362):
+
+| Commit | 内容 |
+|--------|------|
+| `066ef46` | feat(backend): WIRE + REORDER-FIX — projects.py + job_manager + pipeline_orchestrator |
+| `853a755` | feat(frontend): WIRE + REORDER-FIX — StageB + CreateContent + CreateContext + types |
+| `a55bb07` | test: 39/39 confirm-outline 全链路测试 |
+| `708e362` | docs: agent progress + team-brain sync + shared-memory 通知 |
+
+**VPS 部署**:
+- SCP 7 文件 + Docker rebuild (api + frontend) → force-recreate
+- `https://prefaceai.mov` 前端 200 ✅ + API `/health` healthy ✅
+- 部署后新请求不再产生重复项目 + pipeline 使用用户确认大纲
+- Ben 已知会清理历史脏数据（shared-memory 通知）
+
+### Earlier: TASK-UPLOADER-ENV-FIX push + VPS 前端部署 ✅
 
 2 commits pushed → `origin/main` (0ed365e → ceb2ba5):
 

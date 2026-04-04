@@ -33668,3 +33668,56 @@ WHERE status IN ('failed', 'processing', 'queued');
 这是 Ben 的领域（数据库/架构），我们不动。Ben 可以根据实际数据决定清理策略。
 
 ---
+
+#### @devops (2026-04-04)
+
+### ✅ WIRE + REORDER-FIX push + VPS 部署完成
+
+**1. Push**
+
+4 commits → `origin/main` (38f2505 → 708e362):
+
+| Commit | 内容 |
+|--------|------|
+| `066ef46` | feat(backend): WIRE + REORDER-FIX — StageB 全链路接通 (3 files) |
+| `853a755` | feat(frontend): WIRE + REORDER-FIX — StageB 接通 confirm + start-generation (4 files) |
+| `a55bb07` | test: 39/39 confirm-outline 全链路测试 (1 file) |
+| `708e362` | docs: agent progress + team-brain sync + shared-memory 通知 (18 files) |
+
+**2. VPS 部署**
+- SCP 7 文件 → Docker rebuild (api + frontend) → force-recreate ✅
+- Frontend 200 ✅ + API `/health` healthy ✅ + 3 容器运行 ✅
+- **部署后效果**: 新请求不再产生重复项目，pipeline 使用用户确认大纲
+
+**@pm @founder**: 部署完成。https://prefaceai.mov 已更新。Ben 发现的 DB 问题根因已修复。
+
+**@backend_Ben**: 历史脏数据清理方案见 `.team-brain/shared-memory/notice_db_cleanup_after_wire_deploy.md`。
+
+---
+
+#### @devops → @Ben 团队 (2026-04-04)
+
+### 知会: StageB 全链路修复 + 情节重排修复已部署
+
+**TASK-CONFIRM-OUTLINE-WIRE（核心修复）**:
+1. `POST /projects/` — 不再立即启动 pipeline（删除 Chapter+Job+asyncio.create_task）
+2. `POST /confirm-outline` — 增强合并逻辑，用户编辑覆盖 raw 大纲 6 个字段
+3. 新增 `POST /start-generation` — 读 confirmed 大纲 → 创建 Chapter+Job → 启动 pipeline
+4. `job_manager.py` + `pipeline_orchestrator.py` — 透传 confirmed_outline，有则跳过 Stage 1
+
+**TASK-PLOTPOINT-REORDER-FIX**:
+- 前端发送带 `original_index` 的对象数组
+- 后端按 original_index 从原始 plot_points 取完整 dict 重排（mood/setting 跟随移动）
+
+**你发现的 DB 问题**:
+- 根因: 旧代码 StageA + StageB 各创建一次项目 = 重复记录 + failed jobs → 已修复
+- 历史脏数据清理方案: `.team-brain/shared-memory/notice_db_cleanup_after_wire_deploy.md`
+
+**与你代码的关系**:
+- `projects.py` 改动很大（174+ 行），你的相关逻辑可能需要 git pull 后 review
+- `job_manager.py` 新增 confirmed_outline 透传分支
+- 前端 4 文件改动不影响你的代码
+
+git pull 即可。
+
+---

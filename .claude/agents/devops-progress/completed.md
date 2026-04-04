@@ -4,6 +4,25 @@
 
 ---
 
+### TASK-CONFIRM-OUTLINE-WIRE + REORDER-FIX push + VPS 部署 ✅
+
+**完成时间**: 2026-04-04
+**任务类型**: 版本控制 + VPS 部署
+
+**Push**:
+- [x] `066ef46` feat(backend): WIRE + REORDER-FIX (3 files, 174+ lines)
+- [x] `853a755` feat(frontend): WIRE + REORDER-FIX (4 files)
+- [x] `a55bb07` test: 39/39 confirm-outline 全链路测试 (1 file)
+- [x] `708e362` docs: agent progress + team-brain + shared-memory (18 files)
+- [x] Push: `origin/main` 38f2505 → 708e362
+
+**VPS 部署**:
+- [x] SCP 7 关键代码文件到 VPS
+- [x] Docker rebuild api + frontend → force-recreate
+- [x] 验证: frontend 200 + API `/health` healthy + 3 容器运行
+
+---
+
 ### TASK-UPLOADER-ENV-FIX push + VPS 前端部署 ✅
 
 **完成时间**: 2026-04-01
