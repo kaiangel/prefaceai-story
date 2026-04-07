@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-TASK-CONFIRM-OUTLINE-TEST + TASK-PLOTPOINT-REORDER-FIX — confirm-outline 全链路自动化验证
+TASK-CONFIRM-OUTLINE-TEST + PLOTPOINT-REORDER-FIX + OUTLINE-MERGE-FIX
 
 零 LLM 成本：纯本地 Python，不启动服务器，不调 API。
 直接构造 mock 数据，复现 projects.py confirm_outline 合并逻辑，断言结果。
 
-8+1 个合并断言 + Pipeline Stage 1 跳过验证。
 PLOTPOINT-REORDER-FIX: 情节拖拽时 mood/setting/characters_involved 跟随移动。
+OUTLINE-MERGE-FIX: summary 同时写入 summary+logline; selected_ending 替换 plot_points[-1]。
 
 测试脚本: tests/test_confirm_outline_wire.py
 """
@@ -25,6 +25,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 RAW_OUTLINE = {
     "title": "逆行的时光",
     "title_en": "Reverse Time",
+    "summary": "年迈的钟表匠贺守时偶然发现百年老钟内藏信，三代人的秘密逐渐浮出水面，最终在钟声中释然。故事以温情治愈为主线，探讨遗憾与释怀的主题。",
     "logline": "年迈的钟表匠贺守时在修复一座百年老钟时，意外发现钟内藏有一封旧信，牵出三代人的秘密与遗憾",
     "characters_overview": [
         {
@@ -146,7 +147,8 @@ def merge_outline(raw_outline_json: str, user_edits: dict) -> dict:
     if user.get("title_en"):
         raw["title_en"] = user["title_en"]
     if user.get("summary"):
-        raw["logline"] = user["summary"]
+        raw["summary"] = user["summary"]
+        raw["logline"] = user["summary"]   # 同步更新 logline（Stage 2 CharacterDesigner 读这个）
 
     # 角色: 按索引匹配，更新名字/描述/性格
     if user.get("characters"):
@@ -178,6 +180,12 @@ def merge_outline(raw_outline_json: str, user_edits: dict) -> dict:
     # 结局选择
     if user.get("selected_ending"):
         raw["selected_ending"] = user["selected_ending"]
+        # MERGE-FIX Bug 2: 用用户选的结局替换 plot_points 最后一条的 description
+        if raw.get("plot_points"):
+            last = raw["plot_points"][-1]
+            if isinstance(last, dict):
+                last["description"] = user["selected_ending"]
+                last["user_selected_ending"] = True   # 标记，方便后续追溯
 
     # 情绪
     if user.get("mood"):
@@ -206,8 +214,9 @@ def test_merge_logic():
     # T1: 标题覆盖
     checks["T1: 标题覆盖"] = result["title"] == "逆行的时光_TEST"
 
-    # T2: 简介→logline 映射
-    checks["T2: summary→logline"] = result["logline"].endswith("_PM测试")
+    # T2: 简介→logline+summary 映射 (MERGE-FIX Bug 1)
+    checks["T2a: summary→logline"] = result["logline"].endswith("_PM测试")
+    checks["T2b: summary→summary"] = result["summary"].endswith("_PM测试")
 
     # T3a: 角色名覆盖 (name_suggestion)
     checks["T3a: 角色名覆盖"] = result["characters_overview"][0]["name_suggestion"] == "贺老师"
@@ -413,8 +422,8 @@ def test_code_consistency():
     # raw_outline_json 读取
     checks["读取 raw_outline_json"] = "raw_outline_json" in code
 
-    # summary → logline 映射
-    checks['summary→logline 映射'] = 'raw["logline"] = user["summary"]' in code
+    # MERGE-FIX Bug 1: summary 同时写入两个字段
+    checks['summary 双写 (Bug1)'] = 'raw["summary"] = user["summary"]' in code and 'raw["logline"] = user["summary"]' in code
 
     # name_suggestion 覆盖
     checks["name_suggestion 覆盖"] = 'name_suggestion' in code
@@ -422,8 +431,10 @@ def test_code_consistency():
     # plot_points reorder 逻辑（PLOTPOINT-REORDER-FIX）
     checks["plot_points original_index 逻辑"] = 'original_index' in code
 
-    # selected_ending 写入
+    # MERGE-FIX Bug 2: selected_ending 替换 plot_points[-1] + 标记
     checks['selected_ending 写入'] = 'raw["selected_ending"]' in code
+    checks['plot_points[-1] 替换 (Bug2)'] = 'last["description"] = user["selected_ending"]' in code
+    checks['user_selected_ending 标记'] = 'user_selected_ending' in code
 
     # visual_tone.overall_mood 写入
     checks["mood→visual_tone 写入"] = 'raw["visual_tone"]["overall_mood"]' in code
@@ -451,6 +462,89 @@ def test_code_consistency():
     else:
         checks["create_project 函数存在"] = False
 
+    all_pass = True
+    for name, passed in checks.items():
+        status = "✅ PASS" if passed else "❌ FAIL"
+        print(f"  {status} — {name}")
+        if not passed:
+            all_pass = False
+
+    return all_pass, checks
+
+
+# ============================================================
+# 测试 5: OUTLINE-MERGE-FIX — 2 个 Bug 修复验证 (4 场景)
+# ============================================================
+
+def test_merge_fix():
+    """验证 TASK-OUTLINE-MERGE-FIX 的 2 个 bug 修复。"""
+    print("\n" + "=" * 60)
+    print("测试 5: OUTLINE-MERGE-FIX (4 场景)")
+    print("=" * 60)
+
+    checks = {}
+
+    # ---- T1: summary 正确写入两个字段 ----
+    raw_t1 = {
+        "logline": "原始一句话",
+        "summary": "原始简介100字，描述了一个关于时光的故事",
+        "plot_points": [{"description": "开头", "beat": "inciting_incident"}],
+    }
+    result_t1 = merge_outline(json.dumps(raw_t1, ensure_ascii=False), {"summary": "用户修改后的简介"})
+    checks["T1a: summary 被更新"] = result_t1["summary"] == "用户修改后的简介"
+    checks["T1b: logline 同步"] = result_t1["logline"] == "用户修改后的简介"
+
+    # ---- T2: summary 未编辑时保持原始值 ----
+    raw_t2 = {
+        "logline": "原始一句话",
+        "summary": "原始简介100字",
+        "plot_points": [{"description": "开头"}],
+    }
+    result_t2 = merge_outline(json.dumps(raw_t2, ensure_ascii=False), {})
+    checks["T2a: summary 不覆盖"] = result_t2["summary"] == "原始简介100字"
+    checks["T2b: logline 不覆盖"] = result_t2["logline"] == "原始一句话"
+
+    # ---- T3: selected_ending 替换 plot_points 最后一条 ----
+    raw_t3 = {
+        "plot_points": [
+            {"beat": "inciting_incident", "description": "开头", "estimated_duration_seconds": 30},
+            {"beat": "resolution", "description": "LLM原始结局", "estimated_duration_seconds": 30},
+        ],
+        "ending_options": [
+            {"id": "ending_1", "description": "LLM原始结局"},
+            {"id": "ending_2", "description": "用户选的结局B"},
+        ],
+    }
+    result_t3 = merge_outline(json.dumps(raw_t3, ensure_ascii=False), {"selected_ending": "用户选的结局B"})
+    checks["T3a: plot_points[-1] 替换"] = result_t3["plot_points"][-1]["description"] == "用户选的结局B"
+    checks["T3b: beat 保留"] = result_t3["plot_points"][-1]["beat"] == "resolution"
+    checks["T3c: duration 保留"] = result_t3["plot_points"][-1]["estimated_duration_seconds"] == 30
+    checks["T3d: 标记存在"] = result_t3["plot_points"][-1].get("user_selected_ending") == True
+    checks["T3e: 其他 plot_point 不变"] = result_t3["plot_points"][0]["description"] == "开头"
+    checks["T3f: selected_ending 字段"] = result_t3["selected_ending"] == "用户选的结局B"
+
+    # ---- T4: 重排 + 选结局同时操作 ----
+    raw_t4 = {
+        "plot_points": [
+            {"beat": "inciting_incident", "description": "原始第1", "mood": "紧张"},
+            {"beat": "midpoint", "description": "原始第2", "mood": "平静"},
+            {"beat": "resolution", "description": "LLM原始结局", "mood": "感人"},
+        ],
+    }
+    user_t4 = {
+        "plot_points": [
+            {"description": "原始第3", "original_index": 2},  # 原第3拖到第1
+            {"description": "原始第1", "original_index": 0},
+            {"description": "原始第2", "original_index": 1},
+        ],
+        "selected_ending": "用户选的结局B",
+    }
+    result_t4 = merge_outline(json.dumps(raw_t4, ensure_ascii=False), user_t4)
+    checks["T4a: 重排 mood 跟随"] = result_t4["plot_points"][0]["mood"] == "感人"
+    checks["T4b: 结局替换最后一条"] = result_t4["plot_points"][-1]["description"] == "用户选的结局B"
+    checks["T4c: 总数不变"] = len(result_t4["plot_points"]) == 3
+
+    # 打印结果
     all_pass = True
     for name, passed in checks.items():
         status = "✅ PASS" if passed else "❌ FAIL"
@@ -497,6 +591,12 @@ def main():
     # 测试 4: 代码一致性
     passed, checks = test_code_consistency()
     results.append(("代码一致性验证", passed, checks))
+    total_checks += len(checks)
+    total_pass += sum(1 for v in checks.values() if v)
+
+    # 测试 5: MERGE-FIX 4 场景
+    passed, checks = test_merge_fix()
+    results.append(("MERGE-FIX (4 场景)", passed, checks))
     total_checks += len(checks)
     total_pass += sum(1 for v in checks.values() if v)
 
