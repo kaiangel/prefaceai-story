@@ -1,82 +1,67 @@
 # Tester Agent - 给其他Agent的上下文
 
-> **最后更新**: 2026-04-03 01:33
+> **最后更新**: 2026-04-07 13:56
 
 ---
 
 ## 当前状态
 
-✅ **TASK-PLOTPOINT-REORDER-FIX (Tester 部分) 完成 — 39/39 PASS** — 等 PM 确认 + Founder 本地测试 + DevOps 部署
+✅ **TASK-OUTLINE-MERGE-TEST 完成 — 55/55 PASS** — 等 PM 确认 → DevOps push + VPS 部署
 
 ---
 
 ## 给 @PM / @Founder 的信息
 
-### ✅ TASK-PLOTPOINT-REORDER-FIX Tester 部分完成 — 39/39 PASS
-
-测试脚本已更新，覆盖新的 original_index 重排逻辑：
+### ✅ TASK-OUTLINE-MERGE-TEST 完成 — 5 组测试 55/55 PASS
 
 | # | 测试组 | 子项数 | 结果 |
 |---|--------|--------|------|
-| 1 | 合并逻辑 (8 原始 + T4b mood 跟随 + 2 LLM 保留) | 11 | ✅ PASS |
-| 2 | JSON 完整性 (序列化 + 字段 + mood/setting 跟随) | 9 | ✅ PASS |
+| 1 | 合并逻辑 | 12 | ✅ PASS |
+| 2 | JSON 完整性 | 9 | ✅ PASS |
 | 3 | Pipeline Stage 1 跳过 | 8 | ✅ PASS |
-| 4 | 代码一致性 (original_index 逻辑) | 11 | ✅ PASS |
+| 4 | 代码一致性 | 13 | ✅ PASS |
+| 5 | **MERGE-FIX 4 场景** | **13** | **✅ PASS** |
 
-**REORDER-FIX 关键验证**:
+**MERGE-FIX 关键验证**:
 
-| 断言 | 结果 |
-|------|------|
-| T4b: plot_points[0].mood = "好奇" (原 #3 的 mood 跟随) | ✅ |
-| plot_points[0].setting = "钟表店" (原 #3 的 setting 跟随) | ✅ |
-| 情节数量仍为 6 | ✅ |
-| Backend original_index 逻辑存在 | ✅ |
+| Bug | 验证 | 结果 |
+|-----|------|------|
+| Bug 1: summary 双写 | summary + logline 同时更新 ✅ / 未编辑时不覆盖 ✅ | ✅ |
+| Bug 2: selected_ending→plot_points[-1] | description 替换 ✅ / beat 保留 ✅ / duration 保留 ✅ / 标记 ✅ | ✅ |
+| 重排+选结局同时 | 先重排再替换最后一条 ✅ / 执行顺序正确 ✅ | ✅ |
 
-**Frontend + Backend 代码已确认修改到位**:
-- Frontend: `StageB.tsx:106` — `original_index: parseInt(p.id.replace("pp_", "")) - 1` ✅
-- Backend: `projects.py:317-331` — 按 original_index 取原始 dict + .copy() ✅
-
-**测试报告**: `test_output/manualtest/confirm_outline_20260403_013321/wire_test_report.md`
+**代码一致性新增检查**:
+- `raw["summary"] = user["summary"]` 存在 ✅
+- `last["description"] = user["selected_ending"]` 存在 ✅
+- `user_selected_ending` 标记存在 ✅
 
 ---
 
 ## 给 @Backend 的信息
 
-### PLOTPOINT-REORDER-FIX 代码验证通过
+### MERGE-FIX 代码验证全通过
 
-- `projects.py` confirm-outline: original_index 逻辑 + .copy() 避免修改原数组 ✅
-- 向后兼容纯字符串 ✅
-- 39/39 全 PASS
-
----
-
-## 给 @Frontend 的信息
-
-### PLOTPOINT-REORDER-FIX 代码验证通过
-
-- `StageB.tsx:106` original_index 从 `p.id` 正确提取 ✅
-- 测试 mock 数据使用 `{description, original_index}` 格式，与前端输出一致 ✅
+- Bug 1: L305-307 summary 双写逻辑正确 ✅
+- Bug 2: L337-344 plot_points[-1] 替换 + 防御性检查 + 标记 ✅
+- 执行顺序: 情节重排(L318-334) → 结局替换(L337-344) 正确 ✅
 
 ---
 
 ## 给 @DevOps 的信息
 
 测试脚本已更新:
-- `tests/test_confirm_outline_wire.py` — 39 项验证（含 PLOTPOINT-REORDER-FIX）
-- `test_output/manualtest/confirm_outline_20260403_013321/` — 报告
+- `tests/test_confirm_outline_wire.py` — 55 项验证（含 MERGE-FIX 13 项）
+- `test_output/manualtest/confirm_outline_20260407_135627/` — 报告
 
-等 PM 确认 + Founder 本地测试后，WIRE + REORDER-FIX 代码待 push + deploy。
+等 PM 确认后，MERGE-FIX 代码待 push + deploy。
 
 ---
 
 ## 历史任务
 
-### TASK-PLOTPOINT-REORDER-FIX ✅ (39/39 PASS, 测试脚本更新)
-### TASK-CONFIRM-OUTLINE-TEST ✅ (37/37 PASS → 被 REORDER-FIX 覆盖为 39/39)
-### TASK-SAFE-DRYRUN ✅ (7/7 PASS, 3 条链路, 零 API 成本)
+### TASK-OUTLINE-MERGE-TEST ✅ (55/55 PASS, 5 组测试)
+### TASK-PLOTPOINT-REORDER-FIX ✅ (39/39 PASS)
+### TASK-CONFIRM-OUTLINE-TEST ✅ (37/37 PASS → 55/55)
+### TASK-SAFE-DRYRUN ✅ (7/7 PASS)
 ### TASK-IMG-SAFETY-VERIFY ✅ (17/17 PASS)
-### TASK-E2E-REGRESSION-R8 ✅ (42/44 PASS, 10/10 shots, 44 维度)
-### TASK-E2E-REGRESSION-R7 ✅ (36/36 PASS, 10/10 shots, 36 维度)
-### TASK-E2E-REGRESSION-R6 ✅ (27/27 PASS, 10/10 shots, 27 维度)
-### TASK-E2E-REGRESSION-R5 ✅ (20/21 PASS, 20/20 shots, 21 维度)
-### TASK-E2E-REGRESSION-R4 ✅ (14/16 PASS, 20/20 shots, 16 维度)
+### TASK-E2E-REGRESSION-R8 ✅ (42/44 PASS)

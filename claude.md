@@ -498,11 +498,19 @@ final.mp4
 - Ben 团队 **不可修改** `.claude/agents/` 下的任何文件
 - Ben 团队 **不可修改** `.team-brain/TEAM_CHAT.md`
 
+### Agent 角色文件所有权（团队内部强约定）
+
+以指定 Agent 角色（PM、Backend、Frontend、Tester、DevOps、AI-ML）运行时，**严禁修改**其他 Agent 所有的文档。只允许编辑明确属于自己角色职责范围内的文件。不确定归属时，必须先向 PM 确认，而非自行修改。
+
+> **背景**：多个会话中出现过 Agent 越权编辑其他 Agent 负责的文件（如 DevOps 擅自修改 PM 的共享文档、Frontend 动了 Backend 的文件），导致摩擦和返工。
+
 ### Git 工作流
 
 - 两人（Founder + Ben）都直接 push 到 `main` 分支
 - 分工不同，代码冲突概率极低；如有冲突，两人沟通解决后再 push
 - **Push 节奏**: 每次工作 session（阶段性）结束后 push
+- **DevOps 部署铁律**：必须先 push 到 GitHub，然后再通知其他团队成员或执行部署操作。严禁跳过 GitHub push 步骤直接部署或通知。
+  > **背景**：Claude 在部署会话中曾忘记此顺序，需要 Founder 手动纠正。此为多个会话中反复出现的部署模式问题。
 
 ### 沟通渠道
 
@@ -600,6 +608,11 @@ python tests/test_character_consistency_regression.py
     - 不要写 `field1 or field2` 这种兼容旧字段的代码
     - 如果LLM输出旧格式，修改prompt而不是写兼容代码
     - 理由：兼容代码会快速变成"屎山"，难以维护
+
+### 文档更新规则
+16. **每批代码任务完成后，必须先更新对应的团队文档，再汇报完成**。文档更新不是可选项，而是任务完成的前置条件。
+    - 适用范围：`.team-brain/status/`、`.team-brain/decisions/`、`.claude/agents/{agent}-progress/` 等所有团队协作文档
+    - 理由：文档更新几乎是每个会话的核心环节（17+ 个会话的主要目标包含文档更新），如果推迟到任务最后再补，上下文窗口可能已接近限制，导致文档内容遗漏或质量下降
 
 ---
 

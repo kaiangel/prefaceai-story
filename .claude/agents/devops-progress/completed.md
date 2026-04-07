@@ -4,6 +4,21 @@
 
 ---
 
+### VPS API Key 验证 ✅
+
+**完成时间**: 2026-04-05
+**任务类型**: 运维验证
+
+**结果**:
+- [x] SSH 检查 `.env.production`: 核心 4/6 Key 已填入
+- [x] 容器内验证: `docker exec` 确认 ANTHROPIC/GEMINI/OPENAI 三个 Key 已加载
+- [x] 容器健康: api (healthy) + frontend (up) + redis (healthy)
+- [x] 不需要重启（容器已在用 Key 运行，uptime 21h）
+- [x] 风险清单 R1 标记 ✅ 基本解决
+- [ ] 缺: VOLCENGINE_SECRET_KEY + TTS_APPID（仅影响 TTS，核心功能不受影响）
+
+---
+
 ### TASK-CONFIRM-OUTLINE-WIRE + REORDER-FIX push + VPS 部署 ✅
 
 **完成时间**: 2026-04-04

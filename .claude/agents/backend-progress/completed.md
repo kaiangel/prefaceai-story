@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-04-07
+
+### TASK-OUTLINE-MERGE-FIX 完成 ✅
+
+- `projects.py` confirm_outline: Bug 1 summary 同时写 summary + logline; Bug 2 selected_ending 替换 plot_points[-1] description（方案 C）
+
+---
+
 ## 2026-04-01
 
 ### TASK-PLOTPOINT-REORDER-FIX Backend 完成 ✅

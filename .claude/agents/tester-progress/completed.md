@@ -4,6 +4,20 @@
 
 ---
 
+## 2026-04-07: TASK-OUTLINE-MERGE-TEST — confirm-outline 合并修复验证
+
+**结果**: 55/55 PASS（在 39/39 基础上 +16 新断言）
+
+**验证内容**: TASK-OUTLINE-MERGE-FIX 的 2 个 bug 修复
+- Bug 1: summary 同时写入 `raw["summary"]` + `raw["logline"]` — 2 场景 4 断言 ✅
+- Bug 2: selected_ending 替换 `plot_points[-1].description` + 标记 — 2 场景 9 断言 ✅
+- 代码一致性新增 3 项检查 (Bug1 双写 + Bug2 替换 + 标记) ✅
+
+**测试脚本**: `tests/test_confirm_outline_wire.py`
+**报告**: `test_output/manualtest/confirm_outline_20260407_135627/wire_test_report.md`
+
+---
+
 ## 2026-04-03: TASK-PLOTPOINT-REORDER-FIX — 测试脚本更新 (情节元数据跟随重排)
 
 **结果**: 39/39 PASS（在 CONFIRM-OUTLINE-TEST 37/37 基础上 +2 新断言）

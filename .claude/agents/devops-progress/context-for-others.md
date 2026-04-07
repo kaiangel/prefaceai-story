@@ -1,7 +1,7 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-04-04
+> **最后更新**: 2026-04-05
 
 ---
 
@@ -173,7 +173,7 @@ Multiple pushes — Stage 1 E2E 联调通过。
 
 ## 待其他 Agent 注意
 
-- **API Key 未填入**: `.env.production` 使用占位符，API 服务能启动但无法调用 AI 模型
+- **API Key 核心已填入**: ANTHROPIC/GEMINI/OPENAI/VOLCENGINE_AK 4 个已填入且容器内生效。缺 VOLCENGINE_SECRET_KEY + TTS_APPID（仅影响 TTS）
 - **前端已可访问**: `https://prefaceai.mov` 返回 Landing Page（V2 品牌宣言 + 新 logo + 风格缩略图）
 - **API 已可访问**: `https://prefaceai.mov/api/health` 返回 healthy
 - **CORS 已限制**: `allow_origins=["https://prefaceai.mov", "http://localhost:3000"]` ✅
@@ -184,7 +184,7 @@ Multiple pushes — Stage 1 E2E 联调通过。
 
 | 风险 | 级别 | 关键时间点 |
 |------|------|-----------|
-| API Key 未填入 | 🔴 P0 | Founder 决定时 |
+| ~~API Key 未填入~~ | ✅ 基本解决 | 04-05 验证 (TTS 2 Key 待补) |
 | ~~CORS 全开放~~ | ✅ 已解决 | 03-18 部署 |
 | 无 CI/CD | 🟡 P1 | 部署稳定后 |
 | 无监控告警 | 🟡 P1 | 第一个用户前 |

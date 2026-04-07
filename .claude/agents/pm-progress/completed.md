@@ -4,6 +4,33 @@
 
 ---
 
+### 2026-04-07 — confirm-outline 全链路深度审计 + 2 Bug 修复派发
+
+**Founder 要求**: 验证 StageB 所有维度的用户确认内容是否完整传入下一 stage
+
+**审计方法**: 6 维度 × 全链路（前端发送 → 后端合并 → Pipeline Stage 2-5），逐 Stage 追踪每个字段的读取路径
+
+**结果**: 4/6 正确 ✅，2/6 有 Bug ❌
+- Bug 1 (🟡): `summary` 被写到 `logline`，`summary` 字段未更新 → 后续读 summary 的功能拿到旧值
+- Bug 2 (🔴): `selected_ending` 存了但 Stage 3 不读 → **用户选的结局不影响最终故事** → 方案 C 修复（替换 plot_points 最后一条 description）
+- 全链路影响验证: Stage 2 角色/Stage 5a 参考图/Stage 5a.5 场景 **不受影响**（不读 plot_points）
+
+**产出文档**: `.team-brain/analysis/CONFIRM_OUTLINE_DATA_AUDIT.md`（含未来优化方向：让 ending_options 携带完整 full_plot_point）
+
+**派发**: TASK-OUTLINE-MERGE-FIX @Backend（2 处修复，projects.py confirm_outline 函数）
+
+---
+
+### 2026-04-05 — 全局状态审查 + confirm-outline 验证 + DevOps API Key 验证派发
+
+- PM 全量读取 TEAM_CHAT 33,000+ 行 + 全部 Agent progress + .team-brain 文档
+- 识别 7 项可协调事项，优先级排序
+- confirm-outline 前端接入: ✅ 深度验证确认 WIRE 修复已完全解决（StageB 正确调 confirm-outline → start-generation）
+- Phase 2 Step 3 通俗解释给 Founder（seed 图生成逻辑）
+- DevOps 验证 VPS API Key: ✅ 审查 PASS — 核心 4 Key 已填入生效，R1 🔴→✅ 基本解决，TTS 2 Key 缺失不影响核心
+
+---
+
 ### 2026-04-04 — Ben DB 异常根因确认 + 部署/清理派发
 
 - **Ben 反馈**: 同一 idea 产生 2 条 projects + generation_jobs 大量 failed + processing 卡住

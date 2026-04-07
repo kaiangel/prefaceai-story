@@ -1,7 +1,7 @@
 # PM Agent - 当前任务
 
-> **最后更新**: 2026-04-04
-> **状态**: Ben 发现 DB 异常 → PM 确认根因=旧代码 → @DevOps 部署 + @Ben 清理
+> **最后更新**: 2026-04-07
+> **状态**: ✅ MERGE-FIX + MERGE-TEST 全部通过 → DevOps push + VPS 部署已派发
 
 ---
 
@@ -92,15 +92,16 @@
 | 54 | ~~TASK-CONFIRM-OUTLINE-WIRE Step 2~~ (后端 pipeline + 链路修复) | ~~@Backend~~ ✅ PM Review 7/7 + 7/7 |
 | 55 | ~~TASK-CONFIRM-OUTLINE-TEST~~ (37/37 PASS) | ~~@Tester~~ ✅ PM 独立确认 |
 | 56 | ~~TASK-PLOTPOINT-REORDER-FIX~~ (元数据跟随排序) | ~~三方~~ ✅ PM Review PASS + 39/39 |
-| — | **DevOps push + VPS 部署** (WIRE + REORDER-FIX, 7 文件) | **@DevOps** |
-| — | Ben DB 脏数据清理 (部署后) | @backend_Ben |
-| — | **=== 待办 ===** | |
-| 49 | Frontend 接入 confirm-outline (Ben 反馈) | 待派发 |
-| — | **=== Phase 2 (文件上传) ===** | |
-| 22 | 文件上传基础设施 + #8 自定义风格 + #9 角色参考 + #10 场景参考 | @AI-ML + @Backend + @Frontend |
-| — | **=== Phase 3 (独立) ===** | |
-| 23 | #11 续写模式 (短/中/长篇, Dashboard) | PM 设计 → 全员 |
-| 24 | Founder 填 API Key (VPS) | Founder |
+| — | ~~DevOps push + VPS 部署~~ (WIRE + REORDER-FIX) | ~~@DevOps~~ ✅ 708e362 |
+| — | Ben DB 脏数据清理 (部署后) | @backend_Ben ⏳ |
+| — | ~~confirm-outline 前端接入验证~~ | ~~PM~~ ✅ 已验证（WIRE 修复中完成）|
+| — | ~~DevOps 验证 VPS API Key~~ | ~~@DevOps~~ ✅ 核心 4/4 已填入生效，R1 基本解决 |
+| — | ~~TASK-OUTLINE-MERGE-FIX~~ | ~~@Backend~~ ✅ PM Review PASS |
+| — | ~~TASK-OUTLINE-MERGE-TEST~~ | ~~@Tester~~ ✅ 55/55 PASS + PM 独立确认 |
+| — | **DevOps: pull Ben → 解决冲突 → push 我们的 → VPS 部署** | **@DevOps** 🔄 |
+| — | **=== 待启动 ===** | |
+| — | Phase 3 #11 续写模式 | PM 设计 → 全员 |
+| — | Resonance Phase 0 蓄水期 | Founder 触发 |
 
 ---
 

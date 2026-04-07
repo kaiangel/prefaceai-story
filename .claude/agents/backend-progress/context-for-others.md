@@ -1,16 +1,26 @@
 # Backend Agent - 给其他 Agent 的上下文
 
-> **最后更新**: 2026-04-03
+> **最后更新**: 2026-04-07
 
 ---
 
 ## 当前状态速览
 
 ```
-状态: ✅ TASK-PLOTPOINT-REORDER-FIX Backend 完成
+状态: ✅ TASK-OUTLINE-MERGE-FIX 完成
 当前任务: 等 PM Review
 阻塞: 无
 ```
+
+---
+
+## ✅ TASK-OUTLINE-MERGE-FIX 完成 (2026-04-07)
+
+### 给 @PM 的信息
+
+`projects.py` confirm_outline 函数 2 处修复:
+- Bug 1: `summary` 同时写 `raw["summary"]` + `raw["logline"]`（之前只写了 logline，summary 字段未更新）
+- Bug 2: `selected_ending` 替换 `plot_points[-1]["description"]`（方案 C），Stage 3 最后一场按用户选的结局生成。添加 `user_selected_ending: True` 标记方便追溯
 
 ---
 

@@ -1,7 +1,7 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-04-04
-> **状态**: ✅ WIRE + REORDER-FIX push + VPS 部署完成
+> **最后更新**: 2026-04-05
+> **状态**: ✅ VPS API Key 验证完成 — 核心 4/6 已填入且生效
 
 ---
 
@@ -170,7 +170,7 @@
 
 | # | 风险项 | 级别 | 当前状态 | 影响 | 解决方案 | 解决时机 |
 |---|--------|------|----------|------|----------|----------|
-| R1 | **API Key 未填入** | 🔴 P0 | `.env.production` 占位符 | AI 功能完全不可用 | Founder 填入 6 组 Key → 重启 api 容器 | Founder 决定时 |
+| R1 | ~~API Key 未填入~~ | ✅ 基本解决 | 核心 4/6 已填入 (ANTHROPIC+GEMINI+OPENAI+VOLCENGINE_AK) | TTS 的 2 Key 缺失不影响核心 | ✅ 04-05 验证 | VOLCENGINE_SECRET+APPID 待补 |
 | R2 | ~~CORS 全开放~~ | ✅ 已解决 | `allow_origins=["prefaceai.mov", "localhost:3000"]` | — | ✅ 03-18 部署 | — |
 | R3 | **无 CI/CD** | 🟡 P1 | 手动 rsync 部署 | 部署易出错、无自动化测试门禁 | GitHub Actions 基础流水线 | 部署稳定后 |
 | R4 | **无监控告警** | 🟡 P1 | 无 Sentry、无成本监控 | 线上报错无感知、API 成本失控无预警 | Sentry 错误追踪 + API 成本看板 | 第一个用户前 |
@@ -190,6 +190,7 @@
 
 | 时间 | 更新内容 |
 |------|----------|
+| 2026-04-05 | VPS API Key 验证: 核心 4/6 已填入且容器内生效，R1 风险标记基本解决 |
 | 2026-04-04 | WIRE + REORDER-FIX push (066ef46+853a755+a55bb07+708e362) + VPS 部署 (api + frontend rebuild) |
 | 2026-04-01 | UPLOADER-ENV-FIX push (f292bee+ceb2ba5) + VPS frontend rebuild |
 | 2026-04-01 | REPAIR-V3 + OUTLINE-PROGRESS + LOGGING-FIX push (2520fc5+029841a+d7eb28c) + VPS 部署 (SCP + Docker rebuild api+frontend) |
