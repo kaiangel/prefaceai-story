@@ -10,3 +10,9 @@ api_router.include_router(beta_applications.router)
 api_router.include_router(projects.router)
 api_router.include_router(chapters.router)
 api_router.include_router(contact_us.router)
+
+
+@api_router.get("/api/health")
+async def api_health():
+    """API health check for reverse-proxy deployments."""
+    return {"status": "healthy"}
