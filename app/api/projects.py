@@ -303,7 +303,8 @@ async def confirm_outline(
     if user.get("title_en"):
         raw["title_en"] = user["title_en"]
     if user.get("summary"):
-        raw["logline"] = user["summary"]
+        raw["summary"] = user["summary"]
+        raw["logline"] = user["summary"]   # 同步更新 logline（Stage 2 CharacterDesigner 读这个）
 
     # 角色: 按索引匹配，更新名字/描述/性格
     if user.get("characters"):
@@ -335,6 +336,12 @@ async def confirm_outline(
     # 结局选择
     if user.get("selected_ending"):
         raw["selected_ending"] = user["selected_ending"]
+        # 方案 C: 用用户选的结局替换 plot_points 最后一条的 description
+        if raw.get("plot_points"):
+            last = raw["plot_points"][-1]
+            if isinstance(last, dict):
+                last["description"] = user["selected_ending"]
+                last["user_selected_ending"] = True   # 标记，方便后续追溯
 
     # 情绪
     if user.get("mood"):
