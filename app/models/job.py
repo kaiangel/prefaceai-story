@@ -7,7 +7,7 @@ from app.database import Base
 
 
 class GenerationJob(Base):
-    __tablename__ = "generation_jobs"
+    __tablename__ = "chapter_generation_jobs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     uuid = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid4()))

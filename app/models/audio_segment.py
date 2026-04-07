@@ -12,7 +12,7 @@ class AudioSegment(Base):
 
     用于存储Whisper返回的时间戳信息和图片匹配结果
     """
-    __tablename__ = "audio_segments"
+    __tablename__ = "chapter_audio_segments"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     uuid = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid4()))
@@ -33,5 +33,5 @@ class AudioSegment(Base):
 
     # 索引
     __table_args__ = (
-        Index('idx_audio_segments_chapter', 'chapter_id'),
+        Index('idx_chapter_audio_segments_chapter', 'chapter_id'),
     )

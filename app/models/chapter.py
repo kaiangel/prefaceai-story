@@ -7,7 +7,7 @@ from app.database import Base
 
 
 class Chapter(Base):
-    __tablename__ = "chapters"
+    __tablename__ = "project_chapters"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     uuid = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid4()))

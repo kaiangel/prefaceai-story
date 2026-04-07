@@ -13,7 +13,7 @@ class SceneImage(Base):
     存储每个场景生成的图像信息
     一个场景可能有多个版本（重新生成时）
     """
-    __tablename__ = "scene_images"
+    __tablename__ = "chapter_scene_images"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     uuid = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid4()))
@@ -56,7 +56,7 @@ class CharacterReference(Base):
 
     存储用于保持角色一致性的参考图
     """
-    __tablename__ = "character_references"
+    __tablename__ = "project_character_references"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     uuid = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid4()))
