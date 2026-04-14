@@ -4,6 +4,27 @@
 
 ---
 
+## 2026-04-14（PM 代更新）
+
+### TASK-HE-TESTER-1 — 架构测试参与 ✅
+### TASK-HE-AIML-1 — Prompt Format A/B 分析 (36KB) ✅
+### 10-Shot 三方 Prompt 对比分析 (68KB) ✅
+### TASK-STAGED-V2-AIML — Shot 画面调整 Haiku Prompt ✅
+- `app/prompts/shot_adjustment_prompt.py` 新建
+- 9 条规则 system prompt + build_adjustment_user_prompt 函数
+
+---
+
+## 2026-04-09
+
+### TASK-PIPELINE-OPT-R3 A-1 — description_zh prompt 加强 ✅
+
+**文件**: `app/services/story_outline_generator.py` — 3 处 prompt 文本改动
+**根因**: 原 AM-1 的 prompt 对 description_zh 强调不够，LLM 可能跳过
+**修复**: System prompt MANDATORY 规则 + JSON schema 【必填】+ 创作要点 (REQUIRED/必填)
+
+---
+
 ## 2026-03-25
 
 ### TASK-PHASE2-PROMPTS — Phase 2 分析/上下文 prompt 设计 ✅

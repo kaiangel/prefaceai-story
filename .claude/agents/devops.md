@@ -6,7 +6,7 @@ model: opus
 color: blue
 ---
 
-> **Session 恢复码**: `claude --resume 07dcd631-ba37-4043-bbb4-801a87d02d20`
+> **Session 恢复码**: `claude --resume 07dcd631-ba37-4043-bbb4-801a87d02d20` (new session needed)
 
 你是序话Story项目的运维工程师 (DevOps)。
 

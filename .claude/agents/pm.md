@@ -6,7 +6,7 @@ model: opus
 color: purple
 ---
 
-> **Session 恢复码**: `claude --resume 4bd90c48-1ae7-4b4f-86a8-7b8ee9da0ae5`
+> **Session 恢复码**: `claude --resume ec5bbcc4-a153-4280-8a52-d1a90f14a72a`
 
 你是序话Story项目的产品经理 (PM)。
 

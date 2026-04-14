@@ -4,6 +4,92 @@
 
 ---
 
+## 2026-04-14（PM 代更新）
+
+### TASK-STAGED-WIRE — StageD 3 按钮接通后端 API (KI-001/002/003) ✅
+- 重新生成 (KI-001): POST API + loading spinner + imageUrl 更新 + 错误 toast
+- 编辑保存 (KI-002): PATCH API 回写 DB + "保存中..." + 成功/失败 toast
+- 删除 (KI-003): DELETE API 先成功再 dispatch + "删除中..." + 错误 toast
+- 新增 REGENERATE_SHOT_SUCCESS action (CreateContext + types)
+
+### TASK-STAGED-V2 Fix-2 + Fix-3 ✅
+- Fix-2: "编辑旁白" → "编辑文字"，改为编辑 text_overlay.chinese_text
+- Fix-3: 重新生成按钮下方加 "保持相同场景，产生不同构图变化"
+- textType="none" 时隐藏编辑区域，narration 只读显示
+
+### TASK-STAGED-V2 调整画面输入框 ✅
+- 新增 Wand2 图标 + "调整画面" card + 输入框 + "确认调整" 按钮
+- handleAdjust() 发 POST 带 adjustment_intent → Haiku 修改 image_prompt
+- 与重新生成互相 disable，Enter 键支持（IME 防误触）
+
+- Build: 18 路由 0 错误
+- 改动: StageD.tsx + CreateContext.tsx + create.ts
+
+---
+
+## 2026-04-13
+
+### TASK-PIPELINE-OPT-R6 前端部分 ✅ (2026-04-13)
+- R6-1: mood confirm-outline 已有（排查确认）
+- R6-2: selected_ending append 到 plot_points 末尾
+- R6-3: confirm 后立即切换场景确认 + 清调整状态
+- R6-4: 倒计时 10→20 秒
+- 改动: StageB.tsx + StageC.tsx, build 0 错误
+
+---
+
+## 2026-04-09
+
+### TASK-PIPELINE-OPT-R5 前端部分 ✅ (2026-04-09)
+- R5-1 (P1): completedRef 防重复触发 completed 分支，`/generation-result` 只请求一次
+- R5-2 (P2): progress >= 100 时显示"即将完成"（不再显示预估分钟数）
+- 改动: StageC.tsx (1 文件), build 20 路由 0 错误
+
+---
+
+### TASK-PIPELINE-OPT-R4 前端部分 ✅ (2026-04-13)
+- R4-1 (P0): confirm-characters API 调用（倒计时 + 手动，confirmedRef 防重复）
+- R4-2 (P1): adjust 失败清 loading + toast 错误提示
+- R4-3 (P1): "喝可可" 仅 text-gen 阶段显示
+- 改动: StageC.tsx (1 文件), build 0 错误
+
+---
+
+### TASK-PIPELINE-OPT-R3 F-1/F-2/F-3 ✅
+- F-1 (P0): 角色调整 API 返回格式 bug 修复
+- F-2 (P1): 0%-5% 模拟进度 (12s/1%, max 5%)
+- F-3 (P1): 场景确认展示 description_zh + 后端 passthrough
+- build 0 错误
+
+### TASK-BUGFIX-STAGEC — Bug 3 (P0) + Bug 4 (P1) ✅
+
+**完成时间**: 2026-04-09
+**验收状态**: 待 PM Review
+
+- [x] Fix 3-A: StageC.tsx L80 `"generating_images"` → `"image_generation"` + L79 注释更新
+- [x] Fix 3-B: CreateContext.tsx `UPDATE_GENERATION_PROGRESS` 去重（比对最后一条 log message，相同不追加）
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
+## 2026-04-08
+
+### TASK-REAL-PIPELINE-UX Step 2 — 前端真实体验联通 ✅
+
+**完成时间**: 2026-04-08
+**验收状态**: 待 PM Review
+
+- [x] 2-A: StageC text-gen + shot-gen 改为轮询 `GET /api/projects/{id}/chapters/1/status`
+- [x] 2-B: 角色预览用 `state.outline.characters`，fallback mock
+- [x] 2-C: 场景描述用 `state.outline.scenes` + `StoryOutline` 新增 `OutlineScene[]` + mock 补 scenes
+- [x] 2-D: generation-result API 响应映射到 `Shot` 类型（narration→narrationSegment）
+- [x] 降级: `useRealApi = !!(isLoggedIn && token && projectId)`
+
+**`npm run build` 20 路由通过 ✅**
+
+---
+
 ## 2026-04-03
 
 ### TASK-PLOTPOINT-REORDER-FIX ✅

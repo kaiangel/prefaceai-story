@@ -452,3 +452,101 @@ Edit(
 | Ben 群聊 | `.team-brain/team_ben/TEAM_CHAT.md` | Ben 团队 Agent |
 | 共享记忆 | `.team-brain/shared-memory/` | 双方可读 |
 | 微信 | 线下 | Founder + Ben（人对人） |
+
+---
+
+## 上下文预算管理 (2026-04-14 新增)
+
+### 原则
+- 每个 Agent 的"必读"文件总量控制在 context window 的 30% 以内
+- 超过 30% 的信息通过"按需阅读"获取
+- 优先读 context-for-others.md（精炼信息），而非完整源文件
+- TEAM_CHAT.md 已有归档机制（`scripts/archive_team_chat.sh`），主文件只保留最近 7 天
+
+### 各角色阅读清单
+
+#### Backend Agent
+**必读（每次开工）**:
+1. `.claude/agents/backend-progress/current.md` — 自己的进度
+2. `.team-brain/status/TODAY_FOCUS.md` — 今日重点
+3. `.claude/agents/pm-progress/context-for-others.md` — PM 的最新指令
+4. `.claude/agents/ai-ml-progress/context-for-others.md` — prompt 约束更新
+
+**按需阅读**:
+- `.claude/agents/frontend-progress/context-for-others.md` — 有 API 对接时
+- `.claude/agents/tester-progress/context-for-others.md` — 有测试反馈时
+- `claude.md` 的对应技术章节 — 需要确认架构约束时
+
+**不需要读**:
+- TEAM_CHAT.md 全文（太长，PM 会在 context-for-others 里摘要关键信息）
+- 其他 agent 的 completed.md（除非需要了解历史）
+- resonance 的所有进度文件
+
+#### Frontend Agent
+**必读（每次开工）**:
+1. `.claude/agents/frontend-progress/current.md` — 自己的进度
+2. `.team-brain/status/TODAY_FOCUS.md` — 今日重点
+3. `.claude/agents/pm-progress/context-for-others.md` — PM 的最新指令
+4. `.claude/agents/backend-progress/context-for-others.md` — API 状态
+
+**按需阅读**:
+- `.claude/agents/tester-progress/context-for-others.md` — 有测试反馈时
+- `claude.md` 的前端相关章节
+
+**不需要读**:
+- ai-ml 的进度（前端不需要了解 prompt 约束细节）
+- devops 的进度（除非有部署相关需求）
+
+#### AI-ML Agent
+**必读（每次开工）**:
+1. `.claude/agents/ai-ml-progress/current.md` — 自己的进度
+2. `.team-brain/status/TODAY_FOCUS.md` — 今日重点
+3. `.claude/agents/pm-progress/context-for-others.md` — PM 的最新指令
+4. `.claude/agents/backend-progress/context-for-others.md` — 服务代码状态
+
+**按需阅读**:
+- `.claude/agents/tester-progress/context-for-others.md` — 一致性测试结果
+- `claude.md` 的 Prompt/模型相关章节
+
+**不需要读**:
+- Frontend/DevOps 进度
+
+#### Tester Agent
+**必读（每次开工）**:
+1. `.claude/agents/tester-progress/current.md` — 自己的进度
+2. `.team-brain/status/TODAY_FOCUS.md` — 今日重点
+3. `.claude/agents/pm-progress/context-for-others.md` — PM 的最新指令
+4. `.claude/agents/backend-progress/context-for-others.md` — 最新代码改动
+5. `.claude/agents/frontend-progress/context-for-others.md` — 最新前端改动
+
+**按需阅读**:
+- `.claude/agents/ai-ml-progress/context-for-others.md` — prompt 改动影响测试时
+
+**不需要读**:
+- AI-ML 的 prompt 优化细节（除非影响测试断言）
+
+#### DevOps Agent
+**必读（每次开工）**:
+1. `.claude/agents/devops-progress/current.md` — 自己的进度
+2. `.team-brain/status/TODAY_FOCUS.md` — 今日重点
+3. `.claude/agents/pm-progress/context-for-others.md` — PM 的最新指令
+
+**按需阅读**:
+- `.claude/agents/backend-progress/context-for-others.md` — 部署相关变更时
+
+**不需要读**:
+- AI-ML/Frontend 的进度（除非有部署依赖）
+
+#### PM Agent
+**必读（每次开工）**:
+1. 所有 agent 的 `context-for-others.md`（这是 PM 的核心职责）
+2. `.team-brain/status/TODAY_FOCUS.md` — 今日重点
+3. `.team-brain/handoffs/PENDING.md` — 待处理交接
+4. `.team-brain/status/PROJECT_STATUS.md` — 项目状态
+
+**按需阅读**:
+- 各 agent 的 `current.md`（被阻塞时深入了解）
+- TEAM_CHAT.md 最新部分（归档后主文件较短）
+
+**不需要读**:
+- 各 agent 的 `completed.md` 全文（除非需要回溯历史）

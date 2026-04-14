@@ -1,67 +1,70 @@
 # Tester Agent - 给其他Agent的上下文
 
-> **最后更新**: 2026-04-07 13:56
+> **最后更新**: 2026-04-14 15:30
 
 ---
 
 ## 当前状态
 
-✅ **TASK-OUTLINE-MERGE-TEST 完成 — 55/55 PASS** — 等 PM 确认 → DevOps push + VPS 部署
+TASK-HE-TESTER-1 完成 — 架构测试 + 质量门测试 10/10 PASS (0.06s)
 
 ---
 
 ## 给 @PM / @Founder 的信息
 
-### ✅ TASK-OUTLINE-MERGE-TEST 完成 — 5 组测试 55/55 PASS
+### 架构测试 + 质量门测试已就绪
 
-| # | 测试组 | 子项数 | 结果 |
-|---|--------|--------|------|
-| 1 | 合并逻辑 | 12 | ✅ PASS |
-| 2 | JSON 完整性 | 9 | ✅ PASS |
-| 3 | Pipeline Stage 1 跳过 | 8 | ✅ PASS |
-| 4 | 代码一致性 | 13 | ✅ PASS |
-| 5 | **MERGE-FIX 4 场景** | **13** | **✅ PASS** |
+PreCommit hook 现在可以激活完整闭环（去掉 `|| true`）。
 
-**MERGE-FIX 关键验证**:
+测试执行命令：
+```bash
+python3 -m pytest tests/test_architecture.py tests/test_quality_gates.py -v
+```
 
-| Bug | 验证 | 结果 |
-|-----|------|------|
-| Bug 1: summary 双写 | summary + logline 同时更新 ✅ / 未编辑时不覆盖 ✅ | ✅ |
-| Bug 2: selected_ending→plot_points[-1] | description 替换 ✅ / beat 保留 ✅ / duration 保留 ✅ / 标记 ✅ | ✅ |
-| 重排+选结局同时 | 先重排再替换最后一条 ✅ / 执行顺序正确 ✅ | ✅ |
-
-**代码一致性新增检查**:
-- `raw["summary"] = user["summary"]` 存在 ✅
-- `last["description"] = user["selected_ending"]` 存在 ✅
-- `user_selected_ending` 标记存在 ✅
-
----
-
-## 给 @Backend 的信息
-
-### MERGE-FIX 代码验证全通过
-
-- Bug 1: L305-307 summary 双写逻辑正确 ✅
-- Bug 2: L337-344 plot_points[-1] 替换 + 防御性检查 + 标记 ✅
-- 执行顺序: 情节重排(L318-334) → 结局替换(L337-344) 正确 ✅
+10 个测试覆盖以下架构规则：
+1. 前后端边界隔离（互不 import）
+2. Shot 生成默认用 NB2 模型（NB2_MODEL + use_pro_model=False）
+3. Image prompt 模板/风格配置全英文
+4. Pipeline 5 阶段核心服务文件完整
+5. 参考图串行生成（portrait→fullbody，无 asyncio.gather）
+6. 角色必需字段在代码中完整定义
+7. 翻译函数存在且被调用
+8. .env.example 和必需目录存在
 
 ---
 
 ## 给 @DevOps 的信息
 
-测试脚本已更新:
-- `tests/test_confirm_outline_wire.py` — 55 项验证（含 MERGE-FIX 13 项）
-- `test_output/manualtest/confirm_outline_20260407_135627/` — 报告
+### PreCommit hook 可以激活
 
-等 PM 确认后，MERGE-FIX 代码待 push + deploy。
+测试文件已就绪，可以去掉 PreCommit 的 `|| true`：
+- `tests/test_architecture.py`（6 个测试）
+- `tests/test_quality_gates.py`（4 个测试）
+
+执行时间: 0.06 秒，不会影响 commit 速度。
+
+---
+
+## 给 @Backend / @AI-ML 的信息
+
+### 新的架构约束测试
+
+以下操作会被 PreCommit hook 拦截：
+- 前端代码引用后端模块（或反过来）
+- 修改 NB2_MODEL 值或 use_pro_model 默认值
+- 在 STYLE_PROMPTS 或 StyleEnforcement 配置中加入中文
+- 删除 Pipeline 核心服务文件
+- 在 reference_image_manager.py 中加入 asyncio.gather
 
 ---
 
 ## 历史任务
 
-### TASK-OUTLINE-MERGE-TEST ✅ (55/55 PASS, 5 组测试)
-### TASK-PLOTPOINT-REORDER-FIX ✅ (39/39 PASS)
-### TASK-CONFIRM-OUTLINE-TEST ✅ (37/37 PASS → 55/55)
-### TASK-SAFE-DRYRUN ✅ (7/7 PASS)
-### TASK-IMG-SAFETY-VERIFY ✅ (17/17 PASS)
-### TASK-E2E-REGRESSION-R8 ✅ (42/44 PASS)
+### TASK-HE-TESTER-1 ✅ (10/10, 0.06s)
+### TASK-REAL-PIPELINE-UX Step 1 ✅ (35/35, pytest)
+### TASK-OUTLINE-MERGE-TEST ✅ (55/55)
+### TASK-PLOTPOINT-REORDER-FIX ✅ (39/39)
+### TASK-CONFIRM-OUTLINE-TEST ✅ (37/37 → 55/55)
+### TASK-SAFE-DRYRUN ✅ (7/7)
+### TASK-IMG-SAFETY-VERIFY ✅ (17/17)
+### TASK-E2E-REGRESSION-R8 ✅ (42/44)

@@ -1,13 +1,13 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-04-05
+> **最后更新**: 2026-04-14
 
 ---
 
 ## 当前状态速览
 
-状态: ✅ **WIRE + REORDER-FIX push + VPS 部署完成（api + frontend rebuild）**
+状态: ✅ **TASK-HE-DEVOPS-2 TEAM_CHAT 归档机制完成** (2026-04-14)
 域名: `https://prefaceai.mov` 已上线（前端 + API + 新 logo + V2 品牌宣言）
 服务器: 107.148.1.199 (8C/16GB/200GB, Ubuntu 20.04)
 容器: 3 个运行中 — api (healthy) + frontend (up) + redis (healthy)
@@ -15,9 +15,45 @@ SSL: Cloudflare Full (Strict) + Origin Certificate
 
 ---
 
-## 最近操作 (2026-04-04)
+## 最近操作 (2026-04-14)
 
-### TASK-CONFIRM-OUTLINE-WIRE + REORDER-FIX push + VPS 部署 ✅
+### TASK-HE-DEVOPS-2: TEAM_CHAT 归档机制 ✅
+
+**全员注意 -- TEAM_CHAT.md 已归档，历史消息在 chat-archive/**：
+
+| 归档文件 | 内容范围 | 行数 |
+|----------|----------|------|
+| `.team-brain/chat-archive/2026-01.md` | 2026-01 消息 | 7,246 |
+| `.team-brain/chat-archive/2026-02.md` | 2026-02 消息 | 8,328 |
+| `.team-brain/chat-archive/2026-03.md` | 2026-03 消息 | 16,970 |
+| `.team-brain/chat-archive/2026-04.md` | 2026-04-01 ~ 04-06 | 1,246 |
+
+- TEAM_CHAT.md 从 36,079 行缩减到 2,343 行
+- 归档脚本: `scripts/archive_team_chat.sh`（可定期运行）
+- 需要查历史消息 → 读对应月份的归档文件
+
+### TASK-HE-DEVOPS-1: Hook 基础设施升级 ✅
+
+**全员注意 — Hooks 已升级，以下自动检查现已生效**：
+
+| 触发时机 | 检查内容 | 影响 |
+|----------|----------|------|
+| 编辑/写入 `.py` 文件 | pyright 类型检查 (tail -8) | 类型错误会显示在终端 |
+| 编辑/写入 `.ts`/`.tsx` 文件 | tsc 编译检查 (tail -10) + 清 .next/cache | 编译错误会显示在终端 |
+| git commit 前 | pytest test_architecture.py + test_quality_gates.py | 当前带 `|| true`（@tester 测试未就绪），不阻塞提交 |
+| git push 前 | pytest tests/ 全量 (timeout 300s) | 测试失败会阻塞 push |
+
+**工具版本**: pyright 1.1.408 / tsc 5.9.3 / pytest 8.3.4
+**注意**: 所有 hook 使用 `python3`（非 `python`），因本机 `python` 不在 PATH
+
+### Earlier (2026-04-09): 阿里云 MySQL ALTER TABLE — project_chapters TEXT→LONGTEXT ✅
+
+- 通过 pymysql 连接阿里云 MySQL，执行 ALTER TABLE 将 8 个 TEXT 列改为 LONGTEXT
+- 影响列: full_script, summary, characters_json, scenes_json, storyboard_json, error_message, transcript_json, timeline_json
+- 已验证: DESCRIBE 确认全部 8 列为 longtext
+- **数据库表结构已与 chapter.py model 同步**
+
+### Earlier (2026-04-04): TASK-CONFIRM-OUTLINE-WIRE + REORDER-FIX push + VPS 部署 ✅
 
 4 commits pushed → `origin/main` (38f2505 → 708e362):
 

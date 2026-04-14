@@ -4,6 +4,83 @@
 
 ---
 
+### TASK-HE-DEVOPS-2: TEAM_CHAT 归档机制 ✅
+
+**完成时间**: 2026-04-14
+**任务类型**: Harness Engineering — 信息治理 (P1)
+
+**完成内容**:
+- [x] 创建 `scripts/archive_team_chat.sh` (chmod 755, #!/bin/bash, set -euo pipefail)
+- [x] 首次归档执行: 36,079行 → 2,343行 (减少 93.5%)
+- [x] 4 个月份归档文件: 2026-01 / 2026-02 / 2026-03 / 2026-04
+- [x] 幂等验证: 二次运行结果不变
+- [x] TEAM_CHAT.md 头部加入归档说明
+- [x] 更新 TEAM_CHAT.md 完成报告
+- [x] 更新 devops-progress (current/context-for-others/completed)
+
+**脚本特性**: macOS+Linux 兼容、日期精确解析、按月分割、幂等
+
+---
+
+### TASK-HE-DEVOPS-1: Hook 基础设施升级 ✅
+
+**完成时间**: 2026-04-14
+**任务类型**: Harness Engineering — 自动化 Sensor 基础设施 (P0)
+
+**完成内容**:
+- [x] 安装 pyright (pip3 install pyright → 1.1.408)
+- [x] 验证 tsc 可用 (frontend/ → Version 5.9.3)
+- [x] 验证 pytest 可用 (8.3.4)
+- [x] settings.local.json PostToolUse hook 升级 — .py→pyright, .ts/.tsx→tsc+清缓存
+- [x] settings.local.json PreCommit hook 新增 — 架构测试+质量门测试 (|| true 安全启动)
+- [x] settings.local.json PrePush hook 新增 — 全量测试 (timeout 300s)
+- [x] env/permissions 保持不变
+- [x] 更新 TEAM_CHAT.md 完成报告
+- [x] 更新 devops-progress (current/context-for-others/completed)
+
+**关键适配**: `python` 在本机不可用，所有 hook 命令使用 `python3` 代替
+
+**待后续**: PM 通知后去掉 PreCommit 的 `|| true`（@tester 测试文件就绪后）
+
+---
+
+### 阿里云 MySQL ALTER TABLE — project_chapters TEXT→LONGTEXT ✅
+
+**完成时间**: 2026-04-09
+**任务类型**: 数据库 DDL 变更（RB-1 配套）
+
+**完成内容**:
+- [x] 连接阿里云 MySQL (101.132.69.232:3306/prefacestory) via pymysql
+- [x] ALTER TABLE project_chapters MODIFY 8 列 TEXT → LONGTEXT
+- [x] DESCRIBE 验证全部 8 列已变为 longtext
+- [x] 更新 TEAM_CHAT.md 完成报告
+- [x] 更新 devops-progress (current/context-for-others/completed)
+
+**影响列**: full_script, summary, characters_json, scenes_json, storyboard_json, error_message, transcript_json, timeline_json
+
+**背景**: Backend RB-1 已在 chapter.py 中将 8 个 Text 列改为 LONGTEXT（SQLAlchemy model），但已有数据库表不会自动变更，需要手动 DDL。
+
+---
+
+### MERGE-FIX push + VPS 部署 ✅
+
+**完成时间**: 2026-04-07
+**任务类型**: push + VPS 部署
+
+**完成内容**:
+- [x] git pull Ben 最新 (4dcccc0, 5 files model 修复)
+- [x] git stash/pop 无冲突
+- [x] Commit 1: `303cb34` fix(backend) — confirm-outline merge summary dual-write + ending replacement
+- [x] Commit 2: `2277ee7` test — MERGE-FIX 4 scenarios (55/55 PASS)
+- [x] Commit 3: `69ebc02` docs — agent progress + team-brain sync
+- [x] Push: `origin/main` 4dcccc0 → 69ebc02
+- [x] rsync projects.py + api/__init__.py + models/ 到 VPS
+- [x] 清理误放到 app/ 根目录的 12 个 model 文件
+- [x] Docker rebuild api + force-recreate
+- [x] 验证: `/health` healthy ✅ + 3 容器正常
+
+---
+
 ### VPS API Key 验证 ✅
 
 **完成时间**: 2026-04-05

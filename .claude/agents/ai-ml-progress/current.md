@@ -1,11 +1,23 @@
 # AI-ML Agent - 当前任务
 
-> **最后更新**: 2026-03-25
-> **状态**: ✅ TASK-PHASE2-PROMPTS 完成 (4 个 prompt)，等 Backend 集成 + PM Review
+> **最后更新**: 2026-04-14（PM 代更新）
+> **状态**: ✅ 今日完成 4 项：Harness 架构测试 + Prompt A/B 分析 + 10-Shot 对比 + Haiku 调整画面 prompt
 
 ---
 
 ## 刚完成
+
+### TASK-PIPELINE-OPT-R3 A-1 — description_zh prompt 加强 ✅
+
+**完成时间**: 2026-04-09
+**文件**: `app/services/story_outline_generator.py`
+
+排查发现原 AM-1 的 prompt 对 description_zh 强调不够，LLM 可能跳过。3 处加强:
+1. System prompt: 新增 MANDATORY 规则（英文强制词）
+2. JSON schema: 加 `【必填】` + 内联示例
+3. 创作要点 #12: 加 `(REQUIRED/必填)` + 三者共存说明
+
+---
 
 ### TASK-PHASE2-PROMPTS — Phase 2 分析/上下文 prompt 设计 ✅
 

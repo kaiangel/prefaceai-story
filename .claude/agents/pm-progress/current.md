@@ -1,7 +1,92 @@
 # PM Agent - 当前任务
 
-> **最后更新**: 2026-04-07
-> **状态**: ✅ MERGE-FIX + MERGE-TEST 全部通过 → DevOps push + VPS 部署已派发
+> **最后更新**: 2026-04-14 22:00
+> **状态**: 🔄 Founder 联调测试通过 → @devops push + 部署中
+
+---
+
+## 正在进行
+
+### TASK-HARNESS-ENGINEERING-V1 — Harness Engineering 升级 (2026-04-14)
+
+**背景**: Sensor 评分 4/10，几乎没有自动化验证。Founder 批准 P0 级升级。
+
+**Phase 1 ✅ 完成**:
+- @devops: TASK-HE-DEVOPS-1 — hooks 配置升级 ✅ PM Review PASS
+- @tester: TASK-HE-TESTER-1 — 10/10 PASS, 0.05s ✅ PM Review PASS
+- PreCommit `|| true` 已去掉，完整闭环激活 ✅
+- PM 补装 pytest-timeout ✅
+
+**Phase 2 ✅ 完成**:
+- @devops: TASK-HE-DEVOPS-2 — TEAM_CHAT 归档 36079→2387 行 ✅ PM Review PASS
+- PM: TASK-HE-PM-1 — ERROR_PATTERNS.md 14 个错误模式 ✅
+- PM: TASK-HE-PM-2 — 上下文预算管理 6 角色清单 ✅
+
+**Phase 3 ✅ 完成**:
+- @backend: TASK-HE-BACKEND-1 — pipeline_schemas.py + orchestrator 验证调用 ✅ PM Review PASS
+- @ai-ml: TASK-HE-AIML-1 — A/B Test 分析文档 36KB ✅ PM Review PASS
+  - 推荐变体 B'（38% token 节省），待 Founder 批准后实施
+
+**Phase 4 ✅ 完成**: HARNESS_HEALTH.md 健康度看板已创建
+
+---
+
+### R6 Founder 测试 (2026-04-14)
+
+**测试故事**: "泰迪的秘密"（宠物美容师听懂动物说话）
+**Pipeline**: 807s，20 shots，零错误
+
+| R6 修复项 | 结果 |
+|-----------|------|
+| R6-1b mood "紧张" | ✅ DB 确认（顶层 + visual_tone） |
+| R6-2/R6-2b selected_ending 追加 plot_points[8] | ✅ DB 确认（9 个节点） |
+| R6-3 confirm 后立即切换 | ✅ 日志确认 |
+| R6-4 倒计时 20s + 点调整暂停 | ✅ Founder 实测确认 |
+| R6-5 超时 1800s | ✅ Pipeline 807s 完成 |
+| 角色调整（卷发+32岁） | ✅ DB 确认 |
+| Schema 验证（Harness） | ✅ Stage 2→3 + Stage 4→5 首次实战通过 |
+
+**发现 3 个 StageD 未接通功能** → 记录到 KNOWN_ISSUES.md：
+- KI-001 (P0): 重新生成按钮纯 UI 壳
+- KI-002 (P0): 旁白编辑不回写 DB
+- KI-003 (P1): 删除 shot 未接通后端
+
+---
+
+### Prompt Format A vs B' 盲测 (2026-04-14)
+
+**状态**: 20 张图已生成（@backend），等待 Founder 盲测评分
+**路径**: `test_output/manualtest/prompt_ab_test/blind/`
+**揭盲**: `test_output/manualtest/prompt_ab_test/blind_mapping.json`
+
+---
+
+### 变体 D 设计 + 10-Shot 三方对比分析 (2026-04-14)
+
+**状态**: ✅ 分析完成，D+ 跳过（收益 13% 不值得风险），直接推进 B' 切换
+**文档**: `.team-brain/analysis/VARIANT_D_DESIGN.md` + `PROMPT_FORMAT_10SHOT_COMPARISON.md`
+
+---
+
+### TASK-PROMPT-B-PRIME + TASK-KI-FIX (2026-04-14 16:30)
+
+**状态**: 🔄 @backend 执行中
+
+**工作项 1 — B' 默认格式**: image_generator.py prompt_format 参数，默认 b_prime，legacy 可切回
+**工作项 2 — 3 个 shot API**: regenerate(POST) + edit(PATCH) + delete(DELETE)，SKIP 模式
+**Backend 审查**: ✅ PASS (10/10 + 10/10 + 架构测试 10/10)
+**Frontend 审查**: ✅ PASS (8/8 + build 18 路由 0 错误)
+
+---
+
+### TASK-PIPELINE-OPT-R2 — Round 2 全面优化 (2026-04-09)
+
+**背景**: R1 修复后 Founder 第二轮测试：batch 失败 fallback、84×529 错误、full_script 溢出、18min 才到角色确认。
+
+**派发**:
+- @Backend: 7 项 (RB-1 LONGTEXT P0 → RB-2 batch debug → RB-3 529+Sem(3) → RB-4 检查点前移 P0 → RB-5 初始消息 → RB-6 estimated_seconds → RB-7 角色调整 API)
+- @Frontend: 6 项 (RF-1 进度不重置 → RF-2 错误不暴露SQL → RF-3 提示分离+20条 → RF-4 后端预估时间 → RF-5 角色调整真实API → RF-6 检查点前移适配)
+- @AI-ML: 1 项 (AM-1 Stage 1 prompt description_zh)
 
 ---
 
@@ -93,12 +178,15 @@
 | 55 | ~~TASK-CONFIRM-OUTLINE-TEST~~ (37/37 PASS) | ~~@Tester~~ ✅ PM 独立确认 |
 | 56 | ~~TASK-PLOTPOINT-REORDER-FIX~~ (元数据跟随排序) | ~~三方~~ ✅ PM Review PASS + 39/39 |
 | — | ~~DevOps push + VPS 部署~~ (WIRE + REORDER-FIX) | ~~@DevOps~~ ✅ 708e362 |
-| — | Ben DB 脏数据清理 (部署后) | @backend_Ben ⏳ |
+| — | ~~Ben DB 脏数据清理~~ | ~~@backend_Ben~~ ✅ 完成 (微信确认 04-07) |
 | — | ~~confirm-outline 前端接入验证~~ | ~~PM~~ ✅ 已验证（WIRE 修复中完成）|
 | — | ~~DevOps 验证 VPS API Key~~ | ~~@DevOps~~ ✅ 核心 4/4 已填入生效，R1 基本解决 |
 | — | ~~TASK-OUTLINE-MERGE-FIX~~ | ~~@Backend~~ ✅ PM Review PASS |
 | — | ~~TASK-OUTLINE-MERGE-TEST~~ | ~~@Tester~~ ✅ 55/55 PASS + PM 独立确认 |
-| — | **DevOps: pull Ben → 解决冲突 → push 我们的 → VPS 部署** | **@DevOps** 🔄 |
+| — | ~~DevOps: pull Ben → push → VPS 部署~~ | ~~@DevOps~~ ✅ 69ebc02 |
+| — | ~~TASK-REAL-PIPELINE-UX Step 1~~ (Backend 3 项 + Tester 35/35) | ~~@Backend + @Tester~~ ✅ PM Review PASS |
+| — | ~~TASK-REAL-PIPELINE-UX Step 2~~ (Frontend: 真实进度+角色+场景+StageD) | ~~@Frontend~~ ✅ |
+| — | ~~TASK-BUGFIX-STAGEC~~ (Bug 3 stage 不匹配 + Bug 4 日志重复) | ~~@Frontend~~ ✅ PM Review PASS (4/4) |
 | — | **=== 待启动 ===** | |
 | — | Phase 3 #11 续写模式 | PM 设计 → 全员 |
 | — | Resonance Phase 0 蓄水期 | Founder 触发 |

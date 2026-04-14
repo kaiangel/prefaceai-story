@@ -4,6 +4,80 @@
 
 ---
 
+### 2026-04-14 — TASK-HARNESS-ENGINEERING-V1 全部完成 + R6 测试 + Prompt A/B + StageD KI
+
+**Harness Engineering V1 (9/9)**:
+- Phase 1: @devops hooks 升级 + @tester 10 架构/质量测试 + 闭环激活
+- Phase 2: @devops TEAM_CHAT 归档(36K→2.4K) + PM ERROR_PATTERNS(14个) + PM 上下文预算
+- Phase 3: @backend Pipeline Schema(Pydantic) + @ai-ml Prompt A/B 分析(36KB)
+- Phase 4: HARNESS_HEALTH.md 健康度看板
+- **成果**: Sensor 4→7, 计算性控制 3→6
+
+**Prompt Format 优化**:
+- 变体 D 设计（李继刚式压缩，-57% token）
+- 10-Shot 三方对比分析（68KB 文档）
+- A vs B' 实测：20 张 NB2 盲测图生成完毕（@backend），等 Founder 评分
+
+**R6 Founder 测试**:
+- "泰迪的秘密" Pipeline 807s 20 shots 零错误
+- R6 全部 6 项修复验证 PASS（mood/ending/confirm切换/倒计时/超时/角色调整）
+- Schema 验证首次实战通过（Stage 2→3 + Stage 4→5）
+
+**StageD 已知问题记录**:
+- KI-001 (P0): 重新生成纯 UI 壳（5 个断裂点）
+- KI-002 (P0): 旁白编辑不回写 DB（3 个断裂点）
+- KI-003 (P1): 删除 shot 未接通后端
+
+---
+
+### 2026-04-09 — TASK-PIPELINE-OPT R1 完成 + R2 规划
+
+**R1 成果**: Backend 7/7 PASS + Frontend 3/3 PASS (DB session + Stage4 并行 + Stage3 batch + 进度更新 + 百分比重分配 + 断点恢复 + 重试 + 动态提示 + 预估时间 + 错误处理)
+
+**R1 测试发现**: batch 失败 fallback、84×529 API 过载、full_script 溢出、18min 到角色确认太慢、角色调整是 mock、场景描述英文
+
+**R2 规划**: Backend 7 + Frontend 6 + AI-ML 1 = 14 项优化，Founder 确认后派发
+
+---
+
+### 2026-04-09 — Pipeline 全面分析 + TASK-PIPELINE-OPT 规划
+
+**Founder 本地真实 Pipeline 测试**: 总耗时 ~12min（短篇 6 scenes），Stage 4 完成后 DB session 崩溃。
+
+**PM 分析成果**:
+1. 定位 P0 崩溃根因: `job_manager.py` 长 session 被阿里云 MySQL 踢掉
+2. 发现 Stage 4 可并行化（`_generate_scene_shots` 无跨 scene 依赖）→ 省 65% 时间
+3. 研究 Sonnet 4.6 输出上限 64K tokens → Stage 3 batch 可行
+4. 确认 Tier 2 API 限额（1K RPM / 90K output TPM）→ 并行无压力
+5. 确认 DB 断点恢复列已存在（characters_json/scenes_json/storyboard_json）
+6. 设计进度百分比重新分配方案 + 逐 Scene 更新 + 自适应 batch 策略
+7. 规划前端等待体验 UX（动态提示 + 预估时间 + 错误处理）
+8. 派发 Backend 7 项 + Frontend 3 项
+
+---
+
+### 2026-04-09 — TASK-BUGFIX-STAGEC Review PASS (4/4)
+
+**Founder 测试发现 5 个 Bug**（Bug 1/2 已修复），PM 验证 + 派发 + 审查 Bug 3/4：
+
+| Bug | 问题 | 修复 | 结果 |
+|-----|------|------|------|
+| 3 (P0) | StageC.tsx L80 `"generating_images"` vs 后端 `"image_generation"` | 前端字符串对齐 | ✅ |
+| 4 (P1) | CreateContext reducer 无条件追加 generationLog | isDuplicate 去重 | ✅ |
+| 5 (P2) | 角色预览占位图 | 暂缓（SKIP 模式可接受） | ⏳ |
+
+**PM 补充发现**: 全量生图模式 Stage 5 路径缺少 `progress_callback("image_generation", ...)`，已记录到 `.team-brain/shared-memory/notice_fullmode_progress_callback_gap.md`。
+
+---
+
+### 2026-04-08 — TASK-REAL-PIPELINE-UX Step 1 Review PASS + Step 2 派发
+
+**Backend**: 4 文件改动（config + pipeline_orchestrator + job_manager + projects），Stage 5 跳过模式 + 场景数据 + 结果 API ✅
+**Tester**: 35/35 pytest PASS，PM 独立跑一致 ✅
+**Step 2 派发 @Frontend**: 4 项（StageC 轮询真实 API + 角色真实数据 + 场景真实数据 + StageD 真实结果）
+
+---
+
 ### 2026-04-07 — confirm-outline 全链路深度审计 + 2 Bug 修复派发
 
 **Founder 要求**: 验证 StageB 所有维度的用户确认内容是否完整传入下一 stage

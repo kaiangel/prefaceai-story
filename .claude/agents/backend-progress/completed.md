@@ -4,6 +4,87 @@
 
 ---
 
+## 2026-04-14（PM 代更新）
+
+### TASK-PROMPT-B-PRIME — B' 默认格式 ✅
+- `app/config.py`: PROMPT_FORMAT = "b_prime"
+- `app/services/image_generator.py`: _build_b_prime_prompt() + prompt_format 参数
+- A 格式保留（legacy 切回），B' 跳过 StyleEnforcer.enforce_prompt()
+
+### TASK-KI-FIX — 3 个 Shot 级 API 端点 ✅
+- `app/api/chapters.py`: regenerate_shot(POST) + update_shot(PATCH) + delete_shot(DELETE)
+- SKIP 模式返回现有图片，update 写回 DB，delete 软删除
+- 共享 helper: _get_project_and_chapter() + _find_shot_in_storyboard()
+
+### TASK-HE-BACKEND-1 — Pipeline Schema 验证 ✅
+- `app/services/pipeline_schemas.py`: Pydantic CharacterSchema + ShotSchema
+- `app/services/pipeline_orchestrator.py`: Stage 2→3 + Stage 4→5 验证调用
+
+### TASK-STAGED-V2 — Haiku 集成到 regenerate 端点 ✅
+- `app/api/chapters.py`: ShotRegenerateRequest + adjustment_intent 参数
+- Haiku 4.5 修改 image_prompt → 写回 storyboard_json
+- 错误处理: Haiku 失败 fallback 不阻塞
+
+---
+
+## 2026-04-13
+
+### R6-1b + R6-2b confirm_outline 修复 ✅
+- R6-1b: `raw["mood"] = user["mood"]` 新增，顶层 mood 字段同步更新（Pipeline 读此字段）
+- R6-2b: 删除 selected_ending 替换 plot_points[-1] 的逻辑（前端 R6-2 已改为 append，后端无需替换）
+- 改动文件: `app/api/projects.py`，syntax ✅
+
+---
+
+### R6 Backend ✅
+- R6-5: max_wait 300→1800 (pipeline_orchestrator.py)
+- R6-6: 风格日志 custom display_name (pipeline_orchestrator.py)
+
+---
+
+### TASK-LOG-AUDIT 日志覆盖审查 ✅
+- 8 文件审查，7 文件加日志（零业务逻辑变更）
+- LLM 调用: 响应长度+耗时。Pipeline: 入口参数+出口耗时。R4-1 轮询: 周期状态。API: 入口/出口
+- 不打 LLM 完整 prompt/response（太长），不打高频轮询（flooding）
+
+---
+
+### MySQL 连接池修复 ✅
+- `app/database.py` — `pool_recycle` 300→1800, `pool_pre_ping` 已有保持 True
+- 背景: Pipeline 长运行导致 `Packet sequence number wrong` 500 错误
+- Ben 确认可直接改
+
+---
+
+### TASK-PIPELINE-OPT-R4 Backend 完成 ✅
+
+- R4-1 (P0): Pipeline 真正等用户确认 — characters_confirmed 字段 + 轮询循环(2s/5min) + confirm-characters 端点 + start-generation 重置 (project.py + pipeline_orchestrator.py + projects.py)
+- R4-4 (P1): Stage 3 batch 可行 — 根因 LLM 未转义内部双引号，新增第 7 层修复 (screenplay_writer.py)
+- DB 迁移: `ALTER TABLE projects ADD COLUMN characters_confirmed TINYINT(1) NOT NULL DEFAULT 0;`
+
+---
+
+## 2026-04-09
+
+### TASK-PIPELINE-OPT-R3 Backend 完成 ✅
+
+- B-1 (P0): character_ready 检查点修复 — 删除即时覆盖 + 5s sleep (pipeline_orchestrator.py)
+- B-2 (P1): Stage 3 batch 诊断加强 — 保存原始响应 + 失败日志增强 (screenplay_writer.py)
+- B-3 (P1): 短篇 29→~18 shots — min_shots 公式 + target_beats 公式修正 (story_outline_generator.py + screenplay_writer.py)
+
+---
+
+## 2026-04-08
+
+### TASK-REAL-PIPELINE-UX Step 1 完成 ✅
+
+- 1-A: Stage 5 跳过模式 (config.py + pipeline_orchestrator.py + .env)
+- 1-B: generate-outline 返回 scenes (projects.py)
+- 1-C: generation-result + 图片服务 2 端点 (projects.py)
+- job_manager.py: generate_images=True + progress_callback + 存 storyboard_json
+
+---
+
 ## 2026-04-07
 
 ### TASK-OUTLINE-MERGE-FIX 完成 ✅

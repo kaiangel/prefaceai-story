@@ -6,7 +6,7 @@ model: opus
 color: pink
 ---
 
-> **Session 恢复码**: `claude --resume 49434edf-9f56-4485-a038-788a1719c184`
+> **Session 恢复码**: `claude --resume 49434edf-9f56-4485-a038-788a1719c184` (new session needed)
 
 你是序话Story项目的前端开发专家 (Frontend)。
 

@@ -1,122 +1,93 @@
 # Backend Agent - 给其他 Agent 的上下文
 
-> **最后更新**: 2026-04-07
+> **最后更新**: 2026-04-14 21:30（PM 代更新）
 
 ---
 
-## 当前状态速览
+## ✅ TASK-STAGED-V2 — Haiku 集成到 regenerate 端点 (2026-04-14)
 
-```
-状态: ✅ TASK-OUTLINE-MERGE-FIX 完成
-当前任务: 等 PM Review
-阻塞: 无
-```
-
----
-
-## ✅ TASK-OUTLINE-MERGE-FIX 完成 (2026-04-07)
-
-### 给 @PM 的信息
-
-`projects.py` confirm_outline 函数 2 处修复:
-- Bug 1: `summary` 同时写 `raw["summary"]` + `raw["logline"]`（之前只写了 logline，summary 字段未更新）
-- Bug 2: `selected_ending` 替换 `plot_points[-1]["description"]`（方案 C），Stage 3 最后一场按用户选的结局生成。添加 `user_selected_ending: True` 标记方便追溯
+- regenerate 端点 API 契约更新：
+  - Body (可选): `{ "adjustment_intent": "让她笑" }`
+  - 返回新增: `prompt_modified: bool`, `modified_prompt_preview: str | null`
+- 有 intent: Haiku 4.5 改 image_prompt → 写回 DB → 生图（或 SKIP 返回现有图片）
+- 无 intent: 原 prompt re-roll
+- Haiku 修改持久化：写回 storyboard_json
+- 错误处理：Haiku 失败 fallback 到原始 prompt，不阻塞
 
 ---
 
-## ✅ TASK-STYLE-LITERAL-FIX 完成 (2026-03-25, P0)
+## ✅ TASK-PROMPT-B-PRIME — B' 默认格式 (2026-04-14)
 
-### 给 @PM 的信息
+- `image_generator.py` 的 `generate_shot_image_phase2()` 新增 `prompt_format` 参数
+- 默认 `"b_prime"`（省 46% token，盲测验证质量等价）
+- `"legacy"` 切回 A 格式（全部旧代码保留）
+- 环境变量 `PROMPT_FORMAT=b_prime|legacy` 可全局切换
+- B' 模式跳过 `StyleEnforcer.enforce_prompt()`（B' 自带风格块）
 
-`StylePreset` Literal 从 10 → 15，与 StyleEnforcer + 前端 15 风格完全对齐。删掉 `"chinese"` 残留。修复 5 个风格导致 422 的 bug。
+## ✅ TASK-KI-FIX — 3 个 Shot 级 API 端点 (2026-04-14)
 
----
+**@Frontend 需要的 API 契约**:
 
-## ✅ TASK-DOC-TEXT-WIRE Backend 完成 (2026-03-25)
+### POST `/{chapter_number}/shots/{shot_id}/regenerate`
 
-### 给 @PM 的信息
-
-- `ProjectCreate` 新增 `document_text: str | None`
-- `create_project` 中: 如果有 `document_text`，拼接到 `original_idea`（`\n\n---\n附加文档内容:\n{text}`）
-
-### 给 @Frontend 的信息
-
-Backend 已接收 `document_text`。POST body 加 `document_text: state.documentText || null` 即可。
-
----
-
-## ✅ TASK-OCR-ENDPOINT 完成 (2026-03-25)
-
-### 给 @PM 的信息
-
-新建 `app/api/utils.py`（独立路由），2 个端点:
-
-**POST /api/utils/ocr**:
-- 接收: `file` (FormData 图片)
-- 校验: 图片类型 + 10MB 限制
-- 模型: 主力 `gemini-3.1-flash-lite-preview`，备用 `claude-haiku-4-5-20251001`
-- 返回: `{ "text": "识别文字" }` 或 `{ "text": "", "error": "识别失败" }`
-
-**POST /api/utils/parse-document**:
-- 接收: `file` (FormData PDF/TXT/MD)
-- 校验: 文件名后缀 + 20MB 限制
-- PDF: pdfplumber 提取，TXT/MD: 直接读取 (UTF-8/GBK fallback)
-- 返回: `{ "text": "提取文字" }`
-
-### 给 @Frontend 的信息
-
-OCR 去 mock 调真实 API:
-```
-// 图片 OCR
-const formData = new FormData();
-formData.append('file', imageFile);
-const res = await fetch('/api/utils/ocr', { method: 'POST', body: formData });
-
-// PDF 解析
-formData.append('file', pdfFile);
-const res = await fetch('/api/utils/parse-document', { method: 'POST', body: formData });
+请求: 无 body
+响应:
+```json
+{
+  "status": "completed",
+  "shot_id": 1,
+  "imageUrl": "/images/shot_01.png",
+  "skipped": true,
+  "message": "..."
+}
 ```
 
-### 给 @DevOps 的信息
+### PATCH `/{chapter_number}/shots/{shot_id}`
 
-- 需要安装 `pdfplumber`: `pip install pdfplumber`
-- 新文件: `app/api/utils.py`
-- `app/main.py` +2 行注册
+请求:
+```json
+{
+  "narration_segment": "新的旁白文字",   // optional
+  "chinese_text": "新的对话文字"         // optional
+}
+```
+响应:
+```json
+{
+  "status": "updated",
+  "shot_id": 1,
+  "updated_fields": ["narration_segment"],
+  "shot": { ... 完整 shot 数据 ... }
+}
+```
+
+### DELETE `/{chapter_number}/shots/{shot_id}`
+
+请求: 无 body
+响应:
+```json
+{
+  "status": "deleted",
+  "shot_id": 1,
+  "message": "Shot 1 已标记为删除"
+}
+```
+
+**通用**: 所有端点需 Authorization header（Bearer token），路由前缀 `/api/projects/{project_id}/chapters/`
 
 ---
 
-## ✅ Phase 1 Step 2: StyleEnforcer 28 + Literal 28 (2026-03-25)
+## 之前的工作
 
-### 给 @PM 的信息
+### ✅ R6 Backend (2026-04-13)
 
-- `style_enforcer.py`: +13 个 `StyleEnforcement`（AI-ML 设计完整配置，逐字复制）
-- `project.py` `StylePreset` Literal: 15 → 28
-- 验证: StyleEnforcement count = 28 ✅ + StylePreset count = 28 ✅
+- R6-5: max_wait 300→1800（30 分钟）
+- R6-6: 有自定义风格时日志显示 `Style: custom (display_name)`
+- R6-1b: mood 更新顶层字段
+- R6-2b: 删除 selected_ending 替换 plot_point 逻辑
 
----
+### ✅ TASK-HE-BACKEND-1 — Pipeline Schema 验证 (2026-04-14)
 
-## ✅ TASK-PHASE2-INFRA 完成 (2026-03-25)
-
-### 给 @PM 的信息
-
-**新建**: `app/services/file_storage.py` — 文件上传验证+压缩+本地存储
-**修改**: `app/api/utils.py` — 3 个分析端点 + 公用 `_vision_analyze` helper
-**修改**: `story_outline_generator.py` — Prompt 4 `_build_user_reference_context()` + `generate()` 3 新参数
-
-3 个端点全部不需要认证（创建项目之前调用）。
-
-### 给 @Frontend 的信息
-
-3 个分析 API 就绪:
-```
-POST /api/utils/analyze-style       → { style_display_name, mandatory_keywords, ..., display_tags }
-POST /api/utils/analyze-character   → { description_zh, description_en, gender, age_range, display_name }
-POST /api/utils/analyze-scene       → { description_zh, description_en, location_type, atmosphere, display_name }
-```
-全部接收 FormData `file` 字段（图片），返回 JSON。无需 Bearer token。
-
-### 给 @DevOps 的信息
-
-- 新增 Pillow 依赖（已在 requirements.txt）
-- 新建 `app/services/file_storage.py`
-- 存储路径: `./storage/uploads/{project_id}/{category}/{filename}`
+- `app/services/pipeline_schemas.py` — Pydantic 验证 characters + shots
+- Stage 2→3 + Stage 4→5 验证调用已嵌入 pipeline_orchestrator.py
+- image_prompt 中文比例检测 validator（>15% 拒绝）

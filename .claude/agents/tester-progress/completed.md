@@ -4,6 +4,54 @@
 
 ---
 
+## 2026-04-14: TASK-HE-TESTER-1 — 架构测试 + 质量门测试 10/10 PASS
+
+**结果**: 10/10 PASS (pytest, 0.06 秒)
+
+**创建文件**:
+- `tests/test_architecture.py` — 6 个架构适应度测试
+- `tests/test_quality_gates.py` — 4 个质量门测试
+
+**覆盖的架构规则**:
+1. 前后端边界隔离（互不 import）
+2. Shot 生成默认用 NB2 模型（NB2_MODEL + use_pro_model=False）
+3. Image prompt 模板/风格配置全英文（STYLE_PROMPTS + StyleEnforcement）
+4. Pipeline 5 阶段核心服务文件完整
+5. 参考图串行生成（portrait→fullbody，无 asyncio.gather）
+6. 角色必需字段在 CharacterDesigner 代码中完整定义
+7. 翻译函数存在且被 image_generator 调用
+8. .env.example 存在
+9. 必需目录结构完整（app/services + frontend/src + tests）
+
+**关键设计决策**:
+- 质量门测试采用结构性检查，不依赖 test_output 历史数据
+- test_shot_generation_uses_nb2_model 通过 AST 解析检查（不是字符串搜索）
+- test_prompt_templates_are_english 精确检查 STYLE_PROMPTS 字典值和 StyleEnforcement 参数值
+
+**发现的源码信息**:
+- shot_prompt_generator.py 含中文 LLM 系统提示词（正确设计，非 image prompt）
+- reference_image_manager.py 无 asyncio.gather（串行正确）
+- test_output 历史数据中部分 image_prompt 含中文人名/店名（LLM 输出已知问题）
+
+---
+
+## 2026-04-08: TASK-REAL-PIPELINE-UX Step 1 验证 — 后端通路 35/35 PASS
+
+**结果**: 35/35 PASS (pytest, 1 轮全绿)
+
+**方法**: /xhtdd 完整模式，零 API 成本
+
+**5 组测试**:
+- 1-A Stage 5 跳过模式: config + R8_DATA_DIR + skip 方法 + R8 数据完整性 + 复制逻辑(循环/截断) + progress_callback — 14/14 ✅
+- 1-B scenes 数据: 字段映射 + fallback + 空列表 — 6/6 ✅
+- 1-C 生成结果 API: 端点 + 路径遍历 + shots 结构 + URL 格式 — 8/8 ✅
+- job_manager: project_uuid + progress_callback + storyboard_json + completed — 6/6 ✅
+- .env: SKIP_IMAGE_GENERATION — 1/1 ✅
+
+**测试脚本**: `tests/test_real_pipeline_ux_step1.py`
+
+---
+
 ## 2026-04-07: TASK-OUTLINE-MERGE-TEST — confirm-outline 合并修复验证
 
 **结果**: 55/55 PASS（在 39/39 基础上 +16 新断言）

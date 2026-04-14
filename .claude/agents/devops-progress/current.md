@@ -1,11 +1,61 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-04-05
-> **状态**: ✅ VPS API Key 验证完成 — 核心 4/6 已填入且生效
+> **最后更新**: 2026-04-14
+> **状态**: ✅ TASK-HE-DEVOPS-2 TEAM_CHAT 归档机制完成
 
 ---
 
 ## 刚完成
+
+**TASK-HE-DEVOPS-2: TEAM_CHAT 归档机制 (Harness Engineering V1 Phase 2)**
+
+### 执行内容 [2026-04-14]
+
+1. **创建归档脚本**: `scripts/archive_team_chat.sh` (chmod 755)
+   - Bash wrapper + Python 核心逻辑（精确日期解析）
+   - 支持 macOS (BSD date) 和 Linux (GNU date)
+   - 日期检测: `### YYYY-MM-DD` + `#### @agent (YYYY-MM-DD)` + `#### @agent [YYYY-MM-DD]`
+   - 幂等: 已归档内容不重复写入
+
+2. **首次归档执行**:
+   - 归档前: 36,079 行 → 归档后: 2,343 行 (减少 93.5%)
+   - 4 个月份归档文件: 2026-01 (7,246行), 2026-02 (8,328行), 2026-03 (16,970行), 2026-04 (1,246行)
+   - 幂等验证: 二次运行输出 "No messages to archive"
+
+3. **头部更新**: TEAM_CHAT.md 头部已加入归档说明
+
+### 下一步
+
+- 无待办，等待 PM 下一个任务派发
+
+---
+
+## 上次完成
+
+**TASK-HE-DEVOPS-1: Hook 基础设施升级 (Harness Engineering V1)**
+
+### 执行内容 [2026-04-14]
+
+1. **前置验证**:
+   - `python3 -m pyright --version` → **pyright 1.1.408** (pip3 install 安装)
+   - `npx tsc --version` (frontend/) → **Version 5.9.3** (已有)
+   - `python3 -m pytest --version` → **pytest 8.3.4** (已有)
+
+2. **settings.local.json 升级** (`.claude/settings.local.json`):
+   - **PostToolUse**: 合并为统一 hook — .py 文件自动跑 pyright 类型检查，.ts/.tsx 文件自动跑 tsc 编译检查 + 清 Next.js 缓存
+   - **PreCommit (新增)**: 提交前自动跑 `tests/test_architecture.py` + `tests/test_quality_gates.py`，带 `|| true` 安全启动（@tester 测试文件未就绪）
+   - **PrePush (新增)**: 推送前跑完整 `tests/` 测试套件，timeout 300s
+   - **env/permissions**: 保持不变
+
+3. **关键适配**: `python` 命令在本机不可用（仅有 `python3`），所有 hook 命令使用 `python3` 代替 `python`
+
+### 下一步
+
+- 等待 PM 通知：@tester 完成 `tests/test_architecture.py` + `tests/test_quality_gates.py` 后，去掉 PreCommit 的 `|| true` 激活完整闭环
+
+---
+
+## 上次完成
 
 **TASK-CONFIRM-OUTLINE-WIRE + REORDER-FIX — push + VPS 部署**
 
@@ -190,6 +240,10 @@
 
 | 时间 | 更新内容 |
 |------|----------|
+| 2026-04-14 | TASK-HE-DEVOPS-2: TEAM_CHAT 归档脚本创建 + 首次执行 (36079→2343行, 4个月份归档文件) |
+| 2026-04-14 | TASK-HE-DEVOPS-1: Hook 基础设施升级 (pyright + tsc + PreCommit + PrePush) |
+| 2026-04-09 | 阿里云 MySQL ALTER TABLE project_chapters 8 列 TEXT→LONGTEXT (RB-1 配套 DDL) |
+| 2026-04-07 | MERGE-FIX push (pull Ben 4dcccc0 → 303cb34+2277ee7+69ebc02) + VPS 部署 (rsync + api rebuild) |
 | 2026-04-05 | VPS API Key 验证: 核心 4/6 已填入且容器内生效，R1 风险标记基本解决 |
 | 2026-04-04 | WIRE + REORDER-FIX push (066ef46+853a755+a55bb07+708e362) + VPS 部署 (api + frontend rebuild) |
 | 2026-04-01 | UPLOADER-ENV-FIX push (f292bee+ceb2ba5) + VPS frontend rebuild |

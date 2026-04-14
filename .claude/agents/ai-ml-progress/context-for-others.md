@@ -1,7 +1,43 @@
 # AI-ML Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 AI-ML 的工作状态和 Prompt 约束
-> **最后更新**: 2026-03-24
+> **最后更新**: 2026-04-14（PM 代更新）
+
+---
+
+## TASK-STAGED-V2-AIML (2026-04-14) — Shot 画面调整 Haiku Prompt
+
+新文件 `app/prompts/shot_adjustment_prompt.py`:
+- `SHOT_ADJUSTMENT_SYSTEM_PROMPT`: Haiku 4.5 系统提示词，9 条规则
+- `build_adjustment_user_prompt(original_image_prompt, user_intent_zh)`: 用户消息构建
+- @Backend 已集成到 regenerate 端点
+
+## Prompt Format A/B 分析 (2026-04-14)
+
+- 3 变体分析（A/B'/D）+ 10-Shot 三方对比（68KB 文档）
+- 结论：B' 质量等价 A，省 46% token → 已切为默认格式
+- 文档：`.team-brain/analysis/PROMPT_FORMAT_AB_TEST_AIML.md` + `PROMPT_FORMAT_10SHOT_COMPARISON.md`
+
+---
+
+## TASK-PIPELINE-OPT-R3 A-1 (2026-04-09) — description_zh prompt 加强
+
+AM-1 加了 description_zh 字段但 LLM 可能跳过。加强 3 处:
+1. System prompt: MANDATORY 规则（英文强制词，LLM 不可忽略）
+2. JSON schema: 【必填】+ 内联示例
+3. 创作要点 #12: (REQUIRED/必填) + 三者共存说明
+
+@Frontend: description_zh 现在应该稳定出现在 LLM 输出中。场景确认页面应优先读取 description_zh，fallback 到 description。
+
+---
+
+## TASK-SCENE-ZH (2026-04-09)
+
+Stage 1 prompt (`story_outline_generator.py`) 新增 `description_zh` 字段:
+- 位于 `unique_locations` 中，中文场景氛围描述（100-150 字，文学性语言）
+- **不是 interior_description 的翻译**，是独立的中文创作
+- 前端场景确认页面应显示 `description_zh` 而非英文 `interior_description`
+- 英文字段不受影响（interior_description/exterior_description/key_visual_elements）
 
 ---
 

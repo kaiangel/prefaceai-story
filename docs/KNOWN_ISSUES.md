@@ -6,9 +6,108 @@
 
 ## 高优先级
 
-（暂无）
+### KI-001: StageD "重新生成"按钮未接通后端（纯 UI 壳）
+
+**发现日期**: 2026-04-14 | **发现者**: PM + Founder 联调
+**优先级**: P0（DEC-011 用户旅程 Stage D 核心功能）
+**影响范围**: Frontend (StageD.tsx) + Backend (chapters.py) + Pipeline 集成
+
+**问题描述**:
+StageD 故事预览页的"重新生成"按钮当前是**纯前端 UI 壳**，无法实际重新生成 shot 图片。用户点击后图片消失（`imageUrl: null`），但不会调用后端 API 重新生图。
+
+**断裂点清单**（共 5 个）:
+
+| # | 断裂点 | 当前代码位置 | 问题详情 |
+|---|--------|-------------|---------|
+| 1 | **前端不调 API** | `StageD.tsx:33-35` `handleRegenerate()` | 只 dispatch `REGENERATE_SHOT` action，reducer 只做 `imageUrl: null`（清空图片），**没有任何 fetch 调用后端** |
+| 2 | **后端 API 用旧 Pipeline** | `chapters.py:636-696` `regenerate_single_image_task()` | 调用 `StoryboardService` + `image_generator.generate_image()`，这是**Phase 1.0 旧版方法**，不是 Phase 2.0 的 `generate_shot_image_phase2()` |
+| 3 | **后端无参考图** | `chapters.py:690-696` | 旧的 `generate_image()` 不接受 `reference_images` 参数。没有角色参考图 = 角色一致性完全丢失。也没有 StyleEnforcer、没有 Phase2PromptBuilder |
+| 4 | **接口 ID 不匹配** | 前端 `shotId` vs 后端 `scene_id` | 前端按 `shotId` 操作（一个 shot 对应一张图），后端 API 按 `scene_id` 操作（一个 scene 有多个 shot）。路由是 `/{chapter_number}/images/{scene_id}/regenerate`，缺少 shot 级粒度 |
+| 5 | **无 Schema 验证** | `chapters.py:678-687` | 旧版重新生成不经过 `pipeline_schemas.py` 的 Pydantic 验证，可能产出不合规数据 |
+
+**修复方案（需 Backend + Frontend 配合）**:
+
+**Backend**:
+1. 新建 `POST /api/projects/{project_id}/chapters/{chapter_number}/shots/{shot_id}/regenerate` 端点
+2. 从 DB 读取该 shot 的 `storyboard_json`（含 `image_prompt`、`camera`、`character_direction` 等完整数据）
+3. 从 DB 读取角色参考图路径（`character_refs`）和场景参考图路径（`scene_refs`）
+4. 调用 `image_generator.generate_shot_image_phase2()`（Phase 2.0 方法），传入完整参考图 + StyleEnforcer
+5. 通过 `pipeline_schemas.py` 验证 shot 数据格式
+6. 保存新图片，返回新 `imageUrl`
+
+**Frontend**:
+1. `handleRegenerate()` 改为调用新的 shot 级 API
+2. 调用期间显示 loading 状态（spinner / skeleton）
+3. API 返回后更新 `imageUrl`
+4. 错误处理（API 失败时恢复原图 + toast 提示）
+
+**验收标准**:
+- [ ] 点"重新生成"后调用后端 API
+- [ ] 后端用 Phase 2.0 Pipeline（`generate_shot_image_phase2`）
+- [ ] 传入角色参考图 + 场景参考图 + StyleEnforcer
+- [ ] 生成的新图角色一致性与原图一致
+- [ ] 前端显示 loading → 新图片
+- [ ] Shot 级粒度（不是 scene 级）
 
 ---
+
+### KI-002: StageD 旁白编辑不回写 DB，重新生成不使用编辑后内容
+
+**发现日期**: 2026-04-14 | **发现者**: PM + Founder 联调
+**优先级**: P0（DEC-011 用户旅程 Stage D 核心功能）
+**影响范围**: Frontend (StageD.tsx + CreateContext.tsx) + Backend
+
+**问题描述**:
+StageD 故事预览页的"编辑"按钮可以修改旁白文字（`narrationSegment`），但改动**只存在于前端内存**（React state），不会写回 DB。且"重新生成"按钮（KI-001）与编辑功能互不关联——即使修复了重新生成，也不会使用用户编辑后的旁白内容。
+
+**断裂点清单**（共 3 个）:
+
+| # | 断裂点 | 当前代码位置 | 问题详情 |
+|---|--------|-------------|---------|
+| 1 | **编辑只改前端 state** | `StageD.tsx:144-156` + `CreateContext.tsx:242-252` | `UPDATE_SHOT_TEXT` action 只更新 React state 中的 `narrationSegment`，**没有调 API 写回 DB** |
+| 2 | **刷新页面丢失编辑** | — | 用户编辑旁白后刷新页面，改动全部丢失（state 重置从 DB 读取原始数据） |
+| 3 | **重新生成不读编辑后内容** | `chapters.py:659-687` | 即使重新生成能工作（KI-001 修复后），后端从 `chapter.scenes_json` / `chapter.storyboard_json` 读取原始数据，不会读取前端编辑后的 `narrationSegment` |
+
+**修复方案**:
+
+**Backend**:
+1. 新建 `PATCH /api/projects/{project_id}/chapters/{chapter_number}/shots/{shot_id}` 端点
+2. 接受 `{ narrationSegment?: string, chineseText?: string }` 请求体
+3. 更新 DB 中 `storyboard_json` 对应 shot 的字段
+4. 返回更新后的 shot 数据
+
+**Frontend**:
+1. 编辑完成后（用户点"完成"按钮时）调用 PATCH API 回写 DB
+2. 乐观更新：先更新本地 state，API 失败时回退
+3. "重新生成"时将最新的 `narrationSegment` 传给后端（如果旁白影响 text_overlay，后端需要用编辑后的版本重新渲染文字）
+
+**注意**:
+- `narrationSegment` 是中文旁白（用于 TTS），不进入 `image_prompt`（英文图像生成）
+- 但 `narrationSegment` 影响 `text_overlay`（条漫文字渲染）——如果用户编辑了旁白，重新生成时的文字叠加应该用编辑后的版本
+- `image_prompt` 本身不需要根据旁白编辑而变化（图像构图由 Stage 4 storyboard 决定，与旁白文字无关）
+
+**验收标准**:
+- [ ] 编辑旁白后点"完成"→ 调 PATCH API 写回 DB
+- [ ] 刷新页面后编辑内容不丢失
+- [ ] 重新生成时的 text_overlay 使用编辑后的旁白
+- [ ] 编辑不影响 image_prompt（图像构图不变）
+
+---
+
+### KI-003: StageD "删除" shot 未接通后端
+
+**发现日期**: 2026-04-14 | **发现者**: PM 代码审查
+**优先级**: P1
+**影响范围**: Frontend (StageD.tsx) + Backend
+
+**问题描述**:
+`handleDelete(shotId)` 只 dispatch `DELETE_SHOT` action，reducer 做 `shots.filter(s => s.shotId !== action.payload)`（从前端 state 移除）。**没有调 API 通知后端**，刷新页面后 shot 重新出现。
+
+**修复方案**: 新建 `DELETE /api/projects/{project_id}/chapters/{chapter_number}/shots/{shot_id}` 端点，标记 shot 为 deleted（软删除）。
+
+---
+
+
 
 ### 2. ~~【系统性问题】图像生成prompt中的中文泄露~~ ✅ 已解决
 

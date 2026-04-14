@@ -1,15 +1,72 @@
 # Frontend 状态速览（供其他Agent参考）
 
-> 更新时间: 2026-04-03
+> 更新时间: 2026-04-14 21:30（PM 代更新）
 
 ---
 
-## 当前状态: TASK-PLOTPOINT-REORDER-FIX 完成，等 PM Review
+## TASK-STAGED-V2 前端变更（其他 Agent 需要知道）
 
-StageB confirm-outline 的 plot_points 格式变更：
-- 旧: `["描述1", "描述2", ...]`
-- 新: `[{ description: "描述1", original_index: 0 }, ...]`
+- **调整画面**: 新增输入框 + 确认按钮，发 POST regenerate 带 `{ adjustment_intent: "让她笑" }`
+- **重新生成**: POST regenerate 无 body = re-roll
+- **编辑文字**: 改为编辑 `text_overlay.chinese_text`（不是 narration_segment），PATCH body `{ chinese_text: string }`
+- **删除**: DELETE 先成功再 dispatch，软删除
+- **提示文字**: 重新生成按钮下方 "保持相同场景，产生不同构图变化"
+- **textType="none"**: 隐藏编辑区域（空镜头无文字可编辑）
+- **旁白只读**: narration 显示但不可编辑
 
-后端据 original_index 从原始 plot_points 取完整 dict（含 mood/setting/characters_involved）重排。
+---
+
+## R6 前端变更（其他 Agent 需要知道）
+
+- **R6-1**: mood 已在 confirm-outline 中发送（排查确认已有）
+- **R6-2**: selected_ending 改为 append 到 plot_points 末尾（不再替换）
+- **R6-3**: confirm 后立即 onConfirm() 切换场景确认，API 后台异步，不阻塞 UI
+- **R6-4**: 角色+场景倒计时 10→20 秒
+
+---
+
+## R5 前端变更（其他 Agent 需要知道）
+
+- **R5-1 completedRef 防重复**: shot-gen 轮询的 `completed` 分支现在用 `completedRef` 保护，只执行一次（与 `confirmedRef` 同模式）。`/generation-result` 只请求一次，消除大量 OPTIONS preflight，跳转预览不再延迟 1-2 分钟。
+- **R5-2 100% 显示"即将完成"**: `progress >= 100` 时预估时间文案由"预计还需约 X 分钟"改为"即将完成"。
+
+---
+
+## R4 前端变更（其他 Agent 需要知道）
+
+- **R4-1 confirm-characters API**: CharacterPreview 倒计时结束/手动确认都会调 `POST /projects/{projectId}/confirm-characters`（Bearer token），失败静默继续
+- **R4-2 adjust 失败修复**: catch 中清除 regeneratingId + adjustingId + toast 报错
+- **R4-3 cocoa tip**: "喝可可" 仅在 text-gen 阶段显示，其他阶段不显示
+
+---
+
+## R3 前端变更（其他 Agent 需要知道）
+
+- **F-1 角色调整读取修复**: apiFetch 类型从顶层 description 改为 result.character.description_zh || result.character.description
+- **F-2 模拟早期进度**: text-gen 阶段前 60 秒，前端以 12s/1% 模拟进度（最高 5%），真实进度到达后 max() 切换
+- **F-3 description_zh passthrough**: projects.py generate-outline 端点新增 description_zh 字段传递，前端 OutlineScene 新增 description_zh? 可选字段
+
+---
+
+## R2 前端变更（其他 Agent 需要知道）
+
+- **`character_ready` 适配**: text-gen 轮询检测 `stage === "character_ready"` 触发角色预览（fallback `completed`）
+- **CONTINUE_GENERATION**: shot-gen 阶段用新 action 不重置 progress
+- **friendlyError**: SQL/pymysql 错误自动替换为友好文案
+- **"喝可可"固定 + 19 条轮播**: FIXED_TIP 常量 + CAROUSEL_TIPS 数组
+- **后端估时**: 优先用 `estimated_remaining_seconds`，fallback 线性外推
+- **角色调整**: 调真实 API `/characters/{id}/adjust`，失败 fallback mock
+
+## 当前状态: TASK-BUGFIX-STAGEC 完成，等 PM Review
+
+### Fix 3-A (P0): StageC 角色预览检查点
+
+StageC.tsx L80 的 stage 判断从 `"generating_images"` 改为 `"image_generation"`，与后端 pipeline_orchestrator.py:690 发送的值一致。L79 注释同步更新。
+
+### Fix 3-B (P1): 进度日志去重
+
+CreateContext.tsx 的 `UPDATE_GENERATION_PROGRESS` reducer 现在会比对新消息与 `generationLog` 最后一条的 `message`，相同则不追加（仅更新 progress 和 message 状态）。这解决了 2 秒轮询导致日志重复 7-8 行的问题。
+
+**改动文件**: StageC.tsx + CreateContext.tsx（仅这 2 个）
 
 **构建**: 20 路由，0 错误
