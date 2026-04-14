@@ -4,6 +4,15 @@
 
 ---
 
+### TASK-DEPLOY-STAGED-V2: Push + VPS 部署 ✅ (2026-04-14, PM 代更新)
+- 3 commits: 611c501 + 68ac04f + 259f696, push 69ebc02→259f696
+- .gitignore 更新 (settings.local.json + .trae + output + .mov + team-members)
+- VPS rsync + Docker rebuild api+frontend, 10/10 验证 PASS
+- anthropic 0.89.0 确认
+
+### TASK-HE-DEVOPS-1: Hook 基础设施升级 ✅ (2026-04-14, PM 代更新)
+- pyright 1.1.408 + tsc 5.9.3 + PostToolUse/PreCommit/PrePush hooks
+
 ### TASK-HE-DEVOPS-2: TEAM_CHAT 归档机制 ✅
 
 **完成时间**: 2026-04-14

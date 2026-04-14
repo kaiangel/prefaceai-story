@@ -3079,3 +3079,59 @@ POST `/{chapter_number}/shots/{shot_id}/regenerate`
 ### TASK-DEPLOY-STAGED-V2 — Push + VPS 部署
 
 **派发**: 详见下方 spawn prompt
+
+
+#### @devops → @pm [2026-04-14 23:00]
+
+### ✅ TASK-DEPLOY-STAGED-V2 完成 — 3 Commits + Push + VPS 部署验证通过
+
+**Pre-processing**:
+- `.gitignore` 更新: 新增 `settings.local.json`, `.trae/`, `output/`, `assets/*.mov`, `team-members/` (5 条)
+- `git pull origin main`: Already up to date (无冲突)
+- 敏感文件检查: `.env` 不在 staging, `settings.local.json` 从未被 tracked
+
+**Git Commits (3)**:
+
+| # | Hash | 类型 | 内容 | 文件数 |
+|---|------|------|------|--------|
+| 1 | `611c501` | feat | Harness V1 + B-prime + StageD shot APIs + adjustment UI + archive script | 25 |
+| 2 | `68ac04f` | feat(frontend) | R6 fixes: mood/ending/confirm/countdown + StageC improvements | 2 |
+| 3 | `259f696` | docs | agent progress + team-brain sync + Harness health + skills cleanup (76 deleted) | 121 |
+
+**Push**: `origin/main` 69ebc02 → 259f696 (3 commits)
+
+**VPS 部署**:
+- rsync: `app/` + `frontend/src/` + tests + scripts + .gitignore
+- Docker rebuild: api + frontend (18 routes, 0 errors)
+- `docker compose up -d --force-recreate api frontend`
+
+**验证结果 (10/10)**:
+
+| # | 验证项 | 结果 |
+|---|--------|:----:|
+| 1 | `.gitignore` 更新 | ✅ |
+| 2 | Ben 最新代码已 pull | ✅ (Already up to date) |
+| 3 | 3 个 commit 按类别分组 | ✅ |
+| 4 | Push origin/main | ✅ 69ebc02→259f696 |
+| 5 | VPS rsync | ✅ app/ + frontend/src/ + tests + scripts |
+| 6 | Docker rebuild | ✅ api + frontend built |
+| 7 | `prefaceai.mov` 前端 | ✅ HTTP 200 |
+| 8 | `prefaceai.mov/api/health` | ✅ `{"status":"healthy"}` |
+| 9 | Shot 端点路由 | ✅ regenerate 返回 401 (auth, 非 404) |
+| 10 | anthropic SDK | ✅ `anthropic 0.89.0` |
+
+**3 容器状态**: api (healthy) + frontend (up) + redis (healthy)
+
+
+#### @pm (2026-04-14 22:30)
+
+### ✅ TASK-DEPLOY-STAGED-V2 PM Review PASS — Push + 部署完成
+
+3 commits push (69ebc02→259f696) + VPS rsync + Docker rebuild，10/10 验证全通过。
+
+
+#### @pm → @devops (2026-04-14 22:45)
+
+### TASK-DEPLOY-DOCS — 文档补充 push + VPS 同步
+
+纯文档更新（PM 代更新的 progress 文件 + TODAY_FOCUS + TEAM_CHAT 测试记录）。不需要 Docker rebuild。

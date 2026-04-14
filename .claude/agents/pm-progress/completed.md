@@ -4,7 +4,7 @@
 
 ---
 
-### 2026-04-14 — TASK-HARNESS-ENGINEERING-V1 全部完成 + R6 测试 + Prompt A/B + StageD KI
+### 2026-04-14 — 全天工作汇总（Harness + R6 + B' + StageD V2 + 部署）
 
 **Harness Engineering V1 (9/9)**:
 - Phase 1: @devops hooks 升级 + @tester 10 架构/质量测试 + 闭环激活
@@ -23,10 +23,24 @@
 - R6 全部 6 项修复验证 PASS（mood/ending/confirm切换/倒计时/超时/角色调整）
 - Schema 验证首次实战通过（Stage 2→3 + Stage 4→5）
 
-**StageD 已知问题记录**:
-- KI-001 (P0): 重新生成纯 UI 壳（5 个断裂点）
-- KI-002 (P0): 旁白编辑不回写 DB（3 个断裂点）
-- KI-003 (P1): 删除 shot 未接通后端
+**StageD 已知问题 → 全部修复**:
+- KI-001: 重新生成 → POST API 接通 + SKIP 模式框架
+- KI-002: 编辑 → 改为 text_overlay.chinese_text + PATCH 写 DB
+- KI-003: 删除 → DELETE 软删除 + generation-result 过滤
+
+**StageD V2 产品升级（6 项）**:
+- Fix-1: generation-result 过滤 deleted shots (PM)
+- Fix-2: 编辑旁白→编辑文字 (@frontend)
+- Fix-3: 重新生成提示文字 (@frontend)
+- New-1: Haiku system prompt 9 规则 (@ai-ml)
+- New-2: regenerate Haiku 集成 (@backend)
+- New-3: 调整画面输入框 (@frontend)
+
+**A vs B' 盲测结论**: Founder 5:4 偏好 B'，PM 4:3 偏好 B'，质量等价，B' 切为默认
+
+**Founder 联调测试 #2**: 泰迪的秘密 688s 21 shots 零错误 + StageD 4 功能实测
+
+**Push + VPS 部署**: 3 commits (611c501+68ac04f+259f696) → 10/10 验证 PASS
 
 ---
 
