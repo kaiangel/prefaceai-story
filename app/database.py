@@ -9,6 +9,8 @@ from app.config import settings
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,
+    pool_pre_ping=True,      # 每次使用前 ping 验证连接存活，断了自动重连
+    pool_recycle=1800,        # 30 分钟回收连接，防止 MySQL 服务器关闭长空闲连接
 )
 
 # Create async session factory

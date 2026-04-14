@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from uuid import uuid4
-from sqlalchemy import Column, String, Integer, DateTime, Text
+from sqlalchemy import Column, String, Integer, DateTime, Text, Boolean
 from app.database import Base
 
 
@@ -26,5 +26,6 @@ class Project(Base):
     custom_style_analysis_json = Column(Text, nullable=True)       # 自定义风格分析结果
     character_refs_analysis_json = Column(Text, nullable=True)     # 角色参考图分析结果
     scene_refs_analysis_json = Column(Text, nullable=True)         # 场景参考图分析结果
+    characters_confirmed = Column(Boolean, default=False, nullable=False)  # R4-1: 用户确认角色后设为 True
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

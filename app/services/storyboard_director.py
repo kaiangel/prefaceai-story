@@ -10,12 +10,17 @@ Phase 2.0 第四阶段 - 分镜脚本生成器（核心升级）
 - 专业image_prompt
 """
 
+import asyncio
 import json
 import re
+import time
+import logging
 from typing import Optional
 import anthropic
 from google import genai
 from app.config import settings
+
+logger = logging.getLogger("xuhua")
 
 from app.prompts.storyboard_prompts import NARRATION_TO_VISUAL_EXTRACTION_RULES, COMIC_MODE_NARRATIVE_RULES
 
@@ -341,7 +346,8 @@ class StoryboardDirector:
         visual_tone: dict,
         style_preset: str = "anime",
         characters_overview: list = None,
-        family_relationships: list = None
+        family_relationships: list = None,
+        progress_callback=None,
     ) -> dict:
         """
         生成分镜脚本（按scene分批生成，解决LLM输出不完整问题）
@@ -364,56 +370,124 @@ class StoryboardDirector:
         print(f"  场景数: {len(scenes)}")
         print(f"  动作节拍: {total_beats}个")
         print(f"  风格: {style_preset}")
+        logger.info(f"[StoryboardDirector] 开始生成分镜脚本")
+        logger.info(f"  场景数: {len(scenes)}, 动作节拍: {total_beats}, 风格: {style_preset}")
+        stage_start = time.time()
 
-        # 按scene分批生成
+        # B-2: 并行生成 — Scene 1 先行获取 global_visual_direction，其余并行
         all_shots = []
         global_visual_direction = None
         shot_id_counter = 1
 
+        # 过滤掉无 action_beats 的 scene
+        valid_scenes = []
         for scene_idx, scene in enumerate(scenes):
             scene_id = scene.get("scene_id", scene_idx + 1)
             beats = scene.get("action_beats", [])
-
             if not beats:
                 print(f"  ⚠️ Scene {scene_id} 无action_beats，跳过")
                 continue
+            valid_scenes.append((scene_idx, scene))
 
-            print(f"  生成 Scene {scene_id} ({len(beats)} beats)...", end=" ")
+        if not valid_scenes:
+            raise ValueError("无法生成任何shots（所有scene无action_beats）")
 
-            # 为这个scene生成shots
-            scene_shots, gvd = await self._generate_scene_shots(
-                scene=scene,
-                scene_idx=scene_idx,
-                characters=characters,
-                visual_tone=visual_tone,
-                style_preset=style_preset,
-                shot_id_start=shot_id_counter,
-                characters_overview=characters_overview,
-                family_relationships=family_relationships
-            )
+        # Step 1: 生成 Scene 1（获取 global_visual_direction）
+        first_scene_idx, first_scene = valid_scenes[0]
+        first_scene_id = first_scene.get("scene_id", first_scene_idx + 1)
+        first_beats = first_scene.get("action_beats", [])
+        print(f"  生成 Scene {first_scene_id} ({len(first_beats)} beats)...", end=" ")
 
-            if scene_shots:
-                # 更新shot_id
-                for shot in scene_shots:
-                    shot["shot_id"] = shot_id_counter
-                    shot_id_counter += 1
-                all_shots.extend(scene_shots)
-                print(f"✅ {len(scene_shots)} shots")
+        first_shots, gvd = await self._generate_scene_shots(
+            scene=first_scene,
+            scene_idx=first_scene_idx,
+            characters=characters,
+            visual_tone=visual_tone,
+            style_preset=style_preset,
+            shot_id_start=shot_id_counter,
+            characters_overview=characters_overview,
+            family_relationships=family_relationships
+        )
 
-                # 保存第一个scene的global_visual_direction
-                if global_visual_direction is None and gvd:
-                    global_visual_direction = gvd
-            else:
-                print(f"❌ 失败")
+        if first_shots:
+            for shot in first_shots:
+                shot["shot_id"] = shot_id_counter
+                shot_id_counter += 1
+            all_shots.extend(first_shots)
+            print(f"✅ {len(first_shots)} shots")
+            if gvd:
+                global_visual_direction = gvd
+        else:
+            print(f"❌ 失败")
+
+        # B-4: Scene 进度回调（Scene 1 完成）
+        if progress_callback and len(valid_scenes) > 0:
+            p = 35 + int(1 / len(valid_scenes) * 30)
+            await progress_callback("storyboard", p, f"分镜生成中 (Scene 1/{len(valid_scenes)})...")
+
+        # Step 2: Scene 2+ 并行（Semaphore 限制并发数）
+        remaining_scenes = valid_scenes[1:]
+        if remaining_scenes:
+            semaphore = asyncio.Semaphore(3)  # RB-3: 降低并发避免 529 overloaded
+
+            async def _generate_with_semaphore(scene_idx: int, scene: dict) -> tuple:
+                async with semaphore:
+                    scene_id = scene.get("scene_id", scene_idx + 1)
+                    beats = scene.get("action_beats", [])
+                    print(f"  生成 Scene {scene_id} ({len(beats)} beats)...", end=" ")
+                    shots, _ = await self._generate_scene_shots(
+                        scene=scene,
+                        scene_idx=scene_idx,
+                        characters=characters,
+                        visual_tone=visual_tone,
+                        style_preset=style_preset,
+                        shot_id_start=1,  # 临时值，后面统一重编号
+                        characters_overview=characters_overview,
+                        family_relationships=family_relationships
+                    )
+                    if shots:
+                        print(f"✅ {len(shots)} shots")
+                    else:
+                        print(f"❌ 失败")
+                    return (scene_idx, shots)
+
+            # 并行执行
+            tasks = [
+                _generate_with_semaphore(si, sc) for si, sc in remaining_scenes
+            ]
+            parallel_results = await asyncio.gather(*tasks)
+
+            # 按 scene_idx 排序，保证顺序正确
+            parallel_results.sort(key=lambda x: x[0])
+
+            # 统一重编号 shot_id 并合并结果
+            for i, (scene_idx, shots) in enumerate(parallel_results):
+                if shots:
+                    for shot in shots:
+                        shot["shot_id"] = shot_id_counter
+                        shot_id_counter += 1
+                    all_shots.extend(shots)
+
+                # B-4: Scene 进度回调（每完成一个 scene）
+                if progress_callback:
+                    completed = i + 2  # +2 因为 Scene 1 已完成
+                    p = 35 + int(completed / len(valid_scenes) * 30)
+                    await progress_callback(
+                        "storyboard", p,
+                        f"分镜生成中 (Scene {completed}/{len(valid_scenes)})..."
+                    )
 
         if not all_shots:
             raise ValueError("无法生成任何shots")
 
         total_duration = sum(s.get("estimated_duration", 5) for s in all_shots)
 
+        stage_elapsed = time.time() - stage_start
         print(f"[StoryboardDirector] ✅ 分镜生成完成")
         print(f"  总镜头数: {len(all_shots)}")
         print(f"  预计时长: {total_duration}秒 ({total_duration/60:.1f}分钟)")
+        logger.info(f"[StoryboardDirector] ✅ 分镜生成完成 (总耗时 {stage_elapsed:.1f}s)")
+        logger.info(f"  总镜头数: {len(all_shots)}, 预计时长: {total_duration}s")
 
         storyboard = {
             "global_visual_direction": global_visual_direction or {
@@ -466,36 +540,7 @@ class StoryboardDirector:
                     with open("forclaudeweb/stage4_actual_prompt.txt", "w", encoding="utf-8") as f:
                         f.write(prompt)
 
-                content = None
-
-                # 优先使用 Claude Sonnet 4.6
-                if self.claude_client:
-                    try:
-                        response = self.claude_client.messages.create(
-                            model=self.claude_model,
-                            max_tokens=8631,
-                            messages=[
-                                {"role": "user", "content": prompt}
-                            ]
-                        )
-                        content = response.content[0].text
-                    except Exception as ce:
-                        pass  # 静默失败，尝试Gemini
-
-                # Fallback到Gemini 3 Flash
-                if content is None and self.gemini_client:
-                    try:
-                        response = await self.gemini_client.aio.models.generate_content(
-                            model=self.gemini_model,
-                            contents=prompt,
-                            config={"max_output_tokens": 8631}
-                        )
-                        content = response.text
-                    except Exception as ge:
-                        pass  # Gemini也失败
-
-                if content is None:
-                    raise ValueError("无可用的LLM服务")
+                content = await self._call_llm_with_retry(prompt, max_tokens=8631)
 
                 # DEBUG: 保存第一个scene的响应
                 if scene_idx == 0 and attempt == 0:
@@ -531,6 +576,95 @@ class StoryboardDirector:
                     print(f"(error: {e})", end=" ")
 
         return [], None
+
+    async def _call_llm_with_retry(self, prompt: str, max_tokens: int = 8631) -> str:
+        """
+        RB-3: 带指数退避重试的 LLM 调用，529 特殊处理。
+
+        - 非 529 错误: 退避 2s, 4s，最多 2 次重试（3 次尝试）
+        - 529 overloaded: 退避 10s, 20s, 40s，最多 3 次重试（4 次尝试）
+        """
+        last_error = None
+        is_529 = False
+        max_retries = 3  # 默认非 529: 3 次尝试
+        llm_start = time.time()
+
+        for retry in range(4):  # 最多 4 次尝试（529 场景）
+            if retry > 0:
+                if is_529:
+                    wait = 10 * (2 ** (retry - 1))  # 10s, 20s, 40s
+                    print(f"    [RB-3] 529 overloaded 重试 {retry}/3，等待 {wait}s...")
+                    logger.warning(f"[StoryboardDirector] ⚠️ 529 overloaded 重试 {retry}/3，等待 {wait}s")
+                else:
+                    if retry > 2:
+                        break  # 非 529 最多 3 次尝试
+                    wait = 2 ** retry  # 2s, 4s
+                    print(f"    [RB-3] LLM 重试 {retry}/2，等待 {wait}s...")
+                    logger.warning(f"[StoryboardDirector] ⚠️ LLM 重试 {retry}/2，等待 {wait}s, 上次错误: {last_error}")
+                await asyncio.sleep(wait)
+
+            try:
+                content = None
+                is_529 = False  # 重置
+
+                # 优先使用 Claude Sonnet 4.6
+                if self.claude_client:
+                    try:
+                        call_start = time.time()
+                        response = self.claude_client.messages.create(
+                            model=self.claude_model,
+                            max_tokens=max_tokens,
+                            messages=[{"role": "user", "content": prompt}]
+                        )
+                        content = response.content[0].text
+                        call_elapsed = time.time() - call_start
+                        logger.info(f"[StoryboardDirector] Claude 响应: {len(content)} chars, 耗时 {call_elapsed:.1f}s")
+                    except Exception as ce:
+                        last_error = ce
+                        # 检测 529 状态码
+                        error_str = str(ce)
+                        if '529' in error_str or 'overloaded' in error_str.lower():
+                            is_529 = True
+                            max_retries = 4
+                            print(f"    [RB-3] ⚠️ Claude 529 overloaded")
+                            logger.warning(f"[StoryboardDirector] ⚠️ Claude 529 overloaded")
+                        if hasattr(ce, 'status_code') and ce.status_code == 529:
+                            is_529 = True
+                            max_retries = 4
+
+                # Fallback 到 Gemini 3 Flash
+                if content is None and self.gemini_client:
+                    try:
+                        call_start = time.time()
+                        response = await self.gemini_client.aio.models.generate_content(
+                            model=self.gemini_model,
+                            contents=prompt,
+                            config={"max_output_tokens": max_tokens}
+                        )
+                        content = response.text
+                        call_elapsed = time.time() - call_start
+                        logger.info(f"[StoryboardDirector] Gemini 响应: {len(content)} chars, 耗时 {call_elapsed:.1f}s")
+                    except Exception as ge:
+                        last_error = ge
+                        error_str = str(ge)
+                        if '529' in error_str or 'overloaded' in error_str.lower():
+                            is_529 = True
+                            max_retries = 4
+
+                if content is not None:
+                    return content
+
+            except Exception as e:
+                last_error = e
+
+            # 非 529 且已超出重试次数
+            if not is_529 and retry >= 2:
+                break
+
+        # 所有重试都失败
+        total_elapsed = time.time() - llm_start
+        logger.error(f"[StoryboardDirector] ❌ LLM 调用失败 ({retry + 1} 次尝试, 总耗时 {total_elapsed:.1f}s): {last_error}")
+        raise ValueError(f"LLM 调用失败（{retry + 1} 次尝试）: {last_error}")
 
     def _check_prompt_quality(self, shot: dict) -> None:
         """检查单个shot的image_prompt质量"""

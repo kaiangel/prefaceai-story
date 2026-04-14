@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     # 音频存储配置
     AUDIO_STORAGE_PATH: str = "./storage/audio"
 
+    # Stage 5 跳过模式（开发用：用 R8 测试图片代替生图）
+    SKIP_IMAGE_GENERATION: bool = False
+
+    # Prompt 格式：b_prime（默认，省 46% token）| legacy（A 格式原版）
+    PROMPT_FORMAT: str = "b_prime"
+
     # ===== 分镜拆分配置 =====
     SHOT_MAX_NARRATION_LENGTH: int = 60    # 超过此字数的scene需要拆分
     SHOT_TARGET_LENGTH: int = 40           # 目标每个shot的字数

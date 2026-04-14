@@ -64,6 +64,14 @@ export interface EndingOption {
   isSelected: boolean;
 }
 
+export interface OutlineScene {
+  id: string;
+  name: string;
+  description: string;
+  description_zh?: string; // F-3 (R3): Stage 1 Chinese scene description, preferred over English description
+  locationType: string;
+}
+
 export interface StoryOutline {
   title: string;
   titleEn: string;
@@ -72,6 +80,7 @@ export interface StoryOutline {
   plotPoints: PlotPoint[];
   endings: EndingOption[];
   mood: string;
+  scenes: OutlineScene[];
 }
 
 // ============ Stage C-D: Generation & Preview ============
@@ -262,11 +271,13 @@ export type CreateAction =
   | { type: "CONFIRM_CHARACTERS" }
   | { type: "CONFIRM_SCENES" }
   | { type: "START_GENERATION" }
+  | { type: "CONTINUE_GENERATION" }
   | { type: "UPDATE_GENERATION_PROGRESS"; payload: { progress: number; message: string } }
   | { type: "GENERATION_COMPLETE"; payload: Shot[] }
   | { type: "GENERATION_ERROR"; payload: string }
   | { type: "UPDATE_SHOT_TEXT"; payload: { shotId: number; field: "narrationSegment" | "chineseText"; value: string | string[] } }
   | { type: "REGENERATE_SHOT"; payload: number }
+  | { type: "REGENERATE_SHOT_SUCCESS"; payload: { shotId: number; imageUrl: string } }
   | { type: "DELETE_SHOT"; payload: number }
   | { type: "SET_BGM"; payload: BGMTrack | null }
   | { type: "SET_DELIVERY_FORMAT"; payload: DeliveryFormat }

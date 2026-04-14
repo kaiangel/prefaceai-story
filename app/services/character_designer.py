@@ -9,10 +9,14 @@ Phase 2.0 第二阶段 - 角色设计器
 """
 
 import json
+import time
+import logging
 from typing import Optional
 import anthropic
 from google import genai
 from app.config import settings
+
+logger = logging.getLogger("xuhua")
 
 
 class CharacterDesigner:
@@ -55,6 +59,9 @@ class CharacterDesigner:
         title = outline.get("title", "")
 
         print(f"[CharacterDesigner] 设计{len(characters_overview)}个角色...")
+        logger.info(f"[CharacterDesigner] 开始设计 {len(characters_overview)} 个角色")
+        logger.info(f"  title: {title}")
+        stage_start = time.time()
 
         prompt = self._build_prompt(
             characters_overview=characters_overview,
@@ -62,6 +69,7 @@ class CharacterDesigner:
             title=title,
             logline=outline.get("logline", "")
         )
+        logger.info(f"  prompt 长度: {len(prompt)} chars")
 
         content = None
         provider = None
@@ -69,6 +77,8 @@ class CharacterDesigner:
         # 优先使用 Claude Sonnet 4.6
         if self.claude_client:
             try:
+                llm_start = time.time()
+                logger.info(f"  [尝试 Claude Sonnet 4.6]")
                 response = self.claude_client.messages.create(
                     model=self.claude_model,
                     max_tokens=8631,
@@ -78,12 +88,17 @@ class CharacterDesigner:
                 )
                 content = response.content[0].text
                 provider = "claude"
+                llm_elapsed = time.time() - llm_start
+                logger.info(f"  [Claude] ✅ 响应: {len(content)} chars, 耗时 {llm_elapsed:.1f}s")
             except Exception as e:
+                logger.warning(f"  [Claude失败: {e}，尝试Gemini备用]")
                 print(f"  [Claude失败: {e}，尝试Gemini备用]")
 
         # Fallback到Gemini 3 Flash
         if content is None and self.gemini_client:
             try:
+                llm_start = time.time()
+                logger.info(f"  [尝试 Gemini 3.1 Flash Lite]")
                 response = await self.gemini_client.aio.models.generate_content(
                     model=self.gemini_model,
                     contents=prompt,
@@ -91,22 +106,31 @@ class CharacterDesigner:
                 )
                 content = response.text
                 provider = "gemini"
+                llm_elapsed = time.time() - llm_start
+                logger.info(f"  [Gemini] ✅ 响应: {len(content)} chars, 耗时 {llm_elapsed:.1f}s")
             except Exception as e:
+                logger.error(f"[CharacterDesigner] ❌ Gemini也失败: {e}")
                 print(f"[CharacterDesigner] ❌ Gemini也失败: {e}")
                 raise
 
         if content is None:
+            logger.error("[CharacterDesigner] ❌ 无可用的LLM服务")
             raise ValueError("无可用的LLM服务")
 
         characters = self._extract_json(content)
 
         if characters:
             self._validate_characters(characters)
+            stage_elapsed = time.time() - stage_start
+            char_names = [c.get('name', 'N/A') for c in characters.get("characters", [])]
             print(f"[CharacterDesigner] ✅ 角色设计完成 (via {provider})")
+            logger.info(f"[CharacterDesigner] ✅ 角色设计完成 (via {provider}, 总耗时 {stage_elapsed:.1f}s)")
+            logger.info(f"  角色: {', '.join(char_names)}")
             for char in characters.get("characters", []):
                 print(f"  - {char.get('name', 'N/A')} ({char.get('role', 'N/A')})")
             return characters
         else:
+            logger.error(f"[CharacterDesigner] ❌ JSON提取失败, 响应长度: {len(content)} chars, 前200字: {content[:200]}")
             raise ValueError("无法从LLM响应中提取JSON")
 
     def _build_prompt(

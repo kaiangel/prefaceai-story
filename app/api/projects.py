@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import os
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy import select, delete
@@ -129,6 +130,7 @@ async def _run_generation_in_background(
     previous_summary: str | None = None,
     characters_json: str | None = None,
     confirmed_outline: dict | None = None,
+    project_uuid: str | None = None,
 ):
     """Run story generation in background with new database session"""
     async with async_session_maker() as db:
@@ -146,6 +148,7 @@ async def _run_generation_in_background(
             previous_summary=previous_summary,
             characters_json=characters_json,
             confirmed_outline=confirmed_outline,
+            project_uuid=project_uuid,
         )
 
 
@@ -262,6 +265,20 @@ async def generate_outline(
             "isSelected": i == 1,
         })
 
+    # 场景数据（从 unique_locations 映射）
+    scenes = []
+    for i, loc in enumerate(outline.get("unique_locations", [])):
+        scene_data = {
+            "id": f"scene_{i+1}",
+            "name": loc.get("display_name", f"场景{i+1}"),
+            "description": loc.get("interior_description", "") or loc.get("exterior_description", ""),
+            "locationType": loc.get("location_type", "interior"),
+        }
+        # F-3: Pass through description_zh (Chinese scene description from Stage 1 LLM) if available
+        if loc.get("description_zh"):
+            scene_data["description_zh"] = loc["description_zh"]
+        scenes.append(scene_data)
+
     return {
         "title": outline.get("title", ""),
         "titleEn": outline.get("title_en", ""),
@@ -270,6 +287,7 @@ async def generate_outline(
         "plotPoints": plot_points,
         "endings": endings,
         "mood": outline.get("mood", ""),
+        "scenes": scenes,
     }
 
 
@@ -286,6 +304,7 @@ async def confirm_outline(
     db: AsyncSession = Depends(get_db),
 ):
     """Store user-confirmed outline after StageB edits — 合并 raw + 用户编辑"""
+    logger.info(f"[ConfirmOutline] 收到确认请求: project={project_id}")
     result = await db.execute(
         select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
     )
@@ -327,6 +346,9 @@ async def confirm_outline(
                     entry = original[idx].copy() if isinstance(original[idx], dict) else {"description": original[idx]}
                     entry["description"] = desc
                     reordered.append(entry)
+                else:
+                    # R6-2 fix: 前端追加的新 plot_point（如 selected_ending），idx 越界，直接用 description
+                    reordered.append({"description": desc})
             else:
                 # 向后兼容: 纯字符串（旧前端）
                 reordered.append({"description": item})
@@ -336,18 +358,14 @@ async def confirm_outline(
     # 结局选择
     if user.get("selected_ending"):
         raw["selected_ending"] = user["selected_ending"]
-        # 方案 C: 用用户选的结局替换 plot_points 最后一条的 description
-        if raw.get("plot_points"):
-            last = raw["plot_points"][-1]
-            if isinstance(last, dict):
-                last["description"] = user["selected_ending"]
-                last["user_selected_ending"] = True   # 标记，方便后续追溯
+        # 前端 R6-2 已改为把 selected_ending 追加到 plot_points 末尾，后端不再替换
 
     # 情绪
     if user.get("mood"):
         if "visual_tone" not in raw:
             raw["visual_tone"] = {}
         raw["visual_tone"]["overall_mood"] = user["mood"]
+        raw["mood"] = user["mood"]  # R6-1b: 同步更新顶层 mood，Pipeline 读的是这个字段
 
     project.confirmed_outline_json = json.dumps(raw, ensure_ascii=False)
     if user.get("title"):
@@ -355,7 +373,30 @@ async def confirm_outline(
     db.add(project)
     await db.commit()
 
+    logger.info(f"[ConfirmOutline] ✅ 大纲已确认: project={project_id}")
     return {"success": True, "message": "大纲已确认"}
+
+
+@router.post("/{project_id}/confirm-characters")
+async def confirm_characters(
+    project_id: str,
+    user_id: int = Depends(verify_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """R4-1: 用户确认角色设计 — pipeline 轮询此字段后继续 Stage 3"""
+    result = await db.execute(
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    project.characters_confirmed = True
+    db.add(project)
+    await db.flush()
+
+    logger.info(f"[ConfirmCharacters] ✅ 角色已确认: project={project_id}")
+    return {"success": True}
 
 
 @router.post("/{project_id}/start-generation")
@@ -371,6 +412,11 @@ async def start_generation(
     project = result.scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
+
+    # R4-1: 每次启动 pipeline 时重置 characters_confirmed
+    project.characters_confirmed = False
+    db.add(project)
+    await db.flush()
 
     # 读取确认后的大纲（优先），否则用原始大纲
     outline_json = project.confirmed_outline_json or project.raw_outline_json
@@ -410,6 +456,7 @@ async def start_generation(
             character_count=project.character_count,
             language=project.language,
             confirmed_outline=confirmed_outline,
+            project_uuid=project.uuid,
         )
     )
 
@@ -424,6 +471,107 @@ async def start_generation(
     )
 
 
+@router.get("/{project_id}/generation-result")
+async def get_generation_result(
+    project_id: str,
+    user_id: int = Depends(verify_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get pipeline generation result (storyboard + image URLs) for StageD"""
+    logger.info(f"[GenerationResult] 请求: project={project_id}")
+    result = await db.execute(
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    # 获取第一个 chapter
+    chapter_result = await db.execute(
+        select(Chapter).where(Chapter.project_id == project.id).order_by(Chapter.chapter_number).limit(1)
+    )
+    chapter = chapter_result.scalar_one_or_none()
+    if not chapter:
+        raise HTTPException(status_code=404, detail="暂无生成数据")
+
+    # 获取 job 状态
+    job_result = await db.execute(
+        select(GenerationJob).where(GenerationJob.chapter_id == chapter.id)
+        .order_by(GenerationJob.created_at.desc()).limit(1)
+    )
+    job = job_result.scalar_one_or_none()
+    job_status = job.status if job else "unknown"
+
+    if job_status not in ("completed",):
+        return {"status": job_status, "storyboard": None, "characters": [], "totalShots": 0}
+
+    # 从 storyboard_json 读取 shots
+    storyboard = json.loads(chapter.storyboard_json) if chapter.storyboard_json else {}
+    characters_data = json.loads(chapter.characters_json) if chapter.characters_json else []
+
+    shots = []
+    for shot in storyboard.get("shots", []):
+        if shot.get("deleted"):
+            continue  # 跳过已软删除的 shot (KI-003)
+        shot_id = shot.get("shot_id", 0)
+        narration = shot.get("narration_segment", "")
+        text_overlay = shot.get("text_overlay", {})
+        shots.append({
+            "shotId": shot_id,
+            "imageUrl": f"/api/projects/{project_id}/images/shot_{shot_id:02d}.png",
+            "narration": narration,
+            "textOverlay": {
+                "type": text_overlay.get("text_type", "none"),
+                "text": " ".join(text_overlay.get("chinese_text", [])) if text_overlay.get("chinese_text") else "",
+            } if text_overlay else None,
+        })
+
+    logger.info(f"[GenerationResult] ✅ 返回: project={project_id}, shots={len(shots)}")
+    return {
+        "status": "completed",
+        "storyboard": {"shots": shots},
+        "characters": characters_data,
+        "totalShots": len(shots),
+    }
+
+
+@router.get("/{project_id}/images/{filename}")
+async def serve_project_image(
+    project_id: str,
+    filename: str,
+    user_id: int = Depends(verify_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Serve generated images from pipeline output directory"""
+    from fastapi.responses import FileResponse
+
+    # 验证项目归属
+    result = await db.execute(
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    # 构建文件路径: ./output/{project_uuid}/images/{filename}
+    image_path = os.path.join("output", project_id, "images", filename)
+
+    # 安全检查: 防止路径遍历
+    abs_path = os.path.abspath(image_path)
+    abs_base = os.path.abspath(os.path.join("output", project_id, "images"))
+    if not abs_path.startswith(abs_base):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if not os.path.exists(image_path):
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    content_type = "image/png"
+    if filename.lower().endswith((".jpg", ".jpeg")):
+        content_type = "image/jpeg"
+
+    return FileResponse(image_path, media_type=content_type, filename=filename)
+
+
 @router.delete("/{project_id}")
 async def delete_project(
     project_id: str,
@@ -431,6 +579,7 @@ async def delete_project(
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a project and all its chapters"""
+    logger.info(f"[DeleteProject] 请求删除: project={project_id}")
     result = await db.execute(
         select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
     )
@@ -465,4 +614,153 @@ async def delete_project(
     await db.delete(project)
     await db.commit()
 
+    logger.info(f"[DeleteProject] ✅ 项目已删除: project={project_id}")
     return {"success": True, "message": "项目已删除"}
+
+
+# ============ RB-7: 角色调整 API ============
+
+
+class CharacterAdjustRequest(BaseModel):
+    """角色调整请求"""
+    adjustment: str  # 用户自然语言调整指令，如 "想让他胖一点"
+
+
+@router.post("/{project_id}/characters/{char_id}/adjust")
+async def adjust_character(
+    project_id: str,
+    char_id: str,
+    req: CharacterAdjustRequest,
+    user_id: int = Depends(verify_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    RB-7: 角色调整 API — 用 Haiku 4.5 重写角色描述
+
+    请求体: { "adjustment": "想让他胖一点" }
+    返回: 更新后的角色数据（含新的 description、physical、clothing）
+    同时更新 chapter 表的 characters_json
+    """
+    import anthropic as anthropic_module
+
+    # 1. 验证项目归属
+    result = await db.execute(
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    # 2. 读取大纲中的角色数据（从 confirmed_outline 或 raw_outline）
+    outline_json = project.confirmed_outline_json or project.raw_outline_json
+    if not outline_json:
+        raise HTTPException(status_code=400, detail="项目尚未生成大纲")
+
+    outline = json.loads(outline_json)
+    characters_overview = outline.get("characters_overview", [])
+
+    # 3. 查找指定角色
+    # char_id 格式: "char_001" → 按索引匹配 characters_overview
+    target_char = None
+    char_index = None
+    try:
+        idx = int(char_id.replace("char_", "")) - 1
+        if 0 <= idx < len(characters_overview):
+            target_char = characters_overview[idx]
+            char_index = idx
+    except (ValueError, IndexError):
+        pass
+
+    if target_char is None:
+        raise HTTPException(status_code=404, detail=f"角色 {char_id} 不存在")
+
+    # 4. 调用 Haiku 4.5 重写角色描述
+    from app.config import settings as app_settings
+    if not app_settings.ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY 未配置")
+
+    client = anthropic_module.Anthropic(api_key=app_settings.ANTHROPIC_API_KEY)
+
+    prompt = f"""你是一个专业的角色设计师。请根据用户的调整指令，修改角色的外观描述。
+
+## 当前角色数据
+```json
+{json.dumps(target_char, ensure_ascii=False, indent=2)}
+```
+
+## 用户调整指令
+{req.adjustment}
+
+## 要求
+1. 根据用户指令修改相应的 physical 和/或 clothing 字段
+2. 同步更新 description 字段使其与修改一致
+3. 保持未被调整指令提到的字段不变
+4. physical 字段的值必须全英文（用于图像生成 prompt）
+5. clothing 字段的值必须全英文
+6. description 字段用中文
+7. 如果用户要求的改动不涉及 physical 或 clothing，只更新 description
+
+直接输出修改后的完整角色 JSON 对象（不要 ```json``` 包裹，不要解释文字）。
+保持原始 JSON 结构，所有字段都保留。"""
+
+    try:
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=2000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        content = response.content[0].text.strip()
+
+        # 解析 JSON 响应
+        # 去除可能的 markdown 代码块
+        import re
+        json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', content)
+        if json_match:
+            content = json_match.group(1)
+
+        updated_char = json.loads(content)
+
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="角色调整 LLM 返回格式异常")
+    except Exception as e:
+        logger.error(f"[AdjustCharacter] ❌ Haiku 调用失败: {e}")
+        raise HTTPException(status_code=500, detail=f"角色调整失败: {str(e)}")
+
+    # 5. 更新 outline 中的角色数据
+    characters_overview[char_index] = updated_char
+    outline["characters_overview"] = characters_overview
+
+    # 写回 confirmed_outline（如有）或 raw_outline
+    if project.confirmed_outline_json:
+        project.confirmed_outline_json = json.dumps(outline, ensure_ascii=False)
+    else:
+        project.raw_outline_json = json.dumps(outline, ensure_ascii=False)
+
+    # 6. 同步更新 chapter 表的 characters_json（如果已存在）
+    chapter_result = await db.execute(
+        select(Chapter).where(Chapter.project_id == project.id).order_by(Chapter.chapter_number).limit(1)
+    )
+    chapter = chapter_result.scalar_one_or_none()
+    if chapter and chapter.characters_json:
+        try:
+            chars_list = json.loads(chapter.characters_json)
+            if char_index < len(chars_list):
+                # 合并更新: 只更新 physical / clothing / description
+                for key in ("physical", "clothing", "description"):
+                    if key in updated_char:
+                        chars_list[char_index][key] = updated_char[key]
+                chapter.characters_json = json.dumps(chars_list, ensure_ascii=False)
+        except (json.JSONDecodeError, IndexError):
+            pass
+
+    db.add(project)
+    await db.commit()
+
+    logger.info(f"[AdjustCharacter] ✅ 角色 {char_id} 已调整: {req.adjustment[:30]}...")
+
+    return {
+        "success": True,
+        "character": updated_char,
+        "char_id": char_id,
+        "message": "角色已调整",
+    }

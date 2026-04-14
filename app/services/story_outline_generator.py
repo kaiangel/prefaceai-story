@@ -122,7 +122,9 @@ class StoryOutlineGenerator:
             outline dict
         """
         # 计算目标指标
-        min_shots = max(23, target_duration_minutes * 8)  # 每分钟约8个shot
+        # B-3: DEC-011 篇幅标准 — 快闪~10/短篇~18/中篇~36
+        # 旧公式 max(23, dur*8) 导致短篇产出 24+ shots，严重超标
+        min_shots = max(8, target_duration_minutes * 6)  # 每分钟约6个shot
         target_seconds = target_duration_minutes * 60
 
         prompt = self._build_prompt(
@@ -160,11 +162,12 @@ class StoryOutlineGenerator:
 Always respond with valid JSON only. No markdown code blocks, no explanation, no text before or after the JSON. Output a single JSON object starting with { and ending with }.
 
 Critical rules:
-- Chinese text for: title, logline, summary, character names, display_name, plot descriptions, mood, ending descriptions, signage_text, description, personality, emotional_journey
+- Chinese text for: title, logline, summary, character names, display_name, description_zh, plot descriptions, mood, ending descriptions, signage_text, description, personality, emotional_journey
 - English text for: title_en, name_en, emotional_arc values, narrative_pace, visual_tone fields, color_palette, archetype, interior_description, exterior_description, key_visual_elements
 - All ending_options must have 3 distinct options with meaningful differences
 - All characters_overview entries must include description (20-30 Chinese chars, appearance) and personality (10-20 Chinese chars, traits)
-- mood must be exactly one of: 感人 / 治愈 / 热血 / 悬疑 / 浪漫 / 温馨"""
+- mood must be exactly one of: 感人 / 治愈 / 热血 / 悬疑 / 浪漫 / 温馨
+- MANDATORY: Every unique_locations entry MUST include description_zh (100-150 Chinese chars, literary scene description). This field is REQUIRED and must NOT be omitted."""
 
         # 优先使用 Claude Sonnet 4.6
         if self.claude_client:
@@ -333,6 +336,7 @@ Critical rules:
         {{
             "location_id": "location_id_snake_case",
             "display_name": "场景显示名称（中文）",
+            "description_zh": "【必填】场景的中文氛围描述（100-150字，用文学性的语言描述场景的视觉特征、光影氛围、关键细节，如同电影场景描述）。示例：'傍晚的胡同口，夕阳将红砖墙染成暖橘色，老槐树的影子斜斜铺在青石板上，远处传来自行车铃声和炒菜的香气。'",
             "location_type": "interior / exterior / both",
             "time_of_day": "night / dawn / morning / afternoon / golden_hour / dusk",
             "weather": "clear / cloudy / rainy / stormy / foggy / snowy",
@@ -359,6 +363,7 @@ Critical rules:
 9. **结局选项**：ending_options 三个选项应有明显差异（如：温馨/开放/反转），让用户有真实的选择感
 10. **情绪基调**：mood 从6个预设值（感人/治愈/热血/悬疑/浪漫/温馨）中选最匹配的一个
 11. **角色简述**：description 和 personality 是给前端用户看的中文简述，不是给图像生成用的英文描述。description 聚焦外貌特征（年龄、穿着、显著特征），personality 聚焦性格特点
+12. **场景氛围描述（REQUIRED/必填）**：每个 unique_location 必须包含 description_zh 字段，这是给前端用户看的中文场景描述（100-150字），用文学性的、有画面感的语言描述场景的视觉特征、光影氛围和关键细节（如同电影场景描述），不是 interior_description/exterior_description 的翻译。description_zh 与 display_name 描述同一个场景，但更丰富。示例："夜色中的古镇老街，青石板路被细雨打湿，红灯笼的暖光倒映在石板上。木质屋檐挂着春联，远处有烟花的微光在墨色天空中绽放。" 注意：description_zh 是中文，interior_description/exterior_description 是英文，三者共存互不替代
 
 ## TITLE CONSISTENCY (IMPORTANT)
 

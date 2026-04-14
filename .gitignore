@@ -49,5 +49,16 @@ next-env.d.ts
 # --- 测试产物 ---
 test_story_output.json
 
+# --- 本地配置 / IDE ---
+.claude/settings.local.json
+.trae/
+
+# --- 大文件 / 测试产物 ---
+output/
+assets/*.mov
+
+# --- 个人文件 ---
+team-members/
+
 # --- 其他 ---
 *.log

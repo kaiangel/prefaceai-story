@@ -113,6 +113,25 @@ async def parse_document(file: UploadFile = File(...)):
 
 # ────────────────── AI 分析公用 helper ──────────────────
 
+def _extract_json(text: str) -> dict:
+    """从 LLM 响应中提取 JSON（处理 markdown 代码块和前后缀文本）"""
+    text = text.strip()
+    # 去掉 markdown 代码块
+    if text.startswith("```"):
+        # 去掉 ```json 或 ``` 开头
+        first_newline = text.index("\n") if "\n" in text else 3
+        text = text[first_newline + 1:]
+        if text.endswith("```"):
+            text = text[:-3]
+        text = text.strip()
+    # 提取第一个 { ... } 块
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        text = text[start:end + 1]
+    return json.loads(text)
+
+
 async def _vision_analyze(contents: bytes, content_type: str, prompt: str) -> dict:
     """调用 Gemini/Claude 视觉分析，返回 JSON dict"""
     b64_data = base64.standard_b64encode(contents).decode("utf-8")
@@ -128,7 +147,9 @@ async def _vision_analyze(contents: bytes, content_type: str, prompt: str) -> di
                     {"inline_data": {"mime_type": content_type, "data": b64_data}},
                 ],
             )
-            return json.loads(response.text.strip())
+            if not response.text:
+                raise ValueError("Gemini 返回空文本")
+            return _extract_json(response.text)
         except Exception as e:
             logger.info(f"[Analyze] Gemini 失败: {e}")
 
@@ -148,7 +169,10 @@ async def _vision_analyze(contents: bytes, content_type: str, prompt: str) -> di
                     ],
                 }],
             )
-            return json.loads(response.content[0].text.strip())
+            raw_text = response.content[0].text
+            if not raw_text:
+                raise ValueError("Claude 返回空文本")
+            return _extract_json(raw_text)
         except Exception as e:
             logger.info(f"[Analyze] Claude Haiku 失败: {e}")
 

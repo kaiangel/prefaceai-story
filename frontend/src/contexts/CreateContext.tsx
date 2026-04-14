@@ -214,16 +214,24 @@ function createReducer(state: CreateState, action: CreateAction): CreateState {
     case "START_GENERATION":
       return { ...state, generationStatus: "generating", generationProgress: 0, generationMessage: "", generationLog: [] };
 
-    case "UPDATE_GENERATION_PROGRESS":
+    case "CONTINUE_GENERATION":
+      return { ...state, generationStatus: "generating", generationMessage: "", generationLog: [] };
+
+    case "UPDATE_GENERATION_PROGRESS": {
+      const lastLog = state.generationLog[state.generationLog.length - 1];
+      const isDuplicate = lastLog && lastLog.message === action.payload.message;
       return {
         ...state,
         generationProgress: action.payload.progress,
         generationMessage: action.payload.message,
-        generationLog: [
-          ...state.generationLog,
-          { timestamp: Date.now(), message: action.payload.message, progress: action.payload.progress },
-        ],
+        generationLog: isDuplicate
+          ? state.generationLog
+          : [
+              ...state.generationLog,
+              { timestamp: Date.now(), message: action.payload.message, progress: action.payload.progress },
+            ],
       };
+    }
 
     case "GENERATION_COMPLETE":
       return { ...state, generationStatus: "complete", generationProgress: 100, shots: action.payload };
@@ -249,6 +257,16 @@ function createReducer(state: CreateState, action: CreateAction): CreateState {
         ...state,
         shots: state.shots.map((s) =>
           s.shotId === action.payload ? { ...s, imageUrl: null } : s
+        ),
+      };
+
+    case "REGENERATE_SHOT_SUCCESS":
+      return {
+        ...state,
+        shots: state.shots.map((s) =>
+          s.shotId === action.payload.shotId
+            ? { ...s, imageUrl: action.payload.imageUrl }
+            : s
         ),
       };
 

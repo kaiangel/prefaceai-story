@@ -107,6 +107,11 @@ export const mockOutline: StoryOutline = {
     },
   ],
   mood: "温馨",
+  scenes: [
+    { id: "scene_1", name: "雨夜公交站", description: "昏黄路灯下的积水路面，空无一人的站台", locationType: "exterior" },
+    { id: "scene_2", name: "24小时便利店", description: "暖黄灯光透过落地玻璃窗洒出，货架整齐", locationType: "interior" },
+    { id: "scene_3", name: "出租车内", description: "后视镜挂着平安符，雨滴打在车窗上", locationType: "interior" },
+  ],
 };
 
 // ============ Stage D: Mock Shots ============

@@ -16,7 +16,8 @@ from app.prompts.storyboard_prompts import (
     translate_image_prompt_to_english,
     prepare_shot_prompt_for_generation,
     _simple_translate_prompt,
-    Phase2PromptBuilder
+    Phase2PromptBuilder,
+    build_identity_line_phase2
 )
 from app.services.style_enforcer import StyleEnforcer
 
@@ -832,6 +833,161 @@ class ImageGenerator:
 
         return result
 
+    def _build_b_prime_prompt(
+        self,
+        shot: dict,
+        storyboard: dict,
+        characters: dict,
+        style_preset: str,
+        reference_images: Optional[List[Image.Image]] = None,
+        use_native_text: bool = True,
+    ) -> str:
+        """
+        Build prompt in B' (compressed label) format.
+
+        Verified through 10-shot blind test: quality equivalent to A format,
+        saves ~46% token. Key principle: identity_line and image_prompt are
+        identical to A format (character consistency foundation).
+
+        Returns:
+            Complete B' format prompt string (before StyleEnforcer — caller
+            should NOT apply StyleEnforcer again since B' already includes
+            the style block).
+        """
+        enforcement = StyleEnforcer.get_enforcement(style_preset)
+        characters_list = characters.get("characters", [])
+        global_dir = storyboard.get("global_visual_direction", {})
+
+        # --- Style header (compressed) ---
+        if enforcement:
+            style_display_name = enforcement.style_display_name
+            mandatory_str = ", ".join(enforcement.mandatory_keywords[:5])
+            forbidden_str = ", ".join(enforcement.forbidden_keywords[:6])
+            # Compressed style direction: first ~30 words of style_description
+            words = enforcement.style_description.split()
+            compressed_style = " ".join(words[:30])
+        else:
+            style_display_name = style_preset
+            mandatory_str = ""
+            forbidden_str = ""
+            compressed_style = ""
+
+        parts: List[str] = []
+        parts.append(f"\u2550\u2550\u2550 MANDATORY STYLE: {style_display_name} \u2550\u2550\u2550")
+        if mandatory_str or forbidden_str:
+            parts.append(f"MUST INCLUDE: {mandatory_str}. DO NOT USE: {forbidden_str}.")
+        if compressed_style:
+            parts.append(compressed_style)
+
+        # --- Character consistency (compressed) ---
+        char_direction = shot.get("character_direction", {})
+        characters_visible = char_direction.get("characters_visible", [])
+
+        if characters_visible:
+            parts.append("")
+            parts.append("[CHARACTER CONSISTENCY]")
+            parts.append(
+                "FIXED: facial features, hair, clothing, accessories MUST match reference images. "
+                "FLEXIBLE: expression, pose, camera angle."
+            )
+
+        # --- References instruction (compressed) ---
+        parts.append("")
+        parts.append("[REFERENCES]")
+        parts.append(
+            'Reference images labeled on-image. "Character: XXX" for appearance, '
+            '"Scene: XXX" for environment. Do not reproduce labels.'
+        )
+
+        # --- Character identity lines (same as A — foundation of consistency) ---
+        for idx, char_id in enumerate(characters_visible, 1):
+            char_data = next((c for c in characters_list if c.get("id") == char_id), None)
+            if char_data:
+                name_en = char_data.get("name_en", "") or char_data.get("name", "Unknown")
+                name_zh = char_data.get("name", "")
+                identity_line = build_identity_line_phase2(char_data)
+
+                if name_zh and name_zh != name_en:
+                    parts.append(f"\n[CHARACTER {idx}: {name_en} ({name_zh})]")
+                else:
+                    parts.append(f"\n[CHARACTER {idx}: {name_en}]")
+                parts.append(identity_line)
+
+        # --- Mood (compressed narrative context) ---
+        lighting = shot.get("lighting", {})
+        emotional_mood = lighting.get("mood", "")
+
+        # Get scene atmosphere from screenplay data if available
+        scene_atmosphere = ""
+        original_scene_id = shot.get("original_scene_id")
+        if original_scene_id and storyboard.get("shots"):
+            # Try to find atmosphere in the storyboard global data
+            pass  # B' uses minimal mood line; atmosphere is in image_prompt
+
+        if emotional_mood:
+            parts.append("")
+            mood_line = f"[MOOD] {emotional_mood}."
+            if scene_atmosphere:
+                mood_line += f" Atmosphere: {scene_atmosphere}."
+            parts.append(mood_line)
+
+        # --- Direction (compressed global visual direction) ---
+        color_grade = global_dir.get("color_grade", "neutral")
+        overall_lighting = global_dir.get("overall_lighting", "natural")
+        lens_style = global_dir.get("lens_style", "35mm")
+
+        parts.append("")
+        parts.append(f"[DIRECTION] Color: {color_grade} | Light: {overall_lighting} | Lens: {lens_style}")
+
+        # --- Scene (same image_prompt as A — the core visual description) ---
+        image_prompt = shot.get("image_prompt", "")
+        parts.append("")
+        parts.append("[SCENE]")
+        parts.append(image_prompt)
+
+        # --- Dialogue (same logic as A, if applicable) ---
+        if use_native_text:
+            text_overlay = shot.get("text_overlay", {})
+            chars_visible = shot.get("character_direction", {}).get("characters_visible", [])
+
+            dialogue_embed = build_dialogue_scene_embed(
+                text_overlay,
+                characters=characters_list,
+                speaker_format='english',
+                text_language='zh-CN',
+                characters_in_scene=chars_visible
+            )
+
+            native_text_block = build_native_text_prompt(
+                text_overlay,
+                characters=characters_list,
+                characters_in_scene=chars_visible
+            )
+
+            text_parts = []
+            if dialogue_embed:
+                text_parts.append(dialogue_embed)
+            if native_text_block:
+                text_parts.append(native_text_block)
+
+            if text_parts:
+                parts.append("")
+                parts.append("[DIALOGUE]")
+                parts.append("\n".join(text_parts))
+
+        # --- Constraints ---
+        parts.append("")
+        parts.append("[CONSTRAINTS] TEXT-FREE: Do not generate text unless requested above.")
+
+        # --- Color mode override ---
+        color_mode = shot.get("color_mode", "full_color")
+        if color_mode == "grayscale":
+            parts.append("\n[COLOR OVERRIDE] This shot MUST be in GRAYSCALE, black and white.")
+        elif color_mode == "sepia":
+            parts.append("\n[COLOR OVERRIDE] This shot MUST be in SEPIA TONE, warm brownish monochrome.")
+
+        return "\n".join(parts)
+
     async def generate_shot_image_phase2(
         self,
         shot: dict,
@@ -842,6 +998,7 @@ class ImageGenerator:
         screenplay: Optional[dict] = None,
         aspect_ratio: str = "2:3",
         use_native_text: bool = True,
+        prompt_format: Optional[str] = None,
         **kwargs
     ) -> dict:
         """
@@ -870,114 +1027,147 @@ class ImageGenerator:
                 "error": "Gemini client not initialized. Check GEMINI_API_KEY."
             }
 
-        # 1. 使用Phase2PromptBuilder构建prompt包
-        prompt_builder = Phase2PromptBuilder(
-            storyboard=storyboard,
-            characters=characters,
-            style_preset=style_preset
-        )
+        # Determine prompt format: parameter > env var > default "b_prime"
+        active_format = prompt_format or settings.PROMPT_FORMAT or "b_prime"
+        if active_format not in ("b_prime", "legacy"):
+            print(f"    [ImageGenerator Phase2] Unknown prompt_format '{active_format}', falling back to b_prime")
+            active_format = "b_prime"
 
-        # 计算参考图数量以正确构建IMAGE编号映射
-        char_direction = shot.get("character_direction", {})
-        characters_in_shot = char_direction.get("characters_visible", [])
-        # SQ-2: 每个角色1张参考图（智能选择 portrait 或 fullbody）
-        char_refs_count = len(characters_in_shot) * 1
-        # 场景参考图 = 总参考图 - 角色参考图
-        total_refs = len(reference_images) if reference_images else 0
-        scene_ref_count = max(0, total_refs - char_refs_count)
+        prompt_package = {}  # will be populated by legacy path
 
-        prompt_package = prompt_builder.build_full_prompt(
-            shot=shot,
-            screenplay=screenplay,
-            include_system_instruction=True,
-            scene_ref_count=scene_ref_count
-        )
-
-        # 2. 提取各部分
-        system_instruction = prompt_package.get("system_instruction", "")
-        critical_header = prompt_package.get("critical_header", "")
-        character_mapping = prompt_package.get("character_mapping", "")
-        main_prompt = prompt_package.get("image_prompt", "")
-        continuity_context = prompt_package.get("continuity_context", "")
-        narrative_context = prompt_package.get("narrative_context", "")
-
-        # 3. 构建完整prompt（按teststory6.4验证的结构）
-        #    顺序：关键指令头 → 角色映射 → 剧情上下文 → 风格 → 连续性 → 场景描述
-        full_prompt_parts = []
-
-        # 角色一致性关键指令头（最重要！放最前面）
-        if critical_header:
-            full_prompt_parts.append(critical_header)
-
-        # 角色参考图映射（含完整身份描述）
-        if character_mapping:
-            full_prompt_parts.append(character_mapping)
-
-        # 剧情上下文（新增：在风格指令之前）
-        if narrative_context:
-            full_prompt_parts.append(narrative_context)
-
-        # 全局风格锚定
-        if system_instruction:
-            full_prompt_parts.append(f"[GLOBAL STYLE DIRECTIVE]\n{system_instruction}")
-
-        # 连续性上下文（如果有上一shot）
-        if continuity_context:
-            full_prompt_parts.append(f"[CONTINUITY]\n{continuity_context}")
-
-        # TASK-PROMPT-BUBBLE: 对话气泡嵌入场景描述（而非 prompt 末尾）
-        # Founder 实测: NB2 用简单 prompt (~30 字) 即可渲染完美气泡，
-        # 嵌入场景描述让模型将气泡视为构图元素，获得更高注意力权重
-        dialogue_embed = ""
-        if use_native_text:
-            text_overlay = shot.get("text_overlay", {})
-            # T6: 传入 characters_in_scene 用于 speaker-visibility 校验
-            chars_visible = shot.get("character_direction", {}).get("characters_visible", [])
-            dialogue_embed = build_dialogue_scene_embed(
-                text_overlay,
-                characters=characters.get("characters", []),
-                speaker_format='english',
-                text_language='zh-CN',
-                characters_in_scene=chars_visible
+        if active_format == "b_prime":
+            # ============================================================
+            # B' FORMAT: compressed label structure, ~46% fewer tokens
+            # Verified through 10-shot blind test (Founder + PM evaluation)
+            # ============================================================
+            full_prompt = self._build_b_prime_prompt(
+                shot=shot,
+                storyboard=storyboard,
+                characters=characters,
+                style_preset=style_preset,
+                reference_images=reference_images,
+                use_native_text=use_native_text,
             )
+            # B' already includes its own MANDATORY STYLE block — skip StyleEnforcer
+            print(f"    [ImageGenerator Phase2] Using B' prompt format ({len(full_prompt)} chars)")
 
-        # 主prompt（场景描述）+ 嵌入的对话气泡
-        if dialogue_embed:
-            full_prompt_parts.append(f"[SCENE DESCRIPTION]\n{main_prompt}\n{dialogue_embed}")
-            print(f"    [ImageGenerator Phase2] 对话气泡已嵌入场景描述 ({len(dialogue_embed)} chars)")
         else:
-            full_prompt_parts.append(f"[SCENE DESCRIPTION]\n{main_prompt}")
+            # ============================================================
+            # LEGACY (A) FORMAT: original verbose decorated blocks
+            # All existing code preserved exactly as-is
+            # ============================================================
 
-        full_prompt = "\n\n".join(full_prompt_parts)
-
-        # 🚨 关键：使用 StyleEnforcer 强制风格，防止风格漂移
-        # StyleEnforcer 会在 prompt 最前面添加 MANDATORY STYLE 指令
-        # 包括 MUST INCLUDE (photorealistic等) 和 DO NOT USE (cartoon, anime等)
-        # TASK-PROMPT-BUBBLE: 禁用 quality_suffix（与 mandatory keywords 重叠冗余）
-        full_prompt = StyleEnforcer.enforce_prompt(full_prompt, style_preset, add_quality_suffix=False)
-
-        # color_mode 处理：覆盖 preset 的颜色设定（用于回忆/闪回等特殊效果）
-        color_mode = shot.get("color_mode", "full_color")
-        if color_mode == "grayscale":
-            full_prompt += "\n\n[COLOR OVERRIDE] This shot MUST be in GRAYSCALE, black and white. Override any color requirements from the style preset."
-        elif color_mode == "sepia":
-            full_prompt += "\n\n[COLOR OVERRIDE] This shot MUST be in SEPIA TONE, warm brownish monochrome. Override any color requirements from the style preset."
-
-        # NB2 原生文字渲染：将 TEXT OVERLAY REQUIREMENT 附加到 prompt 末尾
-        # TASK-PROMPT-BUBBLE: dialogue 已嵌入场景描述（上方），此处只处理 thought/narration
-        # 当 use_native_text=True 时，NB2 直接在图像中渲染中文文字（旁白/心理描述）
-        # 当 use_native_text=False 时，不附加文字指令，由 TextOverlay 后处理叠加
-        if use_native_text:
-            text_overlay = shot.get("text_overlay", {})
-            # T-A: 传入 characters + characters_in_scene，避免 off_screen 时可见 speaker 文字双重渲染
-            native_text_block = build_native_text_prompt(
-                text_overlay,
-                characters=characters.get("characters", []),
-                characters_in_scene=chars_visible
+            # 1. 使用Phase2PromptBuilder构建prompt包
+            prompt_builder = Phase2PromptBuilder(
+                storyboard=storyboard,
+                characters=characters,
+                style_preset=style_preset
             )
-            if native_text_block:
-                full_prompt += "\n\n" + native_text_block
-                print(f"    [ImageGenerator Phase2] 原生文字渲染 (thought/narration): text_type={text_overlay.get('text_type', 'none')}")
+
+            # 计算参考图数量以正确构建IMAGE编号映射
+            char_direction = shot.get("character_direction", {})
+            characters_in_shot = char_direction.get("characters_visible", [])
+            # SQ-2: 每个角色1张参考图（智能选择 portrait 或 fullbody）
+            char_refs_count = len(characters_in_shot) * 1
+            # 场景参考图 = 总参考图 - 角色参考图
+            total_refs = len(reference_images) if reference_images else 0
+            scene_ref_count = max(0, total_refs - char_refs_count)
+
+            prompt_package = prompt_builder.build_full_prompt(
+                shot=shot,
+                screenplay=screenplay,
+                include_system_instruction=True,
+                scene_ref_count=scene_ref_count
+            )
+
+            # 2. 提取各部分
+            system_instruction = prompt_package.get("system_instruction", "")
+            critical_header = prompt_package.get("critical_header", "")
+            character_mapping = prompt_package.get("character_mapping", "")
+            main_prompt = prompt_package.get("image_prompt", "")
+            continuity_context = prompt_package.get("continuity_context", "")
+            narrative_context = prompt_package.get("narrative_context", "")
+
+            # 3. 构建完整prompt（按teststory6.4验证的结构）
+            #    顺序：关键指令头 → 角色映射 → 剧情上下文 → 风格 → 连续性 → 场景描述
+            full_prompt_parts = []
+
+            # 角色一致性关键指令头（最重要！放最前面）
+            if critical_header:
+                full_prompt_parts.append(critical_header)
+
+            # 角色参考图映射（含完整身份描述）
+            if character_mapping:
+                full_prompt_parts.append(character_mapping)
+
+            # 剧情上下文（新增：在风格指令之前）
+            if narrative_context:
+                full_prompt_parts.append(narrative_context)
+
+            # 全局风格锚定
+            if system_instruction:
+                full_prompt_parts.append(f"[GLOBAL STYLE DIRECTIVE]\n{system_instruction}")
+
+            # 连续性上下文（如果有上一shot）
+            if continuity_context:
+                full_prompt_parts.append(f"[CONTINUITY]\n{continuity_context}")
+
+            # TASK-PROMPT-BUBBLE: 对话气泡嵌入场景描述（而非 prompt 末尾）
+            # Founder 实测: NB2 用简单 prompt (~30 字) 即可渲染完美气泡，
+            # 嵌入场景描述让模型将气泡视为构图元素，获得更高注意力权重
+            dialogue_embed = ""
+            if use_native_text:
+                text_overlay = shot.get("text_overlay", {})
+                # T6: 传入 characters_in_scene 用于 speaker-visibility 校验
+                chars_visible = shot.get("character_direction", {}).get("characters_visible", [])
+                dialogue_embed = build_dialogue_scene_embed(
+                    text_overlay,
+                    characters=characters.get("characters", []),
+                    speaker_format='english',
+                    text_language='zh-CN',
+                    characters_in_scene=chars_visible
+                )
+
+            # 主prompt（场景描述）+ 嵌入的对话气泡
+            if dialogue_embed:
+                full_prompt_parts.append(f"[SCENE DESCRIPTION]\n{main_prompt}\n{dialogue_embed}")
+                print(f"    [ImageGenerator Phase2] 对话气泡已嵌入场景描述 ({len(dialogue_embed)} chars)")
+            else:
+                full_prompt_parts.append(f"[SCENE DESCRIPTION]\n{main_prompt}")
+
+            full_prompt = "\n\n".join(full_prompt_parts)
+
+            # 🚨 关键：使用 StyleEnforcer 强制风格，防止风格漂移
+            # StyleEnforcer 会在 prompt 最前面添加 MANDATORY STYLE 指令
+            # 包括 MUST INCLUDE (photorealistic等) 和 DO NOT USE (cartoon, anime等)
+            # TASK-PROMPT-BUBBLE: 禁用 quality_suffix（与 mandatory keywords 重叠冗余）
+            full_prompt = StyleEnforcer.enforce_prompt(full_prompt, style_preset, add_quality_suffix=False)
+
+            # color_mode 处理：覆盖 preset 的颜色设定（用于回忆/闪回等特殊效果）
+            color_mode = shot.get("color_mode", "full_color")
+            if color_mode == "grayscale":
+                full_prompt += "\n\n[COLOR OVERRIDE] This shot MUST be in GRAYSCALE, black and white. Override any color requirements from the style preset."
+            elif color_mode == "sepia":
+                full_prompt += "\n\n[COLOR OVERRIDE] This shot MUST be in SEPIA TONE, warm brownish monochrome. Override any color requirements from the style preset."
+
+            # NB2 原生文字渲染：将 TEXT OVERLAY REQUIREMENT 附加到 prompt 末尾
+            # TASK-PROMPT-BUBBLE: dialogue 已嵌入场景描述（上方），此处只处理 thought/narration
+            # 当 use_native_text=True 时，NB2 直接在图像中渲染中文文字（旁白/心理描述）
+            # 当 use_native_text=False 时，不附加文字指令，由 TextOverlay 后处理叠加
+            if use_native_text:
+                text_overlay = shot.get("text_overlay", {})
+                # T-A: 传入 characters + characters_in_scene，避免 off_screen 时可见 speaker 文字双重渲染
+                chars_visible = shot.get("character_direction", {}).get("characters_visible", [])
+                native_text_block = build_native_text_prompt(
+                    text_overlay,
+                    characters=characters.get("characters", []),
+                    characters_in_scene=chars_visible
+                )
+                if native_text_block:
+                    full_prompt += "\n\n" + native_text_block
+                    print(f"    [ImageGenerator Phase2] 原生文字渲染 (thought/narration): text_type={text_overlay.get('text_type', 'none')}")
+
+            print(f"    [ImageGenerator Phase2] Using legacy (A) prompt format ({len(full_prompt)} chars)")
 
         # DEBUG: 保存shot的完整prompt用于验证
         shot_id = shot.get("shot_id", 0)
@@ -988,9 +1178,9 @@ class ImageGenerator:
                 os.makedirs(debug_dir, exist_ok=True)
                 filename = f"phase2_shot{shot_id:02d}_prompt.txt"
                 with open(f"{debug_dir}/{filename}", "w", encoding="utf-8") as f:
-                    f.write(f"=== Phase 2.0 Shot {shot_id} Prompt (角色一致性增强版) ===\n\n")
+                    f.write(f"=== Phase 2.0 Shot {shot_id} Prompt (format: {active_format}) ===\n\n")
                     f.write(f"生成时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-                    f.write(f"has_previous_shot_image: False (DEC-014: removed)\n\n")
+                    f.write(f"prompt_format: {active_format}\n\n")
                     f.write(f"=== 完整Prompt ===\n\n")
                     f.write(full_prompt)
                 print(f"    [DEBUG] Shot {shot_id} prompt已保存至 {debug_dir}/{filename}")
@@ -1013,7 +1203,7 @@ class ImageGenerator:
         print(f"\n    [ImageGenerator Phase2] === Gemini请求结构 ===")
         print(f"      model: {self.NB2_MODEL}")
         print(f"      style_preset: {style_preset}")
-        print(f"      has_system_instruction: {bool(system_instruction)}")
+        print(f"      prompt_format: {active_format}")
         print(f"      has_continuity: False (DEC-014: removed)")
         print(f"      reference_images: {len(reference_images) if reference_images else 0}")
         print(f"      shot camera: {shot.get('camera', {}).get('shot_size', 'N/A')}")

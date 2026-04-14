@@ -12,14 +12,21 @@ Stage 5: ShotImageGenerator - 镜头图像生成
 idea → outline.json → characters.json → screenplay.json → storyboard.json → images/
 """
 
+import glob
 import json
+import logging
 import os
 import re
+import shutil
+import time
 import asyncio
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Callable, Awaitable
 from PIL import Image
 
+logger = logging.getLogger("xuhua")
+
+from app.config import settings
 from app.services.story_outline_generator import StoryOutlineGenerator
 from app.services.character_designer import CharacterDesigner
 from app.services.screenplay_writer import ScreenplayWriter
@@ -30,6 +37,14 @@ from app.services.scene_reference_manager import SceneReferenceManager
 from app.models.style_config import ProjectStyleConfig
 from app.services.text_overlay_service import TextOverlayService
 from app.services.shot_validator import ShotValidator
+from app.services.pipeline_schemas import (
+    validate_characters,
+    validate_storyboard,
+    PipelineSchemaError,
+)
+
+
+R8_DATA_DIR = "test_output/manualtest/e2e_regression_r8/20260316_145613/story_A/20260316_145614"
 
 
 class Phase2PipelineOrchestrator:
@@ -80,6 +95,9 @@ class Phase2PipelineOrchestrator:
         character_seeds: dict = None,
         scene_seeds: dict = None,
         confirmed_outline: dict = None,
+        project_uuid: str = None,
+        progress_callback: Optional[Callable[..., Awaitable]] = None,
+        checkpoint_callback: Optional[Callable[..., Awaitable]] = None,
     ) -> dict:
         """
         运行完整的5阶段生成流程
@@ -98,7 +116,7 @@ class Phase2PipelineOrchestrator:
             完整的生成结果
         """
         start_time = datetime.now()
-        project_id = start_time.strftime("%Y%m%d_%H%M%S")
+        project_id = project_uuid or start_time.strftime("%Y%m%d_%H%M%S")
         project_dir = os.path.join(self.output_dir, project_id)
         os.makedirs(project_dir, exist_ok=True)
 
@@ -107,11 +125,23 @@ class Phase2PipelineOrchestrator:
         print(f"{'='*60}")
         print(f"Project ID: {project_id}")
         print(f"Idea: {idea}")
-        print(f"Style: {style_preset}")
+        _style_label = f"custom ({custom_style_analysis.get('style_display_name', 'custom')})" if custom_style_analysis else style_preset
+        print(f"Style: {_style_label}")
         print(f"Target: {target_duration_minutes}分钟")
         print(f"{'='*60}\n")
+        logger.info(f"[Pipeline] ========== Pipeline 开始 ==========")
+        logger.info(f"[Pipeline] project_id={project_id}, style={_style_label}, duration={target_duration_minutes}min")
+        logger.info(f"[Pipeline] idea: {idea[:100]}{'...' if len(idea) > 100 else ''}")
+        logger.info(f"[Pipeline] has_confirmed_outline={'是' if confirmed_outline else '否'}, generate_images={generate_images}")
 
         try:
+            # RB-5 + B-7: 启动空白期 — 根据是否有 confirmed_outline 调整初始消息
+            if progress_callback:
+                if confirmed_outline:
+                    await progress_callback("character_design", 2, "大纲已确认，正在设计角色...")
+                else:
+                    await progress_callback("story_generation", 2, "正在构思故事大纲...")
+
             # ============================================================
             # Stage 1: 故事大纲生成
             # ============================================================
@@ -153,6 +183,9 @@ class Phase2PipelineOrchestrator:
             self._save_json(project_dir, "1_outline.json", outline)
 
             print(f"✅ Stage 1 完成: {outline.get('title', 'N/A')}")
+            # B-5: Stage 1 = 0→5%
+            if progress_callback:
+                await progress_callback("story_generation", 5, "大纲生成完成，正在设计角色...")
 
             # ============================================================
             # Stage 2: 角色设计
@@ -167,8 +200,59 @@ class Phase2PipelineOrchestrator:
             self.stage_results["characters"] = characters
             self._save_json(project_dir, "2_characters.json", characters)
 
+            # HE-BACKEND-1: Schema 验证 — Stage 2 输出
+            validate_characters(characters, "Stage 2 -> 3")
+
             char_names = [c.get("name", "N/A") for c in characters.get("characters", [])]
             print(f"✅ Stage 2 完成: {', '.join(char_names)}")
+            # B-6: Stage 2 完成后存中间结果到 chapter 表
+            if checkpoint_callback:
+                await checkpoint_callback(
+                    "characters_json", characters.get("characters", [])
+                )
+            # R4-1: Stage 2 后发 character_ready 信号，然后真正等待用户确认
+            # 前端检测到 stage === "character_ready" 后弹出角色/场景确认
+            # 用户点"确认" → 调 confirm-characters API → characters_confirmed = True
+            # Pipeline 轮询 DB 等待确认，超时 5 分钟自动继续
+            if progress_callback:
+                await progress_callback("character_ready", 10, "角色设计完成，请确认角色和场景")
+
+            # R4-1: 轮询等待用户确认角色
+            max_wait = 1800  # 30 分钟超时（前端会主动调 confirm API）
+            waited = 0
+            confirmed = False
+            logger.info(f"[Pipeline] R4-1: 开始等待用户确认角色 (超时 {max_wait}s)")
+            if project_uuid:
+                from app.database import async_session_maker
+                from sqlalchemy import select
+                from app.models.project import Project
+                while waited < max_wait:
+                    await asyncio.sleep(2)
+                    waited += 2
+                    try:
+                        async with async_session_maker() as check_db:
+                            result = await check_db.execute(
+                                select(Project.characters_confirmed).where(Project.uuid == project_uuid)
+                            )
+                            row = result.scalar_one_or_none()
+                            if row:
+                                confirmed = True
+                                print(f"  [R4-1] ✅ 用户已确认角色 (等待 {waited}s)")
+                                logger.info(f"[Pipeline] R4-1: ✅ 用户已确认角色 (等待 {waited}s)")
+                                break
+                    except Exception as e:
+                        print(f"  [R4-1] ⚠️ 查询 characters_confirmed 失败: {e}")
+                        logger.warning(f"[Pipeline] R4-1: ⚠️ 查询 characters_confirmed 失败: {e}")
+                    # 每 30s 打一次轮询状态日志
+                    if waited % 30 == 0:
+                        logger.info(f"[Pipeline] R4-1: 仍在等待用户确认... (已等待 {waited}s)")
+                if not confirmed:
+                    print(f"  [R4-1] ⏰ 等待超时 ({max_wait}s)，自动继续")
+                    logger.warning(f"[Pipeline] R4-1: ⏰ 等待超时 ({max_wait}s)，自动继续")
+            else:
+                # 无 project_uuid（手动测试模式）— 直接继续
+                print(f"  [R4-1] 无 project_uuid，跳过等待确认")
+                logger.info(f"[Pipeline] R4-1: 无 project_uuid，跳过等待确认")
 
             # ============================================================
             # Stage 3: 分场剧本
@@ -180,15 +264,23 @@ class Phase2PipelineOrchestrator:
 
             screenplay = await self.screenplay_writer.write(
                 outline, characters,
-                family_relationships=outline.get("family_relationships", [])
+                family_relationships=outline.get("family_relationships", []),
+                progress_callback=progress_callback,
             )
 
             self.stage_results["screenplay"] = screenplay
             self._save_json(project_dir, "3_screenplay.json", screenplay)
 
+            # B-6: Stage 3 完成后存中间结果到 chapter 表
+            if checkpoint_callback:
+                await checkpoint_callback("scenes_json", screenplay.get("scenes", []))
+
             scene_count = len(screenplay.get("scenes", []))
             beat_count = screenplay.get("total_action_beats", 0)
             print(f"✅ Stage 3 完成: {scene_count}场戏, {beat_count}个动作节拍")
+            # B-5: Stage 3 = 10→35%（进度已由 screenplay_writer 内部回调更新）
+            if progress_callback:
+                await progress_callback("screenplay", 35, "剧本编写完成，正在创建分镜...")
 
             # ============================================================
             # Stage 4: 分镜脚本
@@ -205,21 +297,47 @@ class Phase2PipelineOrchestrator:
                 visual_tone=visual_tone,
                 style_preset=style_preset,
                 characters_overview=outline.get("characters_overview", []),
-                family_relationships=outline.get("family_relationships", [])
+                family_relationships=outline.get("family_relationships", []),
+                progress_callback=progress_callback,
             )
 
             self.stage_results["storyboard"] = storyboard
             self._save_json(project_dir, "4_storyboard.json", storyboard)
 
+            # HE-BACKEND-1: Schema 验证 — Stage 4 输出 (特别是 image_prompt 纯英文)
+            validate_storyboard(storyboard, "Stage 4 -> 5")
+
             # 保存prompt质量报告
             self._save_prompt_quality_report(storyboard, project_dir)
 
+            # B-6: Stage 4 完成后存中间结果到 chapter 表
+            if checkpoint_callback:
+                await checkpoint_callback("storyboard_json", storyboard)
+
             shot_count = len(storyboard.get("shots", []))
             print(f"✅ Stage 4 完成: {shot_count}个镜头")
+            # B-5: Stage 4 = 35→65%（进度已由 storyboard_director 内部回调更新）
+            if progress_callback:
+                await progress_callback("storyboard", 65, "分镜创建完成，正在生成图像...")
 
             # ============================================================
             # Stage 5: 图像生成（可选）
             # ============================================================
+            # Stage 5 跳过模式: 用 R8 测试图片代替生图
+            if generate_images and settings.SKIP_IMAGE_GENERATION:
+                self.current_stage = "Stage 5: ShotImageGenerator"
+                print(f"\n{'='*40}")
+                print(f"Stage 5: 生成镜头图像 (跳过模式)")
+                print(f"{'='*40}")
+                print("⚠️ SKIP_IMAGE_GENERATION=true — 使用 R8 测试数据代替生图")
+                image_results = await self._run_stage5_skip_mode(
+                    project_dir, storyboard, characters, progress_callback
+                )
+                self.stage_results["images"] = image_results
+                self._save_json(project_dir, "5_image_results.json", image_results)
+                print(f"\n✅ Stage 5 完成 (跳过模式): {len(image_results)} 图像已复制")
+                generate_images = False  # 跳过下方正常 Stage 5
+
             if generate_images:
                 self.current_stage = "Stage 5: ShotImageGenerator"
                 print(f"\n{'='*40}")
@@ -529,6 +647,9 @@ class Phase2PipelineOrchestrator:
             print(f"场景数: {summary['total_scenes']}")
             print(f"镜头数: {summary['total_shots']}")
             print(f"{'='*60}\n")
+            logger.info(f"[Pipeline] ========== Pipeline 完成 ==========")
+            logger.info(f"[Pipeline] ✅ 总耗时: {duration:.1f}s, 标题: {summary['title']}")
+            logger.info(f"[Pipeline] 角色: {summary['total_characters']}, 场景: {summary['total_scenes']}, 镜头: {summary['total_shots']}")
 
             return {
                 "success": True,
@@ -538,6 +659,7 @@ class Phase2PipelineOrchestrator:
 
         except Exception as e:
             print(f"\n❌ Pipeline 失败于 {self.current_stage}: {e}")
+            logger.error(f"[Pipeline] ❌ Pipeline 失败于 {self.current_stage}: {e}")
             import traceback
             traceback.print_exc()
 
@@ -627,6 +749,78 @@ class Phase2PipelineOrchestrator:
                         )
 
         return warnings
+
+    async def _run_stage5_skip_mode(
+        self, project_dir: str, storyboard: dict, characters: dict,
+        progress_callback=None,
+    ) -> list:
+        """Stage 5 跳过模式: 从 R8 测试数据复制图片，不调 Gemini/NB2"""
+        # 5a: 角色参考图
+        char_refs_dir = os.path.join(project_dir, "character_refs")
+        os.makedirs(char_refs_dir, exist_ok=True)
+        r8_char_files = sorted(glob.glob(os.path.join(R8_DATA_DIR, "character_refs", "char_*")))
+        r8_char_ids = sorted(set(
+            "_".join(os.path.basename(f).split("_")[:2]) for f in r8_char_files
+        ))  # ["char_001", "char_002", ...]
+        r8_char_count = len(r8_char_ids)
+
+        char_list = characters.get("characters", [])
+        for i, char in enumerate(char_list):
+            char_id = char.get("id", f"char_{i+1:03d}")
+            # 循环复用 R8 角色
+            r8_idx = i % r8_char_count if r8_char_count > 0 else 0
+            r8_id = r8_char_ids[r8_idx] if r8_char_ids else "char_001"
+            for suffix in ["portrait", "fullbody"]:
+                src = os.path.join(R8_DATA_DIR, "character_refs", f"{r8_id}_{suffix}.png")
+                dst = os.path.join(char_refs_dir, f"{char_id}_{suffix}.png")
+                if os.path.exists(src):
+                    shutil.copy2(src, dst)
+            print(f"  ✅ {char_id} 参考图已复制 (from {r8_id})")
+
+        # B-5: Stage 5 = 65→100%
+        if progress_callback:
+            await progress_callback("image_generation", 75, "角色参考图就绪...")
+
+        # 5a.5: 场景参考图
+        scene_refs_dir = os.path.join(project_dir, "scene_refs")
+        os.makedirs(scene_refs_dir, exist_ok=True)
+        r8_scene_files = glob.glob(os.path.join(R8_DATA_DIR, "scene_refs", "*.png"))
+        for f in r8_scene_files:
+            shutil.copy2(f, os.path.join(scene_refs_dir, os.path.basename(f)))
+        print(f"  ✅ 场景参考图已复制: {len(r8_scene_files)} 张")
+
+        if progress_callback:
+            await progress_callback("image_generation", 80, "场景参考图就绪，正在准备 Shot 图...")
+
+        # 5b: Shot 图
+        images_dir = os.path.join(project_dir, "images")
+        os.makedirs(images_dir, exist_ok=True)
+        r8_shots = sorted(glob.glob(os.path.join(R8_DATA_DIR, "images", "shot_*.png")))
+        r8_shot_count = len(r8_shots)
+
+        shots = storyboard.get("shots", [])
+        image_results = []
+        for i, shot in enumerate(shots):
+            shot_id = shot.get("shot_id", i + 1)
+            # 循环复用 R8 shot 图
+            r8_idx = i % r8_shot_count if r8_shot_count > 0 else 0
+            src = r8_shots[r8_idx] if r8_shots else None
+            dst = os.path.join(images_dir, f"shot_{shot_id:02d}.png")
+            if src and os.path.exists(src):
+                shutil.copy2(src, dst)
+                image_results.append({
+                    "shot_id": shot_id,
+                    "success": True,
+                    "image_path": dst,
+                })
+            else:
+                image_results.append({"shot_id": shot_id, "success": False, "error": "R8 source missing"})
+            print(f"    Shot {shot_id}: 复制 {os.path.basename(src) if src else 'N/A'} → shot_{shot_id:02d}.png")
+
+        if progress_callback:
+            await progress_callback("image_generation", 90, f"Shot 图就绪 ({len(image_results)} 张)...")
+
+        return image_results
 
     def _save_json(self, directory: str, filename: str, data: dict) -> str:
         """保存JSON文件"""

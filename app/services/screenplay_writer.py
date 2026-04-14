@@ -10,11 +10,16 @@ Phase 2.0 第三阶段 - 分场剧本生成器（分批生成模式）
 - 传入previous_scenes保证叙事连贯性
 """
 
+import asyncio
 import json
+import time
+import logging
 from typing import Optional, List
 import anthropic
 from google import genai
 from app.config import settings
+
+logger = logging.getLogger("xuhua")
 
 
 class ScreenplayWriter:
@@ -42,14 +47,20 @@ class ScreenplayWriter:
         if settings.GEMINI_API_KEY:
             self.gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
-    async def write(self, outline: dict, characters: dict, family_relationships: list = None) -> dict:
+    async def write(self, outline: dict, characters: dict, family_relationships: list = None, progress_callback=None) -> dict:
         """
-        生成分场剧本（分批生成：每个plot_point生成一个scene）
+        生成分场剧本（B-3: 自适应 batch 模式）
+
+        策略:
+        - ≤8 scenes: 全 batch，一次 API 调用
+        - 9-15 scenes: 分 2 批
+        - batch 失败: fallback 到逐 scene 模式
 
         Args:
             outline: Stage 1生成的故事大纲
             characters: Stage 2生成的角色设计
             family_relationships: T32 — Stage 1 输出的家庭/人物关系列表（可选）
+            progress_callback: 进度回调函数
 
         Returns:
             screenplay dict
@@ -59,32 +70,109 @@ class ScreenplayWriter:
         target_metrics = outline.get("target_metrics", {})
         target_seconds = target_metrics.get("target_duration_seconds", 180)
 
-        print(f"[ScreenplayWriter] 生成分场剧本（按plot_point分批）...")
+        print(f"[ScreenplayWriter] 生成分场剧本...")
         print(f"  剧情节点数: {len(plot_points)}")
         print(f"  目标时长: {target_seconds}秒")
+        logger.info(f"[ScreenplayWriter] 开始生成分场剧本")
+        logger.info(f"  剧情节点数: {len(plot_points)}, 目标时长: {target_seconds}s")
+        stage_start = time.time()
 
         all_scenes = []
+        n = len(plot_points)
 
-        for i, plot_point in enumerate(plot_points):
-            beat_name = plot_point.get("beat", f"plot_{i+1}")
-            print(f"  生成 Scene {i+1}/{len(plot_points)} [{beat_name}]...", end=" ")
+        # B-3: 自适应 batch 策略
+        if n <= 8:
+            # 全 batch: 一次 API 调用
+            print(f"  [B-3] 全 batch 模式 ({n} scenes ≤ 8)")
+            try:
+                all_scenes = await self._generate_all_scenes_batch(
+                    plot_points=plot_points,
+                    outline=outline,
+                    characters=characters,
+                    previous_scenes=[],
+                )
+                if all_scenes:
+                    print(f"  [B-3] ✅ 全 batch 成功: {len(all_scenes)} scenes")
+                    # B-4: batch 完成后一次性更新进度
+                    if progress_callback:
+                        await progress_callback("screenplay", 35, f"剧本编写完成 ({len(all_scenes)} 场戏)...")
+                else:
+                    print(f"  [B-3] ⚠️ 全 batch 返回空，fallback 到逐 scene")
+                    all_scenes = []
+            except Exception as e:
+                print(f"  [B-3] ⚠️ 全 batch 失败 ({e})，fallback 到逐 scene")
+                all_scenes = []
 
-            scene = await self._generate_scene_for_plot_point(
-                plot_point=plot_point,
-                plot_point_index=i,
-                total_plot_points=len(plot_points),
-                outline=outline,
-                characters=characters,
-                previous_scenes=all_scenes
-            )
+        elif n <= 15:
+            # 分 2 批
+            mid = (n + 1) // 2
+            print(f"  [B-3] 分 2 批模式 ({n} scenes: 前 {mid} + 后 {n - mid})")
+            try:
+                batch1 = await self._generate_all_scenes_batch(
+                    plot_points=plot_points[:mid],
+                    outline=outline,
+                    characters=characters,
+                    previous_scenes=[],
+                )
+                if batch1:
+                    all_scenes.extend(batch1)
+                    print(f"  [B-3] ✅ 第 1 批成功: {len(batch1)} scenes")
+                    if progress_callback:
+                        await progress_callback("screenplay", 22, f"剧本编写中 (第 1 批完成)...")
 
-            if scene:
-                all_scenes.append(scene)
-                beats_count = len(scene.get("action_beats", []))
-                narration_len = len(scene.get("narration", ""))
-                print(f"✅ {beats_count} beats, {narration_len}字")
-            else:
-                print(f"❌ 失败")
+                    batch2 = await self._generate_all_scenes_batch(
+                        plot_points=plot_points[mid:],
+                        outline=outline,
+                        characters=characters,
+                        previous_scenes=all_scenes,
+                        scene_id_offset=mid,
+                    )
+                    if batch2:
+                        all_scenes.extend(batch2)
+                        print(f"  [B-3] ✅ 第 2 批成功: {len(batch2)} scenes")
+                        if progress_callback:
+                            await progress_callback("screenplay", 35, f"剧本编写完成 ({len(all_scenes)} 场戏)...")
+                    else:
+                        print(f"  [B-3] ⚠️ 第 2 批失败，fallback 剩余到逐 scene")
+                        all_scenes = []  # 重置，全部 fallback
+                else:
+                    print(f"  [B-3] ⚠️ 第 1 批失败，fallback 到逐 scene")
+                    all_scenes = []
+            except Exception as e:
+                print(f"  [B-3] ⚠️ 分批失败 ({e})，fallback 到逐 scene")
+                all_scenes = []
+
+        # Fallback: 逐 scene 模式（原始逻辑）
+        if not all_scenes:
+            print(f"  [B-3] 逐 scene 模式 ({n} scenes)")
+            for i, plot_point in enumerate(plot_points):
+                beat_name = plot_point.get("beat", f"plot_{i+1}")
+                print(f"  生成 Scene {i+1}/{n} [{beat_name}]...", end=" ")
+
+                scene = await self._generate_scene_for_plot_point(
+                    plot_point=plot_point,
+                    plot_point_index=i,
+                    total_plot_points=n,
+                    outline=outline,
+                    characters=characters,
+                    previous_scenes=all_scenes
+                )
+
+                if scene:
+                    all_scenes.append(scene)
+                    beats_count = len(scene.get("action_beats", []))
+                    narration_len = len(scene.get("narration", ""))
+                    print(f"✅ {beats_count} beats, {narration_len}字")
+                else:
+                    print(f"❌ 失败")
+
+                # B-4: 逐 scene 进度回调
+                if progress_callback:
+                    p = 10 + int((i + 1) / n * 25)
+                    await progress_callback(
+                        "screenplay", p,
+                        f"剧本编写中 (Scene {i+1}/{n})..."
+                    )
 
         if not all_scenes:
             raise ValueError("无法生成任何scene")
@@ -93,10 +181,13 @@ class ScreenplayWriter:
         total_beats = sum(len(s.get("action_beats", [])) for s in all_scenes)
         total_words = sum(len(s.get("narration", "")) for s in all_scenes)
 
+        stage_elapsed = time.time() - stage_start
         print(f"[ScreenplayWriter] ✅ 剧本生成完成")
         print(f"  场景数: {len(all_scenes)}")
         print(f"  动作节拍: {total_beats}个")
         print(f"  旁白字数: {total_words}字 (≈{total_words/4:.0f}秒)")
+        logger.info(f"[ScreenplayWriter] ✅ 剧本生成完成 (总耗时 {stage_elapsed:.1f}s)")
+        logger.info(f"  场景数: {len(all_scenes)}, 动作节拍: {total_beats}, 旁白字数: {total_words}")
 
         screenplay = {
             "scenes": all_scenes,
@@ -142,33 +233,7 @@ class ScreenplayWriter:
                     with open("forclaudeweb/stage3_actual_prompt.txt", "w", encoding="utf-8") as f:
                         f.write(prompt)
 
-                content = None
-
-                # 优先使用 Claude Sonnet 4.6
-                if self.claude_client:
-                    try:
-                        response = self.claude_client.messages.create(
-                            model=self.claude_model,
-                            max_tokens=8631,
-                            messages=[
-                                {"role": "user", "content": prompt}
-                            ]
-                        )
-                        content = response.content[0].text
-                    except Exception as ce:
-                        pass  # 静默失败，尝试Gemini
-
-                # Fallback到Gemini 3 Flash
-                if content is None and self.gemini_client:
-                    response = await self.gemini_client.aio.models.generate_content(
-                        model=self.gemini_model,
-                        contents=prompt,
-                        config={"max_output_tokens": 8631}
-                    )
-                    content = response.text
-
-                if content is None:
-                    raise ValueError("无可用的LLM服务")
+                content = await self._call_llm_with_retry(prompt, max_tokens=8631)
 
                 # DEBUG: 保存第一个scene的响应
                 if plot_point_index == 0 and attempt == 0:
@@ -211,6 +276,478 @@ class ScreenplayWriter:
             self._validate_scene(best_scene, plot_point_index + 1)
 
         return best_scene
+
+    async def _generate_all_scenes_batch(
+        self,
+        plot_points: list,
+        outline: dict,
+        characters: dict,
+        previous_scenes: list = None,
+        scene_id_offset: int = 0,
+    ) -> Optional[List[dict]]:
+        """
+        B-3: 全 batch 模式 — 一次 API 调用生成多个 scenes 的 JSON 数组。
+
+        Args:
+            plot_points: 要生成的 plot_point 列表
+            outline: Stage 1 大纲
+            characters: Stage 2 角色
+            previous_scenes: 前序 scenes（用于第 2 批的上下文）
+            scene_id_offset: scene_id 起始偏移（第 2 批 = 第 1 批数量）
+
+        Returns:
+            scenes 列表，或 None（失败时）
+        """
+        n = len(plot_points)
+        if n == 0:
+            return []
+
+        # 动态 max_tokens: scenes * 1500 * 2，上限 64000
+        dynamic_max_tokens = min(n * 1500 * 2, 64000)
+
+        # 构建 batch prompt
+        prompt = self._build_batch_prompt(
+            plot_points=plot_points,
+            outline=outline,
+            characters=characters,
+            previous_scenes=previous_scenes or [],
+            scene_id_offset=scene_id_offset,
+        )
+
+        # B-7: 使用带重试的 LLM 调用
+        try:
+            content = await self._call_llm_with_retry(prompt, max_tokens=dynamic_max_tokens)
+        except Exception as e:
+            print(f"  [B-3] batch LLM 调用异常: {e}")
+            return None
+
+        # B-2 诊断: 保存 batch 原始响应便于 debug
+        try:
+            import os
+            os.makedirs("forclaudeweb", exist_ok=True)
+            with open("forclaudeweb/stage3_batch_raw_response.txt", "w", encoding="utf-8") as f:
+                f.write(content)
+            print(f"  [B-3] batch 原始响应已保存 (长度: {len(content)} 字符)")
+        except Exception:
+            pass
+
+        # 解析 JSON 数组
+        scenes = self._extract_batch_json(content)
+        if not scenes:
+            print(f"  [B-3] batch JSON 解析失败，content 前 500 字: {content[:500]}")
+            return None
+
+        # 验证每个 scene
+        validated = []
+        for i, scene in enumerate(scenes):
+            expected_id = scene_id_offset + i + 1
+            self._validate_scene(scene, expected_id)
+            validated.append(scene)
+
+        return validated if validated else None
+
+    def _build_batch_prompt(
+        self,
+        plot_points: list,
+        outline: dict,
+        characters: dict,
+        previous_scenes: list,
+        scene_id_offset: int = 0,
+    ) -> str:
+        """构建 batch 模式的 prompt"""
+        n = len(plot_points)
+
+        # 角色信息
+        chars_info = []
+        chars_props = []
+        for char in characters.get("characters", []):
+            char_id = char.get('id')
+            char_name = char.get('name')
+            chars_info.append(f"- {char_id}: {char_name} ({char.get('role', 'character')})")
+            clothing = char.get('clothing', {})
+            accessories = clothing.get('accessories', [])
+            if accessories:
+                chars_props.append(f"  - {char_name} ({char_id}): {', '.join(accessories)}")
+            else:
+                chars_props.append(f"  - {char_name} ({char_id}): 无配饰")
+
+        chars_str = "\n".join(chars_info)
+        chars_props_str = "\n".join(chars_props) if chars_props else "  （无角色定义配饰）"
+
+        # 关系块
+        relationships_block = ""
+        if self._family_relationships:
+            rel_lines = []
+            for rel in self._family_relationships:
+                if isinstance(rel, dict):
+                    from_char = rel.get("from", "")
+                    to_char = rel.get("to", "")
+                    relation = rel.get("relationship", "")
+                    if from_char and to_char and relation:
+                        rel_lines.append(f"  - {from_char} → {to_char}: {relation}")
+                elif isinstance(rel, str):
+                    rel_lines.append(f"  - {rel}")
+            if rel_lines:
+                relationships_block = (
+                    "\n\n## CHARACTER RELATIONSHIPS\n"
+                    "Use these relationships to inform dialogue tone, forms of address, "
+                    "and emotional dynamics between characters:\n"
+                    + "\n".join(rel_lines)
+                )
+
+        # 场景位置
+        locations = outline.get("unique_locations", [])
+        if locations:
+            locations_lines = []
+            for loc in locations:
+                loc_id = loc.get("location_id", loc.get("id", "unknown"))
+                display_name = loc.get("display_name", loc.get("name", "未知场景"))
+                loc_type = loc.get("location_type", "")
+                locations_lines.append(f"  - {loc_id}: {display_name} ({loc_type})")
+            locations_str = "\n".join(locations_lines)
+            first_location_id = locations[0].get("location_id", locations[0].get("id", "L001"))
+        else:
+            locations_str = "  - default_location: 默认场景"
+            first_location_id = "default_location"
+
+        # 构建 plot_points 描述
+        pp_lines = []
+        for i, pp in enumerate(plot_points):
+            sid = scene_id_offset + i + 1
+            beat = pp.get("beat", f"plot_{sid}")
+            desc = pp.get("description", "")
+            dur = pp.get("estimated_duration_seconds", 30)
+            target_words = max(80, int(dur * 4))
+            # B-3: 旧公式 int(dur/6) 产出 5 beats/scene → 30 shots/短篇
+            # DEC-011 短篇~18 shots ÷ 6 scenes ≈ 3 beats/scene
+            target_beats = max(2, int(dur / 10))
+            pp_lines.append(
+                f"### Scene {sid}\n"
+                f"- 节拍类型: {beat}\n"
+                f"- 描述: {desc}\n"
+                f"- 目标时长: {dur}秒\n"
+                f"- 目标旁白字数: ≥{target_words}字\n"
+                f"- 目标 action_beats 数: ≥{target_beats}"
+            )
+        pp_block = "\n\n".join(pp_lines)
+
+        # 前情提要
+        previous_context = ""
+        if previous_scenes:
+            last = previous_scenes[-1]
+            last_narration = last.get("narration", "")
+            previous_context = f"""
+## 前情提要（前序 {len(previous_scenes)} 场已完成）
+上一场景: {last.get('scene_heading', '')}
+结束状态: {last_narration[-80:] if len(last_narration) > 80 else last_narration}
+"""
+
+        return f"""一次性生成 {n} 个 scenes 的完整分场剧本。
+
+═══════════════════════════════════════════════════════════
+CRITICAL: CHARACTER CONSISTENCY RULES
+═══════════════════════════════════════════════════════════
+
+You MUST only use props and accessories that are DEFINED in the character data.
+DO NOT invent new accessories, clothing items, or physical features.
+
+ALLOWED props for each character (from characters.json):
+{chars_props_str}
+
+❌ FORBIDDEN: Adding glasses, hats, bags, umbrellas, or any item NOT in the character definition
+✅ CORRECT: Use only defined accessories, use natural alternatives for plot needs
+
+═══════════════════════════════════════════════════════════
+
+## 角色
+{chars_str}
+{relationships_block}
+
+## 可用场景位置
+{locations_str}
+
+⚠️ location_id 必须完全匹配上述列表中的值（如 "{first_location_id}"）。
+{previous_context}
+
+## 需要生成的 {n} 个 Scenes
+
+{pp_block}
+
+═══════════════════════════════════════════════════════════
+## 对话与内心独白要求（CRITICAL）
+═══════════════════════════════════════════════════════════
+
+每个 action_beat 必须有至少 1 个对应的 dialogue_beat（对话或内心独白）。
+dialogue_beats 中 thought 类型 ≥20%。
+对话必须简洁有力，每句≤20字。
+thought 类型用括号包裹：line="（内心独白内容）"
+
+### DIALOGUE NATURALNESS RULES
+1. Dialogue should not contradict common knowledge
+2. Each line should have an unambiguous subject
+3. Dialogue tone should match speaker's age and identity
+4. Use natural spoken language, not written prose
+5. Use correct kinship terms based on CHARACTER RELATIONSHIPS
+
+═══════════════════════════════════════════════════════════
+
+## 输出格式
+
+直接输出 JSON 数组（不要```json```包裹，不要任何解释文字）。
+每个元素是一个 scene 对象，格式如下：
+
+[
+    {{
+        "scene_id": {scene_id_offset + 1},
+        "scene_heading": "EXT/INT. LOCATION - TIME - WEATHER",
+        "plot_point": "beat_name",
+        "location_id": "{first_location_id}",
+        "time_of_day": "时间",
+        "weather": "天气",
+        "lighting_condition": "光线条件",
+        "atmosphere": {{
+            "mood": "English only mood word",
+            "sound_design_hint": "音效提示",
+            "temperature_feel": "温度感受"
+        }},
+        "characters_in_scene": ["char_001"],
+        "action_beats": [
+            {{"beat_id": "1a", "action": "动作描述", "duration_hint": 5, "emotional_note": "情绪"}}
+        ],
+        "dialogue_beats": [
+            {{"beat_id": "1a_dialogue", "type": "dialogue", "speaker": "char_001", "line": "对话≤20字", "emotion": "情绪"}}
+        ],
+        "narration": "TTS朗读旁白，有文学性，详细描写人物神态动作、内心活动、环境氛围...",
+        "narration_tone": "情绪基调",
+        "narration_pace": "节奏"
+    }}
+]
+
+必须输出 {n} 个 scene 对象，scene_id 从 {scene_id_offset + 1} 到 {scene_id_offset + n}。"""
+
+    def _extract_batch_json(self, content: str) -> Optional[List[dict]]:
+        """
+        从 batch 模式的 LLM 响应中提取 JSON 数组。
+
+        RB-2: 增强解析逻辑 — 处理 markdown 代码块、trailing comma、
+        注释行、BOM、以及各种 LLM 输出格式偏差。
+        """
+        import re
+
+        def _try_parse_array(text: str) -> Optional[List[dict]]:
+            """尝试解析 JSON 数组，包含自动修复常见格式问题"""
+            if not text or not text.strip():
+                return None
+
+            text = text.strip()
+
+            # 去除 BOM
+            if text.startswith('\ufeff'):
+                text = text[1:]
+
+            # 移除 // 行注释（JSON 不支持但 LLM 常输出）
+            text = re.sub(r'//[^\n]*', '', text)
+
+            # 移除 /* ... */ 块注释
+            text = re.sub(r'/\*[\s\S]*?\*/', '', text)
+
+            # 直接尝试解析
+            try:
+                result = json.loads(text)
+                if isinstance(result, list) and len(result) > 0:
+                    return result
+            except json.JSONDecodeError:
+                pass
+
+            # 修复 trailing comma: },] 或 }, ]
+            fixed = re.sub(r',\s*(\])', r'\1', text)
+            # 修复 trailing comma in objects: ,}
+            fixed = re.sub(r',\s*(\})', r'\1', fixed)
+            try:
+                result = json.loads(fixed)
+                if isinstance(result, list) and len(result) > 0:
+                    print(f"  [RB-2] JSON trailing comma 已修复")
+                    return result
+            except json.JSONDecodeError:
+                pass
+
+            # R4-4: 修复 LLM 在 JSON 字符串值中输出未转义的双引号
+            # 例如: "emotion": "声音在"走"字上轻微破碎"
+            # 策略: 遍历字符，在字符串内部检测到的 " 如果后面不是 JSON 分隔符 (,}]:)
+            # 则替换为中文引号 \u201c（左双引号）
+            def _fix_inner_quotes(src: str) -> str:
+                out = []
+                i = 0
+                in_str = False
+                while i < len(src):
+                    ch = src[i]
+                    if ch == '\\' and in_str and i + 1 < len(src):
+                        out.append(ch)
+                        out.append(src[i + 1])
+                        i += 2
+                        continue
+                    if ch == '"':
+                        if not in_str:
+                            in_str = True
+                            out.append(ch)
+                        else:
+                            # Is this the real end of the string?
+                            rest = src[i + 1:].lstrip()
+                            if not rest or rest[0] in ',}]:':
+                                in_str = False
+                                out.append(ch)
+                            else:
+                                # Unescaped inner quote — replace with Chinese left quote
+                                out.append('\u201c')
+                    else:
+                        out.append(ch)
+                    i += 1
+                return ''.join(out)
+
+            quote_fixed = _fix_inner_quotes(fixed)
+            if quote_fixed != fixed:
+                try:
+                    result = json.loads(quote_fixed)
+                    if isinstance(result, list) and len(result) > 0:
+                        print(f"  [R4-4] JSON 未转义内部引号已修复")
+                        return result
+                except json.JSONDecodeError:
+                    pass
+
+            return None
+
+        # 策略 1: 提取 ```json ... ``` 代码块（支持 ```JSON 和 ``` 无标签）
+        code_block_patterns = [
+            r'```json\s*([\s\S]*?)\s*```',
+            r'```JSON\s*([\s\S]*?)\s*```',
+            r'```\s*([\s\S]*?)\s*```',
+        ]
+        for pattern in code_block_patterns:
+            match = re.search(pattern, content)
+            if match:
+                result = _try_parse_array(match.group(1))
+                if result:
+                    print(f"  [RB-2] ✅ 从 markdown 代码块中提取 JSON 数组 ({len(result)} scenes)")
+                    return result
+
+        # 策略 2: 直接解析整个内容
+        result = _try_parse_array(content)
+        if result:
+            print(f"  [RB-2] ✅ 直接解析 JSON 数组 ({len(result)} scenes)")
+            return result
+
+        # 策略 3: 提取最外层 [ ... ]（处理 LLM 在 JSON 前后添加解释文字的情况）
+        start = content.find('[')
+        end = content.rfind(']')
+        if start != -1 and end != -1 and end > start:
+            extracted = content[start:end + 1]
+            result = _try_parse_array(extracted)
+            if result:
+                print(f"  [RB-2] ✅ 从 [...] 范围提取 JSON 数组 ({len(result)} scenes)")
+                return result
+
+            # 策略 3b: 如果提取后仍失败，尝试逐层剥离修复
+            # 有时 LLM 输出的 JSON 数组中间有截断，尝试找到最后一个完整的 }
+            # 然后截断到那里加 ]
+            last_complete = extracted.rfind('}')
+            if last_complete > 0:
+                truncated = extracted[:last_complete + 1] + ']'
+                result = _try_parse_array(truncated)
+                if result:
+                    print(f"  [RB-2] ✅ 截断修复后提取 JSON 数组 ({len(result)} scenes)")
+                    return result
+
+        print(f"  [RB-2] ❌ 所有 JSON 提取策略均失败，content 前 200 字: {content[:200]}")
+        return None
+
+    async def _call_llm_with_retry(self, prompt: str, max_tokens: int = 8631) -> str:
+        """
+        RB-3: 带指数退避重试的 LLM 调用，529 特殊处理。
+
+        - 非 529 错误: 退避 2s, 4s，最多 2 次重试（3 次尝试）
+        - 529 overloaded: 退避 10s, 20s, 40s，最多 3 次重试（4 次尝试）
+        """
+        last_error = None
+        is_529 = False
+        max_retries = 3  # 默认非 529: 3 次尝试
+        llm_start = time.time()
+
+        for retry in range(4):  # 最多 4 次尝试（529 场景）
+            if retry > 0:
+                if is_529:
+                    wait = 10 * (2 ** (retry - 1))  # 10s, 20s, 40s
+                    print(f"    [RB-3] 529 overloaded 重试 {retry}/3，等待 {wait}s...")
+                    logger.warning(f"[ScreenplayWriter] ⚠️ 529 overloaded 重试 {retry}/3，等待 {wait}s")
+                else:
+                    if retry > 2:
+                        break  # 非 529 最多 3 次尝试
+                    wait = 2 ** retry  # 2s, 4s
+                    print(f"    [RB-3] LLM 重试 {retry}/2，等待 {wait}s...")
+                    logger.warning(f"[ScreenplayWriter] ⚠️ LLM 重试 {retry}/2，等待 {wait}s, 上次错误: {last_error}")
+                await asyncio.sleep(wait)
+
+            try:
+                content = None
+                is_529 = False  # 重置
+
+                # 优先使用 Claude Sonnet 4.6
+                if self.claude_client:
+                    try:
+                        call_start = time.time()
+                        response = self.claude_client.messages.create(
+                            model=self.claude_model,
+                            max_tokens=max_tokens,
+                            messages=[{"role": "user", "content": prompt}]
+                        )
+                        content = response.content[0].text
+                        call_elapsed = time.time() - call_start
+                        logger.info(f"[ScreenplayWriter] Claude 响应: {len(content)} chars, 耗时 {call_elapsed:.1f}s")
+                    except Exception as ce:
+                        last_error = ce
+                        # 检测 529 状态码
+                        error_str = str(ce)
+                        if '529' in error_str or 'overloaded' in error_str.lower():
+                            is_529 = True
+                            max_retries = 4
+                            print(f"    [RB-3] ⚠️ Claude 529 overloaded")
+                            logger.warning(f"[ScreenplayWriter] ⚠️ Claude 529 overloaded")
+                        if hasattr(ce, 'status_code') and ce.status_code == 529:
+                            is_529 = True
+                            max_retries = 4
+
+                # Fallback 到 Gemini 3 Flash
+                if content is None and self.gemini_client:
+                    try:
+                        call_start = time.time()
+                        response = await self.gemini_client.aio.models.generate_content(
+                            model=self.gemini_model,
+                            contents=prompt,
+                            config={"max_output_tokens": max_tokens}
+                        )
+                        content = response.text
+                        call_elapsed = time.time() - call_start
+                        logger.info(f"[ScreenplayWriter] Gemini 响应: {len(content)} chars, 耗时 {call_elapsed:.1f}s")
+                    except Exception as ge:
+                        last_error = ge
+                        error_str = str(ge)
+                        if '529' in error_str or 'overloaded' in error_str.lower():
+                            is_529 = True
+                            max_retries = 4
+
+                if content is not None:
+                    return content
+
+            except Exception as e:
+                last_error = e
+
+            # 非 529 且已超出重试次数
+            if not is_529 and retry >= 2:
+                break
+
+        # 所有重试都失败
+        total_elapsed = time.time() - llm_start
+        logger.error(f"[ScreenplayWriter] ❌ LLM 调用失败 ({retry + 1} 次尝试, 总耗时 {total_elapsed:.1f}s): {last_error}")
+        raise ValueError(f"LLM 调用失败（{retry + 1} 次尝试）: {last_error}")
 
     async def _expand_narration_if_needed(self, scene: dict, target_words: int) -> dict:
         """如果narration太短，调用LLM进行扩写"""
@@ -291,7 +828,8 @@ class ScreenplayWriter:
         duration = plot_point.get("estimated_duration_seconds", 30)
 
         # 计算目标数量
-        target_beats = max(3, int(duration / 6))  # 约6秒一个beat
+        # B-3: DEC-011 短篇~18 shots ÷ 6 scenes ≈ 3 beats/scene
+        target_beats = max(2, int(duration / 10))
         target_narration_words = max(80, int(duration * 4))  # 4字/秒
 
         # 前情提要

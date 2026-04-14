@@ -2,12 +2,15 @@
 
 import json
 import asyncio
+import logging
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger("xuhua")
 from app.database import get_db
 from app.models.project import Project
 from app.models.chapter import Chapter
@@ -124,11 +127,20 @@ async def get_generation_status(
             message="暂无生成任务",
         )
 
+    # RB-6: 计算剩余秒数 = max(0, total_estimated - elapsed)
+    estimated_remaining = None
+    if job.estimated_seconds is not None:
+        if job.started_at:
+            elapsed = (datetime.utcnow() - job.started_at).total_seconds()
+            estimated_remaining = max(0, int(job.estimated_seconds - elapsed))
+        else:
+            estimated_remaining = job.estimated_seconds
+
     return ChapterStatus(
         status=job.status,
         stage=job.current_stage,
         progress=job.progress,
-        estimated_remaining_seconds=job.estimated_seconds,
+        estimated_remaining_seconds=estimated_remaining,
         message=job.stage_message,
     )
 
@@ -1195,3 +1207,322 @@ async def generate_audio_and_align_task(
                 chapter.error_message = str(e)
                 chapter.status = "failed"
                 await db.commit()
+
+
+# ============ Shot-level API endpoints (KI-001/002/003) ============
+
+
+class ShotRegenerateRequest(BaseModel):
+    """Shot 重新生成请求（可选 body）"""
+    adjustment_intent: Optional[str] = None  # 用户中文修改意图，如"让她笑"
+
+
+class ShotUpdateRequest(BaseModel):
+    """Shot 可编辑字段更新请求"""
+    narration_segment: Optional[str] = None  # 旁白文字
+    chinese_text: Optional[str] = None       # 对话/气泡文字
+
+
+def _find_shot_in_storyboard(storyboard_data: dict, shot_id: int) -> tuple:
+    """
+    在 storyboard_json 中查找指定 shot_id 的 shot。
+
+    Returns:
+        (shot_dict, shot_index) 或 (None, -1)
+    """
+    shots = storyboard_data.get("shots", [])
+    for idx, shot in enumerate(shots):
+        if shot.get("shot_id") == shot_id:
+            return shot, idx
+    return None, -1
+
+
+async def _get_project_and_chapter(
+    project_id: str,
+    chapter_number: int,
+    user_id: int,
+    db: AsyncSession,
+) -> tuple:
+    """
+    验证项目归属 + 获取 chapter，返回 (project, chapter)。
+    任一验证失败抛 HTTPException。
+    """
+    project_result = await db.execute(
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
+    )
+    project = project_result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    chapter_result = await db.execute(
+        select(Chapter).where(
+            Chapter.project_id == project.id,
+            Chapter.chapter_number == chapter_number,
+        )
+    )
+    chapter = chapter_result.scalar_one_or_none()
+    if not chapter:
+        raise HTTPException(status_code=404, detail="章节不存在")
+
+    return project, chapter
+
+
+@router.post("/{chapter_number}/shots/{shot_id}/regenerate")
+async def regenerate_shot(
+    project_id: str,
+    chapter_number: int,
+    shot_id: int,
+    body: Optional[ShotRegenerateRequest] = None,
+    user_id: int = Depends(verify_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    重新生成单个 shot 的图片（KI-001 修复 + TASK-STAGED-V2 Haiku 集成）
+
+    Phase 2.0 shot 级粒度，使用 generate_shot_image_phase2() + 参考图 + StyleEnforcer。
+
+    两种模式：
+    - 无 adjustment_intent：re-roll（保持原 prompt，重新生成图片）
+    - 有 adjustment_intent：Haiku 4.5 修改 image_prompt 后重新生成
+
+    当 SKIP_IMAGE_GENERATION=true 时：
+    - Haiku prompt 修改照常执行（这是 LLM 调用不是生图）
+    - 只有最后的 Gemini 生图被 skip，返回现有图片路径
+    """
+    from app.config import settings as app_settings
+
+    project, chapter = await _get_project_and_chapter(
+        project_id, chapter_number, user_id, db
+    )
+
+    # 解析 storyboard_json
+    if not chapter.storyboard_json:
+        raise HTTPException(status_code=400, detail="章节没有分镜数据（storyboard_json 为空）")
+
+    try:
+        storyboard_data = json.loads(chapter.storyboard_json)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="分镜数据解析失败")
+
+    shot, shot_idx = _find_shot_in_storyboard(storyboard_data, shot_id)
+    if shot is None:
+        raise HTTPException(status_code=404, detail=f"Shot {shot_id} 不存在")
+
+    # 检查 shot 是否被软删除
+    if shot.get("deleted"):
+        raise HTTPException(status_code=400, detail=f"Shot {shot_id} 已被删除")
+
+    # --- Haiku "调整画面" 逻辑 ---
+    prompt_modified = False
+    modified_prompt_preview = None
+    adjustment_intent = body.adjustment_intent if body else None
+
+    if adjustment_intent:
+        original_prompt = shot.get("image_prompt", "")
+        if not original_prompt:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Shot {shot_id} 没有 image_prompt，无法调整"
+            )
+
+        try:
+            import anthropic
+            from app.prompts.shot_adjustment_prompt import (
+                SHOT_ADJUSTMENT_SYSTEM_PROMPT,
+                build_adjustment_user_prompt,
+            )
+
+            client = anthropic.Anthropic(api_key=app_settings.ANTHROPIC_API_KEY)  # 从 settings 读取
+            response = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=2000,
+                system=SHOT_ADJUSTMENT_SYSTEM_PROMPT,
+                messages=[{
+                    "role": "user",
+                    "content": build_adjustment_user_prompt(
+                        original_prompt, adjustment_intent
+                    ),
+                }],
+            )
+            modified_prompt = response.content[0].text
+
+            # 将修改后的 prompt 写回 storyboard_json（持久化）
+            shot["image_prompt"] = modified_prompt
+            storyboard_data["shots"][shot_idx] = shot
+            chapter.storyboard_json = json.dumps(storyboard_data, ensure_ascii=False)
+            chapter.updated_at = datetime.utcnow()
+            await db.commit()
+
+            prompt_modified = True
+            modified_prompt_preview = modified_prompt[:100]
+
+            logger.info(
+                f"[Shot Regenerate] Haiku modified prompt for shot {shot_id}, "
+                f"intent='{adjustment_intent}', preview='{modified_prompt_preview}'"
+            )
+
+        except Exception as e:
+            # Haiku 调用失败：fallback 到原始 prompt 继续（不阻塞 re-roll）
+            logger.warning(
+                f"[Shot Regenerate] Haiku adjustment failed for shot {shot_id}: {e}. "
+                f"Falling back to original prompt."
+            )
+            prompt_modified = False
+            modified_prompt_preview = None
+
+    # SKIP_IMAGE_GENERATION 模式：Haiku 已执行完毕，只 skip 生图部分
+    if app_settings.SKIP_IMAGE_GENERATION:
+        existing_image_url = shot.get("image_url", "")
+        logger.info(
+            f"[Shot Regenerate] SKIP mode — returning existing image for shot {shot_id}: "
+            f"{existing_image_url}, prompt_modified={prompt_modified}"
+        )
+        return {
+            "status": "completed",
+            "shot_id": shot_id,
+            "imageUrl": existing_image_url,
+            "skipped": True,
+            "prompt_modified": prompt_modified,
+            "modified_prompt_preview": modified_prompt_preview,
+            "message": "SKIP_IMAGE_GENERATION=true, 返回现有图片"
+                + (f"（prompt 已由 Haiku 修改）" if prompt_modified else ""),
+        }
+
+    # 真实生图模式（未来启用）
+    # TODO: 当 SKIP_IMAGE_GENERATION=false 时：
+    # 1. 从 DB 读取角色参考图 + 场景参考图
+    # 2. 调用 image_generator.generate_shot_image_phase2()
+    # 3. 保存新图片，更新 storyboard_json 中的 image_url
+    # 4. 返回新 imageUrl
+
+    # 当前 SKIP_IMAGE_GENERATION 未设置但也不实际生图时，返回框架响应
+    return {
+        "status": "completed",
+        "shot_id": shot_id,
+        "imageUrl": shot.get("image_url", ""),
+        "skipped": False,
+        "prompt_modified": prompt_modified,
+        "modified_prompt_preview": modified_prompt_preview,
+        "message": "Regeneration framework ready; actual image generation pending full pipeline integration"
+            + (f" (prompt modified by Haiku)" if prompt_modified else ""),
+    }
+
+
+@router.patch("/{chapter_number}/shots/{shot_id}")
+async def update_shot(
+    project_id: str,
+    chapter_number: int,
+    shot_id: int,
+    body: ShotUpdateRequest,
+    user_id: int = Depends(verify_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    更新单个 shot 的可编辑字段（KI-002 修复）
+
+    支持更新 narration_segment（旁白文字）和 chinese_text（对话/气泡文字）。
+    将修改写回 chapter.storyboard_json 持久化到 DB。
+    """
+    project, chapter = await _get_project_and_chapter(
+        project_id, chapter_number, user_id, db
+    )
+
+    if not chapter.storyboard_json:
+        raise HTTPException(status_code=400, detail="章节没有分镜数据")
+
+    try:
+        storyboard_data = json.loads(chapter.storyboard_json)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="分镜数据解析失败")
+
+    shot, shot_idx = _find_shot_in_storyboard(storyboard_data, shot_id)
+    if shot is None:
+        raise HTTPException(status_code=404, detail=f"Shot {shot_id} 不存在")
+
+    if shot.get("deleted"):
+        raise HTTPException(status_code=400, detail=f"Shot {shot_id} 已被删除，无法编辑")
+
+    # 更新字段（只更新非 None 值）
+    updated_fields = []
+    if body.narration_segment is not None:
+        shot["narration_segment"] = body.narration_segment
+        updated_fields.append("narration_segment")
+
+    if body.chinese_text is not None:
+        # chinese_text 存在 text_overlay 子结构中
+        if "text_overlay" not in shot:
+            shot["text_overlay"] = {}
+        shot["text_overlay"]["chinese_text"] = body.chinese_text
+        updated_fields.append("chinese_text")
+
+    if not updated_fields:
+        raise HTTPException(status_code=400, detail="没有提供要更新的字段")
+
+    # 写回 storyboard_json
+    storyboard_data["shots"][shot_idx] = shot
+    chapter.storyboard_json = json.dumps(storyboard_data, ensure_ascii=False)
+    chapter.updated_at = datetime.utcnow()
+    await db.commit()
+
+    logger.info(
+        f"[Shot Update] project={project_id} chapter={chapter_number} "
+        f"shot={shot_id} updated_fields={updated_fields}"
+    )
+
+    return {
+        "status": "updated",
+        "shot_id": shot_id,
+        "updated_fields": updated_fields,
+        "shot": shot,
+    }
+
+
+@router.delete("/{chapter_number}/shots/{shot_id}")
+async def delete_shot(
+    project_id: str,
+    chapter_number: int,
+    shot_id: int,
+    user_id: int = Depends(verify_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    软删除单个 shot（KI-003 修复）
+
+    在 storyboard_json 中标记 shot.deleted = true（不物理移除）。
+    被删除的 shot 不参与后续渲染/导出，但可通过恢复接口取消删除。
+    """
+    project, chapter = await _get_project_and_chapter(
+        project_id, chapter_number, user_id, db
+    )
+
+    if not chapter.storyboard_json:
+        raise HTTPException(status_code=400, detail="章节没有分镜数据")
+
+    try:
+        storyboard_data = json.loads(chapter.storyboard_json)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="分镜数据解析失败")
+
+    shot, shot_idx = _find_shot_in_storyboard(storyboard_data, shot_id)
+    if shot is None:
+        raise HTTPException(status_code=404, detail=f"Shot {shot_id} 不存在")
+
+    if shot.get("deleted"):
+        return {"status": "already_deleted", "shot_id": shot_id}
+
+    # 软删除：标记 deleted: true
+    shot["deleted"] = True
+    storyboard_data["shots"][shot_idx] = shot
+    chapter.storyboard_json = json.dumps(storyboard_data, ensure_ascii=False)
+    chapter.updated_at = datetime.utcnow()
+    await db.commit()
+
+    logger.info(
+        f"[Shot Delete] project={project_id} chapter={chapter_number} "
+        f"shot={shot_id} soft-deleted"
+    )
+
+    return {
+        "status": "deleted",
+        "shot_id": shot_id,
+    }

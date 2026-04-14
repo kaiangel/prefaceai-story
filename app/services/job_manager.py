@@ -1,13 +1,18 @@
 """Job management service for async task tracking"""
 
 import json
+import logging
+import time
 from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.database import async_session_maker
 from app.models.job import GenerationJob
 from app.models.chapter import Chapter
 from app.models.project import Project
 from app.services.story_generator import StoryGenerator
+
+logger = logging.getLogger("xuhua")
 
 
 class JobManager:
@@ -86,6 +91,42 @@ class JobManager:
         return result.scalar_one_or_none()
 
 
+async def _update_job_short_session(
+    job_id: int,
+    status: str | None = None,
+    stage: str | None = None,
+    progress: int | None = None,
+    message: str | None = None,
+    estimated_seconds: int | None = None,
+):
+    """B-1: 使用短生命周期 session 更新 job 状态，避免长 pipeline 运行中 MySQL 连接超时"""
+    async with async_session_maker() as db:
+        result = await db.execute(
+            select(GenerationJob).where(GenerationJob.id == job_id)
+        )
+        job = result.scalar_one_or_none()
+        if not job:
+            return
+
+        if status:
+            job.status = status
+            if status == "processing" and not job.started_at:
+                job.started_at = datetime.utcnow()
+            elif status in ("completed", "failed"):
+                job.completed_at = datetime.utcnow()
+
+        if stage:
+            job.current_stage = stage
+        if progress is not None:
+            job.progress = progress
+        if message:
+            job.stage_message = message
+        if estimated_seconds is not None:
+            job.estimated_seconds = estimated_seconds
+
+        await db.commit()
+
+
 async def run_story_generation_task(
     db: AsyncSession,
     job_id: int,
@@ -100,25 +141,69 @@ async def run_story_generation_task(
     previous_summary: str | None = None,
     characters_json: str | None = None,
     confirmed_outline: dict | None = None,
+    project_uuid: str | None = None,
 ):
     """
     Background task to generate story
 
-    This function runs the story generation and updates the database
+    B-1: 所有 DB 操作使用短生命周期 session（async_session_maker），
+    不复用传入的长生命周期 db 参数，避免 LLM 调用间隙 MySQL 连接超时。
     """
-    job_manager = JobManager(db)
+    logger.info(f"[JobManager] ========== run_story_generation_task 开始 ==========")
+    logger.info(f"[JobManager] job_id={job_id}, chapter_id={chapter_id}, style={style}")
+    logger.info(f"[JobManager] idea: {idea[:80]}{'...' if len(idea) > 80 else ''}")
+    logger.info(f"[JobManager] has_confirmed_outline={'是' if confirmed_outline else '否'}, project_uuid={project_uuid}")
+    task_start = time.time()
+
     generator = StoryGenerator()
 
     try:
-        # Update job status to processing
-        await job_manager.update_job_status(
+        # B-5: 根据 scene 数量动态估算总时间
+        scene_count = 6  # 默认短篇
+        if confirmed_outline:
+            scene_count = len(confirmed_outline.get("plot_points", [])) or 6
+        estimated_total = 75 + 45 + (scene_count * 35) + (scene_count * 70) + 30
+        # 约: Stage1=75s + Stage2=45s + Stage3=(scene*35s) + Stage4=(scene*70s) + Stage5=30s
+
+        # RB-5: 根据是否有 confirmed_outline 调整初始消息
+        if confirmed_outline:
+            initial_message = "大纲已确认，正在设计角色..."
+            initial_stage = "character_design"
+        else:
+            initial_message = "正在构思故事大纲..."
+            initial_stage = "story_generation"
+
+        # Update job status to processing (短 session)
+        await _update_job_short_session(
             job_id,
             status="processing",
-            stage="story_generation",
-            progress=10,
-            message="正在生成故事剧本...",
-            estimated_seconds=60,
+            stage=initial_stage,
+            progress=2,
+            message=initial_message,
+            estimated_seconds=estimated_total,
         )
+
+        # B-1: progress_callback 使用短生命周期 session
+        async def progress_callback(stage: str, progress: int, message: str):
+            await _update_job_short_session(
+                job_id, stage=stage, progress=progress, message=message
+            )
+
+        # B-6: checkpoint_callback — 每个 Stage 完成后存中间结果到 chapter 表
+        async def checkpoint_callback(column_name: str, data):
+            """将 stage 中间结果写入 chapter 表的指定列"""
+            try:
+                async with async_session_maker() as short_db:
+                    chapter_result = await short_db.execute(
+                        select(Chapter).where(Chapter.id == chapter_id)
+                    )
+                    chapter = chapter_result.scalar_one_or_none()
+                    if chapter:
+                        setattr(chapter, column_name, json.dumps(data, ensure_ascii=False))
+                        await short_db.commit()
+                        print(f"  [B-6] ✅ 已写入 chapter.{column_name}")
+            except Exception as e:
+                print(f"  [B-6] ⚠️ 写入 chapter.{column_name} 失败: {e}")
 
         # Generate story
         if confirmed_outline:
@@ -131,8 +216,11 @@ async def run_story_generation_task(
                 target_duration_minutes=duration_minutes,
                 language=language,
                 character_count=character_count,
-                generate_images=False,  # 先只生成文本，图像后续阶段处理
+                generate_images=True,
                 confirmed_outline=confirmed_outline,
+                project_uuid=project_uuid,
+                progress_callback=progress_callback,
+                checkpoint_callback=checkpoint_callback,
             )
             result = {"success": True, "data": pipeline_result}
         else:
@@ -149,53 +237,63 @@ async def run_story_generation_task(
             )
 
         if not result["success"]:
-            # Update job as failed
-            await job_manager.update_job_status(
+            task_elapsed = time.time() - task_start
+            logger.error(f"[JobManager] ❌ 生成失败 (耗时 {task_elapsed:.1f}s): {result.get('error', '未知错误')}")
+            # B-1: 使用短 session 更新失败状态
+            await _update_job_short_session(
                 job_id,
                 status="failed",
                 progress=0,
                 message=f"生成失败: {result.get('error', '未知错误')}",
             )
-            # Update chapter status
-            chapter_result = await db.execute(
+            async with async_session_maker() as short_db:
+                chapter_result = await short_db.execute(
+                    select(Chapter).where(Chapter.id == chapter_id)
+                )
+                chapter = chapter_result.scalar_one()
+                chapter.status = "failed"
+                chapter.error_message = result.get("error", "未知错误")
+                await short_db.commit()
+            return
+
+        # B-1: 使用短 session 更新 chapter 数据
+        story_data = result["data"]
+        async with async_session_maker() as short_db:
+            chapter_result = await short_db.execute(
                 select(Chapter).where(Chapter.id == chapter_id)
             )
             chapter = chapter_result.scalar_one()
-            chapter.status = "failed"
-            chapter.error_message = result.get("error", "未知错误")
-            await db.commit()
-            return
 
-        # Update chapter with generated story
-        story_data = result["data"]
-        chapter_result = await db.execute(
-            select(Chapter).where(Chapter.id == chapter_id)
-        )
-        chapter = chapter_result.scalar_one()
-
-        chapter.status = "generating_images"  # Ready for next phase
-        chapter.full_script = json.dumps(story_data, ensure_ascii=False)
-        chapter.summary = story_data.get("summary", "")
-        chapter.characters_json = json.dumps(
-            story_data.get("characters", []), ensure_ascii=False
-        )
-        chapter.scenes_json = json.dumps(
-            story_data.get("scenes", []), ensure_ascii=False
-        )
-
-        # Update project title if first chapter
-        if chapter_number == 1 and story_data.get("title"):
-            project_result = await db.execute(
-                select(Project).where(Project.id == chapter.project_id)
+            chapter.status = "completed"
+            chapter.full_script = json.dumps(story_data, ensure_ascii=False)
+            stage_results = story_data.get("stage_results", {})
+            summary_data = story_data.get("summary", {})
+            chapter.summary = summary_data.get("title", "") if isinstance(summary_data, dict) else str(summary_data)
+            chapter.characters_json = json.dumps(
+                stage_results.get("characters", {}).get("characters", []), ensure_ascii=False
             )
-            project = project_result.scalar_one()
-            if project.title == "未命名项目":
-                project.title = story_data["title"]
+            chapter.scenes_json = json.dumps(
+                stage_results.get("screenplay", {}).get("scenes", []), ensure_ascii=False
+            )
+            chapter.storyboard_json = json.dumps(
+                stage_results.get("storyboard", {}), ensure_ascii=False
+            )
 
-        await db.commit()
+            # Update project title if first chapter
+            if chapter_number == 1 and story_data.get("title"):
+                project_result = await short_db.execute(
+                    select(Project).where(Project.id == chapter.project_id)
+                )
+                project = project_result.scalar_one()
+                if project.title == "未命名项目":
+                    project.title = story_data["title"]
 
-        # Update job as completed
-        await job_manager.update_job_status(
+            await short_db.commit()
+
+        # Update job as completed (短 session)
+        task_elapsed = time.time() - task_start
+        logger.info(f"[JobManager] ✅ 生成任务完成 (总耗时 {task_elapsed:.1f}s)")
+        await _update_job_short_session(
             job_id,
             status="completed",
             stage="story_generation",
@@ -204,18 +302,24 @@ async def run_story_generation_task(
         )
 
     except Exception as e:
-        # Handle unexpected errors
-        await job_manager.update_job_status(
+        task_elapsed = time.time() - task_start
+        logger.error(f"[JobManager] ❌ 系统异常 (耗时 {task_elapsed:.1f}s): {e}")
+        # B-1: 异常处理也用短 session
+        await _update_job_short_session(
             job_id,
             status="failed",
             progress=0,
             message=f"系统错误: {str(e)}",
         )
-        chapter_result = await db.execute(
-            select(Chapter).where(Chapter.id == chapter_id)
-        )
-        chapter = chapter_result.scalar_one_or_none()
-        if chapter:
-            chapter.status = "failed"
-            chapter.error_message = str(e)
-            await db.commit()
+        try:
+            async with async_session_maker() as short_db:
+                chapter_result = await short_db.execute(
+                    select(Chapter).where(Chapter.id == chapter_id)
+                )
+                chapter = chapter_result.scalar_one_or_none()
+                if chapter:
+                    chapter.status = "failed"
+                    chapter.error_message = str(e)
+                    await short_db.commit()
+        except Exception:
+            pass  # 防止异常处理中再次失败导致未处理异常

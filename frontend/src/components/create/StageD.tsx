@@ -12,16 +12,27 @@ import {
   X,
   Image as ImageIcon,
   Sparkles,
+  Loader2,
+  Wand2,
 } from "lucide-react";
 import { useCreate } from "@/contexts/CreateContext";
 import { BGM_TRACKS } from "@/types/create";
+import { apiFetch, getStoredToken } from "@/lib/api";
+import { useToast } from "@/components/ui/Toast";
 
 export default function StageD() {
   const { state, dispatch } = useCreate();
+  const { toast } = useToast();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [editingShotId, setEditingShotId] = useState<number | null>(null);
   const [showBGM, setShowBGM] = useState(false);
+  const [regeneratingId, setRegeneratingId] = useState<number | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [adjustmentText, setAdjustmentText] = useState("");
+  const [adjusting, setAdjusting] = useState(false);
 
+  const token = getStoredToken();
   const shots = state.shots;
   const currentShot = shots[currentIndex];
 
@@ -30,14 +41,109 @@ export default function StageD() {
   const handlePrev = () => setCurrentIndex((i) => Math.max(0, i - 1));
   const handleNext = () => setCurrentIndex((i) => Math.min(shots.length - 1, i + 1));
 
-  const handleRegenerate = (shotId: number) => {
+  // KI-001: Regenerate shot — call POST API then update imageUrl
+  const handleRegenerate = async (shotId: number) => {
+    setRegeneratingId(shotId);
     dispatch({ type: "REGENERATE_SHOT", payload: shotId });
+    try {
+      const result = await apiFetch<{
+        status: string;
+        imageUrl: string;
+        shot_id: number;
+      }>(
+        `/projects/${state.projectId}/chapters/1/shots/${shotId}/regenerate`,
+        { method: "POST" },
+        token
+      );
+      dispatch({
+        type: "REGENERATE_SHOT_SUCCESS",
+        payload: { shotId, imageUrl: result.imageUrl },
+      });
+      toast("success", "重新生成完成");
+    } catch {
+      toast("error", "重新生成失败，请重试");
+    } finally {
+      setRegeneratingId(null);
+    }
   };
 
-  const handleDelete = (shotId: number) => {
-    dispatch({ type: "DELETE_SHOT", payload: shotId });
-    if (currentIndex >= shots.length - 1 && currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
+  // Adjust shot image — user provides Chinese intent, backend uses Haiku to modify image_prompt then regenerate
+  const handleAdjust = async () => {
+    if (!adjustmentText.trim()) return;
+    setAdjusting(true);
+    dispatch({ type: "REGENERATE_SHOT", payload: currentShot.shotId });
+    try {
+      const result = await apiFetch<{
+        status: string;
+        imageUrl: string;
+        shot_id: number;
+        prompt_modified: boolean;
+      }>(
+        `/projects/${state.projectId}/chapters/1/shots/${currentShot.shotId}/regenerate`,
+        {
+          method: "POST",
+          body: JSON.stringify({ adjustment_intent: adjustmentText.trim() }),
+        },
+        token
+      );
+      dispatch({
+        type: "REGENERATE_SHOT_SUCCESS",
+        payload: { shotId: currentShot.shotId, imageUrl: result.imageUrl },
+      });
+      toast("success", "画面已调整");
+      setAdjustmentText("");
+    } catch {
+      toast("error", "调整失败，请重试");
+    } finally {
+      setAdjusting(false);
+    }
+  };
+
+  // KI-002: Save edited text overlay (chinese_text) — call PATCH API to persist to DB
+  const handleSaveEdit = async () => {
+    if (!editingShotId) return;
+    const shot = state.shots.find((s) => s.shotId === editingShotId);
+    if (!shot) return;
+
+    setSavingEdit(true);
+    try {
+      await apiFetch(
+        `/projects/${state.projectId}/chapters/1/shots/${editingShotId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            chinese_text: shot.chineseText.join("\n"),
+          }),
+        },
+        token
+      );
+      toast("success", "保存成功");
+    } catch {
+      toast("error", "保存失败，请重试");
+    } finally {
+      setSavingEdit(false);
+      setEditingShotId(null);
+    }
+  };
+
+  // KI-003: Delete shot — call DELETE API first, then remove from state
+  const handleDelete = async (shotId: number) => {
+    setDeletingId(shotId);
+    try {
+      await apiFetch(
+        `/projects/${state.projectId}/chapters/1/shots/${shotId}`,
+        { method: "DELETE" },
+        token
+      );
+      dispatch({ type: "DELETE_SHOT", payload: shotId });
+      if (currentIndex >= shots.length - 1 && currentIndex > 0) {
+        setCurrentIndex(currentIndex - 1);
+      }
+      toast("success", "已删除");
+    } catch {
+      toast("error", "删除失败，请重试");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -85,7 +191,14 @@ export default function StageD() {
           {/* Image Area */}
           <div className="bg-bg-primary flex items-center justify-center relative">
             <div className="w-full max-w-sm mx-auto aspect-[2/3]">
-              {currentShot.imageUrl ? (
+              {regeneratingId === currentShot.shotId || adjusting ? (
+                <div className="w-full h-full flex flex-col items-center justify-center">
+                  <Loader2 className="w-12 h-12 text-brand-primary/50 animate-spin mb-2" />
+                  <span className="text-xs text-text-muted">
+                    {adjusting ? "正在调整画面..." : "正在重新生成..."}
+                  </span>
+                </div>
+              ) : currentShot.imageUrl ? (
                 <img
                   src={currentShot.imageUrl}
                   alt={`Shot ${currentShot.shotId}`}
@@ -120,49 +233,66 @@ export default function StageD() {
 
           {/* Shot Info */}
           <div className="p-4 space-y-3">
-            {/* Narration */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs text-text-muted">旁白文字</label>
+            {/* Text Overlay (editable) — hidden when textType is "none" (empty shot) */}
+            {currentShot.textType !== "none" && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-text-muted">画面文字</label>
+                  {editingShotId === currentShot.shotId ? (
+                    <button
+                      onClick={handleSaveEdit}
+                      disabled={savingEdit}
+                      className="text-xs text-brand-primary flex items-center gap-1 disabled:opacity-50"
+                    >
+                      {savingEdit ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Check className="w-3 h-3" />
+                      )}
+                      {savingEdit ? "保存中..." : "完成"}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setEditingShotId(currentShot.shotId)}
+                      className="text-xs text-text-muted hover:text-text-secondary"
+                    >
+                      编辑
+                    </button>
+                  )}
+                </div>
                 {editingShotId === currentShot.shotId ? (
-                  <button
-                    onClick={() => setEditingShotId(null)}
-                    className="text-xs text-brand-primary flex items-center gap-1"
-                  >
-                    <Check className="w-3 h-3" />
-                    完成
-                  </button>
+                  <textarea
+                    value={currentShot.chineseText.join("\n")}
+                    onChange={(e) =>
+                      dispatch({
+                        type: "UPDATE_SHOT_TEXT",
+                        payload: {
+                          shotId: currentShot.shotId,
+                          field: "chineseText",
+                          value: e.target.value.split("\n"),
+                        },
+                      })
+                    }
+                    rows={3}
+                    className="w-full bg-bg-primary border border-white/10 rounded-lg px-3 py-2 text-text-primary text-sm resize-none focus:outline-none focus:border-brand-primary/50"
+                  />
                 ) : (
-                  <button
-                    onClick={() => setEditingShotId(currentShot.shotId)}
-                    className="text-xs text-text-muted hover:text-text-secondary"
-                  >
-                    编辑
-                  </button>
+                  <p className="text-sm text-text-secondary leading-relaxed">
+                    {currentShot.chineseText.join("\n")}
+                  </p>
                 )}
               </div>
-              {editingShotId === currentShot.shotId ? (
-                <textarea
-                  value={currentShot.narrationSegment}
-                  onChange={(e) =>
-                    dispatch({
-                      type: "UPDATE_SHOT_TEXT",
-                      payload: {
-                        shotId: currentShot.shotId,
-                        field: "narrationSegment",
-                        value: e.target.value,
-                      },
-                    })
-                  }
-                  rows={3}
-                  className="w-full bg-bg-primary border border-white/10 rounded-lg px-3 py-2 text-text-primary text-sm resize-none focus:outline-none focus:border-brand-primary/50"
-                />
-              ) : (
-                <p className="text-sm text-text-secondary leading-relaxed">
+            )}
+
+            {/* Narration (read-only) */}
+            {currentShot.narrationSegment && (
+              <div>
+                <label className="text-xs text-text-muted mb-1 block">旁白（只读）</label>
+                <p className="text-sm text-text-secondary/70 leading-relaxed">
                   {currentShot.narrationSegment}
                 </p>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Shot Meta */}
             <div className="flex items-center gap-3 text-[11px] sm:text-[10px] text-text-muted">
@@ -171,21 +301,72 @@ export default function StageD() {
               <span>场景: {currentShot.sceneId}</span>
             </div>
 
+            {/* Adjust Image */}
+            <div className="bg-bg-secondary rounded-xl border border-white/5 p-3 space-y-2">
+              <div className="flex items-center gap-1.5 text-xs text-text-secondary font-medium">
+                <Wand2 className="w-3.5 h-3.5 text-brand-primary" />
+                调整画面
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={adjustmentText}
+                  onChange={(e) => setAdjustmentText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.nativeEvent.isComposing) handleAdjust();
+                  }}
+                  placeholder='输入你想要的调整，如"让她笑"...'
+                  disabled={adjusting || regeneratingId !== null}
+                  className="flex-1 bg-bg-primary border border-white/10 rounded-lg px-3 py-1.5 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-brand-primary/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <button
+                  onClick={handleAdjust}
+                  disabled={adjusting || regeneratingId !== null || !adjustmentText.trim()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-primary/10 border border-brand-primary/30 text-brand-primary text-xs font-medium hover:bg-brand-primary/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {adjusting ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Wand2 className="w-3 h-3" />
+                  )}
+                  {adjusting ? "调整中..." : "确认调整"}
+                </button>
+              </div>
+              <p className="text-[10px] text-text-muted">
+                提示：AI 会根据你的描述修改画面内容
+              </p>
+            </div>
+
             {/* Actions */}
             <div className="flex gap-2 pt-1">
-              <button
-                onClick={() => handleRegenerate(currentShot.shotId)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-white/10 text-text-muted hover:text-text-secondary hover:border-white/20 text-xs transition-colors"
-              >
-                <RefreshCw className="w-3 h-3" />
-                重新生成
-              </button>
+              <div className="flex-1 flex flex-col">
+                <button
+                  onClick={() => handleRegenerate(currentShot.shotId)}
+                  disabled={regeneratingId === currentShot.shotId || adjusting}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-white/10 text-text-muted hover:text-text-secondary hover:border-white/20 text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {regeneratingId === currentShot.shotId ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-3 h-3" />
+                  )}
+                  {regeneratingId === currentShot.shotId ? "生成中..." : "重新生成"}
+                </button>
+                <span className="text-[10px] text-text-muted text-center mt-1">
+                  保持相同场景，产生不同构图变化
+                </span>
+              </div>
               <button
                 onClick={() => handleDelete(currentShot.shotId)}
-                className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg border border-white/10 text-text-muted hover:text-red-400 hover:border-red-400/30 text-xs transition-colors"
+                disabled={deletingId === currentShot.shotId || adjusting || regeneratingId !== null}
+                className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg border border-white/10 text-text-muted hover:text-red-400 hover:border-red-400/30 text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed self-start"
               >
-                <Trash2 className="w-3 h-3" />
-                删除
+                {deletingId === currentShot.shotId ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Trash2 className="w-3 h-3" />
+                )}
+                {deletingId === currentShot.shotId ? "删除中..." : "删除"}
               </button>
             </div>
           </div>
