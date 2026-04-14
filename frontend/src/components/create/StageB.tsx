@@ -99,13 +99,23 @@ export default function StageB() {
               description: c.description,
               personality: c.personality,
             })),
-            plot_points: outline.plotPoints
-              .sort((a, b) => a.order - b.order)
-              .map(p => ({
-                description: p.description,
-                original_index: parseInt(p.id.replace("pp_", "")) - 1,
-              })),
-            selected_ending: outline.endings.find(e => e.isSelected)?.description || "",
+            plot_points: (() => {
+              const sortedPoints = outline.plotPoints
+                .sort((a, b) => a.order - b.order)
+                .map(p => ({
+                  description: p.description,
+                  original_index: parseInt(p.id.replace("pp_", "")) - 1,
+                }));
+              // R6-2: Append selected_ending as a new plot_point at the end (do not replace any existing point)
+              const selectedEndingDesc = outline.endings.find(e => e.isSelected)?.description || "";
+              if (selectedEndingDesc) {
+                sortedPoints.push({
+                  description: selectedEndingDesc,
+                  original_index: sortedPoints.length,
+                });
+              }
+              return sortedPoints;
+            })(),
             mood: outline.mood,
           },
         }),
