@@ -40,8 +40,45 @@ from app.services.shot_validator import ShotValidator
 from app.services.pipeline_schemas import (
     validate_characters,
     validate_storyboard,
+    validate_outline,
+    validate_screenplay,
     PipelineSchemaError,
 )
+
+
+class PipelineCostLimitExceeded(Exception):
+    """Pipeline API 成本超过单次上限时抛出"""
+    pass
+
+
+class PipelineCostTracker:
+    """Pipeline 运行期间的 API 成本追踪"""
+
+    def __init__(self, cost_limit: float = 10.0):
+        self.cost_limit = cost_limit  # 单次 Pipeline 上限（默认 $10）
+        self.total_cost = 0.0
+        self.calls = []  # 记录每次 API 调用
+
+    def add_cost(self, service: str, cost: float, detail: str = "") -> None:
+        """
+        记录一次 API 调用费用。
+
+        Args:
+            service: 服务名称（如 "sonnet", "gemini_nb2"）
+            cost: 本次调用费用（美元）
+            detail: 调用详情（如 "Stage 1", "Shot 3"）
+
+        Raises:
+            PipelineCostLimitExceeded: 累计成本超过上限时抛出
+        """
+        self.total_cost += cost
+        self.calls.append({"service": service, "cost": cost, "detail": detail})
+        if self.total_cost > self.cost_limit:
+            raise PipelineCostLimitExceeded(
+                f"Pipeline 成本已超过上限 ${self.cost_limit}! "
+                f"当前: ${self.total_cost:.2f}, "
+                f"最近调用: {detail}"
+            )
 
 
 R8_DATA_DIR = "test_output/manualtest/e2e_regression_r8/20260316_145613/story_A/20260316_145614"
@@ -135,6 +172,9 @@ class Phase2PipelineOrchestrator:
         logger.info(f"[Pipeline] has_confirmed_outline={'是' if confirmed_outline else '否'}, generate_images={generate_images}")
 
         try:
+            # 成本熔断: 单次 Pipeline 成本上限
+            cost_tracker = PipelineCostTracker(cost_limit=settings.PIPELINE_COST_LIMIT)
+
             # RB-5 + B-7: 启动空白期 — 根据是否有 confirmed_outline 调整初始消息
             if progress_callback:
                 if confirmed_outline:
@@ -161,6 +201,8 @@ class Phase2PipelineOrchestrator:
                     language=language,
                     character_count=character_count
                 )
+                # 成本计数: Stage 1 Sonnet 调用（每次 $0.05 保守估算）
+                cost_tracker.add_cost("sonnet", 0.05, "Stage 1")
 
             self.stage_results["outline"] = outline
 
@@ -182,6 +224,9 @@ class Phase2PipelineOrchestrator:
 
             self._save_json(project_dir, "1_outline.json", outline)
 
+            # HE-BACKEND-1: Schema 验证 — Stage 1 输出（大纲完整性检查）
+            validate_outline(outline, "Stage 1 -> 2")
+
             print(f"✅ Stage 1 完成: {outline.get('title', 'N/A')}")
             # B-5: Stage 1 = 0→5%
             if progress_callback:
@@ -196,6 +241,8 @@ class Phase2PipelineOrchestrator:
             print(f"{'='*40}")
 
             characters = await self.character_designer.design(outline)
+            # 成本计数: Stage 2 Sonnet 调用
+            cost_tracker.add_cost("sonnet", 0.05, "Stage 2")
 
             self.stage_results["characters"] = characters
             self._save_json(project_dir, "2_characters.json", characters)
@@ -267,9 +314,14 @@ class Phase2PipelineOrchestrator:
                 family_relationships=outline.get("family_relationships", []),
                 progress_callback=progress_callback,
             )
+            # 成本计数: Stage 3 Sonnet 调用
+            cost_tracker.add_cost("sonnet", 0.05, "Stage 3")
 
             self.stage_results["screenplay"] = screenplay
             self._save_json(project_dir, "3_screenplay.json", screenplay)
+
+            # HE-BACKEND-1: Schema 验证 — Stage 3 输出（剧本完整性检查）
+            validate_screenplay(screenplay, "Stage 3 -> 4")
 
             # B-6: Stage 3 完成后存中间结果到 chapter 表
             if checkpoint_callback:
@@ -300,6 +352,8 @@ class Phase2PipelineOrchestrator:
                 family_relationships=outline.get("family_relationships", []),
                 progress_callback=progress_callback,
             )
+            # 成本计数: Stage 4 Sonnet 调用
+            cost_tracker.add_cost("sonnet", 0.05, "Stage 4")
 
             self.stage_results["storyboard"] = storyboard
             self._save_json(project_dir, "4_storyboard.json", storyboard)
@@ -383,6 +437,8 @@ class Phase2PipelineOrchestrator:
                             image_generator=self.image_generator,
                             seed_image=seed,
                         )
+                        # 成本计数: portrait + fullbody = 2 张参考图（Gemini Flash 生成）
+                        cost_tracker.add_cost("gemini_nb2", 0.067 * 2, f"Ref {char_id} portrait+fullbody")
                         print("✅")
                     except Exception as e:
                         print(f"❌ {e}")
@@ -432,6 +488,11 @@ class Phase2PipelineOrchestrator:
                             if img:
                                 img.save(os.path.join(scene_refs_dir, f"{anchor_key}.png"))
 
+                        # 成本计数: 场景参考图（每张 $0.067，interior + exterior = 2 张/location）
+                        cost_tracker.add_cost(
+                            "gemini_nb2", 0.067 * len(scene_anchors),
+                            f"Scene refs {len(scene_anchors)} images"
+                        )
                         print(f"✅ 场景参考图生成完成: {len(scene_anchors)}张")
                     except Exception as e:
                         print(f"⚠️ 场景参考图生成失败: {e}")
@@ -559,6 +620,9 @@ class Phase2PipelineOrchestrator:
                     # 处理最终结果
                     result = best_result
                     if result.get("success"):
+                        # 成本计数: NB2 图像生成（$0.067/张，官方定价）
+                        cost_tracker.add_cost("gemini_nb2", 0.067, f"Shot {shot_id}")
+
                         # 保存无文字版图像
                         image_path = os.path.join(images_dir, f"shot_{shot_id:02d}.png")
                         result["pil_image"].save(image_path)

@@ -481,3 +481,25 @@ Shot生成流程: /docs/phase2_shot_generation_flow.md
 5. 然后告诉我：今天你打算做什么，有什么风险点需要注意？
 
 记住：你不是在"写代码"，你是在**守护让普通人能做电影的技术基座**。
+
+---
+
+## 可修改文件白名单
+
+以下是本角色被允许修改的文件范围，超出范围需先向 PM 确认：
+
+**代码文件**:
+- `app/**/*.py`
+- `tests/test_*.py`
+
+**文档文件**:
+- `.claude/agents/backend-progress/*`
+- `.team-brain/TEAM_CHAT.md`（仅追加）
+
+**禁止修改**:
+- 其他角色的 progress 文件（`frontend-progress/`、`tester-progress/`、`ai-ml-progress/`、`devops-progress/`、`resonance-progress/`、`pm-progress/` 等）
+- `.team-brain/status/`（由 PM 维护）
+- `.team-brain/decisions/`（由 PM 维护）
+- `.team-brain/handoffs/`（由 PM 维护）
+- `.team-brain/team_ben/`（Ben 团队领域，只读）
+- `frontend/`（前端领域，交给 @frontend）

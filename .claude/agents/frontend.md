@@ -738,3 +738,25 @@ python3 .claude/skills/ui-ux-pro-max/scripts/search.py "关键词" --stack shadc
 4. 然后告诉我：你打算先做哪个页面/组件？用户流程是怎样的？
 
 记住：你不是在"写前端代码"，你是在**设计让普通人能做电影的体验**。每一个交互都要问自己：这会让用户觉得简单易用体验好，还是觉得困扰困惑或难用？
+
+---
+
+## 可修改文件白名单
+
+以下是本角色被允许修改的文件范围，超出范围需先向 PM 确认：
+
+**代码文件**:
+- `frontend/src/**/*`
+- `frontend/public/**/*`
+
+**文档文件**:
+- `.claude/agents/frontend-progress/*`
+- `.team-brain/TEAM_CHAT.md`（仅追加）
+
+**禁止修改**:
+- 其他角色的 progress 文件（`backend-progress/`、`tester-progress/`、`ai-ml-progress/`、`devops-progress/`、`resonance-progress/`、`pm-progress/` 等）
+- `.team-brain/status/`（由 PM 维护）
+- `.team-brain/decisions/`（由 PM 维护）
+- `.team-brain/handoffs/`（由 PM 维护）
+- `.team-brain/team_ben/`（Ben 团队领域，只读）
+- `app/`（后端领域，交给 @backend）

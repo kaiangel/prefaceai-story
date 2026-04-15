@@ -416,8 +416,9 @@ class ImageGenerator:
     """
 
     # 模型配置
-    FAST_MODEL = "gemini-2.5-flash-image"  # 快速模型（主用）
-    NB2_MODEL = "gemini-3.1-flash-image-preview"  # Nano Banana 2（主力生图模型）
+    # FAST_MODEL 已废弃 — T23 统一使用 NB2，保留注释供历史参考
+    # FAST_MODEL = "gemini-2.5-flash-image"
+    NB2_MODEL = "gemini-3.1-flash-image-preview"  # Nano Banana 2（主力生图模型，参考图+shot 统一使用）
 
     # 重试配置
     MAX_RETRIES = 3

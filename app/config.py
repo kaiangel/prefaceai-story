@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     # Prompt 格式：b_prime（默认，省 46% token）| legacy（A 格式原版）
     PROMPT_FORMAT: str = "b_prime"
 
+    # 单次 Pipeline 成本上限（美元），超过时中止并抛 PipelineCostLimitExceeded
+    PIPELINE_COST_LIMIT: float = 10.0
+
     # ===== 分镜拆分配置 =====
     SHOT_MAX_NARRATION_LENGTH: int = 60    # 超过此字数的scene需要拆分
     SHOT_TARGET_LENGTH: int = 40           # 目标每个shot的字数

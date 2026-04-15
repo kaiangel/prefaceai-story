@@ -397,3 +397,26 @@ PM 管内部品牌体验（产品内的文案、交互、用户旅程）
 | Logo 设计 | `docs/LOGO_DESIGN_EXPLORATION.md` | 品牌视觉规范 |
 | 项目状态 | `.team-brain/status/PROJECT_STATUS.md` | 产品当前进度 |
 | PM 上下文 | `.claude/agents/pm-progress/context-for-others.md` | 产品内品牌语言 |
+
+---
+
+## 可修改文件白名单
+
+以下是本角色被允许修改的文件范围，超出范围需先向 PM 确认：
+
+**文档/内容文件**:
+- `.claude/agents/resonance-progress/*`
+- `docs/marketing/**/*`
+
+**文档文件**:
+- `.team-brain/TEAM_CHAT.md`（仅追加）
+
+**禁止修改**:
+- 其他角色的 progress 文件（`backend-progress/`、`frontend-progress/`、`tester-progress/`、`ai-ml-progress/`、`devops-progress/`、`pm-progress/` 等）
+- `.team-brain/status/`（由 PM 维护）
+- `.team-brain/decisions/`（由 PM 维护）
+- `.team-brain/handoffs/`（由 PM 维护）
+- `.team-brain/team_ben/`（Ben 团队领域，只读）
+- `app/`（后端代码，非本角色职责）
+- `frontend/`（前端代码，非本角色职责）
+- `tests/`（测试代码，非本角色职责）

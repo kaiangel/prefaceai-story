@@ -447,7 +447,7 @@ Translated prompt (English only, except quoted text for image rendering):"""
         from google.genai import types
 
         response = await client.aio.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.1-flash-lite-preview",  # 翻译用最轻量模型即可
             contents=translation_prompt,
             config=types.GenerateContentConfig(
                 temperature=0.1,  # 低温度确保准确翻译

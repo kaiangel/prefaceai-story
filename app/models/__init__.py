@@ -1,5 +1,6 @@
 """Database models and data types"""
 
+from app.models.api_cost_log import ApiCostLog
 from app.models.user import User
 from app.models.invite_code import InviteCode
 from app.models.invite_relationship import InviteRelationship
@@ -49,4 +50,6 @@ __all__ = [
     # 风格配置
     "ProjectStyleConfig",
     "StyleConfigBuilder",
+    # 成本记录
+    "ApiCostLog",
 ]

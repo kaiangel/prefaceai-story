@@ -3,7 +3,8 @@ Pipeline 阶段间数据 Schema - Harness Engineering 的 Sensor
 确保阶段间数据传递的格式正确性
 
 覆盖范围:
-- Stage 1 → Stage 2: 角色数据 (CharacterSchema)
+- Stage 1 → Stage 2: 大纲数据 (OutlineSchema) + 角色数据 (CharacterSchema)
+- Stage 3 → Stage 4: 剧本数据 (ScreenplaySchema)
 - Stage 4 → Stage 5: 分镜数据 (ShotSchema)
 
 校验失败时抛出 PipelineSchemaError，Pipeline 中止，
@@ -27,6 +28,123 @@ class PipelineSchemaError(Exception):
         super().__init__(
             f"[Pipeline] Schema 验证失败 ({stage_transition}): {errors}"
         )
+
+
+# ============================================================
+# Stage 1 输出 Schema: StoryOutlineGenerator → Stage 2
+# ============================================================
+
+
+class OutlineCharacterOverview(BaseModel):
+    """角色概览 — Stage 1 大纲中的 characters_overview 子项"""
+
+    name_suggestion: Optional[str] = None
+    name_en: Optional[str] = None
+    role: Optional[str] = None
+    description: str
+    personality: Optional[str] = None
+    archetype: Optional[str] = None
+    age_range: Optional[str] = None
+    gender: Optional[str] = None
+    family_role: Optional[str] = None
+    emotional_journey: Optional[str] = None
+
+    @field_validator("description")
+    @classmethod
+    def description_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("角色 description 不能为空")
+        return v
+
+
+class OutlinePlotPoint(BaseModel):
+    """情节节点 — Stage 1 大纲中的 plot_points 子项"""
+
+    beat: Optional[str] = None
+    description: str
+    estimated_duration_seconds: Optional[float] = None
+
+    @field_validator("description")
+    @classmethod
+    def description_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("plot_point description 不能为空")
+        return v
+
+
+class OutlineLocation(BaseModel):
+    """场景位置 — Stage 1 大纲中的 unique_locations 子项"""
+
+    location_id: str
+    display_name: Optional[str] = None
+    description_zh: Optional[str] = None
+    location_type: Optional[str] = None
+    time_of_day: Optional[str] = None
+    weather: Optional[str] = None
+    atmosphere: Optional[str] = None
+    interior_description: Optional[str] = None
+    exterior_description: Optional[str] = None
+    key_visual_elements: Optional[List[str]] = None
+    signage_text: Optional[str] = None
+
+
+class OutlineSchema(BaseModel):
+    """
+    Stage 1 大纲完整 Schema — StoryOutlineGenerator 输出
+
+    必需字段: title, title_en, logline, summary,
+    characters_overview (min 1), plot_points (min 3), unique_locations (min 1)
+    """
+
+    title: str
+    title_en: str
+    logline: str
+    summary: str
+    ending_options: Optional[List[Dict[str, Any]]] = None
+    mood: Optional[str] = None
+    emotional_arc: Optional[Dict[str, Any]] = None
+    narrative_pace: Optional[str] = None
+    visual_tone: Optional[Dict[str, Any]] = None
+    target_metrics: Optional[Dict[str, Any]] = None
+    characters_overview: List[OutlineCharacterOverview] = Field(min_length=1)
+    family_relationships: Optional[List[Dict[str, Any]]] = None
+    plot_points: List[OutlinePlotPoint] = Field(min_length=3)
+    unique_locations: List[OutlineLocation] = Field(min_length=1)
+
+    @field_validator("title")
+    @classmethod
+    def title_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("title 不能为空")
+        return v
+
+    @field_validator("title_en")
+    @classmethod
+    def title_en_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("title_en 不能为空")
+        return v
+
+    @field_validator("logline")
+    @classmethod
+    def logline_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("logline 不能为空")
+        return v
+
+    @field_validator("summary")
+    @classmethod
+    def summary_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("summary 不能为空")
+        return v
+
+    @field_validator("characters_overview")
+    @classmethod
+    def characters_not_empty_list(cls, v: List[OutlineCharacterOverview]) -> List[OutlineCharacterOverview]:
+        if not v:
+            raise ValueError("characters_overview 不能为空列表")
+        return v
 
 
 # ============================================================
@@ -97,6 +215,88 @@ class CharactersOutput(BaseModel):
     """Stage 2 完整输出"""
 
     characters: List[CharacterSchema] = Field(min_length=1)
+
+
+# ============================================================
+# Stage 3 输出 Schema: ScreenplayWriter → Stage 4
+# ============================================================
+
+
+class ActionBeat(BaseModel):
+    """动作节拍 — Stage 3 剧本中 scene.action_beats 子项"""
+
+    beat_id: str
+    action: Optional[str] = None
+    duration_hint: Optional[float] = None
+    emotional_note: Optional[str] = None
+
+    @field_validator("beat_id")
+    @classmethod
+    def beat_id_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("beat_id 不能为空")
+        return v
+
+
+class DialogueBeat(BaseModel):
+    """对话节拍 — Stage 3 剧本中 scene.dialogue_beats 子项"""
+
+    beat_id: str
+    type: Optional[str] = None
+    speaker: Optional[str] = None
+    line: Optional[str] = None
+    emotion: Optional[str] = None
+
+
+class SceneAtmosphere(BaseModel):
+    """场景氛围"""
+
+    mood: Optional[str] = None
+    sound_design_hint: Optional[str] = None
+    temperature_feel: Optional[str] = None
+
+
+class SceneSchema(BaseModel):
+    """
+    单个场景的完整 Schema — Stage 3 ScreenplayWriter 输出的 scene
+
+    必需: scene_id, location_id, characters_in_scene (list), action_beats (min 1)
+    每个 action_beat 必须有 beat_id
+    """
+
+    scene_id: int
+    scene_heading: Optional[str] = None
+    plot_point: Optional[str] = None
+    location_id: str
+    time_of_day: Optional[str] = None
+    weather: Optional[str] = None
+    lighting_condition: Optional[str] = None
+    atmosphere: Optional[Union[SceneAtmosphere, Dict[str, Any]]] = None
+    characters_in_scene: List[str] = Field(default_factory=list)
+    action_beats: List[ActionBeat] = Field(min_length=1)
+    dialogue_beats: Optional[List[DialogueBeat]] = None
+    narration: str = ""
+    narration_tone: Optional[str] = None
+    narration_pace: Optional[str] = None
+
+
+class ScreenplaySchema(BaseModel):
+    """
+    Stage 3 完整输出 — ScreenplayWriter 的 scenes 列表
+
+    必需: scenes (min 1)
+    每个 scene 必须有 scene_id, location_id, characters_in_scene, action_beats (min 1)
+    每个 action_beat 必须有 beat_id
+    """
+
+    scenes: List[SceneSchema] = Field(min_length=1)
+
+    @field_validator("scenes")
+    @classmethod
+    def scenes_not_empty_list(cls, v: List[SceneSchema]) -> List[SceneSchema]:
+        if not v:
+            raise ValueError("scenes 不能为空列表")
+        return v
 
 
 # ============================================================
@@ -180,8 +380,8 @@ class ShotSchema(BaseModel):
         - 中国美食/店铺类型 (兰州拉面、火锅等)
         - 画面中需要出现的中文书法/文字 (春联、牌匾等)
 
-        检测策略: 如果中文字符超过 prompt 总长度的 15%，判定为中文泄露。
-        少量中文字符 (人名、地名等) 属于允许例外。
+        检测策略: 如果中文字符超过 prompt 总长度的 5%，判定为中文泄露。
+        5% 允许角色中文名 (如 "Chen Mo (陈默)") 但拒绝大段中文。
         """
         if not v or not v.strip():
             raise ValueError("image_prompt 不能为空")
@@ -189,7 +389,7 @@ class ShotSchema(BaseModel):
         chinese_chars = re.findall(r"[\u4e00-\u9fff]", v)
         total_chars = len(v)
 
-        if total_chars > 0 and len(chinese_chars) / total_chars > 0.15:
+        if total_chars > 0 and len(chinese_chars) / total_chars > 0.05:
             raise ValueError(
                 f"image_prompt 中文比例过高 ({len(chinese_chars)}/{total_chars} = "
                 f"{len(chinese_chars)/total_chars:.0%}): {v[:80]}..."
@@ -207,6 +407,85 @@ class StoryboardOutput(BaseModel):
 # ============================================================
 # 验证入口函数
 # ============================================================
+
+
+def validate_outline(outline_data: dict, stage_transition: str = "Stage 1 -> 2") -> None:
+    """
+    验证 Stage 1 大纲输出的数据格式。
+
+    在 Pipeline 的 Stage 1 LLM 返回后立即调用。
+    验证失败时抛出 PipelineSchemaError。
+
+    Args:
+        outline_data: StoryOutlineGenerator.generate() 的返回值
+        stage_transition: 阶段转换标识（用于错误信息）
+    """
+    try:
+        OutlineSchema(**outline_data)
+
+        logger.info(
+            f"[Pipeline] Schema 验证通过 ({stage_transition}): "
+            f"大纲包含 {len(outline_data.get('characters_overview', []))} 角色, "
+            f"{len(outline_data.get('plot_points', []))} 情节点, "
+            f"{len(outline_data.get('unique_locations', []))} 场景"
+        )
+        print(
+            f"[Pipeline] Schema 验证通过 ({stage_transition}): "
+            f"大纲 {len(outline_data.get('characters_overview', []))} 角色 / "
+            f"{len(outline_data.get('plot_points', []))} 情节点 / "
+            f"{len(outline_data.get('unique_locations', []))} 场景"
+        )
+
+    except PipelineSchemaError:
+        raise
+    except Exception as e:
+        raise PipelineSchemaError(stage_transition, str(e))
+
+
+def validate_screenplay(screenplay_data: dict, stage_transition: str = "Stage 3 -> 4") -> None:
+    """
+    验证 Stage 3 剧本输出的数据格式。
+
+    在 Pipeline 的 Stage 3 LLM 返回后立即调用。
+    验证失败时抛出 PipelineSchemaError。
+
+    Args:
+        screenplay_data: ScreenplayWriter.write() 的返回值
+        stage_transition: 阶段转换标识（用于错误信息）
+    """
+    try:
+        scenes = screenplay_data.get("scenes", [])
+        if not scenes:
+            raise PipelineSchemaError(
+                stage_transition, "scenes 数组为空"
+            )
+
+        errors = []
+        for i, scene in enumerate(scenes):
+            scene_id = scene.get("scene_id", i + 1)
+            try:
+                SceneSchema(**scene)
+            except Exception as e:
+                errors.append(f"Scene {scene_id}: {e}")
+
+        if errors:
+            error_msg = "\n".join(errors)
+            raise PipelineSchemaError(stage_transition, error_msg)
+
+        total_beats = sum(len(s.get("action_beats", [])) for s in scenes)
+        logger.info(
+            f"[Pipeline] Schema 验证通过 ({stage_transition}): "
+            f"{len(scenes)} 个场景, {total_beats} 个 action_beats"
+        )
+        print(
+            f"[Pipeline] Schema 验证通过 ({stage_transition}): "
+            f"{len(scenes)} 场景 / {total_beats} action_beats"
+        )
+
+    except PipelineSchemaError:
+        raise
+    except Exception as e:
+        raise PipelineSchemaError(stage_transition, str(e))
 
 
 def validate_characters(characters_data: dict, stage_transition: str = "Stage 1 -> 2") -> None:
