@@ -1,7 +1,7 @@
 # Backend Agent - 当前任务
 
-> **最后更新**: 2026-04-14 21:30（PM 代更新）
-> **状态**: ✅ TASK-STAGED-V2 Backend 完成 — Haiku 集成到 regenerate 端点
+> **最后更新**: 2026-04-15（PM 代更新）
+> **状态**: ✅ Harness V2: Schema 扩展 (Stage 1→2 + 3→4) + 成本熔断 $10 + 已部署
 
 ---
 

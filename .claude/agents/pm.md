@@ -253,7 +253,7 @@ color: purple
 
 **序话Story特别关注**：
 - 修改`image_generator.py`、`storyboard_prompts.py`前是否跑了回归测试？
-- Shot生成是否使用了`use_pro_model=True`？
+- Shot生成是否使用了NB2默认（`use_pro_model=False`）？禁止启用Pro（仅Premium储备）
 - 新功能是否影响角色一致性？
 
 ### @frontend (前端)
@@ -309,7 +309,7 @@ color: purple
 
 **序话Story特别关注**：
 - Prompt优化后一致性是否下降？
-- 是否在Flash和Pro之间做了合理的任务分配？
+- 是否正确使用了NB2作为主力模型（参考图+Shot默认）？Pro是否仅在明确Premium需求时才启用？
 - 新的Prompt是否全英文？（除了中文名字和传统文化元素）
 
 ### @devops (运维)

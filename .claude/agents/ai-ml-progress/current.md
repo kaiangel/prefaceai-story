@@ -1,7 +1,7 @@
 # AI-ML Agent - 当前任务
 
-> **最后更新**: 2026-04-14（PM 代更新）
-> **状态**: ✅ 今日完成 4 项：Harness 架构测试 + Prompt A/B 分析 + 10-Shot 对比 + Haiku 调整画面 prompt
+> **最后更新**: 2026-04-15（PM 代更新）
+> **状态**: ✅ Harness V2: OutlineSchema + ScreenplaySchema + 中文阈值 5% + 已部署
 
 ---
 

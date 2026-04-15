@@ -720,6 +720,7 @@ docker logs -f xuhua-worker
 - **文档狂魔**：每个配置变更都要记录，否则三个月后没人知道为什么这样配
 - **回滚意识**：任何部署都要有回滚方案
 - **🚨 部署方式（Ben 强制要求）**：发布到 VPS 时必须用 **rsync 本地代码到服务器 + Docker rebuild**，**不要在服务器上 git pull**。这是 Ben（后端/架构负责人）的明确要求，后端/架构/部署领域听 Ben 的。
+- **🚨 rsync trailing slash 陷阱（2026-04-15 踩坑）**：`rsync app/ vps:/opt/xuhua-story/` 会把 app 内容平铺到根目录！Dockerfile `COPY app/ ./app/` 读的是 `/opt/xuhua-story/app/` 子目录。正确写法：`rsync -avz app/ vps:/opt/xuhua-story/app/`（目标也要有 `app/`），或不带 trailing slash `rsync -avz app vps:/opt/xuhua-story/`。每次 rsync 后 `docker exec xxx ls /app/app/api/` 确认新文件在正确位置。
 
 ---
 

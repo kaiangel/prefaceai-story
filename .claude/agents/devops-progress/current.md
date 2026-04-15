@@ -1,11 +1,20 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-04-15（自更新）
-> **状态**: ✅ TASK-HARNESS-V2 Phase 3 全部完成 (4/4 验证 PASS)
+> **最后更新**: 2026-04-14（自更新）
+> **状态**: ✅ TASK-ARCHIVE-LINES 完成
 
 ---
 
 ## 刚完成
+
+**TASK-ARCHIVE-LINES: archive_team_chat.sh 新增 --max-lines 模式 (2026-04-14)**
+- `--max-lines N --keep M` 参数解析 + MODE 分支 `date` / `lines`
+- 行数模式: ≤ max_lines → 打印"无需归档"；> max_lines → 中间按月归档 → 重写主文件保留末尾 keep_lines 行
+- 4/4 验收 PASS: 可执行 ✅ + 3039<5000→无需归档 ✅ + 日期模式不受影响 ✅ + 幂等 ✅
+
+---
+
+## 上次完成
 
 **TASK-HARNESS-V2 Phase 3: PreCommit + Push + VPS 部署 (2026-04-15)**
 - Step 1: settings.local.json PreCommit 加入 test_error_patterns.py
@@ -262,6 +271,7 @@
 
 | 时间 | 更新内容 |
 |------|----------|
+| 2026-04-14 | TASK-ARCHIVE-LINES: archive_team_chat.sh 新增 --max-lines/--keep 行数模式，4/4 验收 PASS |
 | 2026-04-15 | TASK-HARNESS-V2 Phase 3: PreCommit hook 更新 + push(87aeaa4+ea0edb1) + VPS rsync+rebuild + 4/4 PASS |
 | 2026-04-14 | TASK-HE-DEVOPS-2: TEAM_CHAT 归档脚本创建 + 首次执行 (36079→2343行, 4个月份归档文件) |
 | 2026-04-14 | TASK-HE-DEVOPS-1: Hook 基础设施升级 (pyright + tsc + PreCommit + PrePush) |
