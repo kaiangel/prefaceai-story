@@ -3135,3 +3135,173 @@ POST `/{chapter_number}/shots/{shot_id}/regenerate`
 ### TASK-DEPLOY-DOCS — 文档补充 push + VPS 同步
 
 纯文档更新（PM 代更新的 progress 文件 + TODAY_FOCUS + TEAM_CHAT 测试记录）。不需要 Docker rebuild。
+
+
+#### @devops → @pm [2026-04-14 23:15]
+
+### ✅ TASK-DEPLOY-DOCS 完成 — 文档 Push + VPS 同步
+
+**Git Commit**:
+- Hash: `e572076`
+- Message: `docs: agent progress sync + test records + TODAY_FOCUS update`
+- 文件数: 8 (6 agent progress + TEAM_CHAT + TODAY_FOCUS)
+- Push: `origin/main` 259f696 → e572076
+
+**VPS rsync**:
+- 184 文件同步到 `trader@107.148.1.199:/opt/xuhua-story/`
+- 包括: `.claude/agents/` + `.team-brain/` + `docs/`
+- 无 Docker rebuild（纯文档，不影响运行时）
+
+**验收**: 3/3 PASS
+1. ✅ commit + push 成功
+2. ✅ rsync 完成 (184 files, 3.5MB)
+3. ✅ 未做 Docker rebuild
+
+
+#### @pm (2026-04-15 11:00)
+
+### TASK-HARNESS-V2 启动 — 补齐自动化验证 7→10 + 代码强制执行 6→10
+
+**Founder 确认**: 成本熔断 $10/Pipeline，自建监控，P1+P2 全做。
+
+**Phase 1（并行）**:
+- @devops: GitHub Actions CI
+- @tester: 6 EP 补 sensor
+- @ai-ml: 4 Stage LLM 输出验证规则
+- @pm: 6 Agent 文件白名单
+
+**Phase 2（Phase 1 后）**:
+- @backend: Pipeline Schema 扩展 + 成本熔断 $10
+- @devops: 错误查询端点 + 健康检查 + 成本计数
+
+**Phase 3（收尾）**: PreCommit 更新 + 审查 + push + 部署
+
+
+#### @ai-ml → @pm (2026-04-15)
+
+### P1-3 LLM 输出验证规则定义完成 — pipeline_schemas.py 扩展
+
+**文件**: `app/services/pipeline_schemas.py`
+
+**新增内容**:
+
+1. **OutlineSchema** (Stage 1 输出验证)
+   - 必需字段: title, title_en, logline, summary, characters_overview (min 1), plot_points (min 3), unique_locations (min 1)
+   - 子 Schema: OutlineCharacterOverview (name/description 必填), OutlinePlotPoint (description 必填), OutlineLocation (location_id 必填)
+   - field_validator: title/title_en/logline/summary 不能为空, characters_overview 不能为空列表
+
+2. **ScreenplaySchema** (Stage 3 输出验证)
+   - 必需字段: scenes (min 1)
+   - 子 Schema: SceneSchema (scene_id, location_id, action_beats min 1), ActionBeat (beat_id 必填), DialogueBeat
+   - field_validator: scenes 不能为空列表, beat_id 不能为空
+
+3. **image_prompt 中文阈值收紧**: 15% -> 5%
+   - 5% 允许角色中文名 (如 "Chen Mo (陈默)") 但拒绝大段中文
+
+4. **validate_outline()** + **validate_screenplay()** 入口函数
+   - 格式与 validate_characters() / validate_storyboard() 一致
+   - 验证失败抛 PipelineSchemaError
+
+**验收**: `python3 -c "from app.services.pipeline_schemas import OutlineSchema, ScreenplaySchema, validate_outline, validate_screenplay; print('OK')"` 通过
+
+**@backend 注意**: Phase 2 集成时，在 pipeline_orchestrator.py 的 Stage 1 返回后调用 `validate_outline(outline_data)`，Stage 3 返回后调用 `validate_screenplay(screenplay_data)`。
+
+
+#### @devops → @pm [2026-04-15]
+
+### P1-1 GitHub Actions CI 完成
+
+**文件**: `.github/workflows/ci.yml` (新建)
+
+**配置**:
+- 触发条件: push 到 main + PR 到 main
+- 运行环境: ubuntu-latest + Python 3.11
+- 依赖安装: `pip install pytest pytest-timeout` (无需完整 requirements.txt)
+- 测试执行: `python -m pytest tests/test_architecture.py tests/test_quality_gates.py -v --timeout=120`
+
+**依赖分析**:
+- `test_architecture.py` imports: `ast`, `os`, `re` (全部 stdlib)
+- `test_quality_gates.py` imports: `ast`, `json`, `os`, `re`, `pytest`
+- 无 pydantic、无项目模块 import -- 测试只用 `ast.parse()` 读代码文件，不 import 业务逻辑
+- 不需要 API keys 或 secrets
+
+**验收标准 4/4**:
+1. [x] `.github/workflows/ci.yml` 存在
+2. [x] workflow 配置正确（push + PR on main）
+3. [x] 步骤: checkout + python setup + install deps + pytest
+4. [x] 不需要 API keys 或 secrets
+
+**补齐的缺口**: HARNESS_V2_GAP_ANALYSIS.md 缺口 1 -- 服务器端 CI。即使本地 `git commit --no-verify` 跳过 PreCommit hook，GitHub Actions 仍会在 push 后自动跑架构测试 + 质量门测试。
+
+**@pm**: P1-1 完成，等 Review。
+
+
+#### @pm (2026-04-15 12:00)
+
+### ✅ Harness V2 Phase 1 全部 PASS — 16/16 测试通过
+
+| Agent | 任务 | 结果 |
+|-------|------|:----:|
+| @devops | GitHub Actions CI | ✅ |
+| @tester | 6 EP sensor (0.01s) | ✅ |
+| @ai-ml | OutlineSchema + ScreenplaySchema + 5% 阈值 | ✅ |
+| PM | 6 Agent 文件白名单 | ✅ |
+| 集成 | 16/16 PASS (0.07s) | ✅ |
+
+**Phase 2 派发**:
+- @backend: Pipeline Schema 扩展（Stage 1→2 + Stage 3→4 验证调用）+ 成本熔断 $10/Pipeline
+- @devops: 错误查询端点 + 健康检查脚本 + API 成本计数
+
+
+#### @devops → @pm [2026-04-15]
+
+### ✅ P2-3 Harness V2 完成 — 错误查询端点 + 健康检查 + 成本计数
+
+**新建文件 (3)**:
+
+| 文件 | 内容 |
+|------|------|
+| `app/api/monitoring.py` | `GET /api/monitoring/errors/recent` + `GET /api/monitoring/costs/summary` |
+| `app/models/api_cost_log.py` | `ApiCostLog` SQLAlchemy model（未建表，等 Alembic DDL） |
+| `scripts/health_check.sh` | curl prefaceai.mov/api/health，exit 0/1，可接 crontab |
+
+**修改文件 (2)**:
+
+| 文件 | 改动 |
+|------|------|
+| `app/api/__init__.py` | import monitoring + `api_router.include_router(monitoring.router)` |
+| `app/models/__init__.py` | import ApiCostLog + `__all__` 导出 |
+
+**端点说明**:
+- `GET /api/monitoring/errors/recent?hours=24&limit=50` — 查 project_chapters 表 status='failed' 记录
+- `GET /api/monitoring/costs/summary?days=7` — 按 service 分组汇总 api_cost_logs，返回 total_cost_usd + by_service
+- 两个端点都需要 JWT 鉴权（Depends(verify_user)）
+
+**验收标准 6/6 ✅**:
+1. `/api/monitoring/errors/recent` 端点存在且返回结构正确
+2. `/api/monitoring/costs/summary` 端点存在
+3. `scripts/health_check.sh` 存在
+4. `ApiCostLog` model 定义存在
+5. 路由在 `app/api/__init__.py` 注册
+6. 未执行 CREATE TABLE（只定义 model）
+
+**待办（需 PM/Founder 执行）**:
+1. `chmod +x scripts/health_check.sh`（本次 Bash 权限限制，无法自行执行）
+2. `api_cost_logs` 建表 DDL（Alembic migration 或手动 ALTER）
+3. progress 文件更新（Edit/Write 权限不足，内容已提供给 PM 代更新）
+
+**progress 更新内容**（请 PM 代更新 `devops-progress/current.md`）:
+- 状态: ✅ P2-3 完成
+- 刚完成: P2-3 Harness V2 错误查询+健康检查+成本计数 (2026-04-15)
+- 待处理队列: P1 CI/CD ✅、P2 监控 ✅（端点已建，需建表）
+- 运维风险 R3: ✅ GitHub Actions CI 完成
+- 更新记录: `2026-04-15 | P2-3 Harness V2: monitoring.py + api_cost_log.py + health_check.sh 新建；__init__ 路由注册`
+
+
+#### @pm (2026-04-15 12:30)
+
+### ✅ Harness V2 Phase 2 PASS — Phase 3 收尾开始
+
+Phase 2 验证: @backend Schema+熔断 ✅ + @devops 监控端点 ✅ + 16/16 测试 PASS
+
+Phase 3: PreCommit hook 更新 + push + VPS 部署
