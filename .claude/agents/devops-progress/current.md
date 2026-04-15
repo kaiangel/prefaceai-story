@@ -1,11 +1,23 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-04-14 22:30（PM 代更新）
-> **状态**: ✅ TASK-DEPLOY-STAGED-V2 Push + VPS 部署完成 (10/10 PASS)
+> **最后更新**: 2026-04-15（自更新）
+> **状态**: ✅ TASK-HARNESS-V2 Phase 3 全部完成 (4/4 验证 PASS)
 
 ---
 
 ## 刚完成
+
+**TASK-HARNESS-V2 Phase 3: PreCommit + Push + VPS 部署 (2026-04-15)**
+- Step 1: settings.local.json PreCommit 加入 test_error_patterns.py
+- Step 2: chmod +x scripts/health_check.sh (0644 → 0755)
+- Step 3: 2 commits — 87aeaa4 (feat:19 files) + ea0edb1 (docs:5 files)
+- Push: e572076 → ea0edb1
+- Step 4: rsync 353 files + Docker --no-cache rebuild + force-recreate api
+- Step 5: 4/4 PASS (push ✅ + health ✅ + errors/recent 401 ✅ + costs/summary 401 ✅)
+
+---
+
+## 上次完成
 
 **TASK-DEPLOY-STAGED-V2: Push + VPS 部署 (2026-04-14)**
 - 3 commits: 611c501 (feat:25) + 68ac04f (frontend:2) + 259f696 (docs:121)
@@ -15,7 +27,7 @@
 
 ---
 
-## 刚完成
+## 上上次完成
 
 **TASK-HE-DEVOPS-2: TEAM_CHAT 归档机制 (Harness Engineering V1 Phase 2)**
 
@@ -232,7 +244,7 @@
 |---|--------|------|----------|------|----------|----------|
 | R1 | ~~API Key 未填入~~ | ✅ 基本解决 | 核心 4/6 已填入 (ANTHROPIC+GEMINI+OPENAI+VOLCENGINE_AK) | TTS 的 2 Key 缺失不影响核心 | ✅ 04-05 验证 | VOLCENGINE_SECRET+APPID 待补 |
 | R2 | ~~CORS 全开放~~ | ✅ 已解决 | `allow_origins=["prefaceai.mov", "localhost:3000"]` | — | ✅ 03-18 部署 | — |
-| R3 | **无 CI/CD** | 🟡 P1 | 手动 rsync 部署 | 部署易出错、无自动化测试门禁 | GitHub Actions 基础流水线 | 部署稳定后 |
+| R3 | ~~无 CI/CD~~ | ✅ 已解决 | GitHub Actions CI 上线 | — | ✅ 2026-04-15 | — |
 | R4 | **无监控告警** | 🟡 P1 | 无 Sentry、无成本监控 | 线上报错无感知、API 成本失控无预警 | Sentry 错误追踪 + API 成本看板 | 第一个用户前 |
 | R5 | **无数据备份** | 🟡 P2 | Redis 无持久化备份 | 重启/宕机丢失任务队列数据 | Redis RDB/AOF + 定期备份脚本 | 有生产数据后 |
 | R6 | ~~无日志脱敏~~ | ✅ 已解决 | `log_sanitizer.py` patch print 正则脱敏 | — | ✅ 03-18 部署 | — |
@@ -250,6 +262,7 @@
 
 | 时间 | 更新内容 |
 |------|----------|
+| 2026-04-15 | TASK-HARNESS-V2 Phase 3: PreCommit hook 更新 + push(87aeaa4+ea0edb1) + VPS rsync+rebuild + 4/4 PASS |
 | 2026-04-14 | TASK-HE-DEVOPS-2: TEAM_CHAT 归档脚本创建 + 首次执行 (36079→2343行, 4个月份归档文件) |
 | 2026-04-14 | TASK-HE-DEVOPS-1: Hook 基础设施升级 (pyright + tsc + PreCommit + PrePush) |
 | 2026-04-09 | 阿里云 MySQL ALTER TABLE project_chapters 8 列 TEXT→LONGTEXT (RB-1 配套 DDL) |

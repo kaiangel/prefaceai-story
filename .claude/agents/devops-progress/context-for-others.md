@@ -1,22 +1,31 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-04-14 22:30（PM 代更新）
+> **最后更新**: 2026-04-15（自更新）
 
 ---
 
 ## 当前状态速览
 
-状态: ✅ **TASK-DEPLOY-STAGED-V2 Push + VPS 部署完成** (2026-04-14)
-最新 commit: `259f696` (3 commits: feat + frontend + docs)
-域名: `https://prefaceai.mov` 已上线（前端 + API + 新 logo + V2 品牌宣言）
+状态: ✅ **TASK-HARNESS-V2 Phase 3 全部完成** (2026-04-15)
+最新 commit: `ea0edb1` (2 commits: feat:87aeaa4 + docs:ea0edb1)
+域名: `https://prefaceai.mov` 已上线（前端 + API + Harness V2 监控端点）
 服务器: 107.148.1.199 (8C/16GB/200GB, Ubuntu 20.04)
 容器: 3 个运行中 — api (healthy) + frontend (up) + redis (healthy)
 SSL: Cloudflare Full (Strict) + Origin Certificate
+新端点: `/api/monitoring/errors/recent` + `/api/monitoring/costs/summary` (JWT 鉴权)
 
 ---
 
-## 最近操作 (2026-04-14)
+## 最近操作 (2026-04-15)
+
+### TASK-HARNESS-V2 Phase 3: PreCommit + Push + VPS 部署 ✅
+
+- settings.local.json PreCommit 加入 test_error_patterns.py (本地 override, gitignored)
+- scripts/health_check.sh chmod +x (0644 → 0755)
+- 2 commits pushed: 87aeaa4 (feat:19) + ea0edb1 (docs:5), e572076 → ea0edb1
+- rsync 353 files → VPS, Docker --no-cache rebuild, force-recreate api
+- 验证 4/4: push ✅ + health ✅ + errors/recent HTTP_401 ✅ + costs/summary HTTP_401 ✅
 
 ### TASK-HE-DEVOPS-2: TEAM_CHAT 归档机制 ✅
 
@@ -223,7 +232,7 @@ Multiple pushes — Stage 1 E2E 联调通过。
 |------|------|-----------|
 | ~~API Key 未填入~~ | ✅ 基本解决 | 04-05 验证 (TTS 2 Key 待补) |
 | ~~CORS 全开放~~ | ✅ 已解决 | 03-18 部署 |
-| 无 CI/CD | 🟡 P1 | 部署稳定后 |
+| ~~无 CI/CD~~ | ✅ 已解决 (GitHub Actions) | 2026-04-15 |
 | 无监控告警 | 🟡 P1 | 第一个用户前 |
 | 无数据备份 | 🟡 P2 | 有生产数据后 |
 | ~~无日志脱敏~~ | ✅ 已解决 | 03-18 部署 |

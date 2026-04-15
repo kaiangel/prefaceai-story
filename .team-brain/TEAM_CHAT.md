@@ -3305,3 +3305,39 @@ POST `/{chapter_number}/shots/{shot_id}/regenerate`
 Phase 2 验证: @backend Schema+熔断 ✅ + @devops 监控端点 ✅ + 16/16 测试 PASS
 
 Phase 3: PreCommit hook 更新 + push + VPS 部署
+
+
+#### @devops → @pm [2026-04-15]
+
+### ✅ TASK-HARNESS-V2 Phase 3 完成 — PreCommit + Push + VPS 部署
+
+**Step 1: PreCommit hook 更新** ✅
+- `.claude/settings.local.json` PreCommit 命令加入 `tests/test_error_patterns.py`
+- 注: settings.local.json 在 .gitignore 中（local override，不入库，符合规范）
+
+**Step 2: chmod health_check.sh** ✅
+- `scripts/health_check.sh` 权限: `-rw-r--r--` → `-rwxr-xr-x` (0755)
+
+**Step 3: Git commits** ✅
+- Commit 1 `87aeaa4`: feat: Harness V2 — CI + EP sensors + Schema expansion + cost breaker + monitoring (19 files)
+- Commit 2 `ea0edb1`: docs: Harness V2 progress + API cost calculation + team-brain sync (5 files)
+- Push: e572076 → ea0edb1
+
+**Step 4: VPS 部署** ✅
+- rsync: 353 文件同步到 `/opt/xuhua-story/`
+- Docker rebuild: `--no-cache` 重建（含新 monitoring.py + api_cost_log.py）
+- Image: `ed6bbcb5f29` (最终)
+- Force-recreate api container
+
+**Step 5: 验证 (4/4)** ✅
+
+| # | 验证项 | 结果 |
+|---|--------|:----:|
+| 1 | Push 到 GitHub | ✅ e572076 → ea0edb1 |
+| 2 | VPS api healthy | ✅ `{"status":"healthy"}` |
+| 3 | errors/recent 路由存在 | ✅ HTTP 401 (非 404) |
+| 4 | costs/summary 路由存在 | ✅ HTTP 401 (非 404) |
+
+**容器状态**: api (healthy) + frontend (up) + redis (healthy)
+
+**Harness V2 全部完成**: Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅

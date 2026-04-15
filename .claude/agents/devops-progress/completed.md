@@ -4,6 +4,22 @@
 
 ---
 
+### TASK-HARNESS-V2 Phase 3: PreCommit + Push + VPS 部署 ✅ (2026-04-15)
+- settings.local.json PreCommit 加入 test_error_patterns.py
+- chmod +x scripts/health_check.sh
+- 2 commits: 87aeaa4 (feat:19 files) + ea0edb1 (docs:5 files), push e572076→ea0edb1
+- rsync 353 files + Docker --no-cache rebuild + force-recreate api
+- 验证 4/4 PASS: push + health + errors/recent 401 + costs/summary 401
+- R3 (无 CI/CD) 风险已解决: GitHub Actions CI 上线
+
+### TASK-HARNESS-V2 Phase 1+2: CI + EP sensors + Schema + monitoring endpoints ✅ (2026-04-15)
+- P1-1: .github/workflows/ci.yml — push/PR to main auto-run tests
+- P1-2 (@tester): 6 EP sensors test_error_patterns.py (EP-005/006/007/009/013/014)
+- P1-3 (@ai-ml): OutlineSchema + ScreenplaySchema + validate_outline/screenplay
+- P1-4 (@pm): 6 Agent 文件白名单
+- P2-3 (devops): monitoring.py (errors/recent + costs/summary) + api_cost_log.py + health_check.sh
+- 16/16 tests PASS
+
 ### TASK-DEPLOY-STAGED-V2: Push + VPS 部署 ✅ (2026-04-14, PM 代更新)
 - 3 commits: 611c501 + 68ac04f + 259f696, push 69ebc02→259f696
 - .gitignore 更新 (settings.local.json + .trae + output + .mov + team-members)
