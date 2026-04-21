@@ -1,6 +1,6 @@
 # 序话Story 项目状态看板
 
-> 最后更新: 2026-03-19
+> 最后更新: 2026-04-16
 > 更新者: PM
 
 ---
@@ -10,8 +10,8 @@
 ```
 项目名称: 序话Story - AI条漫/短视频生成系统
 目标: 用户输入创意 → 自动生成可发布的条漫或短视频
-当前版本: v0.6.6
-当前主线: **双团队协作启动** — Ben 团队加入 + 安全加固已部署 (f76ac1e)
+当前版本: v0.8.0
+当前主线: **Harness V2 + Prompt B' 默认化 + Stage D 产品逻辑 + Pipeline 全连通 + Mureka BGM 集成测试** — 部署至 VPS (commits 87aeaa4 + ea0edb1, 2026-04-15)
 核心内容: 都市情感短剧 (DEC-005)
 产品形态: 条漫优先 → 短视频保留
 Pipeline品牌: FrameSpark™
@@ -28,9 +28,9 @@ Pipeline品牌: FrameSpark™
 | 2 | 图像生成 | ✅ DONE | 100% | Backend + AI_ML |
 | 3 | 音频对齐 | ✅ DONE | 100% | Backend |
 | 4 | 条漫MVP技术验证 | ✅ **完成** | 100% | PM + AI-ML + Backend + Tester |
-| 4.5 | 视频合成 | 🔄 WIP | 5% | Backend |
-| 5 | 前端开发 | ✅ **LP+Stage A+Create P0+P1+P2 全部完成, PM 复验全部通过** | 95% | Frontend (LP 5.0/5 + 子页面 4.8/5 + Stage A 4.8/5 + P0 4.8/5 + P1 4.7/5 + P2 4.8/5) |
-| 6 | 优化部署 | ✅ **VPS 部署完成** — https://prefaceai.mov 上线，等 Founder 填 API Key | 70% | DevOps |
+| 4.5 | 视频合成 | 🔄 暂缓 | 5% | Backend |
+| 5 | 前端开发 | ✅ **LP+Stage A~E 全流程连通，B' 默认格式，Stage D 三操作（调整画面/编辑文字/重新生成）** | 98% | Frontend |
+| 6 | 优化部署 | ✅ **VPS 已部署 Harness V2 + B' + Stage D**，CI/CD GitHub Actions 已接入 | 85% | DevOps |
 
 ---
 
@@ -264,95 +264,107 @@ Pipeline品牌: FrameSpark™
 
 ### Backend (后端)
 ```
-状态: ✅ TASK-REWRITER-CLEANUP + OB-2/3/4 全部完成 — PM Review PASS
-更新时间: 2026-03-17
-当前任务: 无（等 DevOps 部署）
+状态: ✅ Pipeline 全链路完成 — Stage D /api/shots/adjust 端点 + JSON 修复 V3 + DB 迁移全部 PASS
+更新时间: 2026-04-13
+当前任务: 🔄 TASK-API-COST-TABLE (Background Agent 运行中)
 阻塞: 无
-已完成: TASK-REWRITER-CLEANUP ✅ + TASK-OB2-MODEL-SYNC+OB-3+OB-4 ✅ + N13-FIX ✅ + IMG-SAFETY-RETRY ✅ + Step 1-3 T4-T9 ✅ + TASK-BACKUP-MODEL-FLASH ✅ + 全历史任务
-待解决: FFmpeg 集成方案选型（Phase 4.5）
+已完成:
+  - ✅ /api/shots/adjust 端点（Stage D 调整画面，Haiku 改写 image_prompt）
+  - ✅ JSON 修复状态机 V3（_fix_unescaped_quotes 状态机，24/24 PASS）
+  - ✅ confirm-outline + start-generation 链路（StageB 接通 Pipeline，39/39 PASS）
+  - ✅ DB 迁移：TEXT→LONGTEXT + characters_confirmed 新列 + pool_recycle
+  - ✅ Pipeline 优化 R1→R6（批处理+并行+进度+角色确认检查点）
+  - ✅ Harness V2 Schema 验证（pipeline_schemas.py，Stage 1→2/3→4 边界）
+  - ✅ 成本熔断器 $10 + 6 EP Sensor
+  - ✅ 全历史任务
+待做: TASK-API-COST-TABLE 建表 + TTS Key 配置（PENDING.md 追踪）
 ```
 
 ### Frontend (前端)
 ```
-状态: ✅ P0+P1+P2 全部完成 + PM 复验全部通过 + RESPONSIVE-OPT PM 复验 PASS (4.5/5)
-更新时间: 2026-03-06
+状态: ✅ Stage A~E 全流程连通 + Stage D 三操作（调整画面/编辑文字/重新生成）完整实现
+更新时间: 2026-04-13
 阻塞: 无
 
 已完成:
-  - ✅ TASK-CREATE-UPGRADE P2 完成 (PM复验 4.8/5, 14文件, 03-03) — 注册+工作台+故事详情+UserMenu
-  - ✅ TASK-CREATE-UPGRADE P1 完成 (PM复验 4.7/5, 7文件, 03-02) + P4修复(revokeObjectURL) + 文档修正
-  - ✅ TASK-CREATE-UPGRADE P0 完成 (PM复验 4.8/5, 16文件, 03-02) + Founder微调完成
-  - ✅ TASK-UI-STAGE-A Stage A 输入界面 (PM复验 4.8/5, 含P1修复, 2026-02-26)
-  - ✅ TASK-LP-PAGES-FIX 4项修复 (PM复验通过 4.8/5)
-  - ✅ TASK-LP-PAGES 10个子页面实现 (17新建+1修改)
-  - ✅ TASK-LP-POLISH + TASK-LP-FIX + Landing Page (5.0/5)
-
-待做:
-  - P3×1 + P4×3 可选修复（不阻塞）
+  - ✅ Stage C 真实 API 轮询（每 2s）+ character_ready 检查点 + 真实等待确认
+  - ✅ Stage D 调整画面（调用 /api/shots/adjust）+ 编辑文字（纯前端）+ 重新生成（re-roll）
+  - ✅ confirm-outline 前端接入（StageB → /api/confirm-outline → start-generation）
+  - ✅ 情节拖拽元数据跟随修复（description+mood+setting+characters_involved 同步）
+  - ✅ TASK-UPLOADER-ENV-FIX（NEXT_PUBLIC_API_BASE_URL → NEXT_PUBLIC_API_URL，5文件）
+  - ✅ 品牌宣言 V2 整合（Pipeline 模块 + About 页），Founder 终审通过
+  - ✅ TASK-CREATE-UPGRADE P0+P1+P2 全部完成（PM 复验 4.8/5）
+  - ✅ 全历史任务
+待做: Stage D Tester 验收（下一步）
 ```
 
 ### Tester (测试)
 ```
-状态: ✅ TASK-SAFE-DRYRUN 7/7 PASS + PM 确认
-更新时间: 2026-03-17
-当前任务: 无（等 DevOps 部署）
-已完成: TASK-SAFE-DRYRUN ✅ (7/7) + IMG-SAFETY-VERIFY ✅ (17/17) + R8 ✅ (42/44) + R7 ✅ (36/36) + R6 ✅ (27/27) + 全历史任务
+状态: ✅ 最新：TASK-CONFIRM-OUTLINE-TEST 39/39 PASS + TASK-PLOTPOINT-REORDER-FIX 39/39 PASS
+更新时间: 2026-04-13
+当前任务: 无（等 Stage D 验收派发）
+已完成:
+  - ✅ TASK-CONFIRM-OUTLINE-TEST (39/39 PASS, 2026-04-03)
+  - ✅ TASK-PLOTPOINT-REORDER-FIX Tester 验证 (39/39, 2026-04-03)
+  - ✅ TASK-SAFE-DRYRUN (7/7) + IMG-SAFETY-VERIFY (17/17) + R8 (42/44) + R7 (36/36) + R6 (27/27)
+  - ✅ 全历史任务
 阻塞: 无
 ```
 
 ### AI_ML (AI/ML)
 ```
-状态: ✅ TASK-OB1-CLEANUP 完成 — PM Review PASS
-更新时间: 2026-03-17
-当前任务: 无（等 DevOps 部署）
-已完成: TASK-OB1-CLEANUP ✅ + IMG-SAFETY-RETRY-AIML ✅ + Step 1-3 T1-T3+T10 ✅ + 全历史任务
+状态: ✅ Prompt B' 默认化完成 + 中文阈值 5% 收紧 + Music Prompt Skill 创建 (2026-04-16)
+更新时间: 2026-04-13
+当前任务: 无
+已完成:
+  - ✅ Prompt B' 格式设为默认（-46% tokens，盲测 5:4 Founder 偏好）
+  - ✅ image_prompt 中文阈值收紧（15% → 5%，DEC-019）
+  - ✅ Music Prompt Skill（专为 BGM 生成优化的 prompt 工程技能文件）
+  - ✅ Harness V2 Schema 定义（Stage 4 ShotSchema + Stage 2 CharacterSchema）
+  - ✅ TASK-OB1-CLEANUP + Style DESC Rewrite 15/15 + 全历史任务
 阻塞: 无
 ```
 
 ### DevOps (运维)
 ```
-状态: ✅ TASK-DEPLOY-CLEANUP 完成 — REWRITER-CLEANUP + OB-1/2/3/4 推送 + VPS api rebuild
-更新时间: 2026-03-17
-当前任务: 等待 Founder 填入 API Key
+状态: ✅ Harness V2 Phase 3 完成 — CI/CD + VPS 部署 PASS (commits 87aeaa4 + ea0edb1)
+更新时间: 2026-04-13
+当前任务: 🔄 TTS Key 填入（Background Agent 运行中）
 阻塞: 无
 
 已完成:
-  - ✅ TASK-DEPLOY-CLEANUP (2 commits push + VPS api rebuild, 2026-03-17)
-  - ✅ TASK-DEPLOY-R8B (3 commits push + VPS api+frontend rebuild, 2026-03-16)
-  - ✅ TASK-DEPLOY-R8 (3 commits push + VPS api rebuild, 2026-03-14)
-  - ✅ TASK-DEPLOY-UPDATE (3 commits push + VPS frontend/api rebuild, 2026-03-10)
-  - ✅ TASK-DEPLOY-EXEC Step 1-4 (VPS 部署, https://prefaceai.mov 上线)
-  - ✅ Docker 配置文件 commit + push (702361d)
-  - ✅ GitHub远程仓库 prefaceai-story (private) 推送完成 (2026-02-26 11:02)
-  - ✅ TASK-GIT-COMMIT-2 三批提交 (67文件, PM核验通过)
-  - ✅ TASK-GIT-COMMIT + TASK-GIT-INIT
-  - ✅ TASK-GIT-COMMIT-3 (4daad77 + Batch A/B/C, 131 文件, push 完成)
+  - ✅ Harness V2 Phase 1-3 全完成（GitHub Actions CI + PreCommit + PrePush + VPS PASS）
+  - ✅ Prompt B' 部署（VPS api rebuild）
+  - ✅ TASK-UPLOADER-ENV-FIX VPS 部署（rsync + frontend rebuild）
+  - ✅ TASK-JSON-REPAIR-V3 VPS 部署（4 commits push, d7eb28c→0ed365e）
+  - ✅ TASK-DEPLOY-CLEANUP (2026-03-17, c6d697a)
+  - ✅ TASK-DEPLOY-R8B + TASK-DEPLOY-R8 + TASK-DEPLOY-UPDATE
+  - ✅ 全历史任务
 
 生产环境:
   - VPS: 107.148.1.199 (Docker 28.1.1 + Compose v2.35.1)
   - 容器: api (healthy) + frontend (up) + redis (healthy)
   - SSL: Cloudflare Full Strict + Origin Certificate
   - 域名: https://prefaceai.mov
-  - 最新 commit: c6d697a (2026-03-17)
+  - CI/CD: GitHub Actions（每次 push 触发 pyright + tsc + pytest）
+  - 最新 commit: ea0edb1 (Harness V2 Phase 2, 2026-04-15)
 
 待做:
-  1️⃣ Founder 填入 API Key → 重启 api 容器
-  2️⃣ CI/CD 基础流水线
-  3️⃣ 监控告警系统
+  1️⃣ TTS Key 填入（剩余 2/6，Background Agent 执行中）
+  2️⃣ 监控告警系统 R4（P1，见 PENDING.md）
 ```
 
 ### Resonance (市场)
 ```
-状态: 🆕 刚创建 (2026-03-23)
-更新时间: 2026-03-23
-当前任务: Phase 0 蓄水期准备
-阻塞: 无
+状态: 📝 时间线重定义中（原计划作废）
+更新时间: 2026-04-13
+当前任务: 等 Founder 重新定义内测启动时间线
+阻塞: 等 Founder 通知内测启动时间
 
 计划:
-  - Phase 0 蓄水期 (3.23→4.5): 内测申请 500+
-  - Phase 1 加速期 (4.5→4.20): 内测申请 2000+
-  - Phase 2 引爆期 (4.20→5.1): 内测申请 5000+
-  - 5.1 公测上线
+  - ⚠️ 原时间线（500+ 内测申请）已作废
+  - 新时间线：待 Founder 通知内测启动时间后重新制定
+  - 目标不变：正式内测启动后 3-4 周内 500+ 内测申请
 
 平台:
   - 抖音"一话故事": 已创建，~100赞
@@ -421,9 +433,11 @@ Pipeline品牌: FrameSpark™
 
 | 指标 | 当前值 | 目标值 | 状态 |
 |------|--------|--------|------|
-| 角色一致性 | 100% (3人) | ≥95% | 🟢 |
-| 单故事成本 | $9.35 | <$5 | 🟡 |
-| 测试覆盖率 | ~70% | >80% | 🟡 |
+| 角色一致性 | ~95% (NB2，3-6人) | ≥95% | 🟢 |
+| 单故事成本（短篇，NB2+B'） | **$3.40** (3角色, 21shots) | <$5 | 🟢 |
+| 单故事成本（长篇，NB2+B'） | **$6.82** (6角色, 45shots) | <$10 | 🟢 |
+| Pipeline 速度（R6 实测） | 807s / 20 shots = ~40s/shot | - | 🟢 |
+| 测试覆盖率 | ~75% | >80% | 🟡 |
 | API 响应时间 | ~2s | <1s | 🟡 |
 
 ---
@@ -452,6 +466,73 @@ Pipeline品牌: FrameSpark™
 ---
 
 ## 更新日志
+
+### 2026-04-13（PM 文档补录）
+- **[PM] PROJECT_STATUS / DECISIONS / PENDING 三文档全面更新** 📋
+  - PROJECT_STATUS：版本升至 v0.8.0，Phase 进度/模块状态/关键指标全部同步至 4 月实际状态
+  - DECISIONS：新增 DEC-015~DEC-019（Harness V2 / Prompt B' / Stage D / Haiku 澄清 / 中文阈值）
+  - PENDING：清理已完成条目 → 归档，新增 5 项当前待处理
+
+### 2026-04-16
+- **[AI-ML] Music Prompt Skill 创建** ✅
+  - 专为 BGM 生成优化的 prompt 工程技能文件（适配火山引擎/Suno 等 API）
+  - 支持情感基调映射：都市情感/武侠/童话等故事类型 → 对应音乐风格关键词
+
+### 2026-04-15
+- **[DevOps] Harness V2 Phase 3 完成 + VPS 部署 PASS** ✅
+  - commit 87aeaa4（Phase 1: CI + Schema）+ ea0edb1（Phase 2: 成本熔断 + EP Sensor）
+  - PreCommit + PrePush hooks + GitHub Actions CI 全部激活
+  - VPS PASS：api 容器 healthy，所有 EP Sensor 端点响应正常
+- **[DEC-016] Prompt B' 格式正式设为默认** ⭐
+  - 盲测 5:4 Founder 偏好 B'，-46% tokens，成本降至 $3.40（短篇）
+  - image_generator.py + storyboard_prompts.py 更新，VPS 已部署
+- **[DEC-019] 中文阈值收紧 15% → 5%** ⭐
+  - Stage 4 prompt 规则 + image_generator.py 校验均已更新
+  - Harness V2 Schema 自动捕获超阈值 prompt
+
+### 2026-04-14
+- **[DEC-017] Stage D 产品交互逻辑定稿** ⭐
+  - 调整画面（Haiku 改写 image_prompt）/ 编辑文字（纯前端）/ 重新生成（re-roll）
+  - Backend /api/shots/adjust 端点完成，Frontend Stage D UI 完成
+- **[DEC-018] Haiku 运行时使用场景澄清** ⭐
+  - 产品运行时轻量 API 调用（Stage D 调整画面等）允许 Haiku
+  - 开发 Agent 子代理禁止 Haiku 规则不变
+
+### 2026-04-07
+- **[Frontend + Backend] Pipeline 前端接通真实 API** ✅
+  - Stage C：每 2s 轮询真实 job 状态，character_ready 检查点后需用户确认
+  - Stage D：真实预览数据，调整/编辑/重新生成三操作全部接通后端
+  - 告别 Mock 数据，用户旅程 A→E 全流程可真实跑通
+
+### 2026-04-06
+- **[Backend] Pipeline 优化 R6 完成 + Founder 实测 PASS** ✅
+  - R1→R6 迭代：批处理 + 并行 Stage 执行 + 进度条 + 角色确认检查点
+  - Founder 实测：807s / 20 shots / 零错误，性能稳定
+
+### 2026-04-05
+- **[DevOps] Harness V1 完成** ✅
+  - PostToolUse hooks（pyright + tsc 自动检查）+ PreCommit 架构测试 + PrePush 全量测试
+  - 本地质量门控全面建立
+
+### 2026-04-04
+- **[Backend] DB 迁移完成** ✅
+  - 所有 TEXT → LONGTEXT（防长 JSON 截断）
+  - characters_confirmed 新列（Stage B 角色确认状态追踪）
+  - pool_recycle 修复（MySQL 长连接 8 小时断线问题）
+
+### 2026-04-03
+- **[Frontend + Backend + Tester] StageB confirm-outline 接通** ✅
+  - StageB 6 个可编辑字段确认后正确传递给 Pipeline，不再丢弃
+  - TASK-CONFIRM-OUTLINE-WIRE：Frontend 9/9 + Backend 7/7 + 链路修复 7/7
+  - TASK-PLOTPOINT-REORDER-FIX：情节拖拽元数据跟随，39/39 PASS
+
+### 2026-04-01
+- **[Backend] JSON 修复状态机 V3 部署** ✅
+  - _fix_unescaped_quotes() 正则→状态机，24/24 测试 PASS
+  - 4a/4b/4c 修复完成，4 commits push + VPS 部署
+- **[Frontend] TASK-UPLOADER-ENV-FIX 完成** ✅
+  - 5 个 Uploader 环境变量统一（NEXT_PUBLIC_API_BASE_URL → NEXT_PUBLIC_API_URL）
+  - VPS 部署完成，生产环境自定义分析功能恢复
 
 ### 2026-03-19
 - **[Coordinator] 双团队协作系统启动** — Ben 团队加入 (3 Codex Agent)

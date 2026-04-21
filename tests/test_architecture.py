@@ -413,3 +413,150 @@ def test_reference_generation_is_serial():
         "参考图（portrait + fullbody）必须串行生成，不能并行。"
         "并行会导致 fullbody 无法使用 portrait 作为参考，破坏角色一致性。"
     )
+
+
+# =========================================================================
+# 6. .env.example 与 Settings 类字段双向对比（EP-016 工程化防护）
+# =========================================================================
+
+def test_env_example_matches_settings():
+    """.env.example 与 app/config.py 的 Settings 类字段必须双向对齐。
+
+    保护的架构规则（EP-016）：
+    - .env.example 有但 Settings 没有 → 用户按模板填了值，但启动时 Pydantic
+      extra_forbidden 会报错，导致 "我明明按文档配置了还是报错" 的用户体验灾难
+    - Settings 有但 .env.example 没有 → 用户无法知道该字段存在，配置盲区
+
+    实现方式（AST 解析）：
+    - 不 import Settings 类，避免触发模块级 settings = get_settings() 导致 DB 连接
+    - 手动 AST 解析 Settings 类的所有类属性名
+    - 解析 .env.example 中所有 KEY=value 格式的行（跳过 # 注释行和空行）
+
+    白名单规则：
+    - Settings-only 白名单（内部配置，无需在 .env.example 暴露）：
+      这些字段由代码默认值控制，普通用户不需要配置
+    - .env.example-only 白名单：无豁免。.env.example 有但 Settings 没有的字段
+      会触发 Pydantic extra_forbidden 启动报错，必须 100% 对齐，无例外
+
+    FAIL 时信息：明确显示哪些字段在哪一侧缺失，以及修复建议。
+    """
+    env_example_path = _project_path(".env.example")
+    config_py_path = _project_path("app", "config.py")
+
+    # ── 前置检查：文件必须存在 ─────────────────────────────────────────────
+    if not os.path.exists(env_example_path):
+        raise AssertionError(
+            ".env.example 文件不存在。\n"
+            "修复: 在项目根目录创建 .env.example（参考 Settings 类字段）"
+        )
+    if not os.path.exists(config_py_path):
+        raise AssertionError(
+            "app/config.py 文件不存在。\n"
+            "修复: 确认 Settings 类配置文件路径正确"
+        )
+
+    # ── Step 1: 解析 .env.example 的所有 KEY ──────────────────────────────
+    env_example_keys: set[str] = set()
+    with open(env_example_path, 'r', encoding='utf-8') as fh:
+        for line in fh:
+            line = line.strip()
+            # 跳过空行和注释行
+            if not line or line.startswith('#'):
+                continue
+            # 解析 KEY=value 格式（value 可以为空）
+            if '=' in line:
+                key = line.split('=', 1)[0].strip()
+                if key:  # 确保 key 非空
+                    env_example_keys.add(key)
+
+    # ── Step 2: AST 解析 app/config.py 的 Settings 类所有字段 ─────────────
+    # 使用 AST 避免 import 触发模块级 settings = get_settings() → DB 连接
+    settings_fields: set[str] = set()
+    with open(config_py_path, 'r', encoding='utf-8') as fh:
+        source = fh.read()
+
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as e:
+        raise AssertionError(f"app/config.py 语法错误，无法解析：{e}")
+
+    # 找到 Settings 类定义，提取所有类属性名
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == 'Settings':
+            for item in node.body:
+                # 类属性注解（FIELD_NAME: Type = default_value）
+                if isinstance(item, ast.AnnAssign):
+                    target = item.target
+                    if isinstance(target, ast.Name):
+                        # 只取全大写字段（环境变量命名约定）
+                        if target.id.isupper():
+                            settings_fields.add(target.id)
+
+    if not settings_fields:
+        raise AssertionError(
+            "无法从 app/config.py 中解析到 Settings 类字段。\n"
+            "请确认 Settings 类定义存在且字段使用 FIELD: Type = default 格式"
+        )
+
+    # ── Step 3: 白名单定义 ────────────────────────────────────────────────
+    #
+    # Settings-only 白名单：这些字段在 Settings 类中有默认值，属于内部配置，
+    # 普通用户不需要在 .env.example 中看到也不需要配置。
+    # 它们可以不在 .env.example 中，但必须在 Settings 中（白名单本身保证这点）。
+    settings_only_whitelist: set[str] = {
+        # 代码行为控制（内部 flag，默认值适合所有场景）
+        "PROMPT_FORMAT",            # b_prime|legacy，代码已有合理默认值
+        "PIPELINE_COST_LIMIT",      # 单次 Pipeline 成本上限，有默认值 $10
+
+        # 分镜拆分配置——已在 .env.example 中暴露，此处保留为文档兼容
+        # （实际上这些字段在 .env.example 里有，不需要白名单，但保留无害）
+
+        # 图像生成开发用跳过 flag（开发调试用，生产不需要配置）
+        "SKIP_IMAGE_GENERATION",    # 开发用：用 R8 测试图替代真实生图，默认 False
+
+        # Wave 4 集成说明：MUREKA_API_KEY 已移除白名单，
+        # .env.example 已补充该字段，Settings 类已声明，三方完全对齐
+    }
+
+    # .env.example-only 白名单：无豁免
+    # .env.example 中存在但 Settings 没有的字段会直接导致 Pydantic extra_forbidden
+    # 启动报错，属于生产事故级别，必须 100% 对齐，无任何白名单豁免
+
+    # ── Step 4: 双向对比 ──────────────────────────────────────────────────
+    # 4a: .env.example 有但 Settings 没有（危险！启动即报错，无白名单豁免）
+    in_example_not_in_settings = env_example_keys - settings_fields
+
+    # 4b: Settings 有但 .env.example 没有（用户配置盲区）
+    # 白名单字段豁免（内部配置，用户不需要知道）
+    in_settings_not_in_example = (settings_fields - env_example_keys) - settings_only_whitelist
+
+    # ── Step 5: 断言并输出清晰的修复建议 ─────────────────────────────────
+    errors = []
+
+    if in_example_not_in_settings:
+        sorted_missing = sorted(in_example_not_in_settings)
+        errors.append(
+            f"❌ 以下字段在 .env.example 中存在，但 Settings 类未声明（会导致启动 Pydantic 报错）:\n"
+            + "\n".join(f"    - {k}" for k in sorted_missing)
+            + "\n  修复: 在 app/config.py 的 Settings 类中添加这些字段的类型注解和默认值\n"
+            + "  例如: FIELD_NAME: str = \"\"  # 字段说明"
+        )
+
+    if in_settings_not_in_example:
+        sorted_missing = sorted(in_settings_not_in_example)
+        errors.append(
+            f"❌ 以下字段在 Settings 类中存在，但 .env.example 未暴露（用户配置盲区）:\n"
+            + "\n".join(f"    - {k}" for k in sorted_missing)
+            + "\n  修复选项 A（推荐）: 在 .env.example 中添加这些字段（带说明注释）\n"
+            + "  修复选项 B: 若确为内部配置，将字段加入 settings_only_whitelist"
+        )
+
+    assert not errors, (
+        "【EP-016】.env.example 与 Settings 类字段不一致！\n\n"
+        + "\n\n".join(errors)
+        + "\n\n"
+        + f"  调试信息:\n"
+        + f"    .env.example 字段数: {len(env_example_keys)}\n"
+        + f"    Settings 字段数: {len(settings_fields)}\n"
+        + f"    Settings-only 白名单: {sorted(settings_only_whitelist)}"
+    )

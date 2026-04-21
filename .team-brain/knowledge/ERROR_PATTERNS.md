@@ -3,14 +3,14 @@
 > Mitchell Hashimoto 原则：每次 agent 犯错 → 工程化一个解决方案，让它结构上不可能再犯。
 > "不要去改 prompt，去改 harness。"
 >
-> 最后更新: 2026-04-14
+> 最后更新: 2026-04-18
 
 ## 统计
 
-- 已记录错误模式: **14 个**
-- 有工程化防护 (Sensor): **8 个** ✅
+- 已记录错误模式: **16 个**
+- 有工程化防护 (Sensor): **9 个** ✅
 - 仅文档记录 (Guide only): **6 个** ❌
-- **防护率**: 8/14 = **57%**
+- **防护率**: 9/16 = **56%**
 
 ---
 
@@ -141,3 +141,22 @@
 - **修复方式**: R6-1b 同步更新顶层 mood + R6-2b 删除替换逻辑（前端改为 append）
 - **工程化防护**: ❌ 仅代码修复
 - **防护状态**: ❌ 需补 confirm-outline 数据完整性测试
+
+### EP-016: Pydantic Settings extra_forbidden — .env 字段未在 Settings 类声明
+
+- **发现日期**: 2026-04-18
+- **发现者**: @pm + @backend (TASK-SETTINGS-FIX)
+- **错误描述**: `.env` 中存在 `VOLCENGINE_API_KEY`、`VOLCENGINE_SECRET_KEY`、`MUREKA_API_KEY` 字段，但 Settings 类未声明这些字段，Pydantic `extra_forbidden`（默认模式）启动时报错。临时用 `extra = "ignore"` 绕过，导致未声明字段静默通过，失去早期发现未声明变量的能力
+- **根因分析**: `.env.example` 引导填写的字段 (`VOLCENGINE_API_KEY`、`VOLCENGINE_SECRET_KEY`) 从未同步到 Settings 类；新增集成 (`MUREKA_API_KEY`) 只加了 `.env` 和调用代码，忘记在 Settings 声明；用 `extra = "ignore"` 绷带时也没警告
+- **修复方式**: 在 Settings 类中显式声明全部遗漏字段（含注释），并删除 `extra = "ignore"` 恢复严格模式
+- **工程化防护**: ✅ `test_architecture.py::test_env_example_matches_settings` (TASK-ENV-SETTINGS-SYNC-TEST, 2026-04-18) — AST 解析双向对比 .env.example 字段 vs Settings 类字段。新增外部服务时，必须同时更新 Settings + `.env` + `.env.example`（三处同步），否则 PreCommit hook 自动拦截
+- **防护状态**: ✅ 已加（2026-04-18）
+
+### EP-015: curl 传含中文的 JSON 给外部 API 报 Invalid JSON
+- **发现日期**: 2026-04-16
+- **发现者**: @backend（Mureka API 调用）
+- **错误描述**: 用 curl 的 `-d '{...}'` 传含中文字符（如"刷"）的 JSON body 给 Mureka API，返回 `Invalid Request, Invalid input parameter JSON format`
+- **根因分析**: curl 的 shell 字符串处理对中文引号/特殊字符不可靠，JSON 编码不正确
+- **修复方式**: 改用 Python `urllib.request` + `json.dumps(data, ensure_ascii=False).encode('utf-8')` 确保正确 UTF-8 编码
+- **工程化防护**: ❌ 仅文档记录。后续集成 Mureka 到 Pipeline 时，必须用 Python HTTP 调用（不用 curl）
+- **防护状态**: ❌ 需在集成代码中强制使用 Python HTTP client

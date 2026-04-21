@@ -4,6 +4,18 @@
 
 ---
 
+## 2026-04-21（PM 代更新）
+
+### Wave 3 Step 6 — Stage D BGM Player ✅
+- 新建 `BgmPlayer.tsx`（5 状态：idle/loading/generating/ready/error）
+- HTML5 audio + 进度条 + 音量 debounce PATCH + 换一首/重新生成
+- `types/create.ts` 加 BGM 类型，`CreateContext` 加 state + 6 actions，`api.ts` 加 4 API 封装
+- `StageD.tsx` 替换旧 BGM_TRACKS 选择器 → 调用 `<BgmPlayer>`
+- `npm run build` 20 路由 0 TS 错误 ✅
+- 配合 @backend Wave 3 Step 5 的 4 BGM REST API 端点
+
+---
+
 ## 2026-04-14（PM 代更新）
 
 ### TASK-STAGED-WIRE — StageD 3 按钮接通后端 API (KI-001/002/003) ✅

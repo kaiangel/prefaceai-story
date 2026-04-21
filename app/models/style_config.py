@@ -192,6 +192,129 @@ class StyleConfigBuilder:
         "architectural": "architectural rendering, precise lines, perspective drawing, blueprint-like",
     }
 
+    # ================================================================
+    # 音乐方向提示 (music_hint) — Pipeline 集成 Wave 1 Step B
+    # 给 Haiku 在生成 BGM prompt 时提供视觉风格 → 音乐方向的锚点
+    # 原则: 从身体感觉/空间氛围描述，不列乐器清单，英文
+    # ================================================================
+    MUSIC_HINTS: Dict[str, str] = {
+        # ============ 基础风格 ============
+        "realistic": "contemporary naturalistic, sparse and grounded, acoustic-piano palette, no synthetic sheen",
+        "cartoon": "bright orchestral, playful mid-tempo, warm and bouncy, light percussion with melodic energy",
+        "anime": "J-pop adjacent cinematic, piano and strings leading, clean production, emotional directness and youthful energy",
+        "watercolor": "impressionist gentle, soft-edged textures, dreamy piano and light strings, unhurried and quietly luminous",
+        "cyberpunk": "electronic nocturne, analog synth pulse with neon underlayer, metropolitan cold, rain-soaked and machine-breathing",
+        "ink": "East Asian minimalist, guqin or dizi or xiao color, negative space breathes between notes, ink-brush pacing",
+        "pixel": "chiptune adjacent or simple pentatonic, clean retro character, nostalgia without irony, constrained palette of sound",
+        "oil_painting": "classical chamber gravity, strings and harpsichord or piano, Old World weight and emotional gravitas",
+        "illustration": "polished contemporary, piano-led with lush production, emotionally articulate without genre constraint",
+        "3d_render": "cinematic orchestral warmth, full strings with adventure lift, emotional and sweeping but never dark",
+
+        # ============ 艺术媒介/技法 ============
+        "pencil_sketch": "intimate acoustic, bare and unhurried, pencil-on-paper quietness, space between notes as loaded as the notes themselves",
+        "colored_pencil": "warm and handcrafted, gentle folk textures, soft and personal, handmade emotional warmth",
+        "charcoal": "brooding and expressive, raw emotional weight, dark tones with stark contrast, gestural and unresolved",
+        "marker": "bold and graphic, energetic pop-commercial, vivid and punchy, fun without subtlety",
+        "crayon": "childlike wonder and play, simple bright melodies, innocent and crayon-box colorful",
+        "pastel": "soft chalky calm, gentle and tender, pastel warmth without saccharine, quiet living-room intimacy",
+        "acrylic": "bold and textured, energetic and confident, painterly strokes made audible",
+        "gouache": "flat and precise, elegant simplicity, matte warmth, illustrated and deliberate",
+        "woodcut": "stark and primal, folk or ancient resonance, wood-grain texture in sound, bold and carved",
+        "linocut": "graphic and forceful, block-print directness, earthy and hand-pressed",
+        "collage": "layered and eclectic, mixed textures, found-sound warmth, unexpected juxtapositions",
+        "paper_cut": "Chinese folk festivity, erhu and pipa warmth, jianzhi red-paper brightness, celebration and community spirit",
+        "stained_glass": "cathedral light and resonance, warm devotional glow, jewel-toned and luminous",
+
+        # ============ 艺术流派 ============
+        "impressionist": "Impressionist shimmering, dappled light in sound, flowing and spontaneous, color-as-feeling",
+        "expressionist": "raw and distorted, emotional urgency, dissonance as truth, the body before the mind",
+        "surrealist": "dreamlogic and uncanny, unexpected collisions of texture, the subconscious given sonic shape",
+        "pop_art": "bold pop energy, repetitive hook-driven, bright and irreverent, commercial punch with artistic attitude",
+        "minimalist": "spare and essential, slow unfolding, each sound chosen with austere intention, silence as presence",
+        "art_deco": "jazz age glamour, geometric elegance, 1920s cocktail-hour sophistication",
+        "art_nouveau": "fin-de-siècle lush and flowing, orchestral with organic sweep, belle époque grace, nature and beauty intertwined",
+        "baroque": "Baroque ornamentation and drama, counterpoint layering, grandeur and spiritual intensity",
+        "rococo": "light and playful ornament, French pastoral elegance, powder-and-lace delicacy",
+        "renaissance": "classical polyphony, sacred and humanist, measured and luminous, the dignity of craft",
+
+        # ============ 文化/地域风格 ============
+        "ukiyo_e": "Japanese classical serenity, shamisen or koto color, Edo period floating world, decorative elegance and unhurried grace",
+        "dunhuang": "ancient Silk Road resonance, Central Asian modal color, devotional reverence and cavernous depth",
+        "chinese_ink": "East Asian minimalist, guqin or xiao color, ink-brush pacing, empty space as sound",
+        "chinese_gongbi": "refined Chinese court music, delicate pipa or zheng, meticulous and ornate, silk-texture precision",
+        "persian_miniature": "Persian classical modal warmth, oud and string resonance, illuminated manuscript intricacy",
+        "byzantine": "Orthodox chant resonance, golden icon solemnity, sacred and gilded, eternal and austere",
+        "african_tribal": "percussive communal energy, earth-rooted rhythm, call-and-response vitality, organic and ancestral",
+        "mexican_mural": "Mexican folk and revolutionary spirit, mariachi color beneath social weight, bold and communal",
+        "indian_miniature": "Indian classical modal warmth, sitar or sarod raga color, Mughal court ornament and devotion",
+        "korean_traditional": "Korean hanji-paper quietness, gayageum or haegeum, natural subject reverence, gentle and precise",
+        "russian_lacquer": "Russian folk tale warmth, balalaika or bayan color, Palekh dark-and-gold mystery",
+        "thai_traditional": "Thai classical court splendor, ranat or khim color, temple painting devotion and golden warmth",
+
+        # ============ 时代/流行风格 ============
+        "steampunk": "Victorian mechanical grandeur, brass ensemble with clockwork rhythm, industrial elegance and adventurous invention",
+        "dieselpunk": "1940s industrial drive, big band edge with diesel-engine grit, Art Deco momentum",
+        "atompunk": "1950s atomic optimism, space-age lounge orchestral, Sputnik-era wonder and naive futurism",
+        "solarpunk": "green acoustic warmth, organic and hopeful, sustainable folk energy, living architecture breathing",
+        "gothic": "dark romantic cathedral resonance, organ or choir undertow, beauty found in shadow, ornate melancholy and sacred dread",
+        "victorian": "Victorian parlor elegance, chamber strings and piano, period formality with repressed longing",
+        "80s_neon": "1980s synth-pop drive, neon grid pulsing, analog warmth meets digital sheen, nostalgic electric",
+        "90s_cartoon": "Saturday morning energy, upbeat and simple, 90s cartoon bounce and bold hooks",
+        "y2k": "early 2000s digital gloss, Y2K pop shimmer, chrome-plated bubblegum electronic",
+        "vaporwave": "slowed and dreamlike, mall-music memory distorted, melancholy nostalgia bathed in pastel digital haze",
+        "synthwave": "retrowave pulse, neon highway at night, analog synth warmth with retro-futurist drive",
+        "medieval": "medieval modal resonance, lute or recorder color, tapestry-pattern repetition, ancient and sacred",
+
+        # ============ 现代数字/动画风格 ============
+        "pixar_3d": "cinematic orchestral warmth, full strings with adventure lift, emotional and sweeping but never dark",
+        "disney_classic": "magical fairy-tale orchestral, classic animation wonder, sweeping and singable, timeless warmth",
+        "dreamworks": "action-comedy orchestral, wit and spectacle, DreamWorks swagger and kinetic energy",
+        "ghibli": "pastoral romantic, acoustic strings and light winds, nostalgic warmth with childlike wonder and open-sky breathing room",
+        "shinkai": "bittersweet cinematic, piano and strings aching with distance, Shinkai longing for what cannot be held",
+        "makoto_style": "slice-of-life warmth, gentle and everyday, Kyoto Animation quiet emotional depth",
+        "cel_shaded": "stylized game-world energy, cel-shaded cartoon bounce, video game adventure palette",
+        "flat_design": "clean and geometric, minimal and precise, design-thinking aesthetic without sentimentality",
+        "isometric": "puzzle-like and contemplative, architectural curiosity, geometric and calm with playful undertone",
+        "low_poly": "geometric and spare, digital minimalism with warmth, angular but human",
+        "vector": "clean graphic precision, bold and scalable, design-forward and unambiguous",
+        "line_art": "bare linework quietness, monochrome intimacy, clean and open, outline and silence",
+        "semi_realistic": "grounded yet stylized, contemporary with emotional color, the real world seen through an artist's eye",
+
+        # ============ 漫画类型 ============
+        "manga": "Japanese cinematic with dramatic peaks and quiet valleys, tension-release arc, emotionally charged pacing",
+        "manhwa": "K-drama romantic ambient, clean production with emotional restraint, the ache of almost-said feelings",
+        "manhua": "Chinese martial arts cinematic energy, traditional instrument color beneath modern drama",
+        "american_comic": "heroic action orchestral, bold punchy themes, larger-than-life energy, kinetic momentum",
+        "marvel_style": "Marvel superhero cinematic, wall-of-sound orchestral, heroic and spectacular, world-saving weight",
+        "dc_style": "DC dark and operatic, dramatic and weighty, iconic and mythic in scale",
+        "european_comic": "European ligne-claire elegance, refined adventure, Tintin-era discovery and wit",
+        "indie_comic": "intimate and experimental, voice-driven and personal, genre-bending sonic identity",
+
+        # ============ 氛围/情绪风格 ============
+        "dark_fantasy": "epic dark orchestral, weight of ancient stone and mythic power, low brass and deep resonance, shadows that breathe",
+        "dreamy_soft": "ethereal soft drift, luminous and weightless, pastel-warm and gently floating",
+        "bright_cheerful": "sunny upbeat energy, major key warmth, joyful bounce, the world at its most generous",
+        "mysterious": "shadowed and questioning, tension held in suspension, the sound of a door not yet opened",
+        "epic_cinematic": "grand cinematic scale, sweeping orchestral, the weight of consequence and the size of sky",
+        "cozy_healing": "warm and unhurried, the sound of a heated room in winter, soft and restorative, no edges",
+        "horror": "dread and unease, tension without resolution, sounds that shouldn't exist in daylight",
+        "romantic": "intimate and longing, the space between two people, warm and soft with aching sweetness",
+        "nostalgic": "faded warmth, vintage grain, the ache of what was, memory given sonic texture",
+
+        # ============ 特定应用风格 ============
+        "children_book": "tender folk-lullaby warmth, gentle and unhurried, innocence without sentimentality, safe and loving sonic space",
+        "picture_book": "storybook gentle, narrative warmth, each page-turn a breath, simple and inviting",
+        "concept_art": "world-building atmospheric, production-quality soundscape, the hum of an imagined world",
+        "game_art": "game-world adventurous, stylized and interactive, genre-appropriate energy and pacing",
+        "movie_storyboard": "cinematic pre-viz, dramatic and scene-setting, the sound of a story about to happen",
+        "fashion_illustration": "editorial chic, cool and stylized, runway tension and effortless attitude",
+        "botanical": "naturalist stillness, the sound of careful observation, delicate and precise, nature's own patience",
+        "architectural": "spatial and structural, the resonance of designed space, form and proportion given sound",
+
+        # ============ fallback ============
+        "custom": "acoustic versatile palette, match visual mood, emotionally responsive and style-agnostic",
+    }
+
     # 风格分类映射
     STYLE_CATEGORIES = {
         # 基础风格
@@ -531,6 +654,28 @@ class StyleConfigBuilder:
         """获取风格总数"""
         return len(self.STYLE_TEMPLATES)
 
+    def get_music_hint(self, style_name: str) -> str:
+        """
+        获取风格对应的音乐方向提示（music_hint）
+        给 Haiku 在生成 BGM prompt 时提供视觉风格 → 音乐方向的锚点。
+        优先从 StyleEnforcer 读取（有完整 StyleEnforcement 的 28 个风格），
+        再查 MUSIC_HINTS dict，最后 fallback 到通用提示。
+        """
+        # 先尝试从 StyleEnforcer 获取（有完整定义的风格）
+        try:
+            from app.services.style_enforcer import StyleEnforcer
+            enforcement = StyleEnforcer.get_enforcement(style_name)
+            if enforcement and enforcement.music_hint:
+                return enforcement.music_hint
+        except ImportError:
+            pass
+        # 从本地 MUSIC_HINTS dict 获取
+        hint = self.MUSIC_HINTS.get(style_name, "")
+        if hint:
+            return hint
+        # fallback
+        return self.MUSIC_HINTS.get("custom", "acoustic versatile palette, match visual mood")
+
 
 # ================================================================
 # 便捷函数
@@ -556,3 +701,12 @@ def get_styles_by_category(category: str) -> List[str]:
         return builder.get_styles_by_category(cat)
     except ValueError:
         return []
+
+
+def get_music_hint(style_name: str) -> str:
+    """
+    获取风格对应的音乐方向提示（music_hint）
+    Pipeline 集成 Wave 1 Step B — 给 Haiku 生成 BGM prompt 时的视觉→音乐锚点
+    """
+    builder = StyleConfigBuilder()
+    return builder.get_music_hint(style_name)

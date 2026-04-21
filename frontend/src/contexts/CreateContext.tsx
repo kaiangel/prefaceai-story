@@ -36,6 +36,14 @@ const initialState: CreateState = {
   shots: [],
   // Stage D
   bgm: null,
+  bgmPlayer: {
+    status: "idle",
+    bgmUrl: null,
+    volume: 70,
+    metaVersion: null,
+    creditsUsed: 0,
+    errorMessage: null,
+  },
   // Stage E
   deliveryFormat: "comic",
   // Continuation
@@ -278,6 +286,36 @@ function createReducer(state: CreateState, action: CreateAction): CreateState {
 
     case "SET_BGM":
       return { ...state, bgm: action.payload };
+
+    // BGM Player actions (Wave 3)
+    case "BGM_LOADING":
+      return { ...state, bgmPlayer: { ...state.bgmPlayer, status: "loading", errorMessage: null } };
+
+    case "BGM_GENERATING":
+      return { ...state, bgmPlayer: { ...state.bgmPlayer, status: "generating", errorMessage: null } };
+
+    case "BGM_READY":
+      return {
+        ...state,
+        bgmPlayer: {
+          ...state.bgmPlayer,
+          status: "ready",
+          bgmUrl: action.payload.bgmUrl,
+          volume: Math.round(action.payload.volume * 100),
+          metaVersion: action.payload.metaVersion,
+          creditsUsed: action.payload.creditsUsed,
+          errorMessage: null,
+        },
+      };
+
+    case "BGM_ERROR":
+      return { ...state, bgmPlayer: { ...state.bgmPlayer, status: "error", errorMessage: action.payload } };
+
+    case "BGM_SET_VOLUME":
+      return { ...state, bgmPlayer: { ...state.bgmPlayer, volume: action.payload } };
+
+    case "BGM_NO_BGM":
+      return { ...state, bgmPlayer: { ...state.bgmPlayer, status: "idle", bgmUrl: null, metaVersion: null, creditsUsed: 0, errorMessage: null } };
 
     case "SET_DELIVERY_FORMAT":
       return { ...state, deliveryFormat: action.payload };

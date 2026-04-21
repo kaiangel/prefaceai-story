@@ -172,9 +172,9 @@ Ben 是项目的人类合伙人兼技术联合创始人（CTO 级别）。使用
 
 **🎉 突破性解决方案（teststory6.4-6.6验证通过）**：
 
-采用**混合模型架构**彻底解决角色一致性问题：
-- **参考图生成**：Gemini 2.5 Flash（速度快、成本低）
-- **Shot生成**：Gemini 3 Pro Image / Nano Banana Pro（参考图理解能力强）
+采用**统一 NB2 模型架构**彻底解决角色一致性问题（2026-04-15 更新）：
+- **参考图生成**：NB2（gemini-3.1-flash-image-preview，速度快、成本低）
+- **Shot生成**：NB2（gemini-3.1-flash-image-preview，默认）/ Gemini 3 Pro Image（未来 Premium 储备，当前不启用）
 
 **验证结果（2025-12-23）**：
 | 场景类型 | 一致性 | 测试用例 |
@@ -402,7 +402,7 @@ final.mp4
 | AlignmentService | 音画时间对齐 | - |
 
 **🚨 模型配置说明**：
-- `FAST_MODEL = "gemini-2.5-flash-image"` - 用于参考图生成
+- `FAST_MODEL` — 已废弃（注释掉），参考图现统一用 NB2_MODEL
 - `NB2_MODEL = "gemini-3.1-flash-image-preview"` - Nano Banana 2，主力生图模型（角色一致性 ~95%）
 
 ---

@@ -1,5 +1,7 @@
 "use client";
 
+import type { BgmInfo, BgmRegenerateResponse, BgmVolumeResponse } from "@/types/create";
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -59,4 +61,57 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}, token?: 
   }
 
   return response.json() as Promise<T>;
+}
+
+// ============ BGM API helpers (Wave 3, Step 6) ============
+
+const BGM_BASE = (projectId: string, chapter: number) =>
+  `/projects/${projectId}/chapters/${chapter}`;
+
+export async function fetchBgmInfo(
+  projectId: string,
+  chapter: number,
+  token: string | null
+): Promise<BgmInfo> {
+  return apiFetch<BgmInfo>(`${BGM_BASE(projectId, chapter)}/bgm`, {}, token);
+}
+
+export async function regenerateBgm(
+  projectId: string,
+  chapter: number,
+  token: string | null
+): Promise<BgmRegenerateResponse> {
+  return apiFetch<BgmRegenerateResponse>(
+    `${BGM_BASE(projectId, chapter)}/bgm/regenerate`,
+    { method: "POST" },
+    token
+  );
+}
+
+export async function changeMetaBgm(
+  projectId: string,
+  chapter: number,
+  token: string | null
+): Promise<BgmRegenerateResponse> {
+  return apiFetch<BgmRegenerateResponse>(
+    `${BGM_BASE(projectId, chapter)}/bgm/change-meta`,
+    { method: "POST" },
+    token
+  );
+}
+
+export async function patchBgmVolume(
+  projectId: string,
+  chapter: number,
+  volume: number,   // 0-1
+  token: string | null
+): Promise<BgmVolumeResponse> {
+  return apiFetch<BgmVolumeResponse>(
+    `${BGM_BASE(projectId, chapter)}/bgm/volume`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ volume }),
+    },
+    token
+  );
 }

@@ -1,23 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   ChevronLeft,
   ChevronRight,
   RefreshCw,
   Trash2,
-  Music,
   Check,
-  X,
   Image as ImageIcon,
   Sparkles,
   Loader2,
   Wand2,
 } from "lucide-react";
 import { useCreate } from "@/contexts/CreateContext";
-import { BGM_TRACKS } from "@/types/create";
 import { apiFetch, getStoredToken } from "@/lib/api";
+import BgmPlayer from "./BgmPlayer";
 import { useToast } from "@/components/ui/Toast";
 
 export default function StageD() {
@@ -25,7 +23,6 @@ export default function StageD() {
   const { toast } = useToast();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [editingShotId, setEditingShotId] = useState<number | null>(null);
-  const [showBGM, setShowBGM] = useState(false);
   const [regeneratingId, setRegeneratingId] = useState<number | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -172,18 +169,6 @@ export default function StageD() {
           <span className="text-sm text-text-muted">
             第 {currentIndex + 1} / {shots.length} 张
           </span>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowBGM(!showBGM)}
-              className={`p-2 rounded-lg border transition-colors ${
-                showBGM
-                  ? "border-brand-primary/50 bg-brand-primary/10 text-brand-primary"
-                  : "border-white/10 text-text-muted hover:text-text-secondary"
-              }`}
-            >
-              <Music className="w-4 h-4" />
-            </button>
-          </div>
         </div>
 
         {/* Shot Card */}
@@ -389,53 +374,10 @@ export default function StageD() {
           ))}
         </div>
 
-        {/* BGM Selector */}
-        <AnimatePresence>
-          {showBGM && (
-            <motion.section
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mb-6 overflow-hidden"
-            >
-              <div className="bg-bg-secondary rounded-xl p-4 border border-white/5">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-medium text-text-secondary">背景音乐</h3>
-                  <button
-                    onClick={() => setShowBGM(false)}
-                    className="text-text-muted hover:text-text-secondary"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {BGM_TRACKS.map((track) => (
-                    <button
-                      key={track.id}
-                      onClick={() => dispatch({ type: "SET_BGM", payload: track })}
-                      className={`w-full flex items-center gap-3 p-2.5 rounded-lg border transition-all text-left ${
-                        state.bgm?.id === track.id
-                          ? "border-brand-primary/50 bg-brand-primary/10"
-                          : "border-white/5 hover:border-white/10"
-                      }`}
-                    >
-                      <Music className="w-4 h-4 text-text-muted flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-text-primary truncate">{track.name}</p>
-                        <p className="text-[10px] text-text-muted">
-                          {track.mood} &middot; {track.duration}
-                        </p>
-                      </div>
-                      {state.bgm?.id === track.id && (
-                        <Check className="w-4 h-4 text-brand-primary flex-shrink-0" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </motion.section>
-          )}
-        </AnimatePresence>
+        {/* BGM Player */}
+        <div className="mb-6">
+          <BgmPlayer projectId={state.projectId} chapter={1} />
+        </div>
 
         {/* Confirm & Deliver */}
         <button

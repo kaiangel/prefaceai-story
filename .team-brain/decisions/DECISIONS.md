@@ -22,7 +22,12 @@
 | **DEC-011** | **2026-02-24** | **条漫产品形态定义：交付模式+篇幅选项+短视频模式** ✅ | **创始人** | **全局** |
 | **DEC-012** | **2026-02-25** | **Phase 2 四项决策：模型全面升级+灌篮高手风格+text_type优化+角色一致性框架** ⭐ 新 | **创始人** | **全局** |
 | **DEC-013** | **2026-02-28** | **Create 页面升级 + 产品方向扩展：7 项功能决策 + 架构设计** ⭐ 新 | **创始人** | **Frontend + 全局** |
-| **DEC-014** | **2026-03-03** | **移除 previous_shot_image 传递 (Plan A)** ⭐ 新 | **创始人** | **Backend + AI-ML** |
+| **DEC-014** | **2026-03-03** | **移除 previous_shot_image 传递 (Plan A)** ✅ | **创始人** | **Backend + AI-ML** |
+| **DEC-015** | **2026-04-15** | **Harness V2 Engineering：CI/CD + Schema 验证 + 成本熔断 + 监控** ⭐ 新 | **创始人** | **全局** |
+| **DEC-016** | **2026-04-15** | **Prompt B' 格式设为默认（-46% tokens，盲测验证）** ⭐ 新 | **创始人** | **AI-ML + Backend** |
+| **DEC-017** | **2026-04-14** | **Stage D 产品交互逻辑：调整画面 + 编辑文字 + 重新生成** ⭐ 新 | **创始人** | **Frontend + Backend** |
+| **DEC-018** | **2026-04-14** | **Haiku 运行时使用场景澄清：产品运行时轻量 API 调用允许 Haiku** ⭐ 新 | **创始人** | **全局** |
+| **DEC-019** | **2026-04-15** | **image_prompt 中文阈值收紧：15% → 5%** ⭐ 新 | **创始人** | **AI-ML + Backend** |
 
 ---
 
@@ -788,6 +793,167 @@ Shot 生成时，系统将前一个 shot 的输出图像作为 "环境参考" (I
 - [ ] @Backend: SQ-8 — 移除 previous_shot_image 传递（pipeline_orchestrator.py, image_generator.py, storyboard_prompts.py）
 - [x] @PM: SQ-7 — 更新 CLAUDE.md 第 2.2 节 + guide 第 656 行 + Pro→NB2 规则 ✅ (2026-03-04)
 - [ ] @Tester: Step 7 — A/B 对比验证（环境连续性是否受影响）
+
+---
+
+## DEC-015: Harness V2 Engineering — CI/CD + Schema 验证 + 成本熔断 + 监控
+
+**日期**: 2026-04-15
+**决策者**: @创始人
+**影响范围**: 全局（工程质量保障体系）
+
+### 问题
+Harness V1（PostToolUse pyright/tsc hooks + PreCommit 架构测试 + PrePush 全量测试）已建立本地质量门控，但缺少：① 云端 CI 验证 ② Pipeline 数据格式校验 ③ 成本失控保护 ④ 生产运行监控
+
+### 最终决策
+**实施 Harness V2 Engineering，4 大能力全面建立**
+
+#### 能力 1: GitHub Actions CI
+- 每次 push 触发：pyright 类型检查 + tsc 编译检查 + pytest 架构测试
+- 失败阻断 merge
+
+#### 能力 2: Pipeline Schema 验证
+- `pipeline_schemas.py`：OutlineSchema、ScreenplaySchema、CharacterSchema、ShotSchema
+- Stage 1→2 边界、Stage 3→4 边界强制 schema 校验
+- 字段缺失/类型错误立即报错
+
+#### 能力 3: $10 成本熔断器
+- 单次 pipeline 运行成本超 $10 自动中断
+- 防止提示词 bug 导致无限 token 消耗
+
+#### 能力 4: 6 EP Sensor + 监控端点
+- 6 个 Endpoint Sensor（EP-1~EP-6）：pipeline 各阶段关键指标采集
+- `/api/monitor/sensors` 端点暴露实时数据
+- 为后续 R4 监控告警系统（DEC-015 延伸任务）奠基
+
+### 执行结果
+3 Phase 全部完成：Phase 1（CI + Schema，commit 87aeaa4）→ Phase 2（成本熔断 + EP Sensor，commit ea0edb1）→ Phase 3（PreCommit + PrePush + VPS 部署，VPS PASS）
+
+### 后续行动
+- [x] Phase 1-3 全部完成 ✅
+- [ ] R4 监控告警：修复外部 `/api/health` 404 + 配置告警服务（见 PENDING.md 监控告警 R4）
+
+---
+
+## DEC-016: Prompt B' 格式设为默认（-46% tokens，盲测验证）
+
+**日期**: 2026-04-15
+**决策者**: @创始人
+**影响范围**: AI-ML（storyboard_prompts.py）+ Backend（image_generator.py）
+
+### 问题
+AI-ML 开发了 Prompt B' 格式（在 A 格式基础上压缩冗余，去掉重复的风格前缀块、精简 IMAGE 编号说明等），token 消耗降低 46%。需要决定是否替换 A 格式成为默认。
+
+### 验证过程
+- A vs B' 盲测：Founder 在不知道来源的情况下对 10 对图像逐对评分
+- 结果：B' 5 分，A 4 分（5:4，B' 略胜）
+- 视觉质量无可感知下降，成本降低 46%
+
+### 最终决策
+**B' 格式正式设为默认，替代 A 格式**
+
+### 理由
+- 盲测验证视觉质量无退步（5:4 Founder 甚至略偏好 B'）
+- -46% tokens → 每故事成本从 ~$3.70（A 格式）降至 ~$3.40（短篇）
+- 更短 prompt 减少模型注意力稀释，反而有助于关键指令权重
+- 代码更简洁，维护成本降低
+
+### 成本影响（更新后官方数据）
+- 短篇（3 角色，21 shots，NB2 + B' + Sonnet 4.6）：**~$3.40/故事**
+- 中长篇满配（6 角色，45 shots）：**~$6.82/故事**
+
+### 后续行动
+- [x] B' 格式部署为默认 ✅
+- [x] VPS 部署生效 ✅
+- [x] CLAUDE.md 成本数据更新 ✅
+
+---
+
+## DEC-017: Stage D 产品交互逻辑 — 调整画面 + 编辑文字 + 重新生成
+
+**日期**: 2026-04-14
+**决策者**: @创始人
+**影响范围**: Frontend（Stage D 预览页）+ Backend（/api/shots/adjust 端点）
+
+### 问题
+Stage D 预览页需要明确"用户能对单张 shot 做什么"的三种操作的精确行为定义，防止前后端理解不一致。
+
+### 最终决策
+**Stage D 三种操作行为定义**
+
+| 操作 | 触发 | 执行者 | 行为 |
+|------|------|--------|------|
+| **调整画面** | 用户输入文字描述修改意图 | Backend + Haiku API | Haiku 根据用户描述重写当前 shot 的 `image_prompt`，然后重新调用 NB2 生图 |
+| **编辑文字** | 用户直接编辑文字框 | 纯前端 | 修改 shot 的 `chinese_text`（旁白/对话），不触发任何 API 调用 |
+| **重新生成** | 用户点击按钮 | Backend | 用当前 `image_prompt`（不修改）重新调用 NB2 生图，相当于 re-roll |
+
+### 理由
+- "调整画面" 用 Haiku 而非 Sonnet 4.6：轻量 prompt 改写任务，Haiku 足够胜任，成本低
+- "编辑文字" 纯前端：用户改 TTS 文字不涉及图像，无需后端参与
+- "重新生成" 简单 re-roll：用户对构图随机性不满，保持 prompt 不变换随机种子
+
+### 后续行动
+- [x] Backend 实现 `/api/shots/adjust` 端点 ✅
+- [x] Frontend Stage D 三种操作 UI 完成 ✅
+- [ ] Tester 验收 Stage D 完整流程
+
+---
+
+## DEC-018: Haiku 运行时使用场景澄清 — 产品运行时轻量 API 调用允许 Haiku
+
+**日期**: 2026-04-14
+**决策者**: @创始人
+**影响范围**: 全局（模型使用规范）
+
+### 问题
+CLAUDE.md 中明确"禁止 Haiku"，但 DEC-017 的 Stage D "调整画面" 需要用 Haiku 做轻量 prompt 改写。两者存在表面矛盾。
+
+### 最终决策
+**规则澄清：禁止 Haiku 仅针对开发 Agent 子代理，产品运行时允许 Haiku 用于轻量任务**
+
+### 规则重申
+
+| 场景 | 规则 | 理由 |
+|------|------|------|
+| 开发 Agent（Task 工具、代码生成、文档分析等子代理） | ❌ 禁止 Haiku，最低 Sonnet 4.6 | 开发质量要求高，Haiku 与 Opus 差距大 |
+| 产品运行时 API 调用（Stage D 画面调整、分类标注、轻量分析等） | ✅ 允许 Haiku | 成本优化合理，用户不感知模型差异 |
+
+### 适用的产品运行时 Haiku 调用场景
+- Stage D "调整画面"：Haiku 改写 `image_prompt`（DEC-017）
+- 角色参考图信息提取（DEC-013 决策 1）
+- 未来其他轻量分类/标注任务
+
+### 后续行动
+- [x] CLAUDE.md 规则说明已更新（"子代理模型规则"章节） ✅
+- [x] TEAM_CHAT.md 已通知全体 Agent ✅
+
+---
+
+## DEC-019: image_prompt 中文阈值收紧 — 15% → 5%
+
+**日期**: 2026-04-15
+**决策者**: @创始人
+**影响范围**: AI-ML（Stage 4 StoryboardDirector prompt 规则）+ Backend（image_generator.py 校验）
+
+### 问题
+Stage 4 生成的 `image_prompt` 被要求全英文（CLAUDE.md 规定），但允许少量中文（如中文名字、传统建筑专名）。原阈值 15% 过宽松，导致部分 prompt 混入大量非必要中文词汇，影响 Gemini NB2 图像生成质量。
+
+### 最终决策
+**中文字符比例阈值从 15% 收紧为 5%**
+
+### 理由
+- 15% 阈值在 100 字符的 prompt 中允许 15 个中文字，过于宽松
+- 5% 已足够容纳合理的中文专名（如"陈默 (Chen Mo)"、"汉服"等）
+- 更低的中文比例 = 更好的 NB2 响应质量（英文 prompt Gemini 理解更准确）
+- Harness V2 的 Schema 验证将自动捕获超阈值的 prompt
+
+### 允许的中文例外（5% 以内）
+延用 CLAUDE.md 已有规定：中文人名、传统建筑专名、传统服饰专名、传统美食/店铺、画面内书法/题字、节日视觉元素文字
+
+### 后续行动
+- [x] Stage 4 prompt 规则更新（中文 ≤5% 强制规则）✅
+- [x] image_generator.py 中文比例校验更新为 5% ✅
+- [x] Harness V2 Schema 验证已覆盖此规则 ✅
 
 ---
 

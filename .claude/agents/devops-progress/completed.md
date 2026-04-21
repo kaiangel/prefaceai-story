@@ -4,6 +4,30 @@
 
 ---
 
+### TTS-KEY-WRITE: 火山引擎 TTS 凭证写入 ✅ (2026-04-13)
+
+**任务**: 将 Founder 提供的 4 个火山引擎 TTS 凭证写入本地 .env + 补全 .env.example
+
+**完成内容**:
+- [x] 分析 config.py + tts_service.py 确认字段映射关系
+- [x] 本地 .env 写入 VOLCENGINE_API_KEY + VOLCENGINE_SECRET_KEY（VOLCENGINE_APP_ID + VOLCENGINE_ACCESS_KEY 已存在）
+- [x] .env.example 补全 VOLCENGINE_API_KEY + VOLCENGINE_SECRET_KEY 字段（含注释说明）
+- [x] R1 风险从"基本解决 4/6"升级为"完全解决 6/6"
+- [x] devops-progress/current.md + context-for-others.md 同步更新
+- [x] TEAM_CHAT.md 追加完成通知（含 VPS 操作指引，不含真实 Key 值）
+
+**字段映射清单**:
+| Founder 提供名称 | .env 字段名 | 用途 |
+|-----------------|-------------|------|
+| TTS_APPID | VOLCENGINE_APP_ID | TTS app 鉴权 ID（payload.app.appid）|
+| ACCESS TOKEN | VOLCENGINE_ACCESS_KEY | Bearer Auth token（Authorization: Bearer;xxx）|
+| API KEY | VOLCENGINE_API_KEY | VolcEngine 控制台 API Key（备用签名鉴权）|
+| SECRET KEY | VOLCENGINE_SECRET_KEY | VolcEngine 控制台 Secret Key（备用签名鉴权）|
+
+**VPS 操作**: Founder 需手动在 VPS /opt/xuhua-story/.env.production 补入 VOLCENGINE_API_KEY + VOLCENGINE_SECRET_KEY，再 docker compose restart api
+
+---
+
 ### TASK-HARNESS-V2 Phase 3: PreCommit + Push + VPS 部署 ✅ (2026-04-15)
 - settings.local.json PreCommit 加入 test_error_patterns.py
 - chmod +x scripts/health_check.sh

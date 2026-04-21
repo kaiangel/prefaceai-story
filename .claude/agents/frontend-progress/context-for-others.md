@@ -1,8 +1,22 @@
 # Frontend 状态速览（供其他Agent参考）
 
-> 更新时间: 2026-04-14 21:30（PM 代更新）
+> 更新时间: 2026-04-21（PM 代更新）
 
 ---
+
+## Wave 3 Step 6 — BGM Player (2026-04-21)
+
+**新组件**: `BgmPlayer.tsx` 在 StageD 预览页底部（shot 序列下方）
+
+**API 调用**（与 @backend Step 5 契约对齐）:
+- GET `/api/projects/:pid/chapters/:cn/bgm` — 获取 BGM 信息
+- POST `/api/projects/:pid/chapters/:cn/bgm/regenerate` — 重新生成（+10 credits）
+- POST `/api/projects/:pid/chapters/:cn/bgm/change-meta` — 换一首（+5 credits）
+- PATCH `/api/projects/:pid/chapters/:cn/bgm/volume` — 调音量（300ms debounce）
+
+**5 个 UI 状态**: idle / loading / generating（2-5min）/ ready（全功能）/ error
+
+**Context state**: `state.bgmPlayer` 里有 url/volume/meta_version/credits/isPlaying/loadingState 等字段
 
 ## TASK-STAGED-V2 前端变更（其他 Agent 需要知道）
 

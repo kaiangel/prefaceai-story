@@ -4,6 +4,139 @@
 
 ---
 
+### 2026-04-21 — TASK-HAIKU-QUOTE-EXTRACTION + v3.1/v3.2 迭代 + Pipeline Wave 1 启动
+
+**TASK-HAIKU-QUOTE-EXTRACTION（方案 A 可行性验证）**:
+- @ai-ml (Opus) 设计 Quote Selection Protocol（5 正 / 5 反 / 位置倾向 / 数量约束 / 忠实规则）
+- @backend (Sonnet) 脚本加 --quote-mode + --all-six 参数
+- PM 跑 12 次 Haiku 调用（6 故事 × 2 变体，不调 Mureka）
+- PM (Opus) 独立评审：mixed 8.4/10 > en 6.8/10，mixed 反超 en（V2 en 最好的结论反转）
+- 产出 `.team-brain/analysis/HAIKU_QUOTE_EXTRACTION_ASSESSMENT.md`
+- 意外发现：少 few-shot 年夜饭示例污染（Haiku 直接复制示例）；en 在秋梨膏违反反向清单
+
+**v3.1 迭代（尝试修 400 字符 + 污染）**:
+- @ai-ml Sonnet 加 ASCII 分层图 + 输出纯净规则
+- PM 实测发现：污染修复成功，但**金句质量大幅退步**（8.4 → 6.7）
+- 根因：大块约束段分走 Haiku attention，挑金句精力减少
+
+**v3.2 方案 B 迭代（污染清理迁到代码层）**:
+- @ai-ml Sonnet 精修 meta-prompt（删 ASCII 图 + 纯净规则，保留 2 行轻量长度建议）
+- @backend Sonnet 并行加 `clean_haiku_output()` 函数（正则去 markdown fence + 非 quotes XML 标签）
+- PM 实测：污染 100% 清理，字符 < 1024 安全，金句质量 7.4/10（接近 v3）
+- 秋梨膏连续 3 次挑动作序列（Haiku 温暖故事偏置）→ 记 PENDING P3
+- Founder 确认 v3.2 为方案 A 最终版
+
+**TASK-MUREKA-PIPELINE-INTEGRATION Wave 1 ✅**:
+- @ai-ml Step B: 95 风格 music_hint 字段（style_enforcer.py + style_config.py）
+- @backend Step 1: story_music_extractor.py 提取 15 字段（PM 3 测试 PASS）
+- @backend Step 3: ffmpeg_post_processor.py 后处理（含 LUFS 小 bug 归 Wave 2）
+
+**TASK-MUREKA-PIPELINE-INTEGRATION Wave 2 ✅（E2E 验证 PASS）**:
+- @backend 单 agent 串行 3 件事：LUFS 修复（ebur128 替代 loudnorm）+ music_generation_service.py（22K, 8 步 flow）+ chapter DB migration + orchestrator Stage 6 接入
+- **PM E2E 测试年夜饭**：Mureka task 134387356336130，-15.5 LUFS 正确，credits_used=10
+- PM 修 URL typo 1 行（MUREKA_QUERY_URL_TPL 少 `/query/`）
+- 已知阻塞：alembic 未初始化，4 列 ALTER TABLE 待 Ben/DevOps 跑 MySQL schema
+
+**TASK-MUREKA-PIPELINE-INTEGRATION Wave 3 ✅**:
+- PM 预定义 REST API 契约供两 agent 并行按契约开发
+- @backend Step 5: Stage D BGM REST API 4 端点（GET bgm / POST regenerate / POST change-meta / PATCH volume，asyncio.to_thread 包装避免阻塞）
+- @frontend Step 6: BgmPlayer.tsx 新建（5 状态：idle/loading/generating/ready/error）+ StageD.tsx 替换旧 BGM_TRACKS + CreateContext + 4 API 封装，build 20 路由 0 错误
+
+**Wave 4 待启动**: @tester 集成测试 + @devops VPS 部署
+
+---
+
+### 2026-04-20 — TASK-MUSIC-LANG-AB-V2
+
+**背景**: V1 盲听结果 PM baseline > cn > en > mixed，@ai-ml 预估完全反了
+
+**Step 1 @ai-ml (Sonnet)**: meta-prompt v2 升级
+- 新增 cross_sensory 4 条元原则 + 3 精选示例（2 好例对极情绪 + 1 反例保守格式）
+- 核心修复: ≤400 字符硬约束（解决 v1 mixed 版 855 字符失控）
+- 14 占位符与 v1 一致
+
+**Step 2 @backend (Sonnet)**: 脚本加 --version v1|v2 参数
+**Step 3 PM 实际运行**: 3/3 v2 BGM 成功
+- en 833→421 chars, cn 265→196 chars, mixed 855→506 chars
+- 长度硬约束部分奏效，mixed 仍超 400 但改善 41%
+
+**Step 4 PM 做盲听包**: 7 首 random A-G (PM baseline×1 + v1×3 + v2×3)
+
+---
+
+### 2026-04-18（晚）— TASK-MUSIC-LANG-RESEARCH + TASK-MUSIC-LANG-AB
+
+**任务 A 研究**: general-purpose (Opus) 调研 Mureka + Top AI 音乐平台的多语言策略，40+ URL 引用
+- 结论：英文骨架 + 中文意象（15-30% 中文）基本有利，V4 年夜饭 prompt 教科书级别
+- 6 条可操作规则已归档 `.team-brain/analysis/MUSIC_PROMPT_LANGUAGE_RESEARCH.md`
+
+**任务 B 实证 A/B/C**: 
+- Step 1: @ai-ml (Sonnet) 设计 3 个语言变体 meta-prompt
+- Step 2: @backend (Sonnet) 写脚本调 Haiku 4.5 + Mureka；PM 审查 + 实际运行
+- 首轮 SSL 报错 → @backend 修（certifi 全局 context）→ 次轮 3/3 成功
+- 3 个 Haiku 生成 BGM 待 Founder 盲听
+
+**关键教训**: PM 差点自己写 Python 脚本（被 Founder 拦下），已记录 feedback_pm_no_scripting.md
+
+---
+
+### 2026-04-18（下午）— TASK-ENV-SETTINGS-SYNC-TEST
+
+- @backend (Sonnet) 新增 `test_env_example_matches_settings` 到 Harness 架构测试
+- AST 解析 + 双向对比 + 白名单（MUREKA_API_KEY 临时在白名单，含 TODO）
+- PM 实测两轮：正常 PASS + 故意制造漂移精准捕获
+- EP-016 防护状态 ❌→✅（9/16 = 56%）
+- PENDING.md 记 TASK-MUREKA-PIPELINE-INTEGRATION（集成时修 .env.example + 移白名单）
+
+---
+
+### 2026-04-18（上午）— TASK-SETTINGS-FIX
+
+- 本地启动 backend 触发 Pydantic `extra_forbidden`（.env 有 3 字段未声明）
+- PM 临时 `extra = "ignore"` 绷带启动，深度调查发现文档/代码不一致
+- @backend (Sonnet) 补齐 `VOLCENGINE_API_KEY`/`VOLCENGINE_SECRET_KEY`/`MUREKA_API_KEY`，删除 `extra = "ignore"`
+- PM 审查 PASS + 实际重启验证 /health = healthy
+- EP-016 记入 ERROR_PATTERNS.md
+- Backend progress 因 Write 被拒，PM 代更新三个文件
+
+---
+
+### 2026-04-17 — TASK-MUSIC-EXTRACT + TRANSITION + REWRITE
+
+**TASK-MUSIC-REWRITE**: @ai-ml 重写 #3/#4/#6 prompt，PM 审查 PASS，PM 调 API 生成 3 首 V2 BGM
+**TASK-MUSIC-EXTRACT**: @ai-ml 定义音乐 prompt 输入格式（story_input_format.md），PM 代创建文件
+**TASK-MUSIC-TRANSITION**: @ai-ml 写年夜饭分段转折 prompt，PM 调 API 生成 bgm_transition_test.mp3
+- 3 个 agent 因 API 错误/权限问题终止，PM 代创建文件并调 API
+
+---
+
+### 2026-04-17（早些时候）— TASK-MUSIC-REWRITE: 3 首 BGM Prompt 重写 + V2 BGM 生成
+
+- Founder 试听后否决 #3/#4/#6 风格（不贴故事）
+- PM 根因分析：@ai-ml 过度追求差异化
+- @ai-ml (Sonnet) 重写 3 个 prompt，PM 审查 PASS (5/5)
+- PM 直接执行 Mureka API 生成 3 首 V2 BGM（bgm_02.mp3，旧版保留对比）
+- 风格变更：Dark jazz→Chinese NY acoustic, Bossa nova→Indie acoustic, Lo-fi electronic→Acoustic warmth
+
+---
+
+### 2026-04-16 — Mureka AI 音乐生成集成测试
+
+**Music Prompt Skill 创建**: 9 个文件（知识库 4 + 模板 3 + 脚本 1 + README 1）
+- 基于 Mureka API 完整文档分析（1253 行 21 端点）
+- 5 层结构: 场域(Genre) + 骨架(Tempo) + 肌肉(Instruments) + 呼吸(Mood Curve) + 灵魂(Narrative Imagery)
+- 李继刚 Prompt 哲学应用（压缩/场域/种子/共振）
+
+**6 个故事 BGM 生成测试**:
+- @ai-ml: 6 个 music_prompt.md（6 种不同风格，反同质化设计）
+- @backend: 3 轮 Mureka API 调用，7 个 mp3 文件
+- 技术发现: EP-015 (curl 中文 JSON) + n=1 成本规则
+- 文档更新: ERROR_PATTERNS.md + mureka_model.md + 各 agent progress
+
+**PM 工作**: 协调 @ai-ml → @backend 流水线，审查 prompt 质量，代更新 agent 文档
+
+---
+
 ### 2026-04-14 — 全天工作汇总（Harness + R6 + B' + StageD V2 + 部署）
 
 **Harness Engineering V1 (9/9)**:

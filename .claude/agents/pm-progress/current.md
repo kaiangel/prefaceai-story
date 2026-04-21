@@ -1,11 +1,37 @@
 # PM Agent - 当前任务
 
-> **最后更新**: 2026-04-15 13:00
-> **状态**: ✅ TASK-HARNESS-V2 全部完成 — Sensor 10/10 + 计算性控制 10/10 + push 4c650b2 + VPS 部署 PASS
+> **最后更新**: 2026-04-21
+> **状态**: 🔄 Wave 4 剩尾巴 — @tester 结果 6P/2W/1S + PM 修 style_hint bug，等 @devops 重 spawn 做 VPS 部署
 
 ---
 
-## 正在进行
+## 刚完成
+
+### ✅ TASK-MUSIC-BGM-TEST — 6 个故事 BGM 音乐生成测试 (2026-04-16)
+
+**背景**: 集成 Mureka AI 音乐生成 API，测试 6 个不同故事的 BGM 质量。
+
+**完成工作**:
+1. Music Prompt Skill 创建（9 个文件: 知识库+模板+脚本）
+2. @ai-ml 为 6 个故事编写音乐 prompt（6 种完全不同风格，5 层结构）
+3. @backend 调 Mureka API 生成 7 个 mp3（story 1 n=2，其余 n=1）
+
+| # | 故事 | 风格 | 时长 | 文件大小 |
+|---|------|------|------|---------|
+| 1 | 最后一投 | Post-rock → Orchestral | 2:55 + 3:23 | 5.4M + 6.2M |
+| 2 | 外公的秋梨膏 | Chinese folk-acoustic | 3:54 | 7.2M |
+| 3 | 年夜饭上的战争 | Dark chamber jazz | 2:58 | 5.5M |
+| 4 | 拿铁上的告白 | Bossa nova + dream pop | 2:52 | 5.2M |
+| 5 | 墨痕 | East Asian minimalist / ambient guqin | 3:25 | 6.3M |
+| 6 | 终点站前的余温 | Lo-fi ambient electronic | 3:39 | 6.7M |
+
+**技术发现**: EP-015 curl 中文 JSON 报错 → Python urllib 解决；n 必须设为 1 节省成本
+
+**等待**: Founder 试听评估 → 决定是否集成到 Pipeline
+
+---
+
+## 已完成（历史）
 
 ### TASK-HARNESS-ENGINEERING-V1 — Harness Engineering 升级 (2026-04-14)
 

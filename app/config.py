@@ -38,12 +38,17 @@ class Settings(BaseSettings):
 
     # 火山引擎（豆包TTS）
     VOLCENGINE_APP_ID: str = ""
-    VOLCENGINE_ACCESS_KEY: str = ""
+    VOLCENGINE_ACCESS_KEY: str = ""          # Access Token（Bearer Auth，TTS HTTP API 直接使用）
+    VOLCENGINE_API_KEY: str = ""             # API Key（控制台 → 访问控制，供签名鉴权备用）
+    VOLCENGINE_SECRET_KEY: str = ""          # Secret Access Key（供签名鉴权备用）
     VOLCENGINE_RESOURCE_ID: str = "volcano_tts"  # TTS集群ID
     VOLCENGINE_DEFAULT_VOICE: str = "zh_female_shuangkuaisisi_moon_bigtts"
 
     # 音频存储配置
     AUDIO_STORAGE_PATH: str = "./storage/audio"
+
+    # Mureka AI 音乐生成
+    MUREKA_API_KEY: str = ""                 # Mureka AI 音乐生成 API Key
 
     # Stage 5 跳过模式（开发用：用 R8 测试图片代替生图）
     SKIP_IMAGE_GENERATION: bool = False

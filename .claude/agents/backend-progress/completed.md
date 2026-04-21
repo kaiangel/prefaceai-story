@@ -4,6 +4,99 @@
 
 ---
 
+## 2026-04-21
+
+### Wave 3 Step 5 — Stage D BGM REST API ✅ (2026-04-21)
+- `app/api/chapters.py` L1530-1913 新增 4 端点
+- GET bgm / POST regenerate (10 credits) / POST change-meta (5 credits) / PATCH volume
+- asyncio.to_thread 包装 service 同步调用（避免阻塞 event loop）
+- Bearer token 认证
+
+### Wave 2 完成 — music_generation_service + orchestrator + DB migration ✅ (PM 实测 E2E PASS)
+- `ffmpeg_post_processor.py` LUFS 改用 ebur128（-15.5 LUFS 验证通过）
+- `music_generation_service.py` 新建（22K），8 步 flow 完整
+- `chapter.py` 加 bgm_url/bgm_volume/bgm_meta_version/credits_used 4 列
+- `alembic/versions/001_add_bgm_fields_to_chapters.py` migration（待 Ben/DevOps 跑 MySQL schema）
+- `pipeline_orchestrator.py` Stage 6 加 BGM 生成（try/except 非阻塞）
+- PM E2E: 年夜饭跑通，Mureka task 134387356336130
+- PM 修 URL typo: MUREKA_QUERY_URL_TPL 少 `/query/` 段
+
+### Wave 1 Step 1 — story_music_extractor.py ✅
+- `app/services/story_music_extractor.py`
+- `extract_story_for_music()` 从 outline + screenplay 提取 15 字段
+- max_scenes 上限按 plot_point 优先级选取
+- 5 个 parity 风险全覆盖
+- PM 3 测试全 PASS
+
+### Wave 1 Step 3 — ffmpeg_post_processor.py ✅ (部分)
+- `app/services/ffmpeg_post_processor.py`
+- `process_bgm()` FFmpeg 一次性 filter 链
+- 切水印 4s + 裁剪 target duration + volume + 淡入淡出 + 静音检测
+- 🟡 LUFS 检测返回 0.0 有 bug (loudnorm 单 pass 限制)，Wave 2 修
+- PM 验证核心路径 PASS
+
+### 方案 B Backend — clean_haiku_output() 输出清理 ✅
+- `scripts/test_haiku_music_prompt_languages.py` 新增清理函数
+- 正则去除 markdown fence + 非 <quotes> XML 标签
+- BGM prompt 超 974 字符警告（Mureka 1024 边缘）
+- 配合 @ai-ml v3.2 meta-prompt 精简（污染修复从 prompt 层迁到代码层）
+
+---
+
+## 2026-04-20
+
+### TASK-MUSIC-LANG-AB-V2 Step 2 — 脚本加 --version 参数 ✅
+- `scripts/test_haiku_music_prompt_languages.py` 加 `argparse --version v1|v2`
+- 默认 v2，v1 保留向后兼容
+- PM 实测 v2 3/3 BGM 成功，长度硬约束起作用（mixed 855→506 字符）
+
+---
+
+## 2026-04-18
+
+### TASK-MUSIC-LANG-AB Step 2 — Haiku+Mureka A/B/C 测试脚本 ✅
+- `scripts/test_haiku_music_prompt_languages.py` 新建（512 行）
+- 3 套 BGM 全部生成成功（en/cn/mixed），PM 实际运行验证
+- SSL fix：certifi 做 urllib 全局 default context（Python 3.11 framework 兼容）
+- 未来 Pipeline 集成可复用 call_haiku + call_mureka 函数
+
+### TASK-ENV-SETTINGS-SYNC-TEST — .env/Settings 漂移 CI 检查 ✅
+- `tests/test_architecture.py` 新增 `test_env_example_matches_settings`
+- AST 解析 Settings 类 + 文本解析 .env.example + 双向对比 + 白名单
+- PM 实测: 正常 PASS + 故意制造漂移时精准捕获
+- EP-016 防护状态 ❌→✅
+
+### TASK-SETTINGS-FIX — Settings 类补齐 + 严格模式恢复 ✅
+- `app/config.py` 补 `VOLCENGINE_API_KEY`、`VOLCENGINE_SECRET_KEY`、`MUREKA_API_KEY`
+- 删除 `extra = "ignore"`
+- PM 重启 backend 验证严格模式下启动正常（/health healthy）
+- 新增 EP-016 到 ERROR_PATTERNS.md
+
+---
+
+## 2026-04-16
+
+### TASK-MUREKA-BGM — "最后一投" BGM 生成 ✅
+- Mureka API `POST /v1/instrumental/generate`（n=2, model=auto → mureka-9）
+- Post-Rock → Orchestral prompt，耗时 ~58s
+- 产出: `bgm_01.mp3`（2:55, 5.4M）+ `bgm_02.mp3`（3:23, 6.2M）
+- 技术坑: curl 传中文 JSON 报 Invalid JSON → 改用 Python urllib + ensure_ascii=False (EP-015)
+
+### TASK-MUREKA-BGM-2 — "外公的秋梨膏" BGM 生成 ✅
+- Mureka API（n=1, model=auto → mureka-9）
+- 合并版 Prompt 732 字符（含中英文），耗时 ~83s
+- 产出: `bgm_01.mp3`（7.17 MB，3分54秒）
+
+### TASK-MUREKA-BGM-3 — 4 个故事 BGM 批量生成 ✅
+- 使用 `generate_bgm.py` 脚本顺序调 Mureka API（n=1 × 4）
+- 年夜饭上的战争: Task 133510809518082, ~2:58, 5.5M, 133s
+- 拿铁上的告白: Task 133511086538756, ~2:52, 5.2M, 133s
+- 墨痕: Task 133511373848578, ~3:25, 6.3M, 118s
+- 终点站前的余温: Task 133511616921601, ~3:39, 6.7M, 120s
+- 各 music_prompt.md 末尾已追加生成结果表格
+
+---
+
 ## 2026-04-14（PM 代更新）
 
 ### TASK-PROMPT-B-PRIME — B' 默认格式 ✅

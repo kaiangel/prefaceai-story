@@ -77,14 +77,14 @@ Shot 2: "画一个黑发女孩" → 模型画了另一个黑发女孩B
 | 参考图选择 | 只传fullbody，不传portrait | 信息过载会让模型混淆 |
 | 身份映射 | `_build_identity_line()` | 包含face_shape、skin_tone等面部特征 |
 | 角色提取 | `_extract_actual_characters_from_description()` | 只传实际出场的角色参考图 |
-| 模型选择 | Shot生成必须用Pro | Flash的多角色理解能力不足 |
+| 模型选择 | Shot生成默认用NB2（gemini-3.1-flash-image-preview）| 角色一致性 ~95%，Pro 仅 Premium 储备 |
 
 ### 一致性失败的常见模式
 
 | 症状 | 可能原因 | 排查方向 |
 |------|----------|----------|
 | 发型变了 | hair_style描述不够具体 | 检查physical.hair_style字段 |
-| 衣服穿错人 | 多角色场景用了Flash | 确认use_pro_model=True |
+| 衣服穿错人 | 多角色场景角色描述不够详细 | 检查 identity_line 是否完整，NB2 默认已足够 |
 | 配饰丢失 | accessories未包含在prompt | 检查_build_character_description() |
 | 肤色不稳定 | skin_tone描述缺失 | 确保physical字段完整 |
 | 性别混淆 | 中性化描述+Flash模型 | 加强性别特征描述，用Pro |

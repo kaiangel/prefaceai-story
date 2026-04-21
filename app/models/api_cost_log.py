@@ -1,8 +1,9 @@
 """API 成本记录模型
 
 用于追踪每次外部 AI API 调用的估算成本。
-注意：只定义 SQLAlchemy model，不执行 CREATE TABLE。
-建表通过 Alembic migration 或手动 DDL 执行。
+建表方式：通过 app.database.init_db() 中的 Base.metadata.create_all 在启动时自动创建。
+该模型已在 app/models/__init__.py 中导入，app/main.py 中的 `import app.models` 确保
+启动时所有模型均注册到 Base.metadata，随后 init_db() 统一建表。
 """
 
 from datetime import datetime

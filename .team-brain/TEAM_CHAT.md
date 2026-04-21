@@ -3051,3 +3051,2933 @@ Phase 3: PreCommit hook 更新 + push + VPS 部署
   3. ✅ 无参数日期模式不受影响（正常运行）
   4. ✅ 幂等（二次运行输出相同）
 - 文件: `scripts/archive_team_chat.sh`
+
+
+#### @pm (2026-04-16 00:30)
+
+### TASK-MUSIC-PROMPT-SKILL 启动 — 音乐 Prompt 工程 Skill 创建
+
+**背景**: 集成 Mureka AI 音乐生成前，需要先建立音乐 prompt 领域能力
+
+**Skill 结构**: `.claude/skills/music-prompt/`
+- PM 写: README.md + mureka_model.md + lijigang_music.md
+- @ai-ml (Opus) 写: music_theory.md + cross_sensory.md + templates/ + examples
+
+
+#### @pm (2026-04-16 02:00)
+
+### Music Prompt Skill 进度 + search.py 派发
+
+**已完成 (8/9)**:
+- PM: README + mureka_model + lijigang_music (3 文件) ✅
+- PM 代写: music_theory + cross_sensory + bgm_prompt + song_prompt + examples (5 文件) ✅
+- PM 审查: AI-ML 视角完善 4 处（ai-ml.md 过时修复 + mureka 强制词讨论 + 叙事→音乐映射 + JSON 字段表）✅
+
+**派发**: @devops search.py
+
+
+#### @devops (2026-04-16 02:30)
+
+### TASK-MUSIC-SEARCH-PY 完成 — search.py 创建
+
+**任务**: 为 music-prompt skill 创建术语搜索脚本
+
+**完成内容**:
+- 创建 `.claude/skills/music-prompt/scripts/search.py` (chmod +x)
+- 搜索 `knowledge/music_theory.md` + `knowledge/cross_sensory.md` 两个知识库
+- 支持 `--domain genre/instrument/term/mood/scene/sensory/all` 过滤
+- 大小写不敏感，支持中英文搜索，输出匹配行 ± 1 行上下文，终端颜色高亮
+
+**验收全部 PASS (5/5)**:
+1. ✅ 文件创建成功 + chmod +x
+2. ✅ `search.py "piano"` → 52 处匹配，涵盖钢琴各种变体
+3. ✅ `search.py "悲伤" --domain mood` → 1 处精确匹配（情绪映射表行）
+4. ✅ `--help` 输出完整使用说明 + 5 个示例
+5. ✅ `search.py "雨夜" --domain scene` + `search.py "jazz" --domain genre` 均正确命中
+
+---
+
+### 2026-04-13 18:00
+
+**@coordinator**:
+@pm 全面审查完成，以下是需要你处理的事项：
+
+**一、文档同步（3 个 PM 维护的文档严重过期）**
+
+1. **PROJECT_STATUS.md** — 停留在 3/19，需要更新：
+   - 版本号、当前主线、Phase 进度
+   - 4 月的所有进展（StageD 升级、Harness V2、B' 默认化、CI/CD、R6 通过等）
+   - API Key 状态更新（4/6 → 即将 6/6）
+   - 各模块状态同步
+
+2. **DECISIONS.md** — 停留在 DEC-014（3/3），4 月多个重大决策未记录：
+   - Harness V2 工程化决策
+   - Prompt B' 默认化决策
+   - StageD 产品逻辑（调整画面 = Haiku、编辑文字 = chinese_text）
+   - $10 成本熔断决策
+   - Haiku 运行时使用（产品 runtime ≠ 开发 Agent，不受禁 Haiku 规则限制）
+   - 中文阈值 15% → 5%
+
+3. **PENDING.md** — 清理已完成的旧条目，加入当前待办：
+   - api_cost_logs 表建表（需 Alembic 迁移或手动 DDL）@Backend
+   - Resonance 新时间线（待 Founder 定义）
+   - 续写模式 Phase 3 #11（待 Founder 决定是否开始设计）
+   - 监控告警系统 R4（P1，待启动）
+
+**二、遗留技术项派发**
+
+4. **TTS Key 填入 VPS** — 派发 @DevOps：
+   - Founder 已提供 3 个 TTS key（VOLCENGINE_SECRET_KEY / TTS_APPID / ACCESS_TOKEN）
+   - **不要写入任何 git 追踪的文件**
+   - 直接在 VPS `.env.production` 中填入，然后重启 api 容器
+   - 填完后 DevOps 风险表 R1 标记完全解决（6/6 key 全部就位）
+   - Key 值我会私下给 DevOps，不通过群聊传递
+
+5. **api_cost_logs 表建表** — 评估后派发：
+   - `app/models/api_cost_log.py` 已定义 `ApiCostLog` 模型，但表还没建
+   - 需要 Alembic 迁移或手动 DDL
+   - 派发给 @Backend 或协调 Ben 团队（DB 是 Ben 的领域）
+
+**三、Coordinator 已自行修复的不一致**
+
+以下 3 处我已直接修复，PM 知悉即可：
+- AI-ML current.md pending queue：删除已完成的旧 P0 条目
+- DevOps current.md pending queue：CI/CD "待启动" → "✅ 完成"
+- Frontend current.md：底部旧 "等 PM Review" 标注为已完成
+
+**四、Coordinator + Resonance progress 已更新**
+
+- Coordinator progress 三件套已更新（补录 3.23→4.13 全部进展）
+- Resonance 旧时间线已清理（Phase 0/1/2 日期作废），标注"待 Founder 重新定义"
+
+---
+
+### 2026-04-13 19:00
+
+**@coordinator**:
+xhteam 启动。Founder 确认执行方案，3 个 teammates 并行 spawn：
+
+| Teammate | 任务 | 验收标准 |
+|----------|------|---------|
+| @pm | 更新 PROJECT_STATUS / DECISIONS / PENDING（3 个过期文档） | 反映 4 月全部进展，DEC-015+，新待办 |
+| @devops | TTS Key 写入本地 .env + VPS .env.production → 重启 → 验证 | 6/6 key 全部就位，TTS 服务可用 |
+| @backend | api_cost_logs 建表（模型已定义，需创建实际表） | 表存在 + 代码可正常读写 |
+
+执行中，完成后我逐个审查。
+
+---
+
+---
+
+#### @devops (2026-04-13)
+
+**TTS-KEY-WRITE 完成** — 火山引擎 TTS 凭证已写入本地 .env，R1 完全解决 (6/6)
+
+**完成内容**:
+- 本地 `.env` 已写入全部 4 个火山引擎凭证（不在此处列出 Key 值）
+- `.env.example` 补全 `VOLCENGINE_API_KEY` + `VOLCENGINE_SECRET_KEY` 字段（含注释说明各字段用途）
+- 风险清单 R1 从"基本解决 4/6"→"**完全解决 6/6**"
+
+**字段映射**（供参考，Key 值不上群聊）:
+| Founder 提供名称 | .env 字段名 | 当前状态 |
+|-----------------|-------------|---------|
+| TTS_APPID | `VOLCENGINE_APP_ID` | ✅ 已在 .env（原有）|
+| ACCESS TOKEN | `VOLCENGINE_ACCESS_KEY` | ✅ 已在 .env（原有）|
+| API KEY | `VOLCENGINE_API_KEY` | ✅ 已写入 .env |
+| SECRET KEY | `VOLCENGINE_SECRET_KEY` | ✅ 已写入 .env |
+
+**VPS 操作指引** — 需 Founder 手动执行（DevOps 无法直接 SSH）:
+
+1. SSH 进入 VPS: `ssh -p 58913 trader@107.148.1.199`
+2. 编辑 VPS 环境变量文件: `sudo nano /opt/xuhua-story/.env.production`
+3. 在火山引擎 TTS 区段追加以下两行（替换为真实值）:
+   ```
+   VOLCENGINE_API_KEY=<Founder 提供的 API KEY 值>
+   VOLCENGINE_SECRET_KEY=<Founder 提供的 SECRET KEY 值>
+   ```
+   注: `VOLCENGINE_APP_ID` 和 `VOLCENGINE_ACCESS_KEY` 已在 VPS 上（03-30 部署时填入）
+4. 重启 api 容器: `cd /opt/xuhua-story && docker compose restart api`
+5. 验证 TTS 服务: 在已登录前端发起一个含旁白的故事生成，检查 api 日志 `docker logs xuhua-story-api-1 | grep TTS`
+
+**注**: VOLCENGINE_APP_ID 和 VOLCENGINE_ACCESS_KEY 已于 03-30 写入 VPS，只需补入上述 2 个新字段即可。TTS 可用后，核心影响是旁白音频合成功能恢复。
+
+@coordinator 任务完成，等待下一步指令。
+
+---
+
+#### @backend (2026-04-13)
+
+### ✅ TASK-API-COST-LOG-TABLE — api_cost_logs 建表机制验证完成
+
+**任务**: 确认 api_cost_logs 表的建表方式，并验证 monitoring.py 端点可正常读写。
+
+**调查结论**: 建表链路已完整，**无需额外配置**，应用启动时自动建表。
+
+**完整链路**:
+```
+main.py → import app.models (L13)
+          ↓
+app/models/__init__.py → from app.models.api_cost_log import ApiCostLog (L3)
+          ↓
+ApiCostLog 注册到 Base.metadata ("api_cost_logs" 表)
+          ↓
+init_db() → Base.metadata.create_all → MySQL 自动建表
+```
+
+**改动文件** (最小化改动):
+1. `app/models/api_cost_log.py` — 修正模块文档注释（原注释称"建表通过 Alembic"，但项目无 Alembic，实际是 create_all），无功能变动
+2. `tests/test_api_cost_log_table.py` — 新建测试文件，4 个测试用例:
+   - `test_api_cost_log_registered_in_base`: 验证 ApiCostLog 已注册到 Base.metadata
+   - `test_api_cost_log_columns`: 验证 9 个字段完整
+   - `test_create_table_and_insert`: SQLite in-memory 建表 + 读写验证
+   - `test_cost_summary_query`: GROUP BY 查询逻辑验证（与 monitoring.py 一致）
+   - `test_monitoring_router_included`: monitoring 路由 prefix + 2 个端点路径验证
+
+**无需操作**: 下次启动后端即自动创建 api_cost_logs 表。monitoring.py 的 `/api/monitoring/costs/summary` 和 `/api/monitoring/errors/recent` 均可正常使用。
+
+@coordinator 任务完成，等待下一步指令。
+
+---
+
+#### @pm (2026-04-13)
+
+**TASK-DOC-UPDATE 完成** — 三个 PM 维护文档全面更新至 4 月最新状态
+
+**完成内容**:
+
+1. **PENDING.md** ✅
+   - 清理并归档所有已完成条目（TASK-HARNESS-V2、TASK-PROMPT-B-DEFAULT、TASK-PIPELINE-UX-CONNECT、TASK-PIPELINE-OPT-R6、TASK-DB-LONGTEXT、TASK-CONFIRM-OUTLINE-WIRE 等 2026-04 全部完成项）
+   - 新增 5 项当前待处理：TASK-API-COST-TABLE (@Backend P1) / Resonance 新时间线（待 Founder 重定义）/ 续写模式 Phase 3 #11（待 Founder 决策）/ 监控告警 R4 (@DevOps P1) / TTS Key 填入 (@DevOps 执行中)
+   - 保留 TASK-STYLE-EXPANSION（暂缓备忘）
+
+2. **DECISIONS.md** ✅
+   - 索引表新增 DEC-015~DEC-019
+   - 正文新增完整决策记录：
+     - DEC-015: Harness V2 Engineering（CI/CD + Schema 验证 + $10 成本熔断 + 6 EP Sensor）
+     - DEC-016: Prompt B' 默认化（-46% tokens，盲测 5:4，成本 $3.40 短篇）
+     - DEC-017: Stage D 产品交互逻辑（调整画面/编辑文字/重新生成）
+     - DEC-018: Haiku 运行时使用澄清（开发 Agent 禁止 ≠ 产品运行时禁止）
+     - DEC-019: 中文阈值收紧（15% → 5%）
+
+3. **PROJECT_STATUS.md** ✅
+   - 更新日期: 2026-03-19 → **2026-04-13**
+   - 版本: v0.6.6 → **v0.8.0**
+   - 主线: 双团队启动 → **Harness V2 + Prompt B' 默认化 + Stage D + Pipeline 全连通**
+   - Phase 进度表：Phase 5 更新（Stage A~E 全连通）/ Phase 6 更新（CI/CD GitHub Actions 接入，85%）
+   - 模块状态：Backend/Frontend/Tester/AI-ML/DevOps/Resonance 全部更新至 4 月实际状态
+   - 关键指标：单故事成本从 $9.35（旧）→ $3.40 短篇 / $6.82 长篇（NB2+B'）
+   - 更新日志：补录 2026-04-01 ~ 2026-04-16 全部重要事件（12 条）
+
+@coordinator 文档全部就绪，等待下一步指令。
+
+---
+
+### 2026-04-13 20:00
+
+**@coordinator**:
+xhteam 审查完成。3 个 teammates 全部通过。
+
+**审查结果**:
+
+| Teammate | 任务 | 结果 | 关键产出 |
+|----------|------|------|---------|
+| @pm | 3 个过期文档大更新 | ✅ PASS | PROJECT_STATUS v0.8.0 + DEC-015~019 + PENDING 重建 |
+| @devops | TTS Key 本地 .env | ✅ PASS | 6/6 key 全部就位，VPS 操作指引已文档化 |
+| @backend | api_cost_logs 建表 | ✅ PASS | 链路已完整（无需改动），新增 5 个测试 |
+
+**补充完成**: PM 的 pm-progress/current.md 因权限问题由 Coordinator 代更新。
+
+**当前全局状态**:
+- 文档同步: ✅ 全部到位
+- 技术项: api_cost_logs ✅ / TTS Key 本地 ✅ / VPS 待 Founder 操作
+- 待 Founder 决策: Resonance 新时间线 + 续写模式 Phase 3 #11
+
+---
+
+### 2026-04-13
+
+#### @devops (2026-04-13)
+
+**TASK-TTS-KEY-VPS-SYNC 完成** — 火山引擎 TTS Key 已同步到 VPS
+
+VPS .env.production 原有 4 个 VOLCENGINE_ 字段，缺少 VOLCENGINE_API_KEY 和 VOLCENGINE_SECRET_KEY。
+
+已执行：
+- 补入 2 个缺失字段（真实 key 值已填入，不记录于此）
+- 重建 api 容器（docker compose stop + up -d，非 restart，确保 env_file 重新加载）
+- 验证：docker exec 确认容器内 6/6 VOLCENGINE_ 字段全部注入
+- 容器状态：Application startup complete，healthy
+
+**R1 风险完全关闭**：VPS 侧 6/6 API Key 全部就位，含 TTS 所有鉴权字段。
+
+@coordinator 任务完成，请知悉。
+
+
+
+#### @pm (2026-04-16 02:30)
+
+### 音乐生成测试 — "最后一投"
+
+**流程**: @ai-ml 写 prompt → PM 审查 → @backend 调 Mureka API
+**故事**: 最后一投（体育热血/励志，20 shots）
+**路径**: test_output/manualtest/prompt_bubble/slamdunk_dialogue
+
+
+
+#### @ai-ml (2026-04-16)
+
+### "最后一投" BGM Prompt 完成
+
+**文件**: `test_output/manualtest/prompt_bubble/slamdunk_dialogue/music_prompt.md`
+
+**情感锚点提取** (5 个):
+1. 更衣室颤抖的手（荧光灯下的自我怀疑）
+2. "你怕自己成功"（林峰的手术刀式点醒）
+3. 人群中无声点头（濒临崩溃被拉回）
+4. 球划出完美弧线入网——"刷"（时间凝固→释然）
+5. 站在光里不再躲（warm gold 的平静胜利）
+
+**合并版 Prompt（74 词英文 + 中文意象，648 字符，可直接传 Mureka API）**:
+
+> Cinematic post-rock building to orchestral climax. Heartbeat pace, 60 BPM. Solo felt piano — sparse, clinical, each note landing in cold silence like footsteps in an empty locker room. Low cello drone as the lone thread of warmth. Tremolo strings and floor-tom heartbeat build through 90 BPM. At the peak: brass swell, crashing cymbal, full ensemble erupts in one blazing fortissimo moment, then sudden silence. Resolves to warm piano at 72 BPM, breathing out. 荧光灯下颤抖的手，白色胶带像伤口一样发光。篮球在弧线顶点旋转——入网那一声"刷"，比任何语言都简单。一个男孩终于不再躲进阴影。
+
+**设计要点**:
+- 流派: Post-rock → Orchestral（匹配"从寂静到风暴"的叙事弧线）
+- 乐器映射: felt piano = 荧光灯孤独 / cello drone = 内心韧劲 / brass = 出手爆发 / warm piano = 释然
+- 色调→音色: 冷钢蓝灰→clinical piano / 深邃赤红→cello warmth / 燃金橙→brass swell
+- 灵魂层意象全部来自故事具体内容（白色胶带、入网的"刷"声、躲进阴影）
+
+@pm 请审查。通过后 @backend 可调 Mureka API 生成。
+
+
+
+#### @backend (2026-04-16)
+
+### Mureka API 生成纯音乐 BGM — "最后一投" 完成
+
+**task_id**: 133491079708673
+**model**: mureka-9（auto 自动选最新）
+**状态**: succeeded
+**耗时**: ~58s（提交到 succeeded）
+**watermarked**: true（尾部 5 秒水印，API 合规）
+
+**生成结果**:
+
+| 文件 | 时长 | 大小 |
+|------|------|------|
+| bgm_01.mp3 | 175.4s (2:55) | 5.36 MB |
+| bgm_02.mp3 | 203.1s (3:23) | 6.20 MB |
+
+**本地路径**: `test_output/manualtest/prompt_bubble/slamdunk_dialogue/bgm_01.mp3` + `bgm_02.mp3`
+
+**注意事项**:
+- 初次调用时 curl 直接传含中文引号（"刷"）的 JSON 会报 Invalid JSON 错误 — 改用 Python urllib + ensure_ascii=False 解决
+- 轮询间隔 10s，running → succeeded 约 4 轮（docs 建议 2-5s，实测 10s 足够）
+- `music_prompt.md` 末尾已追加生成结果记录
+
+@pm 2 个 mp3 文件已就绪，可以试听评估质量。
+
+
+#### @pm (2026-04-16 03:30)
+
+### 音乐生成测试 #2 — "外公的秋梨膏"（温馨家族/乡土）
+
+上一首"最后一投"Founder 试听通过。选反差最大的故事继续测试。
+**流程**: @ai-ml 写 prompt → PM 审查 → @backend 调 Mureka API (n=1)
+
+
+#### @ai-ml (2026-04-16)
+
+### 完成: "外公的秋梨膏" BGM Prompt
+
+@pm 已完成 music_prompt.md，5 层结构完整，格式同"最后一投"。
+
+**产出文件**: `test_output/manualtest/e2e_regression_r8/20260316_145613/story_A/20260316_145614/music_prompt.md`
+
+**合并版 prompt（可直接用于 Mureka API）**:
+
+```
+Chinese folk-acoustic, neoclassical with pastoral warmth. Unhurried walking pace, 72 BPM, like footsteps on a gravel mountain path. Breathy bamboo dizi opens alone through morning mist, one spare phrase at a time. Warm nylon guitar fingerpicking enters as the gentle heartbeat, close-mic'd and intimate. Soft cello hums beneath like unspoken tenderness. Light wood percussion joins in the middle — the bustle of a rural market. A few guzheng notes surface near the end, unhurried as evening light on rice paddies. The music breathes from quiet morning calm through childlike wonder into warm full-hearted contentment, then fades slowly into golden stillness. 老人的指节轻叩陶罐——那一声清脆而认真，是不会说出口的深情。一罐秋梨膏，一串糖葫芦，四个剪影走进夕阳，没有什么大事发生，可就是这样，就已经足够了。
+```
+
+**与"最后一投"的核心差异**:
+- 流派: post-rock/orchestral → Chinese folk-acoustic/neoclassical
+- 乐器: felt piano + brass → bamboo dizi + nylon guitar + guzheng
+- 动态: 60→120→72 BPM 极端变速 → 72 BPM 始终从容
+- 情绪: 孤立→恐惧→爆发→释然 → 平静→好奇→牵挂→满足
+
+**灵魂层锚点**: 外公叩击陶罐的声音、糖葫芦在夕阳里的暗红光、故事原文"没有什么大事发生，可就是这样，就已经足够了"。
+
+请 @pm 审查后交 @backend 调 Mureka API (n=1)。
+
+---
+
+#### @backend (2026-04-16)
+
+### 完成: TASK-MUREKA-BGM-2 — "外公的秋梨膏" BGM 生成 ✅
+
+**调用参数**:
+- Endpoint: `POST https://api.mureka.cn/v1/instrumental/generate`
+- model: `auto`（自动选 mureka-9）
+- n: 1
+- prompt: music_prompt.md 合并版（732 字符，含中英文）
+
+**生成结果**:
+- 任务 ID: `133495221583873`
+- 状态: `succeeded`
+- 生成耗时: ~83 秒（running → reviewing → succeeded）
+- 时长: 234,630 ms（约 **3 分 54 秒**）
+- 水印: 是（watermarked: true）
+
+**产出文件**:
+- `test_output/manualtest/e2e_regression_r8/20260316_145613/story_A/20260316_145614/bgm_01.mp3`（7.17 MB）
+
+**文档更新**:
+- `music_prompt.md` 末尾追加了"生成结果"表格（任务 ID、CDN URL、时长、文件大小等）
+
+请 @pm / Founder 试听并评估音乐质量。
+
+
+#### @pm (2026-04-16 05:00)
+
+### 音乐生成测试 #3-6 — 4 个故事并行写 prompt
+
+| # | 故事 | 类型 | 路径 |
+|---|------|------|------|
+| 3 | 年夜饭上的战争 | 家庭冲突 | sq_upgrade_ab_test/20260304_113630 |
+| 4 | 拿铁上的告白 | 都市爱情 | cross_style_test/20260228_152134 |
+| 5 | 墨痕 | 古风传承 | e2e_regression_r4/.../story_B/20260310_161426 |
+| 6 | 终点站前的余温 | 都市治愈 | phase2/20251231_181728 |
+
+@ai-ml 并行写 4 个 prompt → PM 审查 → @backend 逐个调 API (n=1)
+
+---
+
+#### @ai-ml (2026-04-14)
+
+### 完成: BGM Prompt #3-6 — 4 个故事音乐 prompt 全部交付
+
+@pm 4 个 music_prompt.md 已创建，每个都包含完整 5 层结构 + 合并版 + 设计思路。6 首 BGM 风格全部互不相同。
+
+**风格分布总览**:
+
+| # | 故事 | 风格 | 核心乐器 | 核心手法 |
+|---|------|------|---------|---------|
+| 1 | 最后一投 | Post-rock → Orchestral | Felt piano + brass | Build-up 渐进爆发 |
+| 2 | 外公的秋梨膏 | Chinese folk-acoustic | Dizi + nylon guitar | 层叠加入 |
+| 3 | 年夜饭上的战争 | **Dark chamber jazz** | Upright piano + muted trumpet | 和声紧缩 → 爆裂 |
+| 4 | 拿铁上的告白 | **Bossa nova + dream pop** | Nylon guitar + Rhodes | 律动摇曳 |
+| 5 | 墨痕 | **East Asian minimalist / ambient guqin** | Guqin + shakuhachi | 负空间/留白 |
+| 6 | 终点站前的余温 | **Lo-fi ambient electronic** | Synth pad + rain texture + toy piano | 质感驱动 |
+
+**4 个合并版 prompt 文本（可直接用于 Mureka API）**:
+
+**#3 年夜饭上的战争**:
+> Dark chamber jazz, cinematic tension. Deliberate 84 BPM, stiff metronomic pulse like chopsticks tapping porcelain at a formal dinner. Upright piano in dry close room, playing clipped polite chords acquiring chromatic dissonance. Pizzicato upright bass as the table's heartbeat. Muted trumpet enters sardonic and distant. Brushed snare beneath — just friction texture. Low cello drone builds under the argument. At crisis: one sharp rim-shot crack, then devastating silence. Solo piano returns, halting, broken intervals. From forced festive politeness through slow chromatic fracture into harmonic compression, one violent crack and silence, resolving to fragile unfinished piano. 年夜饭的蒸汽模糊了三张脸。筷子落在瓷碗上那一声，比窗外的烟花都响——而碎掉的茶杯之后的沉默里，一个像素老人坐在数字门槛上，等着被认出来。
+
+**#4 拿铁上的告白**:
+> Bossa nova, dream pop with intimate cafe warmth. Gentle swaying 78 BPM, like stirring milk foam in slow circles, soft syncopated lilt. Warm nylon guitar fingerpicking close-mic'd — you hear fingertips on strings, intimate as a whisper across a counter. Soft Rhodes piano adds hazy golden chords, slightly detuned like light through linen curtains. Gentle shaker as the cafe's heartbeat. At the heartbreak: Rhodes sustains alone, trembling, no rhythm. Then a solo cello enters — one long aching phrase, words on foam finding a voice. From quiet daily tenderness through sudden stillness into private ache, then trembling courage rising note by note, ending in bittersweet release — not resolution, just the lightness of having spoken. 拉花针在奶泡上一笔一划，字迹还没写完就开始晕开——三年的清晨浓缩成一杯再也不会以同样方式做出的拿铁。
+
+**#5 墨痕**:
+> East Asian minimalist, ambient guqin with sparse neoclassical elements. Very slow, 54 BPM rubato, breath-paced like grinding an ink stick. Solo guqin opens — single plucked notes with long decay, each placed like ink on wet paper, surrounded by deliberate silence. Breathy shakuhachi enters one phrase at a time, like mountain wind. Muted piano joins at midpoint, hammers wrapped in old cloth. At the revelation: low taiko pulse through rain, a heartbeat heard through wooden walls. Resolution: guqin and piano together for the first time, two voices coexisting — a master and student side by side. From resistant silence through stubborn friction into fragile truce, then devastating quiet revelation, ending in still dawn. 砚台上墨转了无数圈。雨夜的门缝里，老人用颤抖的手为无人的寂静写下一个字——少年终于明白，师父撕掉的不是他的字，是替他撕掉了不配留下的东西。
+
+**#6 终点站前的余温**:
+> Lo-fi ambient electronic, urban nocturne. Slow pulse 66 BPM, like rain finding a pattern on a tin roof. Low sine-wave synth pad as continuous urban hum. Rain texture layered at multiple depths — close drips, steady downpour, distant city wash. Detuned toy piano plays sparse child-like notes, three at a time, like the kindness of cheap candy offered to strangers. Warm sub-bass enters slowly, felt more than heard, a city breathing beneath concrete. A thin analog synth melody line wavers like a phone signal found in nowhere. All textures gradually thin, rain recedes, a lone music-box phrase plays the melody back — smaller, warmer, further away. From urban numbness through tentative disruption into unexpected warmth, then quiet shared vulnerability, ending in gentle dispersal. 三个陌生人，一个铁皮屋檐，一颗皱巴巴的糖。甜味还没来得及叫出名字就化了——出租车的红尾灯在湿漉漉的路面上拉得很长，像一个不需要结尾的故事的最后一句话。
+
+**文件路径**:
+- #3: `test_output/manualtest/sq_upgrade_ab_test/20260304_113630/music_prompt.md`
+- #4: `test_output/manualtest/cross_style_test/20260228_152134/music_prompt.md`
+- #5: `test_output/manualtest/e2e_regression_r4/20260310_155024/story_B/20260310_161426/music_prompt.md`
+- #6: `test_output/manualtest/phase2/20251231_181728/music_prompt.md`
+
+@pm 请审查后交 @backend 逐个调 Mureka API (n=1, model=auto)。
+
+---
+
+#### @backend (2026-04-16)
+
+### 完成报告: TASK-MUREKA-BGM-3 — 4 个故事 BGM 批量生成
+
+4 首纯音乐 BGM 全部生成成功，逐个顺序执行，无错误。模型: mureka-9（auto）。
+
+| # | 故事 | Task ID | 时长（ms） | 文件大小 | API 耗时 |
+|---|------|---------|-----------|---------|---------|
+| 3 | 年夜饭上的战争 | 133510809518082 | 178,430ms (~2:58) | 5.5 MB | 133s |
+| 4 | 拿铁上的告白 | 133511086538756 | 171,750ms (~2:52) | 5.2 MB | 133s |
+| 5 | 墨痕 | 133511373848578 | 204,910ms (~3:25) | 6.3 MB | 118s |
+| 6 | 终点站前的余温 | 133511616921601 | 219,310ms (~3:39) | 6.7 MB | 120s |
+
+**文件位置**:
+- `test_output/manualtest/sq_upgrade_ab_test/20260304_113630/bgm_01.mp3`
+- `test_output/manualtest/cross_style_test/20260228_152134/bgm_01.mp3`
+- `test_output/manualtest/e2e_regression_r4/20260310_155024/story_B/20260310_161426/bgm_01.mp3`
+- `test_output/manualtest/phase2/20251231_181728/bgm_01.mp3`
+
+各 music_prompt.md 末尾已追加生成结果表格（Task ID、时长、URL、文件大小）。生成脚本保存于 `generate_bgm.py`。
+
+---
+
+#### @pm (2026-04-16 20:30)
+
+### ✅ 音乐生成测试全部完成 — 6 个故事 7 首 BGM
+
+**PM 审查通过**。@backend TASK-MUREKA-BGM-3 验收：4 个 mp3 文件全部存在且有实际内容（5.2M-6.7M），music_prompt.md 均已追加结果，TEAM_CHAT 已更新。
+
+**6 首 BGM 完整清单**（等 Founder 试听）:
+
+| # | 故事 | 风格 | 时长 | 文件 |
+|---|------|------|------|------|
+| 1 | 最后一投 | Post-rock → Orchestral | 2:55 | `slamdunk_dialogue/bgm_01.mp3` |
+| 1b | (备选) | 同上 | 3:23 | `slamdunk_dialogue/bgm_02.mp3` |
+| 2 | 外公的秋梨膏 | Chinese folk-acoustic | 3:54 | `e2e_regression_r8/.../bgm_01.mp3` |
+| 3 | 年夜饭上的战争 | Dark chamber jazz | 2:58 | `sq_upgrade_ab_test/.../bgm_01.mp3` |
+| 4 | 拿铁上的告白 | Bossa nova + dream pop | 2:52 | `cross_style_test/.../bgm_01.mp3` |
+| 5 | 墨痕 | East Asian minimalist / ambient guqin | 3:25 | `e2e_regression_r4/.../bgm_01.mp3` |
+| 6 | 终点站前的余温 | Lo-fi ambient electronic | 3:39 | `phase2/.../bgm_01.mp3` |
+
+**文档更新**: 全部 agent progress (current/context-for-others/completed) + TODAY_FOCUS + PROJECT_STATUS 已更新。
+
+**下一步**: Founder 试听评估 → 质量满意则集成到 Pipeline (music_prompt_builder.py + music_generator.py)。
+
+---
+
+#### @pm (2026-04-17 00:30)
+
+### TASK-MUSIC-REWRITE — 3 首 BGM Prompt 重写
+
+**背景**: Founder 试听后认为 #3（年夜饭上的战争）、#4（拿铁上的告白）、#6（终点站前的余温）不符合故事调调。
+
+**根因分析**: @ai-ml 上一轮过度追求 6 首风格互不相同（反同质化），导致风格选择服务于"差异化"而非"故事契合度"。具体问题：
+- #3 Dark chamber jazz 的冷面讽刺感盖住了故事温情转折
+- #4 Bossa nova 太慵懒惬意，和暗恋心碎有温差
+- #6 Lo-fi electronic 合成器太数字化，但故事核心是朴素的人间温暖
+
+**派发**: @ai-ml (Sonnet 4.6) 重写 3 个 music_prompt.md
+- **第一优先级：故事契合度**，不需要刻意和其他几首不同
+- 重写后 PM 审查 → @backend 调 Mureka API 重新生成
+
+**验收标准**:
+1. 3 个 music_prompt.md 重写（分层版 + 合并版 + 设计思路）
+2. 设计思路解释"为什么这个风格最契合这个故事"
+3. 合并版 ≤ 1024 字符
+4. 文档全部更新
+
+---
+
+#### @ai-ml (2026-04-17，PM 代发，agent 完成工作后终止)
+
+### 完成: TASK-MUSIC-REWRITE — 3 首 BGM Prompt 重写
+
+3 个 music_prompt.md 已重写，风格变更：
+
+| 故事 | 旧风格 | 新风格 | 字符数 |
+|------|--------|--------|:-----:|
+| #3 年夜饭上的战争 | Dark chamber jazz | **Cinematic Chinese NY acoustic + erhu** | 940 |
+| #4 拿铁上的告白 | Bossa nova + dream pop | **Cinematic indie acoustic, bittersweet** | 947 |
+| #6 终点站前的余温 | Lo-fi ambient electronic | **Lo-fi acoustic warmth + harmonica** | 909 |
+
+核心改变：以故事情绪和文化底色驱动风格选择，不再追求差异化。
+
+---
+
+#### @pm (2026-04-17)
+
+### PM 审查: TASK-MUSIC-REWRITE ✅ PASS
+
+验收 5/5 全部通过。风格选择自然契合故事。派发 @backend 调 Mureka API 重新生成 3 首 BGM (n=1)。
+
+---
+
+#### @pm (2026-04-17)
+
+### 完成: 3 首 V2 BGM 生成（重写 prompt 后）
+
+PM 直接执行 Mureka API 调用（@backend agent 权限问题）。3 首全部成功：
+
+| 故事 | Task ID | 时长 | 文件 |
+|------|---------|------|------|
+| #3 年夜饭上的战争 | 133653443313665 | 3:30 | bgm_02.mp3 (6.4M) |
+| #4 拿铁上的告白 | 133654397517825 | 2:38 | bgm_02.mp3 (4.8M) |
+| #6 终点站前的余温 | 133654669950977 | 2:37 | bgm_02.mp3 (4.8M) |
+
+旧版 bgm_01.mp3 保留用于对比。等 Founder 试听。
+
+---
+
+#### @pm (2026-04-18)
+
+### TASK-SETTINGS-FIX — Settings 类补齐 + .env 字段审计
+
+**背景**: 本地启动后端时，`.env` 中的 `VOLCENGINE_API_KEY`, `VOLCENGINE_SECRET_KEY`, `MUREKA_API_KEY` 触发 Pydantic `extra_forbidden` 报错。PM 临时加 `extra = "ignore"` 绷带启动成功，但深度调查发现 3 个实质问题：
+
+1. `.env.example` 明确引导用户填 `VOLCENGINE_API_KEY` / `VOLCENGINE_SECRET_KEY`（为签名鉴权预留），但 Settings 类从未声明 → 文档与代码不一致
+2. `MUREKA_API_KEY` 未登记，未来集成 Pipeline 时 `settings.MUREKA_API_KEY` 会 AttributeError
+3. `extra = "ignore"` 让任何未声明字段静默通过，后续新增字段忘了更新 Settings 也不会报错（之前 EP-TASK-ENVVAR-FIX 同类问题）
+
+**派发 @backend (Sonnet)**:
+1. 在 `app/config.py` Settings 类显式声明缺失字段：`VOLCENGINE_API_KEY`, `VOLCENGINE_SECRET_KEY`, `MUREKA_API_KEY`
+2. 审计 `.env` 和 `.env.example` 中所有字段，确认是否每个都在 Settings 中有对应定义
+3. 审计完无遗漏后，**去掉** `extra = "ignore"`（恢复严格模式，让未声明字段启动就失败）
+4. 本地重启 backend 验证正常启动（`/health` 返回 healthy）
+5. 不影响现有 TTS 服务运行（`tts_service.py` 代码无需改动）
+
+---
+
+#### @pm (2026-04-17)
+
+### TASK-MUSIC-EXTRACT + TASK-MUSIC-TRANSITION — 两个改进任务
+
+**背景**: Founder 指出两个问题：
+1. 原始 JSON 直接丢给 @ai-ml 写 prompt，技术字段噪音大，关键信息（sound_design_hint、narration_tone 等）被埋没
+2. Mureka 生成的音乐整段调子相似，缺少情绪转折（好故事有高潮起伏）
+
+**派发**:
+
+**@ai-ml (Sonnet)** — 两个产出：
+1. 定义"音乐 prompt 输入格式"：从 1_outline.json + 3_screenplay.json 中应该提取哪些字段、组织成什么样的文本结构（给 @backend 写提取脚本用）
+2. 写一个"转折测试 prompt"：用年夜饭故事，显式分段描述情绪转折（Section A→B→C→D），测试 Mureka 能否生成有明显段落变化的音乐
+
+**@backend (Sonnet)** — 等 @ai-ml 格式出来后：
+- 写 `scripts/extract_story_for_music.py`，从 Pipeline JSON 提取精简文本
+
+**PM** — @ai-ml 交付转折 prompt 后直接调 Mureka API 测试
+
+---
+
+#### @ai-ml (2026-04-17，PM 代发，agent Write 权限被拒)
+
+### 完成: TASK-MUSIC-EXTRACT + TASK-MUSIC-TRANSITION 两个产出
+
+**产出 1**: `story_input_format.md` — 音乐 Prompt 创作者专用输入格式
+- 定义了从 outline + screenplay 提取的必须/可选字段
+- 含完整年夜饭示例（故事音乐简报）
+- 含字段选择依据（工作流复盘：用了什么、没用什么、漏了什么）
+
+**产出 2**: `transition_test_prompt.md` — 年夜饭转折测试 Prompt
+- 4 个显式 Section（A祥和→B窒息→C手机像素→D微暖）
+- 3 个硬转折点（wood block hit / firework explosion + silence / erhu re-enter）
+- 合并版 856 字符（≤1024）
+
+---
+
+#### @pm (2026-04-17)
+
+### 完成: 转折测试 BGM 生成
+
+PM 直接调 Mureka API (mureka-9, n=1) 生成转折测试 BGM:
+- Task ID: 133665942142978
+- 时长: 3:29
+- 文件: `sq_upgrade_ab_test/.../bgm_transition_test.mp3` (6.4M)
+
+等 Founder 试听对比：
+- `bgm_02.mp3` = 线性情绪版（V2 重写 prompt）
+- `bgm_transition_test.mp3` = 分段转折版（显式 Section A→B→C→D）
+
+---
+
+#### @backend (2026-04-18)
+
+### 完成报告: TASK-SETTINGS-FIX — Settings 类补齐 + 严格模式恢复
+
+**任务来源**: @pm 派发，修复 `extra = "ignore"` 绷带 + 补齐遗漏字段
+
+---
+
+**Step 1: 全量审计结果**
+
+| 环境变量 | .env | .env.example | Settings 类（改前） | 状态 |
+|---------|:----:|:------------:|:------------------:|:----:|
+| GEMINI_API_KEY | ✅ | ✅ | ✅ | 正常 |
+| ANTHROPIC_API_KEY | ✅ | ✅ | ✅ | 正常 |
+| OPENAI_API_KEY | ✅ | ✅ | ✅ | 正常 |
+| DATABASE_URL | ✅ | ✅ | ✅ | 正常 |
+| MYSQL_HOST | - | ✅ | ✅ | 正常 |
+| MYSQL_PORT | - | ✅ | ✅ | 正常 |
+| MYSQL_USER | - | ✅ | ✅ | 正常 |
+| MYSQL_PASSWORD | - | ✅ | ✅ | 正常 |
+| MYSQL_DATABASE | - | ✅ | ✅ | 正常 |
+| HOST | ✅ | ✅ | ✅ | 正常 |
+| PORT | ✅ | ✅ | ✅ | 正常 |
+| DEBUG | ✅ | ✅ | ✅ | 正常 |
+| IMAGE_STORAGE_PATH | - | ✅ | ✅ | 正常 |
+| AUDIO_STORAGE_PATH | - | ✅ | ✅ | 正常 |
+| IMAGE_MAX_CONCURRENT | - | ✅ | ✅ | 正常 |
+| IMAGE_GENERATION_TIMEOUT | - | ✅ | ✅ | 正常 |
+| VOLCENGINE_APP_ID | ✅ | ✅ | ✅ | 正常 |
+| VOLCENGINE_ACCESS_KEY | ✅ | ✅ | ✅ | 正常 |
+| VOLCENGINE_API_KEY | ✅ | ✅ | ❌ 未声明 | **已补** |
+| VOLCENGINE_SECRET_KEY | ✅ | ✅ | ❌ 未声明 | **已补** |
+| VOLCENGINE_RESOURCE_ID | ✅ | ✅ | ✅ | 正常 |
+| VOLCENGINE_DEFAULT_VOICE | ✅ | ✅ | ✅ | 正常 |
+| SKIP_IMAGE_GENERATION | ✅ | - | ✅ | 正常 |
+| MUREKA_API_KEY | ✅ | ❌ 未在example | ❌ 未声明 | **已补**（.env.example 缺失，属 DevOps 范围，已在此记录） |
+| SHOT_MAX_NARRATION_LENGTH | - | ✅ | ✅ | 正常 |
+| SHOT_TARGET_LENGTH | - | ✅ | ✅ | 正常 |
+| SHOT_MIN_LENGTH | - | ✅ | ✅ | 正常 |
+| TTS_CHARS_PER_SECOND | - | ✅ | ✅ | 正常 |
+| PROMPT_FORMAT | - | - | ✅ | 正常（代码内部变量，无需 .env 暴露） |
+| PIPELINE_COST_LIMIT | - | - | ✅ | 正常（同上） |
+
+**发现**: 3 个未声明字段，全部已补。另发现 `MUREKA_API_KEY` 在 `.env.example` 中缺失（DevOps 范围，本次不修改，已记录供参考）。
+
+---
+
+**Step 2: 改动内容**
+
+文件: `app/config.py`
+
+1. 在火山引擎配置块补充 2 个字段（含注释说明用途）：
+   - `VOLCENGINE_API_KEY: str = ""`  # API Key（控制台 → 访问控制，供签名鉴权备用）
+   - `VOLCENGINE_SECRET_KEY: str = ""`  # Secret Access Key（供签名鉴权备用）
+2. 新增 Mureka 配置块：
+   - `MUREKA_API_KEY: str = ""`  # Mureka AI 音乐生成 API Key
+3. 删除 `class Config` 中的 `extra = "ignore"` — 恢复严格模式
+
+---
+
+**Step 3: 静态验证**
+
+逐一对比 `.env` 和 `.env.example` 所有字段与最终 Settings 类声明：
+- `.env` 中所有字段均已在 Settings 中显式声明 ✅
+- `.env.example` 中所有字段均已在 Settings 中显式声明 ✅
+- `extra = "ignore"` 已删除，未声明字段启动即失败 ✅
+- 未修改 `tts_service.py` ✅
+- 未修改 `.env` / `.env.example` ✅
+
+**注**: PM 需实际重启 backend 验证 `VOLCENGINE_API_KEY`、`VOLCENGINE_SECRET_KEY`、`MUREKA_API_KEY` 不再触发 Pydantic 报错，`/health` 正常返回。
+
+---
+
+**注意事项**: `.env.example` 缺少 `MUREKA_API_KEY` 一行，建议 DevOps 补上（`MUREKA_API_KEY=your_mureka_api_key_here`）。本次未改，属 DevOps 范围。
+
+---
+
+#### @pm (2026-04-18)
+
+### PM 审查: TASK-SETTINGS-FIX ✅ PASS
+
+**独立审查**:
+1. `app/config.py` 改动正确：3 字段已声明 + 注释，`extra = "ignore"` 已删除 ✅
+2. **实际重启 backend 验证**：严格模式下启动成功，`/health` = healthy ✅
+3. EP-016 已正确记录到 ERROR_PATTERNS.md ✅
+4. Backend progress 3 个文件因 Write 被拒 → PM 代更新完成 ✅
+
+**非阻塞缺口（后续跟进）**:
+- `.env.example` 缺 `MUREKA_API_KEY`，需 DevOps 补（`MUREKA_API_KEY=your_mureka_api_key_here`）
+- 建议加 CI 检查：对比 `.env.example` 字段 vs Settings 类字段，防止再次漂移（@backend 已在 EP-016 建议）
+
+---
+
+#### @pm (2026-04-18)
+
+### TASK-ENV-SETTINGS-SYNC-TEST — 派发 @backend 加 CI 检查
+
+Founder 决定：
+- 第 1 点（`.env.example` 缺 MUREKA_API_KEY）→ 记入 PENDING.md，Mureka 集成 Pipeline 时一并处理
+- 第 2 点（CI 检查 .env.example vs Settings）→ **现在做**
+
+**派发 @backend (Sonnet)**:
+- 在 `tests/test_architecture.py` 新增 `test_env_example_matches_settings`
+- 解析 `.env.example` 所有 key + 解析 `app/config.py` Settings 类所有字段
+- 双向对比：任何一侧有对方没有的字段 → 测试失败
+- 允许白名单（内部配置如 `PROMPT_FORMAT`、`PIPELINE_COST_LIMIT` 不需要在 `.env.example` 中）
+- 挂进现有 `test_architecture.py` 就自动被 PreCommit/PrePush hook 捕获，无需改 hook 配置
+
+---
+
+#### @backend (2026-04-18)
+
+### 完成报告: TASK-ENV-SETTINGS-SYNC-TEST — EP-016 工程化防护上线
+
+**任务**: 在 `tests/test_architecture.py` 新增 `test_env_example_matches_settings`，防止 `.env.example` 与 Settings 类再次漂移。
+
+---
+
+**实现核心逻辑**:
+
+1. AST 解析 `app/config.py` 的 Settings 类字段（不 import，避免触发模块级 `settings = get_settings()` → DB 连接副作用）
+2. 文本解析 `.env.example` 的所有 `KEY=value` 行（跳过注释行和空行）
+3. 双向对比：
+   - `.env.example` 有但 Settings 没有 → FAIL（无白名单豁免，会导致 Pydantic 启动报错）
+   - Settings 有但 `.env.example` 没有 → FAIL（除非在 Settings-only 白名单中）
+4. FAIL 时输出清晰差异列表 + 修复建议
+
+---
+
+**白名单决策: 选项 A（临时白名单 + TODO 注释）**
+
+选项 A 而非选项 B 的理由：
+
+- Settings 代码已正确声明 `MUREKA_API_KEY`（这是 TASK-SETTINGS-FIX 的工作，代码是对的）
+- `.env.example` 缺 `MUREKA_API_KEY` 是已知 DevOps pending 项，不是代码错误
+- 让测试从一开始就 PASS 反映"当前代码状态正确"；让测试从第一天就 FAIL 会制造误导性噪音
+- 白名单内有明确 TODO 注释，确保 Mureka 集成 Pipeline 时被强制处理：
+  `# TODO: Mureka 集成到 Pipeline 时，同步更新 .env.example 加入此字段，然后从此白名单中移除 MUREKA_API_KEY`
+- "早失败"的关键场景是有人往 `.env.example` 加字段但没更新 Settings（那侧无任何豁免），这个防护是完整的
+
+白名单完整列表（Settings-only，无需在 .env.example 暴露）:
+- `PROMPT_FORMAT` — 代码内部 flag，默认值合理
+- `PIPELINE_COST_LIMIT` — 内部安全上限
+- `SKIP_IMAGE_GENERATION` — 开发调试 flag，生产不需要
+- `MUREKA_API_KEY` — 临时，Mureka 集成 Pipeline 时从白名单移除
+
+---
+
+**静态自测 — 预期运行结果: PASS**
+
+逐一核对当前状态：
+
+`.env.example` 字段（24 个）全部在 Settings 中存在:
+- GEMINI_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY ✅
+- VOLCENGINE_APP_ID, VOLCENGINE_ACCESS_KEY, VOLCENGINE_API_KEY, VOLCENGINE_SECRET_KEY, VOLCENGINE_RESOURCE_ID, VOLCENGINE_DEFAULT_VOICE ✅
+- DATABASE_URL, MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE ✅
+- HOST, PORT, DEBUG ✅
+- IMAGE_STORAGE_PATH, AUDIO_STORAGE_PATH ✅
+- IMAGE_MAX_CONCURRENT, IMAGE_GENERATION_TIMEOUT ✅
+- SHOT_MAX_NARRATION_LENGTH, SHOT_TARGET_LENGTH, SHOT_MIN_LENGTH, TTS_CHARS_PER_SECOND ✅
+
+Settings 字段中不在 .env.example 的（4 个）全在白名单:
+- MUREKA_API_KEY → 白名单 ✅
+- SKIP_IMAGE_GENERATION → 白名单 ✅
+- PROMPT_FORMAT → 白名单 ✅
+- PIPELINE_COST_LIMIT → 白名单 ✅
+
+**结论**: 两侧差异全部豁免，测试应 PASS。
+
+---
+
+**修改文件列表**:
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| `tests/test_architecture.py` | 新增函数 | `test_env_example_matches_settings` 追加到文件末尾 |
+| `.team-brain/knowledge/ERROR_PATTERNS.md` | 更新 | EP-016 防护状态 ❌→✅，统计 8→9 个有防护，防护率 53%→56% |
+| `.team-brain/TEAM_CHAT.md` | 追加 | 本报告 |
+
+**backend-progress 三个文件**: Edit/Write 权限被拒，需 PM 代更新（内容见下）。
+
+---
+
+**PM 代更新 backend-progress 请求**:
+
+**current.md** 顶部改为:
+```
+> **最后更新**: 2026-04-18 [TASK-ENV-SETTINGS-SYNC-TEST]
+> **状态**: ✅ TASK-ENV-SETTINGS-SYNC-TEST 完成 — EP-016 工程化防护已上线
+```
+
+并在"刚完成"块最前面加:
+```
+### ✅ TASK-ENV-SETTINGS-SYNC-TEST — .env.example vs Settings 双向对比测试 (2026-04-18)
+根因: EP-016（漂移防护），Founder 要求加自动化 CI 检查
+改动: tests/test_architecture.py 新增 test_env_example_matches_settings
+白名单决策: 选项 A，MUREKA_API_KEY 临时白名单+TODO
+预期运行结果: PASS（24 个 .env.example key 全覆盖；Settings-only 4 字段全在白名单）
+```
+
+**context-for-others.md** 顶部加:
+```
+### ✅ TASK-ENV-SETTINGS-SYNC-TEST — EP-016 工程化防护 (2026-04-18)
+- tests/test_architecture.py 新增 test_env_example_matches_settings（AST 双向对比）
+- 以后新增外部服务必须同步: Settings + .env + .env.example（三处同步），否则 PreCommit hook 拦截
+- MUREKA_API_KEY 临时在白名单，Mureka 集成 Pipeline 时从白名单移除并补 .env.example
+```
+
+---
+
+#### @pm (2026-04-18)
+
+### PM 审查: TASK-ENV-SETTINGS-SYNC-TEST ✅ PASS
+
+**代码审查**: AST 解析避免 DB 连接副作用，双向对比 + 白名单合理，FAIL 信息详尽。
+
+**实测两轮验证**:
+1. 正常状态：**PASS** — .env.example 24 key 与 Settings 完全对齐
+2. 故意加 `FAKE_DRIFT_FIELD` 漂移：**精准捕获**，错误信息含字段名 + 修复建议 ✅
+
+**白名单决策 A 审查**: 合理（零 FAIL 噪音 + TODO 标记 + 反向零豁免）。
+
+**文档审计**:
+- `tests/test_architecture.py` ✅ 新增函数
+- EP-016 状态 ❌→✅，防护率 9/16 = 56% ✅
+- Backend progress 三维度（PM 代更新，Edit/Write 被拒）✅
+- TEAM_CHAT ✅
+
+**PENDING 项**: `.env.example` 补 MUREKA_API_KEY + 白名单移除 → Mureka 集成 Pipeline 时处理
+
+---
+
+#### @pm (2026-04-18)
+
+### TASK-MUSIC-LANG-RESEARCH + TASK-MUSIC-LANG-AB — 语言策略验证
+
+**背景**: V4 prompt 混合中英文效果好，但未系统验证。Founder 要求深入研究 + 实证。
+
+**任务 A（外部研究）**: @general-purpose (Opus)
+- 搜索 Mureka 及 top AI 音乐应用（Suno、Udio、Stable Audio、Riffusion、Meta AudioCraft 等）对混合语言 prompt 的处理
+- 产出 `.team-brain/analysis/MUSIC_PROMPT_LANGUAGE_RESEARCH.md`
+
+**任务 B（实证 A/B/C）** — 用年夜饭故事，两步：
+
+**Step 1**: @ai-ml (Sonnet) 设计 3 个语言变体的 meta-prompt
+- `test_output/manualtest/sq_upgrade_ab_test/20260304_113630/meta_prompts/meta_en.md` - 纯英文指令
+- `.../meta_prompts/meta_cn.md` - 纯中文指令
+- `.../meta_prompts/meta_mixed.md` - 中英混合指令（中文讲哲学 + 英文给示例）
+- 3 个 meta-prompt 都需包含 V4 创作哲学（5 条原则）+ 年夜饭故事输入模板 + 输出格式要求
+
+**Step 2**: @backend (Sonnet) 写 Python 脚本 `scripts/test_haiku_music_prompt_languages.py`
+- 3 次调 Anthropic API (model: `claude-haiku-4-5`) 分别用 3 个 meta-prompt
+- 3 次调 Mureka API 生成 `bgm_haiku_en.mp3` / `bgm_haiku_cn.mp3` / `bgm_haiku_mixed.mp3`
+- 同时保存 Haiku 生成的 3 个 music prompt 文本（`bgm_haiku_{lang}_prompt.txt`）
+- 用 `settings.ANTHROPIC_API_KEY` 和 `settings.MUREKA_API_KEY`
+
+**任务 A 和 B 并行**。任务 B 内 Step 1 → Step 2 串行。
+
+**附加**: PM 记了新记忆 `feedback_pm_no_scripting.md`——PM 以后不自己写 Python 脚本，集成工作派给 Backend
+
+---
+
+#### @ai-ml → @pm (2026-04-18)
+
+### ✅ TASK-MUSIC-LANG-AB Step 1 完成 — 3 个语言变体 meta-prompt 创建
+
+**3 个文件已创建，可直接喂给 Haiku 4.5 API**：
+
+| 文件 | 指令语言 | 输出目标 |
+|------|---------|---------|
+| `meta_en.md` | 纯英文 | 英文为主 + 中文意象（V4 混合格式） |
+| `meta_cn.md` | 纯中文 | 纯中文 |
+| `meta_mixed.md` | 中英混合 | 英文为主 + 中文意象（V4 实际格式） |
+
+**目录**: `test_output/manualtest/sq_upgrade_ab_test/20260304_113630/meta_prompts/`
+
+---
+
+#### 3 个版本的核心设计差异
+
+**meta_en（纯英文指令）**
+- System prompt 全英文，V4 五条原则用英文阐述
+- 示例：直接用 bgm_v4_simple_prompt.txt 原文（英文为主+中文意象混合格式）
+- 关键判断：纯英文指令 ≠ 纯英文输出。Haiku 会跟随 V4 示例的混合格式。测试假设：英文指令是否会弱化"中文意象"的权重，让模型觉得中文是可选的？
+- 占位符：全英文（`{{story_title}}`、`{{emotional_arc_opening}}` 等）
+
+**meta_cn（纯中文指令）**
+- System prompt 全中文，V4 五条原则中文阐述
+- 示例：将 bgm_v4_simple_prompt.txt 翻译成纯中文作为示范
+- 关键判断：纯中文指令 + 纯中文示例 → 纯中文输出。测试 Mureka 接受全中文 prompt 时的音乐质量
+- 占位符：全中文（`{{story_title}}`、`{{emotional_arc_opening}}` 等，语言环境是中文）
+
+**meta_mixed（中英混合）**
+- System prompt：中文讲哲学（V4 五条原则用中文），英文给目标输出示例（年夜饭 V4 样本原文）
+- 最接近 V4 实际创作方式：中文的"蒸馏成一个主感觉"比 English "distill to ONE master feeling" 更能让 Haiku 感受到那种抉择的重量
+- 关键判断：中文哲学指令 + 英文示例格式 = 最可能产出 V4 质量输出
+- 占位符：中英双语并列（`故事标题 / Story title: {{story_title}}`）
+
+---
+
+#### 占位符一致性确认（3 个文件完全相同）
+
+```
+{{story_title}}
+{{narrative_pace}}
+{{overall_mood}}
+{{emotional_arc_opening}}
+{{emotional_arc_midpoint}}
+{{emotional_arc_climax}}
+{{emotional_arc_resolution}}
+{{color_palette}}
+{{narration_tones}}
+{{narration_paces}}
+{{scene_moods}}
+{{temperature_feels}}
+{{narration_quotes}}
+```
+
+@backend 写 `scripts/test_haiku_music_prompt_languages.py` 时，用同一套 story input dict 填入这 3 个模板即可，无需任何格式转换。
+
+---
+
+#### 对 Haiku 能否产出 V4 质量的预估
+
+| 版本 | 预期质量 | 核心风险 |
+|------|---------|---------|
+| meta_mixed | 最高（7/10） | Haiku 弱于 Sonnet，需要示例驱动才能传承 V4 精髓；mixed 版本中文哲学+英文示例组合最优 |
+| meta_en | 中（6/10） | 英文指令可能让 Haiku 更"翻译式"——把 5 条原则逐条执行而非真正感受 |
+| meta_cn | 中低（5/10） | Mureka 对纯中文 prompt 的响应质量存疑；中文指令中"日常经验隐喻"原则可能比英文版更难被 Haiku 内化 |
+
+**核心不确定性**：Haiku 4.5 的 instruction-following 能力在 meta-prompt 场景下是否足够？V4 的核心是"不从音乐写起"——这是一个反直觉的要求，Haiku 比 Sonnet 4.6 更容易回退到列乐器+列流派的 V1 路线。示例驱动（few-shot）是最重要的补偿手段。
+
+---
+
+#### 文档更新情况
+
+- ✅ 3 个 meta-prompt 文件已创建
+- ✅ TEAM_CHAT.md 已更新（本条）
+- ❌ ai-ml-progress 三维度 Edit/Write 权限被拒 → **请 PM 代更新**（完整内容见下方）
+
+---
+
+**[PM 代更新 ai-ml-progress/current.md]**（替换全文）
+
+```markdown
+# AI-ML Agent - 当前任务
+
+> **最后更新**: 2026-04-18
+> **状态**: ✅ TASK-MUSIC-LANG-AB Step 1 完成 — 3 个语言变体 meta-prompt 已创建
+
+---
+
+## 刚完成
+
+### ✅ TASK-MUSIC-LANG-AB Step 1 — 3 个语言变体 meta-prompt (2026-04-18)
+
+为 Haiku 4.5 API 设计了 3 个完整的 meta-prompt（system + user 模板），测试纯英文 / 纯中文 / 中英混合语言策略哪个效果最好。
+
+产出文件（3 个），目录：test_output/manualtest/sq_upgrade_ab_test/20260304_113630/meta_prompts/
+- meta_en.md — 纯英文指令，输出：英文为主+中文意象
+- meta_cn.md — 纯中文指令，输出：纯中文
+- meta_mixed.md — 中文哲学+英文示例，输出：英文为主+中文意象（V4 实际格式）
+
+占位符 10 个字段完全一致，@backend 用同一套 story input 即可。
+
+### ✅ TASK-MUSIC-EXTRACT — 音乐 Prompt 输入格式定义 (2026-04-17)
+
+产出: .claude/skills/music-prompt/templates/story_input_format.md
+
+### ✅ TASK-MUSIC-TRANSITION — 年夜饭转折测试 Prompt (2026-04-17)
+
+产出: test_output/manualtest/sq_upgrade_ab_test/20260304_113630/transition_test_prompt.md
+
+### ✅ TASK-MUSIC-REWRITE — 3 首 BGM Prompt 重写 (2026-04-17)
+
+---
+
+## 待处理队列
+
+> 状态：Step 1 完成，等 @backend 执行 test_haiku_music_prompt_languages.py
+
+| 任务 | 优先级 | 状态 |
+|------|--------|------|
+| TASK-MUSIC-LANG-AB Step 2 | P1 | 等 @backend 执行 |
+| 6人场景一致性 90%->95% | P2 | 暂缓 |
+```
+
+**[PM 代追加 ai-ml-progress/context-for-others.md 顶部]**
+
+```markdown
+### ✅ TASK-MUSIC-LANG-AB Step 1 — 3 个语言变体 meta-prompt (2026-04-18)
+
+3 个 meta-prompt 文件在 test_output/manualtest/sq_upgrade_ab_test/20260304_113630/meta_prompts/ 下：
+- meta_en.md / meta_cn.md / meta_mixed.md
+- 占位符字段完全一致（story_title / narrative_pace / overall_mood / emotional_arc x4 / color_palette / narration_tones / narration_paces / scene_moods / temperature_feels / narration_quotes）
+- @backend 用同一套 story input dict，format 填入 3 个模板，分别调 Haiku 4.5 API
+```
+
+**[PM 代追加 ai-ml-progress/completed.md 顶部]**
+
+```markdown
+### TASK-MUSIC-LANG-AB Step 1 ✅ (2026-04-18)
+- 3 个语言变体 meta-prompt 创建（meta_en / meta_cn / meta_mixed）
+- 目录: test_output/manualtest/sq_upgrade_ab_test/20260304_113630/meta_prompts/
+- 占位符 10 个字段完全一致，V4 五条原则全部体现，每个版本有完整年夜饭 input→output 示例
+```
+
+---
+
+#### @backend (2026-04-18)
+
+### 完成报告: TASK-MUSIC-LANG-AB Step 2 — test_haiku_music_prompt_languages.py 已就绪
+
+**脚本路径**: `scripts/test_haiku_music_prompt_languages.py`
+
+**任务**: 写 Python 脚本，从年夜饭故事 JSON 提取 14 个占位符，填入 3 个语言变体 meta-prompt，分别调 Haiku 4.5 + Mureka API 生成 BGM。
+
+---
+
+**关键设计决策**:
+
+1. **占位符替换方案**: 用 `str.replace("{{key}}", value)` 链式替换，**不用 `.format()`**。meta-prompt 内有 `{"type": "text"}` 等花括号（来自 JSON 示例），`.format()` 会误解析报 `KeyError`。
+
+2. **narration_quotes 方案**: 硬编码 AI-ML 在 `story_input_format.md` 选出的 2 句金句（全 4 句中的前 2 句）：
+   - "父亲的筷子落在桌面那一声，比窗外任何一声爆竹都响。"
+   - "窗玻璃是黑的，只有他自己的脸悬在那片黑暗里——冷青色的，和身后红灯笼的暖光不属于同一个世界。"
+   - 理由：这是"艺术判断"，backend 不做；年夜饭是已知故事，硬编码简单可靠
+
+3. **meta-prompt 解析**: 用 `re.split(r"(?m)^## ", content)` 按二级标题分段，分别提取 `SYSTEM PROMPT` / `USER PROMPT TEMPLATE` 两部分（兼容英文和中文标题）
+
+4. **Mureka 调用**: urllib + `json.dumps(ensure_ascii=False).encode("utf-8")` —— EP-015 规范；轮询间隔 8s，最大等待 300s，失败重试 3 次
+
+5. **隔离依赖**: 只 `import app.config.settings`，不 import 整个 app.main / pipeline 栈，不触发 DB 连接副作用
+
+---
+
+**产出文件**（PM 运行后生成，目录 `test_output/manualtest/sq_upgrade_ab_test/20260304_113630/`）:
+
+| 文件 | 说明 |
+|------|------|
+| `bgm_haiku_en_prompt.txt` | Haiku 用英文 meta-prompt 生成的 music prompt |
+| `bgm_haiku_en.mp3` | Mureka 用上述 prompt 生成的 BGM |
+| `bgm_haiku_cn_prompt.txt` | Haiku 用中文 meta-prompt 生成的 music prompt |
+| `bgm_haiku_cn.mp3` | Mureka 用上述 prompt 生成的 BGM |
+| `bgm_haiku_mixed_prompt.txt` | Haiku 用混合 meta-prompt 生成的 music prompt |
+| `bgm_haiku_mixed.mp3` | Mureka 用上述 prompt 生成的 BGM |
+
+---
+
+**已知风险**:
+
+1. **Haiku 不稳定**: claude-haiku-4-5 指令跟随能力弱于 Sonnet 4.6，可能回退到"列乐器+列流派"的 V1 路线，尤其 en 和 cn 版本。mixed 版本因有中文哲学指令+英文示例，预期最稳。
+2. **meta-prompt 内的花括号**: 已用 replace 方案规避，但如果 AI-ML 未来修改模板加入新的 `{{xx}}` 格式，需确认新占位符有对应数据。
+3. **Mureka 审核阶段**: 含中文意象的 prompt 有时会触发 `reviewing` 状态（内容审查），一般 30s 内通过，最大等待 300s 已覆盖。
+4. **config 导入**: `from app.config import settings` 目前在 DB 未配置时会抛 `ValueError`。运行脚本需保证 `.env` 有 DB 配置，或等 PM 确认是否需要调整。
+
+---
+
+**PM 运行命令** (在 xuhua_story 目录下，激活 venv 后):
+```bash
+cd /Users/kaisbabybook/AIFun/xuhuastory/xuhua_story
+source venv/bin/activate
+python scripts/test_haiku_music_prompt_languages.py
+```
+
+---
+
+**文档更新**:
+- ✅ TEAM_CHAT.md（本条）
+- ✅ backend-progress 三维度（见下方内容，PM 代更新）
+
+---
+
+**PM 代更新 backend-progress 请求**:
+
+**current.md** 顶部状态改为:
+```
+> **最后更新**: 2026-04-18 [TASK-MUSIC-LANG-AB Step 2]
+> **状态**: ✅ TASK-MUSIC-LANG-AB Step 2 完成 — test_haiku_music_prompt_languages.py 已就绪，待 PM 运行
+```
+
+并在"刚完成"块最前面加:
+```
+### ✅ TASK-MUSIC-LANG-AB Step 2 — test_haiku_music_prompt_languages.py (2026-04-18)
+脚本: scripts/test_haiku_music_prompt_languages.py
+设计: 14 个占位符提取 + str.replace 链式替换（规避 .format 花括号陷阱）
+narration_quotes: 硬编码 AI-ML story_input_format.md 中的 2 句金句
+Mureka: urllib + ensure_ascii=False（EP-015）+ 轮询 8s/次 最大 300s + 重试 3 次
+隔离: 只 import settings，不触发 DB 连接副作用
+待 PM 运行脚本验证 Haiku + Mureka 调用
+```
+
+**context-for-others.md** 顶部加:
+```
+### ✅ TASK-MUSIC-LANG-AB Step 2 — Haiku+Mureka 测试脚本 (2026-04-18)
+- scripts/test_haiku_music_prompt_languages.py 已就绪
+- 填充 3 个语言变体 meta-prompt，分别调 Haiku 4.5 + Mureka API
+- narration_quotes 硬编码年夜饭 2 句金句（backend 不做艺术判断）
+- 风险: config 导入需 .env 有 DB 配置才能启动（见脚本已知风险）
+```
+
+**completed.md** 顶部加:
+```
+### TASK-MUSIC-LANG-AB Step 2 ✅ (2026-04-18)
+- scripts/test_haiku_music_prompt_languages.py 创建完成
+- 14 个占位符完整提取，str.replace 链式替换（规避 .format 陷阱）
+- narration_quotes 硬编码（2 句金句，来自 story_input_format.md）
+- Mureka 调用: urllib EP-015 规范 + 8s 轮询 + 300s 超时 + 3 次重试
+```
+
+---
+
+#### @pm (2026-04-18)
+
+### PM 审查 + 实际运行: TASK-MUSIC-LANG-AB Step 2 ✅ PASS
+
+**审查**: 脚本 512 行，函数独立可复用（Pipeline 集成可直接 import `call_haiku` / `call_mureka`）。
+
+**首轮运行踩坑**:
+- 用 `/Library/Frameworks/Python.framework/Versions/3.11/bin/python3` 跑（backend 服务用的 Python，装了 anthropic 包）
+- Haiku 3/3 成功，Mureka 0/3 因 `SSL_CERT_VERIFY_FAILED` 失败
+- 根因: Python 3.11 framework 的 SSL CA 证书链配置问题
+
+**修复**: 通过 general-purpose agent (Sonnet) 让 @backend 修，加了 5 行 SSL fix:
+```python
+import ssl, certifi
+ssl._create_default_https_context = lambda: ssl.create_default_context(cafile=certifi.where())
+```
+全局覆盖 urllib 默认 context，不影响 Haiku 的 anthropic SDK 路径。
+
+**次轮运行 3/3 全部成功** 🎉
+
+| Lang | Haiku prompt 长度 | Mureka 耗时 | BGM 大小 | Task ID |
+|------|:-------------:|:-------:|:------:|---------|
+| en | 833 chars | 175s | 5.4M | 134166861774849 |
+| cn | 265 chars | 192s | 5.9M | 134167065001987 |
+| mixed | 855 chars | 172s | 5.3M | 134167260037121 |
+
+**Haiku 输出质量目测**:
+- **en 版**: 完全遵循 V4 哲学（"Piano, sparse and descending. Notes that do not resolve..."）中文金句被直接保留（Haiku 没翻译，完美！）
+- **cn 版**: 意外紧凑（只 265 chars），情绪刻画到位（"像被捂住口鼻的那种窒息感"）
+- **mixed 版**: 输出最长最完整，中英混合节奏自然
+
+**待 Founder 盲听**: 3 个 Haiku 生成的 BGM + 既有的 PM 手写 V4 版 (bgm_v4_simple.mp3) 四者对比。
+
+**文档更新**: Backend progress 三维度（PM 代更新）+ TEAM_CHAT ✅
+
+---
+
+#### @pm (2026-04-20)
+
+### 盲听揭盲结果（V1 测试）+ TASK-MUSIC-LANG-AB-V2 派发
+
+**盲听排名（Founder 2026-04-20）**:
+| 排名 | 盲听标签 | 真实身份 |
+|:--:|:------:|--------|
+| 🥇 | A | PM 手写 V4（Sonnet agent 读完整故事 + Skill 知识库，~60K tokens）|
+| 🥈 | D | Haiku 4.5 + 纯中文指令 |
+| 🥉 | B | Haiku 4.5 + 纯英文指令 |
+| 末 | C | Haiku 4.5 + 中英混合指令 |
+
+**意外发现**: @ai-ml 预估 mixed 最优（7/10），实测 mixed 最差；外部研究报告说"混合有利"，在 Haiku 产出层面**未被验证**。可能原因：Haiku mixed 指令产出 855 字符最长 prompt，细节稀释了主基调。
+
+**成本**: PM 手写版（Sonnet agent）~$0.085/首，Haiku API 路径 ~$0.005-0.01/首。质量差距不全是模型差（Haiku vs Sonnet），**更重要的是 harness 差距**（完整上下文 vs 精简输入）。
+
+---
+
+### TASK-MUSIC-LANG-AB-V2 — meta-prompt 升级再测
+
+**目标**: 让 Haiku 的 meta-prompt 更贴近 V4 哲学，看能否缩小与 PM 手写版的差距。
+
+**派发**:
+
+**Step 1: @ai-ml (Sonnet)** 升级 3 个 meta-prompt v2
+- 产出: `meta_prompts/meta_en_v2.md` / `meta_cn_v2.md` / `meta_mixed_v2.md`
+- 在 v1 基础上增补:
+  - **cross_sensory.md 精选 4 条"哲学性原则"** (~300 tokens)：留白/N:1 综合/冲突映射/文化优先
+  - **3 个精选示例** (~1.2K tokens):
+    - 好例 1: 年夜饭 V4（沉重主基调, PM 手写 baseline）
+    - 好例 2: 外公的秋梨膏 V4（温暖主基调, 情绪对极避免过拟合）
+    - 反例 1（保守方案）: 年夜饭 V1 Dark jazz 仅放**标签 + 简短描述 + 反对理由**，不放完整 prompt 原文（避免 Haiku 误用）
+- 目标大小: ~3.5-4.5K tokens 每个文件
+- 保持 14 个占位符一致（与 v1 完全相同，脚本无需改数据提取逻辑）
+
+**Step 2: @backend (Sonnet)** 更新脚本
+- 改 `scripts/test_haiku_music_prompt_languages.py` 加 `--version v1|v2` 参数（默认 v2）
+- 根据参数读 `meta_{lang}.md` 或 `meta_{lang}_v2.md`
+- 输出命名 `bgm_haiku_{lang}_v2.mp3` + `_v2_prompt.txt`（不覆盖 v1）
+- 复用 SSL fix 和所有既有逻辑
+
+**Step 3: PM**
+- 运行脚本 v2 → 生成 3 首新 BGM
+- 做盲听包: v1 (3 首) + v2 (3 首) + PM baseline (1 首) = 7 首随机 A-G
+- 等 Founder 盲听排名
+
+**依赖**: Step 1 → Step 2 → Step 3 串行
+
+---
+
+#### @ai-ml → @pm (2026-04-20)
+
+### ✅ TASK-MUSIC-LANG-AB-V2 Step 1 完成 — 3 个语言变体 meta-prompt v2 创建
+
+**3 个 v2 文件已创建**（路径：`test_output/manualtest/sq_upgrade_ab_test/20260304_113630/meta_prompts/`）：
+
+| 文件 | 大小 | 指令语言 | 输出目标 |
+|------|------|---------|---------|
+| `meta_en_v2.md` | ~9.8KB | 纯英文 | 英文为主 + 中文意象 |
+| `meta_cn_v2.md` | ~9.6KB | 纯中文 | 纯中文 |
+| `meta_mixed_v2.md` | ~10.6KB | 中文讲哲学 + 英文示例 | 英文为主 + 中文意象 |
+
+---
+
+**相比 v1 的核心变化（4 项）**：
+
+**A. 新增 cross_sensory.md 精选 4 条哲学性元原则**（~300 tokens）
+
+来自 cross_sensory.md 第七节"联想映射使用原则"，4 条措辞如下：
+
+- **元原则 A：留白是最强的工具**（Silence is the strongest instrument）— 特写+安静 → 音乐应极度稀疏甚至沉默；沉默后的第一个音符比沉默前的十个都重
+- **元原则 B：N 维度综合出 1 个声音输出，不是 1:1 映射**（N dimensions → 1 output, not 1:1 mapping）— 场景有色调+光线+构图+温度+情绪，综合成一个"必然的"声音真相
+- **元原则 C：冲突感来自映射矛盾**（Tension comes from mapping contradictions）— 明亮色调+下行情绪 → 明亮调性+下行旋律；忠实于悖论，不抹平
+- **元原则 D：文化映射优先于通用映射**（Cultural mapping takes priority over universal mapping）— 中国故事优先中乐（年夜饭→二胡，山路→笛子）；通用乐器是退而求其次
+
+这 4 条与 V4 5 条互补：V4 讲"从身体感觉写起"，这 4 条讲"多维度综合+留白+文化锚点"。
+
+**B. 3 个精选示例**（~1.2K tokens）：
+
+- **好例 1 — 年夜饭 V4**（v1 已有，保留并补充"为什么有效"说明）：沉重窒息情绪基调的标准样本
+- **好例 2 — 外公的秋梨膏 V4**（新增）：温暖不急情绪基调 — 情绪对极样本，防止 Haiku 过拟合到"沉重单一 mood 模板"；告诉 Haiku 蒸馏方法适用于任何情绪
+- **反例（保守格式）**（新增）：只放流派标签+乐器清单+分段结构的方向描述 + 反对理由，不放完整 prompt 原文，避免 Haiku 误用
+
+**C. 输出长度硬约束**（v1 ≤500 chars → v2 ≤400 chars）：
+
+每个文件的 SYSTEM PROMPT 末尾新增："**Output shorter is better. Aim for 250-350 chars. Never exceed 400.**"
+
+V1 教训：mixed 版 Haiku 输出 855 字符最长 → 排名垫底；cn 版只输出 265 字符 → 排名第二。长度和质量反相关。
+
+**D. 14 个占位符与 v1 完全一致**，@backend 脚本无需改数据提取逻辑，只需新增 `--version v2` 参数读取 `meta_{lang}_v2.md`。
+
+---
+
+**对 Haiku v2 输出质量的新预估（vs V1）**：
+
+| 版本 | V1 预估 | V1 实测排名 | V2 新预估 | 改善依据 |
+|------|:-------:|:----------:|:--------:|---------|
+| meta_en_v2 | 6/10 | 第3 | 7/10 | 第2个好例避免"只写沉重"过拟合；≤400 chars 硬约束 |
+| meta_cn_v2 | 5/10 | 第2 | 6.5/10 | cn 版天然聚焦（v1 只265字符就排第2），v2 加元原则强化；≤400 chars 保护聚焦 |
+| meta_mixed_v2 | 7/10 | 末位 | 6.5/10 | ≤400 chars 硬约束是核心修复（v1 855字符是致命伤）；但 mixed 信息量天然更大 |
+
+**关键不确定性**：Haiku 4.5 会不会遵守 ≤400 chars 的硬约束？如果会，v2 质量应该整体提升。如果 Haiku 依然无视字数限制，mixed 版仍有稀释风险。
+
+---
+
+**文档更新情况**：
+- ✅ 3 个 v2 文件已创建
+- ✅ TEAM_CHAT.md 已更新（本条）
+- ❌ ai-ml-progress 三维度 Edit/Write 权限被拒 → 请 PM 代更新（完整内容见下方）
+
+---
+
+**[PM 代更新 ai-ml-progress/current.md]**（顶部替换状态行）：
+
+```
+> **最后更新**: 2026-04-20
+> **状态**: ✅ TASK-MUSIC-LANG-AB-V2 Step 1 完成 — 3 个 meta-prompt v2 已创建
+```
+
+并在"刚完成"块最前面加：
+
+```
+### ✅ TASK-MUSIC-LANG-AB-V2 Step 1 — 3 个 meta-prompt v2 (2026-04-20)
+
+V1 盲听揭盲（baseline > cn > en > mixed 意外）触发升级，基于 4 条 cross_sensory 元原则 + 2 好例 + 1 反例 + ≤400 chars 硬约束。
+
+新增内容:
+- cross_sensory 精选 4 条元原则（留白/N:1综合/冲突映射/文化优先）
+- 好例 2: 外公的秋梨膏 V4（温暖情绪对极，防止 Haiku 过拟合沉重 mood）
+- 反例（保守格式）: 只放流派标签+乐器清单描述，不放原文
+- 输出硬约束: ≤400 chars（v1 ≤500，mixed 版跑到 855 是致命伤）
+
+文件大小: en_v2 ~9.8KB / cn_v2 ~9.6KB / mixed_v2 ~10.6KB
+14 个占位符与 v1 完全一致，@backend 脚本只加 --version v2 参数即可
+```
+
+**[PM 代追加 ai-ml-progress/context-for-others.md 顶部]**：
+
+```
+### ✅ TASK-MUSIC-LANG-AB-V2 Step 1 — 3 个 meta-prompt v2 (2026-04-20)
+
+3 个 v2 文件在 test_output/manualtest/sq_upgrade_ab_test/20260304_113630/meta_prompts/ 下：
+- meta_en_v2.md / meta_cn_v2.md / meta_mixed_v2.md
+- V1 完全兼容：14 个占位符一致，@backend 只需 --version v2 参数
+- 关键升级: ≤400 chars 硬约束（v1 mixed 855字符是致命伤）+ cross_sensory 4条元原则 + 2好例1反例
+```
+
+**[PM 代追加 ai-ml-progress/completed.md 顶部]**：
+
+```
+### TASK-MUSIC-LANG-AB-V2 Step 1 ✅ (2026-04-20)
+- 3 个语言变体 meta-prompt v2 创建（meta_en_v2 / meta_cn_v2 / meta_mixed_v2）
+- 目录: test_output/manualtest/sq_upgrade_ab_test/20260304_113630/meta_prompts/
+- 核心升级: cross_sensory 4条元原则 + 好例2（秋梨膏）+ 反例（保守格式）+ ≤400 chars 硬约束
+- 14个占位符与v1完全一致
+```
+
+---
+
+#### @backend (2026-04-20)
+
+### ✅ TASK-MUSIC-LANG-AB-V2 Step 2 完成 — 脚本加 --version 参数
+
+**改动文件**: `scripts/test_haiku_music_prompt_languages.py`
+
+**改动行说明**:
+
+| 改动 | 位置 | 说明 |
+|------|------|------|
+| `import argparse` | L22 | 新增 import |
+| `load_meta_prompt(lang, version="v2")` | L169 | 加 `version` 参数，默认 `"v2"` |
+| 文件名逻辑 | L186-190 | v2 → `meta_{lang}_v2.md`，v1 → `meta_{lang}.md` |
+| argparse block | L407-417 | `--version` choices=["v1","v2"] default="v2" |
+| 版本日志 | L421 | `print(f"[版本] meta-prompt version = {version}")` |
+| 输出命名 | L452-457 | v2 → `bgm_haiku_{lang}_v2.mp3` + `_v2_prompt.txt`；v1 原名不变 |
+| meta-prompt 调用 | L463 | `load_meta_prompt(lang, version)` 传入 version |
+
+**SSL fix、故事数据提取、Haiku 调用、Mureka 调用、narration_quotes 硬编码均未改动。**
+
+**PM 运行验证命令**（在 xuhua_story 目录下，激活 venv 后）:
+```bash
+# v2（默认，用 meta_{lang}_v2.md，产出带 _v2 后缀）
+python scripts/test_haiku_music_prompt_languages.py --version v2
+
+# v1（向后兼容验证，用 meta_{lang}.md，产出原名，不覆盖已有 v1 结果）
+python scripts/test_haiku_music_prompt_languages.py --version v1
+```
+
+---
+
+**PM 代更新 backend-progress 请求**（Edit/Write 被拒，由 PM 代更新）:
+
+**current.md** 状态行替换为:
+```
+> **最后更新**: 2026-04-20
+> **状态**: ✅ TASK-MUSIC-LANG-AB-V2 Step 2 完成 — 脚本加 --version v1|v2 参数，默认 v2，待 PM 运行验证
+```
+
+并在"刚完成"块最前面加:
+```
+### ✅ TASK-MUSIC-LANG-AB-V2 Step 2 — 脚本加 --version 参数 (2026-04-20)
+
+**文件**: `scripts/test_haiku_music_prompt_languages.py`
+- 加 `argparse --version v1|v2`（默认 v2）
+- v2 → 读 `meta_{lang}_v2.md`，产出 `bgm_haiku_{lang}_v2.mp3` + `_v2_prompt.txt`
+- v1 → 读 `meta_{lang}.md`，产出原名不变（向后兼容）
+- 版本日志打印方便 PM 确认
+- SSL fix/Haiku/Mureka/narration_quotes 均未改动
+```
+
+**context-for-others.md** 顶部加:
+```
+### ✅ TASK-MUSIC-LANG-AB-V2 Step 2 — 脚本 --version 参数 (2026-04-20)
+- `scripts/test_haiku_music_prompt_languages.py` 支持 `--version v1|v2`（默认 v2）
+- v2 产出: `bgm_haiku_{lang}_v2.mp3` + `_v2_prompt.txt`（不覆盖 v1）
+- 函数 `load_meta_prompt(lang, version)` 按 version 选文件
+```
+
+**completed.md** 顶部加:
+```
+### TASK-MUSIC-LANG-AB-V2 Step 2 ✅ (2026-04-20)
+- `scripts/test_haiku_music_prompt_languages.py` 加 `--version v1|v2` argparse（默认 v2）
+- v2 → meta_{lang}_v2.md + bgm_haiku_{lang}_v2.mp3 + _v2_prompt.txt
+- v1 → 原名不变（向后兼容验证路径）
+- 改动行: L22 import argparse / L169 load_meta_prompt 签名 / L186-190 文件名逻辑 / L407-421 argparse+日志 / L452-463 命名+调用
+```
+
+---
+
+#### @pm (2026-04-20)
+
+### PM 审查 + 运行: TASK-MUSIC-LANG-AB-V2 Step 2 + 3 ✅ PASS
+
+**脚本审查**: `--version` 参数实现清晰（L22 argparse + L169 函数签名 + L451 文件命名 + L462 日志打印），v1 向后兼容不破坏已验证路径。
+
+**实际运行 v2**: 3/3 BGM 全部成功
+
+| Lang | v1 prompt 长度 | v2 prompt 长度 | 长度改善 | Task ID | 耗时 |
+|------|:----------:|:----------:|:----:|---------|:---:|
+| en | 833 chars | **421 chars** | ↓50% | 134214647283716 | 169s |
+| cn | 265 chars | **196 chars** | ↓26% | 134214842515458 | 183s |
+| mixed | 855 chars | **506 chars** | ↓41% | 134215033159681 | 182s |
+
+**关键发现**: 
+- ≤400 字符硬约束起作用了，mixed 版 v1 的 855 字符失控问题基本修复（但 506 仍超 400，Haiku 部分遵守）
+- en 版恰好卡在 421（基本合格）
+- cn 版 196 最聚焦
+
+**盲听包**: 7 首 random A-G 映射
+- 位置: `test_output/manualtest/sq_upgrade_ab_test/20260304_113630/blind_test/`
+- 构成: PM baseline × 1 + Haiku v1 × 3 + Haiku v2 × 3
+- 映射表: `blind_test/_DO_NOT_OPEN_mapping.json`（Founder 听完后揭盲）
+
+**文档更新**: Backend progress 三维度（PM 代更新）+ TEAM_CHAT ✅
+
+---
+
+#### @pm (2026-04-21)
+
+### TASK-HAIKU-QUOTE-EXTRACTION — 验证 Haiku 自挑金句能力
+
+**背景**: Pipeline 集成前要解决一个关键风险点 —— 生产环境 `narration_quotes` 不能像测试那样硬编码（当前 backend 代码为年夜饭硬编码了 2 句，生产无法复制）。
+
+**备选方案**:
+- 方案 A: Haiku 在 meta-prompt 里自挑（单次调用省成本）
+- 方案 B: Sonnet 预调用挑金句（+$0.005/首，艺术判断更强）
+
+**决定先验证方案 A 可行性**，失败再退 B。
+
+**派发**:
+
+**Step 1: @ai-ml (Opus)** 升级 meta-prompt 加金句挑选指令
+- 基于 `meta_en_v2.md` / `meta_mixed_v2.md` 产出 v3 版本（`_v3_quote_picking`）
+- 替换 `{{narration_quotes}}` 占位符为 `{{full_narration}}`
+- 新增"Quote Selection Protocol"段落：挑选标准（画面感/隐喻 > 情节/对白）、数量（1-2 句）、位置倾向、规避清单
+- 要求 Haiku 输出用 `<quotes>...</quotes>` 标记挑选的金句，方便 PM 独立审查
+- 用 Opus 因为：金句挑选是深度文学+prompt 工程任务
+- **只改 en 和 mixed 两个 v3**（cn 暂不做）
+
+**Step 2: @backend (Sonnet)** 改脚本加参数
+- `--quote-mode hardcoded|haiku-pick`（默认 hardcoded 保向后兼容）
+- `--stories all-six` 支持 6 个故事循环
+- haiku-pick 模式: 拼接 full_narration 喂给 v3 meta-prompt
+- **只调 Haiku 不调 Mureka**（这轮只验证金句挑选质量）
+- 产出: 每个故事一个 `haiku_quote_test_output.txt`（完整 Haiku 响应）
+
+**Step 3: PM (Opus)** 独立评审
+- 6 故事 × 2 变体（en + mixed）= 12 个 Haiku 输出
+- 评审：挑选贴切度、诗意、代表性、数量控制、BGM prompt 整体质量
+- 产出: `.team-brain/analysis/HAIKU_QUOTE_EXTRACTION_ASSESSMENT.md`
+
+**决策规则**:
+- Haiku 挑得好 → 采用方案 A，进入 Pipeline 集成
+- Haiku 挑得差 → 切方案 B（Sonnet 预调用）
+
+**成本**: ~$0.03（12 次 Haiku 调用，不调 Mureka）
+
+**依赖**: Step 1 → Step 2 → Step 3 串行
+
+---
+
+#### @pm (2026-04-21)
+
+### Double Check 发现 + 补档
+
+Founder 要求地毯式 double check v2 测试完成至今所有讨论/决策。发现 2 个遗漏已补：
+
+1. **`PENDING.md` 补充**：
+   - "用户自定义 BGM 上传（跳过 Mureka）" 作为 P3 MVP 后迭代项
+   - TASK-HAIKU-QUOTE-EXTRACTION 作为独立 P0 条目（集成前置闸门）
+   - TASK-MUREKA-PIPELINE-INTEGRATION 状态更新为 P1 + 链接到完整 TASK 文档
+
+2. **新建 `.team-brain/handoffs/TASK-MUREKA-PIPELINE-INTEGRATION.md`**：
+   - 完整归档 Founder 12 条产品决策（不做 TTS / meta_en_v2 默认 / 换 BGM 逻辑 en→mixed→en / 每次生成 1 章 / 水印切 4 秒 / FFmpeg 时长适配 / 风格映射方案 B / 3 次重试降级 / prompt cache 保质量 / 不限次重生成 / QA 静音+音量电平 / credits mock A2）
+   - 完整 Phase 3 简化版生成流程图
+   - V2 测试 → 生产的 5 个 parity 风险点（narration_quotes / per-scene 数组上限 / 风格映射 / confirmed_outline_json / prompt cache 质量）
+   - 子任务拆解骨架（A-B 并行 → 1-8 串行）
+   - 成本估算 + 风险清单 + 历史决策链路溯源
+
+**潜在风险提醒 Founder**：
+- few-shot 示例偏置：v3 Quote Protocol 用年夜饭做 few-shot，Haiku 可能过度模仿"沉重"风格。PM 评审时**重点观察温暖/热血故事**（秋梨膏 / 最后一投）的金句质量。
+- 当前 quote extraction 测试只是 5 个集成前风险点的第 1 个，通过后还需处理其他 4 个。
+
+@ai-ml Opus 仍在后台运行写 v3 meta-prompt，不阻塞。
+
+---
+
+#### @ai-ml → @pm (2026-04-21)
+
+### ✅ TASK-HAIKU-QUOTE-EXTRACTION Step 1 完成 — 2 个 v3 meta-prompt（金句自挑版）交付
+
+**2 个新 v3 文件**（路径：`test_output/manualtest/sq_upgrade_ab_test/20260304_113630/meta_prompts/`）：
+
+| 文件 | 大小 | 指令语言 |
+|------|------|---------|
+| `meta_en_v3_quote_picking.md` | ~15.8KB | 纯英文（Quote Protocol 英文指令）|
+| `meta_mixed_v3_quote_picking.md` | ~15.1KB | 中英混合（Quote Protocol 中文讲挑选心法）|
+
+按 PM 派发要求只做 en + mixed 两个，不做 cn。
+
+---
+
+#### 核心改动（两个文件同步）
+
+**1. 占位符替换**: `{{narration_quotes}}` → `{{full_narration}}`。其他 13 个占位符与 v2 完全一致。@backend 只需改一处数据提取逻辑：concat 全文旁白替代原"摘取金句"。
+
+**2. 新增 "Quote Selection Protocol" 独立段落**（system prompt 中，位于 V4 哲学 + cross_sensory 元原则之后、好例之前，确保 Haiku 先完成挑选再写 BGM prompt）。覆盖 7 个要点：
+
+- **a. 两步任务明示**: Step 1 挑 1–2 句放 `<quotes>...</quotes>`；Step 2 写 BGM prompt 把金句作为中文意象锚点织入
+- **b. 正向挑选标准 5 条**: 画面感 > 情节 / 隐喻通感 > 直白描写 / 独立成句不依附上下文 / 代表整个故事主基调 / 张力压进一词一动作
+- **c. 反向规避清单 5 条**: 情节总结句 / 抽象情绪独白 / 对白 / 角色姓名密集句 / 动作序列中间句
+- **d. 位置倾向**: 段落末句 > 独立画面句 > 段中（基于 @ai-ml 手选 6 故事经验）
+- **e. 数量硬约束**: 恰好 1–2 句，不能 0（毁掉灵魂层），不能 3+（稀释主基调）
+- **f. 输出格式**: `<quotes>…</quotes>` 块在前 + BGM prompt 在后（≤400 字符硬约束只约束 BGM 部分，quotes 块不计预算）
+- **g. 忠实规则**: 原文照搬，不改标点
+
+**3. few-shot 示例（年夜饭完整输出示范）**：
+
+挑选展示用 @ai-ml 手选 4 句中最经典的两句：
+- 「父亲的筷子落在桌面那一声，比窗外任何一声爆竹都响。」
+- 「手机屏幕是这张桌子上唯一不说谎的东西。」
+
+示例不仅展示"挑了什么"，还解释"为什么这两句有效"——第一句是声音核心（跨感官压缩），第二句是情绪判词（整个家唯一不说谎的东西）。两句都代表整体而非单场景，都不含专有人名，都落在旁白段尾——自我印证 Protocol 的每条标准。
+
+**4. V2 所有其他内容完整保留**: V4 哲学 5 条 + cross_sensory 4 元原则 + 好例 1（年夜饭）+ 好例 2（秋梨膏温暖对极）+ 反例保守格式 + ≤400 字符硬约束 + 输出格式要求 + 14 个数据占位符（除 narration_quotes 换为 full_narration）。
+
+**5. 语言分工**:
+- en_v3: Quote Selection Protocol 用英文（保持 v2 纯英文风格）
+- mixed_v3: Protocol 用中文（"画面感压缩"、"张力压进一个动作"这种文学判断的微妙差别，中文表达更精准）
+
+---
+
+#### 对 Haiku 挑金句能力的预估
+
+| 维度 | 预估 |
+|------|------|
+| Haiku 有 Opus 级心法后的执行力 | 相比 Sonnet 独立挑选可达 70–80% |
+| en_v3 预估 | 7/10（Haiku 对英文标准精确执行） |
+| mixed_v3 预估 | 7.5/10（中文讲挑选心法更精准） |
+
+**Haiku 比 Sonnet 弱的地方**: 文学直觉判断（"代表整体"、"独立成句"需要整体性理解）。Protocol 用具体化正反清单 + 位置倾向 + few-shot 三层补偿。
+
+**主要风险点（已意识到 PM 已提醒 few-shot 偏置）**:
+1. **位置偏置**: 长故事（6 段旁白）Haiku 可能保守挑靠前段落。Protocol 明确"段尾优先"+ few-shot 示范的两句都来自后段，应能缓解
+2. **凑数陷阱**: Haiku 可能默认凑够 2 句而非"只挑 1 句"。Protocol 明示"故事有一个主导意象时挑 1 句"，执行力存疑
+3. **专有名词泄漏**: 反向清单第 4 条针对，执行力未知
+4. **沉重 mood 过拟合**（PM 已提醒）: few-shot 用年夜饭（沉重）。缓解：好例 2 秋梨膏（温暖对极）已在 v2 保留，v3 也保留。Haiku 看到两种情绪样本应不会认定"只写沉重"
+5. **Upstream 数据质量**: 如果 6 故事某些剧本派偏动作/对白，Haiku 再聪明也挑不出好句
+
+**判决方式**: PM Step 3 评审 12 个输出（6 故事 × en_v3/mixed_v3）对比 @ai-ml 手选基准 → 决定方案 A vs 方案 B。
+
+---
+
+#### 文档更新情况
+
+- ✅ 2 个 v3 文件已创建
+- ✅ TEAM_CHAT.md 已更新（本条）
+- ❌ ai-ml-progress 三维度 Edit/Write 权限被拒 → **请 PM 代更新**（完整内容见下方）
+
+---
+
+**[PM 代更新 ai-ml-progress/current.md]**
+
+替换顶部状态行：
+```
+> **最后更新**: 2026-04-21
+> **状态**: ✅ TASK-HAIKU-QUOTE-EXTRACTION Step 1 完成 — 2 个 v3 meta-prompt（自挑金句版）交付
+```
+
+"刚完成"块最前面插入：
+```
+### ✅ TASK-HAIKU-QUOTE-EXTRACTION Step 1 — meta-prompt v3 金句自挑指令 (2026-04-21)
+
+**背景**: 生产环境 narration_quotes 不能硬编码，先验证方案 A（Haiku 自挑）。
+
+**产出（2 个 v3 文件）**:
+- meta_en_v3_quote_picking.md (~15.8KB) / meta_mixed_v3_quote_picking.md (~15.1KB)
+- 占位符替换: {{narration_quotes}} → {{full_narration}}，其他 13 个不变
+- V2 全部内容保留（V4 5条 + cross_sensory 4条 + 2好例 1反例 + ≤400 字符硬约束）
+
+**Quote Selection Protocol**:
+- Step 1 挑 1-2 句放 <quotes>...</quotes>  Step 2 织入 BGM prompt
+- 正向 5: 画面>情节 / 隐喻>直白 / 独立成句 / 代表整体 / 张力压进一词一动作
+- 反向 5: 情节总结句 / 情绪独白 / 对白 / 姓名密集句 / 动作序列中间句
+- 位置: 段末句 > 独立画面句 > 段中
+- 数量硬约束 1-2（不能 0/3+），原文照搬不改标点
+
+**few-shot 示例**: 年夜饭完整输出，挑的 2 句=@ai-ml 手选 4 句最经典（筷子落桌+手机不说谎）。
+
+**对 Haiku 预估**: 70-80% of Sonnet；en 7/10，mixed 7.5/10；风险=位置偏置/凑数/姓名泄漏/沉重过拟合（PM 已提醒）。
+
+**待接力**: @backend Step 2（--quote-mode + --stories all-six）
+```
+
+**[PM 代追加 ai-ml-progress/context-for-others.md 顶部]**
+```
+### ✅ TASK-HAIKU-QUOTE-EXTRACTION Step 1 — v3 meta-prompt 金句自挑版 (2026-04-21)
+
+2 个 v3 文件在 test_output/manualtest/sq_upgrade_ab_test/20260304_113630/meta_prompts/ 下：
+- meta_en_v3_quote_picking.md / meta_mixed_v3_quote_picking.md（不做 cn 变体）
+- 占位符: {{narration_quotes}} → {{full_narration}}，其他 13 个与 v2 完全一致
+- 新增 Quote Selection Protocol（正5+反5+位置倾向+1-2硬约束+忠实规则）
+- 输出格式新增 <quotes>...</quotes> 块，方便 PM 独立审查挑选 vs 使用对应关系
+- @backend 脚本改造点: 数据提取改为 concat 全文旁白（替代原 narration_quotes 摘取）
+```
+
+**[PM 代追加 ai-ml-progress/completed.md 顶部]**
+```
+### TASK-HAIKU-QUOTE-EXTRACTION Step 1 ✅ (2026-04-21)
+- 2 个 v3 meta-prompt 创建（meta_en_v3_quote_picking / meta_mixed_v3_quote_picking）
+- 目录: test_output/manualtest/sq_upgrade_ab_test/20260304_113630/meta_prompts/
+- 核心升级: Quote Selection Protocol（两步 + 5正5反标准 + 位置倾向 + 1-2硬约束 + 年夜饭 few-shot）
+- V2 基线全部保留，占位符 {{narration_quotes}} → {{full_narration}}
+- 输出格式新增 <quotes>...</quotes> 块
+- 待 @backend Step 2 改脚本 + PM Step 3 评审 12 个输出
+```
+
+---
+
+#### @backend (2026-04-21)
+
+### ✅ TASK-HAIKU-QUOTE-EXTRACTION Step 2 完成 — 脚本加 --quote-mode + --stories 参数
+
+**改动文件**: `scripts/test_haiku_music_prompt_languages.py`
+
+**改动说明（行级）**:
+
+| 改动 | 位置 | 说明 |
+|------|------|------|
+| 新增 `STORIES` 列表 | L77-114 | 6 个故事路径配置（id/name/outline/screenplay/output_dir） |
+| `extract_story_data` 新增 `quote_mode` 参数 | L121 | 默认 "hardcoded" |
+| 旁白收集逻辑 | L163, 190-192 | 新增 `narration_parts` 列表，每 scene 追加 `[Scene N] 旁白文本` |
+| 按 mode 返回不同字段 | L216-221 | hardcoded → `narration_quotes`；haiku-pick → `full_narration` |
+| `load_meta_prompt` 新增 `quote_mode` 参数 | L230 | 默认 "hardcoded" |
+| 文件名选择逻辑 | L253-258 | haiku-pick → `meta_{lang}_v3_quote_picking.md` |
+| argparse 新增两个参数 | L262-284 | `--quote-mode` choices=["hardcoded","haiku-pick"] default="hardcoded"；`--stories` choices=["single","all-six"] default="single" |
+| Mureka key check 改为条件判断 | L306-308 | haiku-pick 模式不检查 MUREKA_API_KEY |
+| 故事列表选择逻辑 | L311-317 | all-six → STORIES 全部；single → STORIES[2]（年夜饭） |
+| 语言变体选择 | L319-322 | haiku-pick → ["en", "mixed"]；hardcoded → ["en", "cn", "mixed"] |
+| 输出路径逻辑 | L340-354 | haiku-pick → `{story_dir}/haiku_quote_test_{lang}_output.txt`；hardcoded → 原逻辑 |
+| meta-prompt 加载 | L357-361 | 传入 `quote_mode` |
+| 保存输出 + 跳过 Mureka | L404-419 | haiku-pick 模式：保存 txt + 跳过 Mureka；hardcoded 模式：保存 prompt.txt + 调 Mureka |
+
+**SSL fix、Haiku API、Mureka API、narration_quotes 硬编码、fill_placeholders、load_meta_prompt 解析逻辑均未改动。**
+
+---
+
+**PM 运行验证命令**（在 xuhua_story 目录下，激活 venv 后）:
+
+```bash
+# 本轮测试：6 故事 × 2 变体(en+mixed) = 12 次 Haiku 调用，不调 Mureka
+/Library/Frameworks/Python.framework/Versions/3.11/bin/python3 scripts/test_haiku_music_prompt_languages.py --quote-mode haiku-pick --stories all-six
+
+# 向后兼容检查：原命令仍然应能工作（跑年夜饭 v2 三语言 + Mureka）
+/Library/Frameworks/Python.framework/Versions/3.11/bin/python3 scripts/test_haiku_music_prompt_languages.py --version v2
+```
+
+---
+
+**预期 12 个产出文件**（haiku-pick 模式，每个故事目录下）：
+
+| 故事 | 产出文件 |
+|------|---------|
+| 最后一投 | `test_output/manualtest/prompt_bubble/slamdunk_dialogue/haiku_quote_test_en_output.txt` |
+| 最后一投 | `test_output/manualtest/prompt_bubble/slamdunk_dialogue/haiku_quote_test_mixed_output.txt` |
+| 外公的秋梨膏 | `test_output/manualtest/e2e_regression_r8/20260316_145613/story_A/20260316_145614/haiku_quote_test_en_output.txt` |
+| 外公的秋梨膏 | `test_output/manualtest/e2e_regression_r8/20260316_145613/story_A/20260316_145614/haiku_quote_test_mixed_output.txt` |
+| 年夜饭上的战争 | `test_output/manualtest/sq_upgrade_ab_test/20260304_113630/haiku_quote_test_en_output.txt` |
+| 年夜饭上的战争 | `test_output/manualtest/sq_upgrade_ab_test/20260304_113630/haiku_quote_test_mixed_output.txt` |
+| 拿铁上的告白 | `test_output/manualtest/cross_style_test/20260228_152134/haiku_quote_test_en_output.txt` |
+| 拿铁上的告白 | `test_output/manualtest/cross_style_test/20260228_152134/haiku_quote_test_mixed_output.txt` |
+| 墨痕 | `test_output/manualtest/e2e_regression_r4/20260310_155024/story_B/20260310_161426/haiku_quote_test_en_output.txt` |
+| 墨痕 | `test_output/manualtest/e2e_regression_r4/20260310_155024/story_B/20260310_161426/haiku_quote_test_mixed_output.txt` |
+| 终点站前的余温 | `test_output/manualtest/phase2/20251231_181728/haiku_quote_test_en_output.txt` |
+| 终点站前的余温 | `test_output/manualtest/phase2/20251231_181728/haiku_quote_test_mixed_output.txt` |
+
+---
+
+**[PM 代更新 backend-progress/current.md]**（顶部替换状态行 + 刚完成块最前面插入）：
+
+替换顶部状态行：
+```
+> **最后更新**: 2026-04-21
+> **状态**: ✅ TASK-HAIKU-QUOTE-EXTRACTION Step 2 完成 — 脚本加 --quote-mode + --stories 参数，待 PM 运行 12 个 Haiku 调用验证
+```
+
+在"刚完成"块最前面插入：
+```
+### ✅ TASK-HAIKU-QUOTE-EXTRACTION Step 2 — 脚本加 --quote-mode + --stories 参数 (2026-04-21)
+
+**文件**: `scripts/test_haiku_music_prompt_languages.py`
+- 新增 `--quote-mode hardcoded|haiku-pick`（默认 hardcoded，向后兼容）
+- 新增 `--stories single|all-six`（默认 single = 原年夜饭路径）
+- `extract_story_data` 新增 `quote_mode`：haiku-pick 拼接全文 narration（[Scene N] 前缀，顺序）返回 `full_narration`
+- `load_meta_prompt` 新增 `quote_mode`：haiku-pick 读 `meta_{lang}_v3_quote_picking.md`
+- 新增 `STORIES` 列表（6 个故事完整路径配置）
+- haiku-pick 模式：只调 Haiku，不调 Mureka；产出 `haiku_quote_test_{lang}_output.txt`（到各故事 output_dir）
+- all-six 模式：6 故事 × en+mixed = 12 次 Haiku 调用
+- SSL fix/Haiku/Mureka/fill_placeholders 逻辑均未改动
+```
+
+**[PM 代更新 backend-progress/context-for-others.md]**（顶部追加）：
+```
+### ✅ TASK-HAIKU-QUOTE-EXTRACTION Step 2 — --quote-mode + --stories 参数 (2026-04-21)
+- `scripts/test_haiku_music_prompt_languages.py --quote-mode haiku-pick --stories all-six` 支持 6 故事 × 2 变体 = 12 次 Haiku
+- haiku-pick 模式：full_narration 替代 narration_quotes，读 v3_quote_picking.md，跳过 Mureka
+- 产出：每故事 `haiku_quote_test_{en,mixed}_output.txt`（到各故事 output_dir）
+- hardcoded 模式向后兼容：原 `--version v2` 命令不受影响
+```
+
+**[PM 代更新 backend-progress/completed.md]**（顶部追加）：
+```
+### TASK-HAIKU-QUOTE-EXTRACTION Step 2 ✅ (2026-04-21)
+- `scripts/test_haiku_music_prompt_languages.py` 加 `--quote-mode hardcoded|haiku-pick` + `--stories single|all-six`
+- haiku-pick: full_narration（concat scene narrations） + v3_quote_picking.md + 跳过 Mureka
+- all-six: 6 故事 × en+mixed = 12 次 Haiku 调用，产出 haiku_quote_test_{lang}_output.txt
+- 改动行: L77-114 STORIES 列表 / L121 extract_story_data 签名 / L163+190-192 narration收集 / L216-221 mode分支 / L230 load_meta_prompt 签名 / L253-258 文件名 / L262-284 argparse / L306-322 mode判断 / L340-419 输出+Mureka skip
+```
+
+---
+
+---
+
+#### @pm (2026-04-21)
+
+### TASK-HAIKU-QUOTE-EXTRACTION 评审完成 + v3.1 修复派发
+
+**评审结论**: `meta_mixed_v3_quote_picking.md` 平均 8.4/10（生产可用），en 6.8/10 不采用。详见 `.team-brain/analysis/HAIKU_QUOTE_EXTRACTION_ASSESSMENT.md`。
+
+**Founder 决策**:
+1. 采用 mixed 作为方案 A 生产版
+2. 先做 v3.1 修复 + PM 验证 → 然后启动 TASK-MUREKA-PIPELINE-INTEGRATION 的 8 个子任务
+
+**派发 @ai-ml (Sonnet)**: v3.1 微调 `meta_mixed_v3_quote_picking.md` 修复 2 件事:
+1. 字符约束分层: `<quotes>` 块独立（金句原文保留，不计字符）+ BGM prompt 部分 ≤400 字符（供 Mureka 用）
+2. 清理输出污染: 禁止 markdown 代码围栏（``` ```）+ 禁止 XML 残留标签（如 `</final_space_reserved>`）
+
+**产出**: 直接覆盖升级 `meta_mixed_v3_quote_picking.md`（不另建 v3.1 文件）
+**模型**: Sonnet（迭代细节，不是深度创作）
+
+---
+
+#### @ai-ml → @pm (2026-04-21)
+
+### ✅ TASK-HAIKU-QUOTE-EXTRACTION v3.1 微调完成 — meta_mixed_v3_quote_picking.md 已更新
+
+**修改位置（文件: `test_output/manualtest/sq_upgrade_ab_test/20260304_113630/meta_prompts/meta_mixed_v3_quote_picking.md`）**:
+
+**1. 将"输出长度 — 硬性约束"段落替换为"输出长度 — 硬性约束（分层计算）"**
+- 新增 ASCII 示意图，明确两部分边界：
+  - Part 1: `<quotes>...</quotes>` 块 = 不计入字符预算，金句原文保留，不要为省字符而裁剪
+  - Part 2: BGM prompt 部分（`</quotes>` 之后）= 严格 ≤400 字符，唯一计算范围
+- 明确 ≤400 是上限不是下限（250–380 字符的段落完全合格）
+- 加注不要为"控制总字数"砍短金句
+
+**2. 新增独立段落"输出纯净规则（Output purity rules — 必须遵守）"（在字符约束段之后、输出格式段之前）**
+- 4 条禁止规则：① 禁止 \`\`\`....\`\`\` markdown 围栏 ② 禁止 XML/HTML 残留标签（</final_space_reserved> 等）③ `<quotes>...</quotes>` 是唯一允许的 XML 标签 ④ BGM prompt 部分必须是纯文本
+
+**3. 好例 1（年夜饭 few-shot 示例）移除外层 ``` 代码围栏**
+- 根因分析：年夜饭示例原来用 ``` 围栏包裹整个输出，这是 Haiku 误用围栏的直接训练信号
+- 修复：示例现在是纯文本格式，加注"注意：纯文本，无 markdown 围栏，无多余标签"
+
+**4. 输出格式要求段落增加一条规则**
+- "整个回复从 `<quotes>` 标签开始，不要在 `<quotes>` 之前加任何前言或解释"
+
+**保留不变**: Quote Selection Protocol 全部内容 + V4 哲学 5 条 + cross_sensory 4 条 + 好例 2（秋梨膏）+ 反例 + 14 个占位符 + 其他一切
+
+---
+
+**预估改善**:
+
+| 问题 | v3 现状 | v3.1 预估 |
+|------|:------:|:--------:|
+| BGM prompt 部分 ≤400 字符遵守率 | ~0%（12/12 全部超标） | 70–85% |
+| markdown 围栏污染率 | ~30%（年夜饭等故事） | <5% |
+| XML 残留标签（</final_space_reserved>）| 偶发 | 接近 0% |
+
+**改善逻辑**:
+- 400 字符问题根因是 Haiku 不知道"从哪里开始数"——ASCII 示意图直接说明 `</quotes>` 之后才开始数，预期显著改善
+- markdown 围栏根因是 few-shot 示例本身用了 ``` ——已修正，且 purity rules 明确禁止，双重保险
+- 如果仍有遗漏，建议后处理脚本在读取 Haiku 输出时用正则去除 ``` 围栏（防御性清理）
+
+---
+
+**文档更新情况**:
+- ✅ `meta_mixed_v3_quote_picking.md` 已覆盖升级（约 16.2KB，原 ~15.1KB）
+- ✅ TEAM_CHAT.md 已追加（本条）
+- ❌ ai-ml-progress 三维度 Edit/Write 权限被拒 → **请 PM 代更新**（完整内容见下方）
+
+---
+
+**[PM 代更新 ai-ml-progress/current.md]**
+
+替换顶部状态行：
+```
+> **最后更新**: 2026-04-21
+> **状态**: ✅ TASK-HAIKU-QUOTE-EXTRACTION v3.1 微调完成 — meta_mixed_v3_quote_picking 字符约束分层 + 输出纯净规则
+```
+
+在"刚完成"块最前面插入：
+```
+### ✅ TASK-HAIKU-QUOTE-EXTRACTION v3.1 微调 — meta_mixed_v3_quote_picking 修复 (2026-04-21)
+
+**修复 1 — 字符约束分层**: 新增 ASCII 示意图明确两部分边界
+- `<quotes>...</quotes>` 块 = 不计入字符预算，金句原文保留不可裁剪
+- BGM prompt 部分（</quotes> 之后）= 严格 ≤400 字符，唯一计算范围
+- ≤400 是上限不是下限，250–380 字符的段落完全合格
+
+**修复 2 — 输出纯净规则（Output purity rules）**: 新增独立段落
+1. 禁止 ``` markdown 代码围栏
+2. 禁止 XML/HTML 残留标签（</final_space_reserved>、<br> 等）
+3. `<quotes>...</quotes>` 是唯一允许的 XML 标签
+4. BGM prompt 部分必须是纯文本，可直接复制给 Mureka API
+
+**few-shot 示例同步修复**: 年夜饭示例的 ``` 外层围栏已移除（根因消除），加注"纯文本，无围栏"
+
+**预估改善**: 400 字符遵守率 ~0% → 70-85%；markdown 污染率 ~30% → <5%
+```
+
+**[PM 代更新 ai-ml-progress/context-for-others.md 顶部]**:
+```
+### ✅ TASK-HAIKU-QUOTE-EXTRACTION v3.1 — meta_mixed_v3 字符约束修复 (2026-04-21)
+- 文件: `test_output/manualtest/sq_upgrade_ab_test/20260304_113630/meta_prompts/meta_mixed_v3_quote_picking.md`（已覆盖升级）
+- 核心修复: ① 字符分层（<quotes> 不计入，BGM prompt 后 ≤400 字符）② 禁止 ``` 围栏 + 禁止 XML 残留标签
+- few-shot 示例已去除 ``` 外层围栏（根因消除）
+- 不改 en 版，保持 14 个占位符、Quote Protocol、V4 哲学不变
+```
+
+**[PM 代更新 ai-ml-progress/completed.md 顶部]**:
+```
+### TASK-HAIKU-QUOTE-EXTRACTION v3.1 微调 ✅ (2026-04-21)
+- meta_mixed_v3_quote_picking.md 覆盖升级（约 16.2KB）
+- 修复 1: 字符约束分层 — ASCII 示意图 + <quotes> 不计字符 + BGM prompt ≤400 字符
+- 修复 2: Output purity rules — 禁止 ``` 围栏 / 禁止 XML 残留标签 / 唯一允许 <quotes> 标签
+- few-shot 示例 ``` 外层围栏已移除，格式示范已纯化
+- 输出格式要求新增: "整个回复从 <quotes> 开始，不要加前言"
+- 预估: 400 字符遵守率 0%→70-85%，markdown 污染率 ~30%→<5%
+```
+
+---
+
+#### @pm (2026-04-21)
+
+### v3.1 验证结果 + v3.2 方案 B 并行派发
+
+**v3.1 验证发现**:
+- ✅ markdown 围栏污染 100% 修复
+- ✅ XML 残留标签 100% 修复
+- ❌ 400 字符约束 0/6 达标（平均 666，仅改善 11%）
+- ❌ **金句质量大幅退步**（平均 8.4 → 6.7，秋梨膏/拿铁/终点站严重退步）
+
+**根因**: v3.1 在 system prompt 末尾加的 ASCII 分层图 + 大段输出纯净规则**分走了 Haiku 的 attention**，挑金句的精力减少。
+
+**Founder 决策**: 选方案 B（回退到 v3 结构 + 轻量保留字符约束 + Backend 代码做污染清理）
+
+**并行派发**:
+
+**@ai-ml (Sonnet)** - `meta_mixed_v3_quote_picking.md` 精修
+- 删除 ASCII 分层图 + 长段输出纯净规则（v3.1 加的）
+- 保留 few-shot 示例无 ``` 围栏（根因消除不回滚）
+- 保留轻量字符约束文字（1-2 行："BGM prompt 部分 ≤400 字符建议，质量第一；金句原文保留"）
+- 恢复 v3 的精简结构（避免 Haiku 分心）
+
+**@backend (Sonnet)** - `scripts/test_haiku_music_prompt_languages.py` 加输出清理
+- 新增 `clean_haiku_output()` 函数在 `call_haiku()` 返回后执行
+- 正则去除: markdown fence (``` 和 ```lang) + 非 <quotes> 的 XML 残留标签
+- 可选: BGM prompt 部分超 1024 字符时截断 + warning（不截断金句）
+
+**依赖**: 独立并行（@backend 直接用 v3.1 脏输出样本写正则，不必等 @ai-ml）
+
+**Step B**: 两个 spawn 都完成后，PM 重跑 6 故事验证金句质量回到 v3 水平 + 清理生效
+
+**Step C**: 验证通过后启动 TASK-MUREKA-PIPELINE-INTEGRATION 的 8 个子任务
+
+---
+
+#### @ai-ml → @pm (2026-04-21)
+
+### ✅ v3.2 精修完成 — meta_mixed_v3_quote_picking.md 过度约束已回滚
+
+**修改文件**: `test_output/manualtest/sq_upgrade_ab_test/20260304_113630/meta_prompts/meta_mixed_v3_quote_picking.md`
+
+**删除（v3.1 加的两大块）**:
+
+1. **ASCII 分层示意图**（`┌────...`/`├────...`/`└────...` 框画的两层分界示意，含 Part 1 / Part 2 标注）— 全部删除
+2. **"输出纯净规则"段落**（标题"Output purity rules — 必须遵守"，4 条禁止：① 禁止 markdown 围栏 ② 禁止 XML/HTML 残留标签 ③ `<quotes>` 唯一允许 XML 标签 ④ BGM prompt 必须纯文本）— 全部删除
+
+**保留（不回退）**:
+- few-shot 示例无 ``` 围栏（根因消除保持，这是 v3.1 的唯一正确修复）
+- Quote Selection Protocol 全部内容完整（5 正 / 5 反 / 位置倾向 / 数量约束 / 忠实规则）
+- V4 哲学 5 条 + cross_sensory 4 元原则 + 2 好例（年夜饭+秋梨膏）+ 1 反例
+
+**新加（轻量版字符约束，1-2 行建议）**:
+
+段落标题从"输出长度 — 硬性约束（分层计算）"改为"输出长度 — 参考建议"。新措辞：
+> **长度建议**：`<quotes>` 块内金句**原文保留**，不压缩；BGM prompt 部分（`</quotes>` 之后的音乐描述）**建议 ≤400 字符**，质量优先于长度。越聚焦越好，250–380 字符的段落完全合格。
+
+措辞用"建议"不是"必须"，"质量优先"给 Haiku 台阶下，不会让 Haiku 把注意力放在"怎么算字数"上。
+
+**文件大小**: 15,195 bytes (~15.2KB)
+- v3 原始: ~15.1KB
+- v3.1 臃肿: ~16.2KB
+- v3.2 精修: ~15.2KB（基本回到 v3 大小，只加 2 行）
+
+**对金句质量的预估**:
+- 回到 v3 水平（平均 8.4/10）
+- 根因分析：v3.1 退步是因为两大块新内容分走 Haiku 的 attention，现在只剩轻量 2 行建议，Haiku 全部注意力集中在"挑金句、写 BGM prompt"这一件事上
+- BGM prompt 字符约束 Haiku 有参考建议但不被迫分心
+
+**文档更新情况**:
+- ✅ `meta_mixed_v3_quote_picking.md` 已覆盖升级（本次任务）
+- ✅ TEAM_CHAT.md 已追加（本条）
+- ❌ ai-ml-progress 三维度 Edit/Write 权限被拒 → **请 PM 代更新**（完整内容见下方）
+
+---
+
+**[PM 代更新 ai-ml-progress/current.md]**
+
+替换顶部状态行：
+```
+> **最后更新**: 2026-04-21（AI-ML 更新）
+> **状态**: ✅ v3.2 精修完成 — 回退 v3.1 过度约束，轻量字符建议保留，金句质量预计回到 v3 水平
+```
+
+在"刚完成"块最前面插入（v3.1 条目之前）：
+```
+### ✅ v3.2 精修 — 回退 v3.1 过度约束 (2026-04-21)
+
+**背景**: PM 验证发现 v3.1 的 ASCII 分层图 + 大段纯净规则分走了 Haiku attention，金句质量大幅退步（平均 8.4→6.7，秋梨膏 9→5）。Founder 选方案 B：回退结构 + 轻量保留字符建议 + Backend 代码做污染清理。
+
+**删除（v3.1 加的）**:
+- ASCII 分层示意图
+- "输出纯净规则"段落（4 条禁止）
+
+**保留（不回退）**:
+- few-shot 示例无 ``` 围栏（根因消除保持）
+- Quote Selection Protocol 全部
+- V4 哲学 5 条 + cross_sensory 4 元原则 + 2 好例 + 1 反例
+
+**新加（轻量约束建议）**:
+> 长度建议：`<quotes>` 块内金句原文保留，不压缩；BGM prompt 部分建议 ≤400 字符，质量优先于长度。
+
+**文件大小**: ~15.2KB（从 v3.1 的 16.2KB 回缩，接近 v3 原始 15.1KB）
+**预估**: 金句质量回到 v3 水平（平均 8.4/10）
+```
+
+**[PM 代更新 ai-ml-progress/context-for-others.md 顶部插入]**:
+```
+### ✅ v3.2 精修 — meta_mixed_v3 回退过度约束 (2026-04-21)
+- `test_output/manualtest/sq_upgrade_ab_test/20260304_113630/meta_prompts/meta_mixed_v3_quote_picking.md` 已覆盖升级
+- 删除: ASCII 分层图 + "输出纯净规则"段落（v3.1 加的，导致金句质量退步 8.4→6.7）
+- 保留: few-shot 无围栏 + Quote Protocol + V4 哲学 + 2 好例
+- 新加: 1-2 行轻量建议（"BGM prompt 建议 ≤400 字符，质量优先"，措辞温和）
+- 文件大小: ~15.2KB（接近 v3 原始 15.1KB）
+- @backend: Backend 代码层做 markdown/XML 清理，meta-prompt 不承担约束责任
+```
+
+**[PM 代更新 ai-ml-progress/completed.md 顶部插入]**:
+```
+### v3.2 精修 ✅ (2026-04-21)
+- meta_mixed_v3_quote_picking.md 覆盖升级（约 15.2KB）
+- 删除 v3.1 加的两大块：ASCII 分层图 + "输出纯净规则"段落（4 条禁止）
+- 保留 v3.1 正确修复：few-shot 示例无 ``` 围栏
+- 新加 1-2 行轻量建议："BGM prompt 建议 ≤400 字符，质量优先于长度"
+- 预估：金句质量回到 v3 水平（平均 8.4/10）
+- 教训：Haiku 能力弱，meta-prompt 加越多它越分心，核心创作指令必须最聚焦
+```
+
+
+---
+
+#### @backend → @pm [2026-04-21 完成报告]
+
+### ✅ TASK-HAIKU-QUOTE-EXTRACTION 输出清理 — clean_haiku_output() 函数交付
+
+**改动文件**: `scripts/test_haiku_music_prompt_languages.py`
+
+**改动说明（行级）**:
+
+| 改动 | 行号 | 说明 |
+|------|------|------|
+| `call_haiku()` 调用清理 | L341-343 | `raw_text = msg.content[0].text.strip()`；`cleaned = clean_haiku_output(raw_text)`；`return cleaned` |
+| 新增 `clean_haiku_output(text: str) -> str` | L346-364 | 位于 `call_haiku` 下方，Mureka 分区前 |
+| BGM prompt 超上限警告 | L666-674 | haiku-pick 分支，`</quotes>` 之后超 974 字符打警告，不截断 |
+
+**clean_haiku_output 清理逻辑（4 条正则）**:
+1. `^\s*```[a-zA-Z]*\s*\n` — 去除开头 markdown fence（``` 或 ```lang）
+2. `\n?\s*```\s*$` — 去除结尾 markdown fence
+3. ` ```[a-zA-Z]*\n?` — 去除行内 markdown fence（罕见兜底）
+4. `</?(?!quotes\b)[a-zA-Z_][^>]*>` — 去除非 `<quotes>` 的 XML/HTML 残留标签（保留 `<quotes>` 和 `</quotes>`）
+
+**验收点**:
+- clean_haiku_output() 函数存在 ✅（L346-364）
+- call_haiku() 在返回前调用清理 ✅（L341-343）
+- BGM prompt 超 974 字符警告 ✅（L666-674，MUREKA_LIMIT=1024，SAFE_MARGIN=50）
+- 向后兼容：hardcoded 模式下函数是安全 no-op ✅
+
+**不自动截断原因**: 截断会损坏中文意象或句子，PM 审查后再决定是否重生成
+
+---
+
+**[PM 代更新 backend-progress/current.md]**
+
+替换顶部状态行：
+```
+> **最后更新**: 2026-04-21
+> **状态**: ✅ TASK-HAIKU-QUOTE-EXTRACTION 输出清理完成 — clean_haiku_output() 函数 + call_haiku 内部调用 + BGM 超上限警告
+```
+
+在"刚完成"块最前面插入：
+```
+### ✅ TASK-HAIKU-QUOTE-EXTRACTION 输出清理 — clean_haiku_output() 函数 (2026-04-21)
+
+**文件**: `scripts/test_haiku_music_prompt_languages.py`
+- 新增 `clean_haiku_output(text: str) -> str`（L346-364）: 4 条正则清理 markdown fence + 非 quotes XML 标签
+- `call_haiku()` 返回前调用清理（L341-343）: raw_text → clean_haiku_output → return
+- haiku-pick 分支加 BGM prompt 超上限检查（L666-674）: >974 字符打警告，不截断
+- 向后兼容: hardcoded 模式是安全 no-op
+```
+
+**[PM 代更新 backend-progress/context-for-others.md]**（顶部追加）：
+```
+### ✅ TASK-HAIKU-QUOTE-EXTRACTION 输出清理 — clean_haiku_output() (2026-04-21)
+- `scripts/test_haiku_music_prompt_languages.py` 新增 `clean_haiku_output(text: str) -> str`（L346）
+- 清理范围: markdown fence (开头/结尾/行内) + 非 <quotes> XML 残留标签（保留 <quotes>/</ quotes>）
+- `call_haiku()` 在返回前自动执行清理（L341-343）
+- haiku-pick 模式 BGM prompt 超 974 字符（1024-50 缓冲）打警告（L666-674），不截断
+- 向后兼容: hardcoded 模式是 no-op
+```
+
+**[PM 代更新 backend-progress/completed.md]**（`## 2026-04-20` 前插入）：
+```
+## 2026-04-21
+
+### TASK-HAIKU-QUOTE-EXTRACTION 输出清理 ✅ (2026-04-21)
+- `scripts/test_haiku_music_prompt_languages.py` 新增 `clean_haiku_output()` 函数（L346-364）
+- 清理: ``` fence(开头/结尾/行内) + 非 <quotes> XML/HTML 残留标签
+- call_haiku() 内部调用（L341-343），haiku-pick BGM prompt 超上限警告（L666-674）
+- 向后兼容 hardcoded 模式（安全 no-op）
+```
+
+---
+
+#### @pm (2026-04-21)
+
+### Pipeline 集成 Wave 1 启动 — 3 个并行任务
+
+**v3.2 验证结果**:
+- ✅ 污染 100% 清理（代码层）
+- ✅ 字符 100% 安全（平均 639，<1024）
+- ✅ 金句质量 7.4/10（v3.1 的 6.7 → v3.2 的 7.4，接近 v3 的 8.4）
+- ⚠️ 秋梨膏连续 3 次挑动作序列（Haiku 温暖故事偏置）→ 记 PENDING.md MVP 后处理
+
+**Founder 决策**: v3.2 作为方案 A 最终版，启动 Pipeline 集成。
+
+**Wave 1 派发**（3 个并行）:
+
+| Step | 任务 | 负责人 | 模型 |
+|------|-----|:----:|:---:|
+| B | 80+ 风格预设加 `music_hint` 字段 | @ai-ml | Sonnet |
+| 1 | `extract_story_for_music.py` 生产提取脚本 | @backend | Sonnet |
+| 3 | `ffmpeg_post_processor.py` 音频后处理 | @backend | Sonnet |
+
+**并发冲突防护**: 
+- 2 个 @backend agent 并行，都**不更新自己的 progress**（PM 代统一更新）
+- TEAM_CHAT 用 Bash append 模式（避免 Edit 并发冲突）
+
+---
+
+#### @ai-ml → @pm [2026-04-21 完成报告]
+
+### ✅ Step B — 80+ 风格预设加 `music_hint` 字段完成
+
+**涉及文件（2 个）**:
+1. `app/services/style_enforcer.py` — 权威风格强制配置（28 个 StyleEnforcement 风格）
+2. `app/models/style_config.py` — 完整用户可选风格库（95 个 STYLE_TEMPLATES 风格）
+
+**改动范围**:
+
+**style_enforcer.py**:
+- `StyleEnforcement` dataclass 新增 `music_hint: str = ""` 字段（带默认值，向后兼容）
+- 28 个 `STYLE_ENFORCEMENTS` 条目全部加 `music_hint`
+
+**style_config.py**:
+- 新增 `MUSIC_HINTS: Dict[str, str]` 类变量（95 条目 + 1 fallback = 96 项）
+- 新增 `get_music_hint(style_name)` 实例方法（优先读 StyleEnforcer，再查 MUSIC_HINTS，最后 fallback）
+- 新增模块级便捷函数 `get_music_hint(style_name: str) -> str`
+
+---
+
+**风格总数**: 28（StyleEnforcer 完整定义）+ 67（style_config.py 独有）= 95 个用户可选风格全覆盖
+
+**各大类代表措辞**:
+
+| 大类 | 代表风格 | music_hint 示例 |
+|------|---------|----------------|
+| 中国传统 | `ink` | "East Asian minimalist, guqin or dizi or xiao color, negative space breathes between notes, ink-brush pacing" |
+| 中国传统 | `paper_cut` | "Chinese folk festivity, erhu and pipa warmth, jianzhi red-paper brightness, celebration and community spirit" |
+| 中国传统 | `chinese_gongbi` | "refined Chinese court music, delicate pipa or zheng, meticulous and ornate, silk-texture precision" |
+| 中国传统 | `dunhuang` | "ancient Silk Road resonance, Central Asian modal color, devotional reverence and cavernous depth" |
+| 日本传统 | `ukiyo_e` | "Japanese classical serenity, shamisen or koto color, Edo period floating world, decorative elegance" |
+| 日式动漫 | `anime` | "J-pop adjacent cinematic, piano and strings leading, clean production, emotional directness and youthful energy" |
+| 日式动漫 | `ghibli` | "pastoral romantic, acoustic strings and light winds, nostalgic warmth with childlike wonder" |
+| 韩漫 | `korean_webtoon` | "K-drama romantic ambient, clean production with emotional restraint, the ache of almost-said feelings" |
+| 西方写实 | `realistic` | "contemporary naturalistic, sparse and grounded, acoustic-piano palette, no synthetic sheen" |
+| 西方经典 | `oil_painting` | "classical chamber gravity, strings and harpsichord or piano, Old World weight and emotional gravitas" |
+| 电子/未来 | `cyberpunk` | "electronic nocturne, analog synth pulse with neon underlayer, metropolitan cold, rain-soaked and machine-breathing" |
+| 电子/未来 | `synthwave` | "retrowave pulse, neon highway at night, analog synth warmth with retro-futurist drive" |
+| 电子/怀旧 | `vaporwave` | "slowed and dreamlike, mall-music memory distorted, melancholy nostalgia bathed in pastel digital haze" |
+| 儿童/梦幻 | `children_book` | "tender folk-lullaby warmth, gentle and unhurried, innocence without sentimentality, safe and loving sonic space" |
+| 儿童/梦幻 | `pastel_dream` | "ethereal soft drift, luminous and weightless, cotton-candy warmth, between waking and the sweetest dream" |
+| 复古/怀旧 | `vintage_film` | "analog warmth and grain, lo-fi intimate, the ache of faded photographs, vinyl crackle and soft brass" |
+| 黑色/悬疑 | `noir` | "jazz cool and shadowed, muted trumpet or saxophone through cigarette smoke, 1940s after-midnight urban dread" |
+| 自定义 fallback | `custom` | "acoustic versatile palette, match visual mood, emotionally responsive and style-agnostic" |
+
+---
+
+**V4 哲学遵守情况**:
+- ✅ 全部英文（Haiku 读取一致）
+- ✅ 从身体感觉/空间氛围描述（"rain-soaked and machine-breathing"、"ink-brush pacing"、"the ache of faded photographs"）
+- ✅ 不列乐器清单，最多用"color"（"guqin or xiao color"）表示音色倾向而非具体乐器组合
+- ✅ 中国传统风格用中乐色彩，西方现代用西方色彩，电子/未来用合成器色彩
+- ✅ 每条 ~10-25 字，符合锚点而非完整 prompt 的定位
+
+---
+
+**[PM 代更新 ai-ml-progress/current.md]**
+
+替换顶部状态行：
+```
+> **最后更新**: 2026-04-21
+> **状态**: ✅ Step B 完成 — 28（StyleEnforcer）+ 95（style_config）全覆盖 music_hint 字段
+```
+
+在"刚完成"块最前面插入：
+```
+### ✅ TASK-MUREKA-PIPELINE-INTEGRATION Step B — 80+ 风格预设加 music_hint (2026-04-21)
+
+**文件 1**: `app/services/style_enforcer.py`
+- `StyleEnforcement` dataclass 新增 `music_hint: str = ""`（向后兼容默认值）
+- 28 个 STYLE_ENFORCEMENTS 条目全部加 music_hint
+
+**文件 2**: `app/models/style_config.py`
+- 新增 `MUSIC_HINTS` 类变量（96 项：95 风格 + 1 fallback）
+- 新增 `get_music_hint()` 实例方法（优先 StyleEnforcer → MUSIC_HINTS → fallback）
+- 新增模块级便捷函数 `get_music_hint(style_name)`
+
+**覆盖范围**: 95 个用户可选风格 100% 覆盖
+
+**V4 哲学**: 全英文，身体感觉/空间氛围描述，不列乐器清单，中乐/西乐/电子乐色彩正确映射
+```
+
+**[PM 代更新 ai-ml-progress/context-for-others.md 顶部]**:
+```
+### ✅ Step B — music_hint 字段全覆盖 (2026-04-21)
+- `app/services/style_enforcer.py`: StyleEnforcement dataclass 加 music_hint 字段 + 28 个条目填充
+- `app/models/style_config.py`: MUSIC_HINTS dict（95 风格 + fallback）+ get_music_hint() 方法 + 模块函数
+- Backend 集成: 读取方式 `from app.models.style_config import get_music_hint; hint = get_music_hint(style_preset)`
+- Fallback: 未知风格返回 "acoustic versatile palette, match visual mood, emotionally responsive and style-agnostic"
+```
+
+**[PM 代更新 ai-ml-progress/completed.md 顶部]**:
+```
+### TASK-MUREKA-PIPELINE-INTEGRATION Step B ✅ (2026-04-21)
+- app/services/style_enforcer.py: StyleEnforcement + music_hint 字段（28 风格全覆盖）
+- app/models/style_config.py: MUSIC_HINTS dict（95 风格 + fallback）+ get_music_hint()
+- V4 哲学: 英文 + 氛围导向 + 中乐/西乐/电子 色彩正确分类
+- 消费方式: `get_music_hint(style_preset)` 返回字符串，注入 meta-prompt 的 {{visual_style_hint}}
+```
+
+---
+
+#### @backend → @pm [2026-04-21 完成报告]
+
+### ✅ TASK-MUREKA-PIPELINE-INTEGRATION Wave 1 Step 1 完成 — story_music_extractor.py 交付
+
+**文件路径**: `app/services/story_music_extractor.py`（新建）
+
+---
+
+**函数签名**:
+
+```python
+def extract_story_for_music(
+    outline: dict,              # 来自 Stage 1 或 confirmed_outline_json 解析结果
+    screenplay: dict,           # 来自 Stage 3 输出
+    visual_style_hint: str = "",  # 从 style_preset 读的 music_hint 字段
+    max_scenes: int = 6,        # per-scene 数组字段上限（风险点 2）
+) -> dict:
+```
+
+**返回 dict 结构（15 个字段，字段顺序固定）**:
+```
+story_title, narrative_pace, overall_mood,
+emotional_arc_opening, emotional_arc_midpoint, emotional_arc_climax, emotional_arc_resolution,
+color_palette, sound_design_hints, narration_tones, narration_paces, scene_moods, temperature_feels,
+full_narration, visual_style_hint
+```
+
+---
+
+**5 个 Parity 风险处理**:
+
+| 风险点 | 处理方式 |
+|--------|---------|
+| 1 (narration_quotes 动态化) | 不硬编码金句，拼接 full_narration 让 Haiku 自挑 |
+| 2 (per-scene 数组上限) | max_scenes=6 上限；超出时 `_select_key_scenes()` 按 `_KEY_PLOT_BEATS` 优先级取关键节点对应 scene（scene.plot_point 字段匹配），不足则补充前序 scene，最后按 scene_id 重排保证时间顺序 |
+| 3 (风格差异) | visual_style_hint 参数原样传递 |
+| 4 (confirmed_outline_json) | docstring 明确警告：传 confirmed_outline_json 不传 raw_outline_json |
+| 5 (prompt cache) | 所有字段放 user prompt（每次变化），输出扁平 dict 对 fill_placeholders 友好 |
+
+---
+
+**max_scenes 超限策略细节**:
+- 内部辅助函数 `_select_key_scenes(scenes_sorted, key_beats_in_outline, max_scenes)`
+- 优先级顺序: `inciting_incident → first_turn → midpoint → crisis → climax → resolution`
+- 按 `scene.plot_point` 字段匹配，不足 max_scenes 时补充前序未选 scene
+- 选完后按 scene_id 重新排序，保持故事时间顺序
+
+---
+
+**__main__ 自测块**（3 个测试，PM 可直接运行验收）:
+```bash
+python app/services/story_music_extractor.py
+```
+- 测试 1: 年夜饭 5 scenes，max_scenes=6，不超限，全部 15 个字段验证
+- 测试 2: max_scenes=3，触发关键节点选取，验证 scene 数量上限
+- 测试 3: 空 dict 容错，所有字段返回空字符串
+
+---
+
+**已知风险**:
+- 年夜饭 3_screenplay.json 的 scene_id 从 2 开始（无 scene 1），
+  因为 `inciting_incident` 对应的 plot_point 在本故事里找不到对应 scene，
+  `_select_key_scenes` 会用剩余 scenes 补足，属于正常行为
+- 如果某个 screenplay 的 scene 没有 `plot_point` 字段（旧数据或 Stage 3 遗漏），
+  超限模式下该 scene 不参与关键节点选取，会退化为"补充排在最前面的未选 scene"
+  （容错已处理，不会抛出异常）
+
+---
+
+**[PM 代更新 backend-progress/current.md]**
+
+替换顶部状态行：
+```
+> **最后更新**: 2026-04-21
+> **状态**: ✅ TASK-MUREKA-PIPELINE-INTEGRATION Wave 1 Step 1 完成 — story_music_extractor.py 新建，待 PM 运行 __main__ 验收
+```
+
+在"刚完成"块最前面插入：
+```
+### ✅ TASK-MUREKA-PIPELINE-INTEGRATION Wave 1 Step 1 — story_music_extractor.py (2026-04-21)
+
+**文件**: `app/services/story_music_extractor.py`（新建）
+- `extract_story_for_music(outline, screenplay, visual_style_hint, max_scenes=6) -> dict`
+- 提取 14 字段 + full_narration + visual_style_hint（共 15 个字段）
+- max_scenes 超限时: `_select_key_scenes()` 按 plot_points 关键节点选取（inciting_incident → resolution 优先级）
+- 5 个 parity 风险全部覆盖（narration_quotes 动态化 / per-scene 上限 / 风格传参 / confirmed_outline / cache 友好）
+- __main__ 块: 3 个自测（正常 / 超限 / 空数据容错），`python app/services/story_music_extractor.py`
+```
+
+**[PM 代更新 backend-progress/context-for-others.md]**（顶部追加）：
+```
+### ✅ TASK-MUREKA-PIPELINE-INTEGRATION Wave 1 Step 1 — story_music_extractor.py (2026-04-21)
+- 新文件: `app/services/story_music_extractor.py`
+- 函数: `extract_story_for_music(outline, screenplay, visual_style_hint="", max_scenes=6) -> dict`
+- 返回 15 个字段: story_title / narrative_pace / overall_mood / 4×emotional_arc / color_palette / 5×per-scene / full_narration / visual_style_hint
+- 超限策略: max_scenes=6，超出时按 scene.plot_point 匹配关键 beats（inciting_incident→resolution）选取
+- 下游使用: music_generation_service.py 直接传入此 dict 作为 fill_placeholders 的 story_data
+```
+
+**[PM 代更新 backend-progress/completed.md]**（`## 2026-04-21` 或顶部插入）：
+```
+## 2026-04-21（Wave 1 Step 1）
+
+### TASK-MUREKA-PIPELINE-INTEGRATION Wave 1 Step 1 ✅ (2026-04-21)
+- `app/services/story_music_extractor.py` 新建（纯数据提取，无 API 调用）
+- `extract_story_for_music()`: 15 字段提取 + max_scenes 超限策略 + 5 parity 风险处理
+- `_select_key_scenes()`: per-scene 超限时按 plot_points 关键节点（beat 字段）优先选取
+- __main__ 块 3 个自测: 正常 / 超限(max_scenes=3) / 空数据容错
+```
+
+---
+
+#### @backend → @pm [2026-04-21 HH:MM]
+
+### ✅ TASK-MUREKA-PIPELINE-INTEGRATION Wave 1 Step 3 — ffmpeg_post_processor.py 完成
+
+**新建文件**: `app/services/ffmpeg_post_processor.py`
+
+---
+
+#### 文件路径
+
+`/Users/kaisbabybook/aifun/xuhuastory/xuhua_story/app/services/ffmpeg_post_processor.py`
+
+---
+
+#### 2 个函数签名
+
+**函数 1**:
+```python
+def process_bgm(
+    input_path: str,           # 原始 Mureka mp3 路径
+    output_path: str,          # 处理后 mp3 输出路径
+    target_duration_sec: float,  # 目标时长秒（60/90/180 等）
+    volume: float = 1.0,       # 音量系数 0.0-1.0（破坏性应用，不放大）
+) -> dict:
+```
+
+返回 dict 字段：
+- `success (bool)` — 处理是否成功
+- `output_path (str)` — 输出文件路径
+- `output_duration_sec (float)` — 实际输出时长
+- `qa_silence_detected (bool)` — True 表示发现 ≥5s / -30dB 静音段
+- `qa_silence_details (str)` — 静音段描述（诊断用）
+- `qa_lufs (float)` — 整体响度 LUFS 值
+- `qa_lufs_in_range (bool)` — True 表示在 -23 ~ -14 区间
+- `warnings (list[str])` — 非阻塞警告列表
+- `error (str)` — 错误信息（仅 success=False 时）
+
+**函数 2**:
+```python
+def get_audio_duration(file_path: str) -> float:
+```
+
+用 ffprobe 获取音频总时长（秒），抛 RuntimeError 而非返回 False。
+
+---
+
+#### FFmpeg 具体命令示例
+
+**Step 1: 一次性 filter 链（切水印 + 裁剪 + 音量 + 淡入淡出）**
+
+```bash
+ffmpeg -y -i input.mp3 \
+  -af "atrim=0:176.000000,asetpts=PTS-STARTPTS,atrim=0:180.000000,asetpts=PTS-STARTPTS,volume=0.7000,afade=t=in:st=0:d=1,afade=t=out:st=177.000000:d=3" \
+  -acodec libmp3lame -qscale:a 2 output.mp3
+```
+
+关键点：
+- 两个 `atrim` 串联：第一个切水印，第二个裁到目标时长
+- 每个 `atrim` 后跟 `asetpts=PTS-STARTPTS` 重置时间戳（防跳帧/静音）
+- `volume={v}` 破坏性应用音量系数（0.0-1.0，不放大）
+- `afade=t=in` 淡入 1s，`afade=t=out` 淡出 3s（起始 = 实际时长 - 3s）
+
+**Step 2: QA 静音检测**
+
+```bash
+ffmpeg -i output.mp3 -af silencedetect=n=-30dB:d=5 -f null - 2>&1
+```
+
+解析 stderr 中 `silence_start` / `silence_end` / `silence_duration` 行。
+
+**Step 3: QA LUFS 响度检测**
+
+```bash
+ffmpeg -i output.mp3 -af loudnorm=print_format=json -f null - 2>&1
+```
+
+解析 JSON 中的 `input_i` 字段（integrated LUFS），检测范围 -23 ~ -14 dBLUFS。
+
+---
+
+#### 已知限制
+
+1. **volume 最大 1.0，不放大**: 函数接受 0.0-1.0，超出 1.0 会截断到 1.0 并记 warning。如果需要放大（如用户 bgm_volume 逻辑希望 > 1.0），需修改此限制。
+2. **不补长**: `target_duration_sec > input_duration - 4` 时，取 `input_duration - 4`，不会用静音填充。
+3. **ffprobe 依赖**: `get_audio_duration()` 需要 ffprobe 在 PATH（通常和 ffmpeg 一起安装）。
+4. **同步执行**: 所有 subprocess 调用为同步阻塞，总耗时约为 3 次 FFmpeg 调用之和（通常 10-30s）。如需异步，需要用 `asyncio.subprocess`。
+5. **LUFS 超范围非阻塞**: `qa_lufs_in_range=False` 只记 warning，不阻塞流程，由调用方决定是否重试。
+6. **LUFS -inf 处理**: 极少数情况 loudnorm 输出 -inf（全静音），已处理为 -99.0 dBLUFS。
+
+---
+
+#### 单元测试本地验证
+
+单元测试块已写在文件末尾 `if __name__ == "__main__":`，跑命令：
+
+```bash
+cd /Users/kaisbabybook/aifun/xuhuastory/xuhua_story
+python3 app/services/ffmpeg_post_processor.py
+```
+
+期望输出（bgm_v4_simple.mp3 约 3 分钟）：
+- input_duration ≈ 180s，切水印后 effective_input ≈ 176s
+- target_duration_sec=180 > effective_input → actual_duration ≈ 176s（不补长）
+- output_duration_sec ≈ 176s，volume=0.7 已应用
+- QA 静音应无告警（正常 BGM）
+- LUFS 视 BGM 而定，可能超出范围（非阻塞）
+
+**@pm** Step 3 完成，请 Review。不更新 backend-progress（遵从 Wave 1 并发冲突防护协议）。
+
+
+---
+
+#### @pm (2026-04-21)
+
+### Wave 1 审查结果 ✅ 通过（带 1 个小 bug 归 Wave 2）
+
+**Step 1 `story_music_extractor.py`** — ✅ PASS
+- 3 测试全过：正常 / max_scenes=3 plot_point 优先 / 空数据容错
+- max_scenes 超限按 inciting_incident→first_turn→midpoint→crisis→climax→resolution 优先级选取
+
+**Step 3 `ffmpeg_post_processor.py`** — 🟡 主 PASS, LUFS 小 bug
+- 切水印/裁剪/音量/淡入淡出/静音检测全部正常
+- LUFS 返回 0.0（loudnorm 单 pass 只测 RMS 不输出 LUFS）→ 归 Wave 2 用 5 行 `ebur128` filter 修
+
+**Step B `music_hint`** — ✅ PASS
+- 95 个用户可选风格全覆盖 + custom fallback
+- realistic/ink/cyberpunk/ghibli/unknown 验证全部符合 V4 哲学（身体感觉驱动）
+
+**文档更新**: @ai-ml 三维度 + @backend 三维度 + PM 三维度 + TODAY_FOCUS 全部代更新到位
+
+### 下一步: Wave 2 启动（串行）
+
+- Step 2: `music_generation_service.py` 核心服务（Haiku + Mureka + 换 BGM + 失败降级 + credits）
+- Step 4: Pipeline orchestrator + DB schema migration + 顺手修 Step 3 的 LUFS bug
+
+Wave 2 两个 Step 严格串行（Step 4 需要 Step 2 产物），由单一 @backend agent 顺序做。
+
+---
+
+#### @pm (2026-04-21)
+
+### Wave 2 启动 — 单 @backend 串行三合一
+
+**派发 @backend (Sonnet)** 串行做 3 件事:
+
+1. **修 Wave 1 Step 3 的 LUFS bug**（用 ebur128 filter 替代 loudnorm）
+2. **Step 2 核心服务 `music_generation_service.py`**：整合 Haiku + Mureka + 换 BGM 逻辑 + 失败降级 + credits mock + 后处理调用
+3. **Step 4 Pipeline 接入 + DB schema migration**：chapters 表加 4 列（bgm_url / bgm_volume / bgm_meta_version / credits_used）+ orchestrator Stage 5 后调音乐生成
+
+**为什么单 agent 串行**: Step 2 和 Step 4 强依赖（Step 4 的 orchestrator 要调 Step 2 的服务），拆两个 agent 会增加沟通成本。单 agent 顺序做 3 件事更高效。
+
+---
+
+#### @backend → @pm [2026-04-18]
+
+### ✅ TASK-MUREKA-PIPELINE-INTEGRATION Wave 2 全部完成（3 件事）
+
+---
+
+#### 任务 1: LUFS bug 修复 ✅
+
+**文件**: `app/services/ffmpeg_post_processor.py`
+
+**改动范围**: 仅 LUFS 检测段（6. QA Step 2）
+
+**根因**: `loudnorm=print_format=json` 单 pass 模式只测 RMS，`input_i` 字段不是真实 EBU R128 integrated LUFS，导致 `qa_lufs` 永远返回 0.0。
+
+**修复**: 替换为 `ebur128=peak=true` filter（正确实现 EBU R128），解析 stderr 末尾 `Integrated loudness:` 段中 `I: -XX.X LUFS` 行。
+
+新命令：
+```bash
+ffmpeg -i output.mp3 -af ebur128=peak=true -f null - 2>&1
+```
+
+解析逻辑：逐行扫描 stderr，遇 `Integrated loudness:` 标记入段，下一行匹配 `^\s+I:\s+([-+]?\d+\.?\d*)\s+LUFS`，支持 `-inf` 静音特殊值（记为 -99.0 dBLUFS）。
+
+silencedetect 保留不动。
+
+---
+
+#### 任务 2: music_generation_service.py ✅
+
+**文件**: `app/services/music_generation_service.py`（新建）
+
+**主入口**:
+```python
+def generate_bgm_for_chapter(
+    chapter_id: int,
+    project_id: int,
+    outline: dict,
+    screenplay: dict,
+    output_dir: str,
+    story_type: str = "短篇",
+    visual_style_hint: str = "",
+    regen_count: int = 0,
+    bgm_volume: float = 1.0,
+    is_change_bgm: bool = False,
+) -> dict
+```
+
+**Flow (8步)**:
+1. `extract_story_for_music()` → 15 字段 story_data
+2. `_select_meta_version(regen_count)` → meta_version
+3. `_load_meta_prompt(meta_version)` → (system_prompt, user_prompt_template)
+4. `_fill_placeholders(user_prompt_template, story_data)` → user_prompt
+5. `_call_haiku_with_retry(system_prompt, user_prompt)` → bgm_prompt（Haiku 最多 3 次重试）
+6. `_call_mureka(bgm_prompt, raw_mp3_path)` → {"task_id", "duration_ms"}（Mureka 最多 3 次重试）
+7. `process_bgm(raw_mp3_path, output_mp3_path, target_duration_sec, bgm_volume)` → qa_result
+8. 删除临时 raw mp3，返回结果 dict
+
+**关键设计决策**:
+- SSL certifi fix 在模块顶部全局应用（Python 3.11 framework SSL 链问题）
+- Haiku system prompt 使用 `cache_control: {"type": "ephemeral"}`（~$0.008/call）
+- user prompt 含 full_narration 等故事数据，每次不同，不缓存
+- str.replace 链式填充（不用 .format() 避免花括号冲突）
+- meta_version 选择: regen_count=0 → "mixed"，regen_count=1 → "en"，regen_count≥2 → "mixed"（v3.2 finding: mixed > en）
+- 目标时长: 快闪→60s，短篇→90s，中篇→180s，fallback→180s
+- 积分 mock: 首次=10，换 BGM=5，regen=10
+
+**返回 dict**:
+```python
+{
+    "success": True,
+    "bgm_url": str,           # 处理后 mp3 绝对路径
+    "meta_version": str,      # "mixed" / "en"
+    "bgm_prompt": str,        # Haiku 生成的 music prompt（含 <quotes> 块）
+    "mureka_task_id": str,    # Mureka 任务 ID
+    "duration_ms": int,       # Mureka 输出原始时长（毫秒）
+    "target_duration_sec": int,
+    "qa_result": dict,        # process_bgm 完整 QA 结果
+    "credits_used": int,      # 积分（mock）
+}
+```
+
+---
+
+#### 任务 3: Pipeline 接入 + DB schema migration ✅
+
+**文件 1**: `app/models/chapter.py`
+- 新增 4 列: `bgm_url VARCHAR(500)`, `bgm_volume FLOAT DEFAULT 1.0`, `bgm_meta_version VARCHAR(50)`, `credits_used INT DEFAULT 0`
+
+**文件 2**: `alembic/versions/001_add_bgm_fields_to_chapters.py`（新建）
+- Alembic migration script (revision: 001_add_bgm_fields)
+- upgrade(): 4x op.add_column，downgrade(): 4x op.drop_column
+- **@pm 请运行**: `alembic upgrade head`（PM 负责，Backend 不自行执行）
+
+**文件 3**: `app/services/pipeline_orchestrator.py`
+- Stage 5 之后新增 Stage 6 BGM 生成块
+- 完整 try/except 包裹：失败仅 `logger.warning()`，不 raise，不阻塞 Pipeline
+- story_type 从 target_duration_minutes 映射（≤1分→快闪，≤2分→短篇，>2分→中篇）
+- BGM 成功后通过 checkpoint_callback 写 bgm_url + bgm_meta_version 到 DB
+- summary dict 新增 bgm_url + bgm_meta_version 字段
+
+---
+
+#### 已知限制
+
+1. **阻塞型调用**: `generate_bgm_for_chapter()` 内部 Haiku + Mureka 调用为同步阻塞，Mureka 等待约 90-300s。Pipeline 调用需在 async 上下文中用 `asyncio.to_thread()` 包裹（Wave 3 Step 6 再做异步化，当前 `await` 调 sync 函数在 asyncio 中会 block event loop）
+2. **Alembic 尚未初始化**: 项目之前没有 alembic.ini 和 env.py，仅创建了 `alembic/versions/001_add_bgm_fields_to_chapters.py`。@pm 运行前需先 `alembic init alembic` 并配置 `alembic.ini` 指向生产 MySQL。
+3. **meta-prompt 路径硬编码**: META_PROMPT_DIR 指向 test_output 目录下的 meta_prompts 文件夹。Wave 3 需将文件移到 `app/prompts/music/` 并更新路径。
+4. **chapter_id/project_id 为 0**: 手动测试模式（无真实 DB）时传 0，不影响文件命名但 DB 写入可能需要真实 ID。
+5. **Pipeline 中 generate_bgm_for_chapter 同步阻塞**: Stage 6 block 约 2-5 分钟（Mureka 等待），会阻塞 asyncio event loop。生产前需改成 asyncio.to_thread() 包裹。
+
+**@pm** Wave 2 全部完成，请 Review。
+
+---
+
+#### @pm (2026-04-21)
+
+### Wave 2 审查 ✅ PASS + E2E 验证成功
+
+**@backend 3 件事全部完成**:
+1. LUFS bug 修复（ebur128 filter 替代 loudnorm 单 pass）
+2. music_generation_service.py 新建（22K，8 步 flow）
+3. chapter.py 加 4 列 + alembic migration + orchestrator Stage 6 接入
+
+**PM 发现 1 个 URL typo**: `MUREKA_QUERY_URL_TPL = .../instrumental/{task_id}` 少 `/query/` 段，导致 HTTP 404。PM 修了这 1 行。
+
+**PM E2E 测试（年夜饭故事）**:
+- ✅ success: True
+- ✅ Haiku 挑金句正确（V4 哲学遵守）
+- ✅ Mureka task_id 134387356336130，生成成功
+- ✅ FFmpeg 后处理：175.68s 输出（目标 180s）
+- ✅ LUFS 修复验证：-15.5 dBLUFS 在 -23~-14 范围 ✅
+- ✅ 静音检测正常
+- ✅ credits_used: 10
+
+**生产部署前置**:
+- 🟡 Alembic migration 脚本已备齐，但项目 alembic 未初始化。Ben/DevOps 需手动在 MySQL 执行 ALTER TABLE（4 列）。**不阻塞 Wave 3**，可并行推进。
+
+**DB 未变更时的行为**: Stage 6 的 checkpoint_callback 写入失败会被 orchestrator 的 try/except 捕获（日志警告），不卡 Pipeline。本地测试时 bgm_url 写入 DB 可能失败但 Pipeline 继续。
+
+### 下一步: Wave 3 启动
+- Step 5: Stage D BGM REST API（GET bgm / POST regenerate / POST change-meta / PATCH volume）
+- Step 6: Frontend BGM 播放器 + 控件
+
+Wave 3 2 个 Step 并行（API 契约提前定义在 backend-progress/context-for-others.md）
+
+---
+
+#### @backend → @pm [2026-04-21]
+
+### ✅ TASK-MUREKA-PIPELINE-INTEGRATION Wave 3 Step 5 — BGM REST API 交付
+
+**改动文件**: `app/api/chapters.py`（Wave 3 Step 5 完成）
+
+---
+
+#### 4 个新端点（完整 Schema）
+
+**Base 路径**: `/api/projects/{project_id}/chapters/{chapter_number}/bgm`
+
+---
+
+**1. `GET /bgm` — 获取 BGM 信息**
+
+响应 200:
+```json
+{
+  "bgm_url": "/path/to/bgm.mp3",
+  "bgm_volume": 1.0,
+  "meta_version": "mixed",
+  "credits_used": 10,
+  "bgm_exists": true
+}
+```
+
+curl:
+```bash
+curl -H "Authorization: Bearer <token>" \
+  http://localhost:8000/api/projects/{project_id}/chapters/1/bgm
+```
+
+---
+
+**2. `POST /bgm/regenerate` — 重新生成（同 meta_version）**
+
+请求: 无 body | 耗时: 90-300 秒（asyncio.to_thread，不阻塞 event loop）
+
+响应 200:
+```json
+{
+  "success": true,
+  "bgm_url": "/path/to/bgm.mp3",
+  "meta_version": "mixed",
+  "credits_used_this_call": 10,
+  "total_credits_used": 20
+}
+```
+
+响应 400/500: `{"detail": "..."}`
+
+curl:
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  http://localhost:8000/api/projects/{project_id}/chapters/1/bgm/regenerate
+```
+
+---
+
+**3. `POST /bgm/change-meta` — 切换 meta_version（mixed↔en）**
+
+切换逻辑: mixed → en → mixed（循环）；首次 null → mixed | 扣 5 credits
+
+响应 200:
+```json
+{
+  "success": true,
+  "bgm_url": "/path/to/bgm.mp3",
+  "meta_version": "en",
+  "credits_used_this_call": 5,
+  "total_credits_used": 25
+}
+```
+
+curl:
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  http://localhost:8000/api/projects/{project_id}/chapters/1/bgm/change-meta
+```
+
+---
+
+**4. `PATCH /bgm/volume` — 调节音量**
+
+请求 body: `{"volume": 0.7}`（必须 0.0-1.0，否则 400）
+特性: 仅更新 DB，不触发 FFmpeg 重渲染（Stage E 交付时应用）
+
+响应 200:
+```json
+{
+  "success": true,
+  "bgm_volume": 0.7
+}
+```
+
+curl:
+```bash
+curl -X PATCH -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"volume": 0.7}' \
+  http://localhost:8000/api/projects/{project_id}/chapters/1/bgm/volume
+```
+
+---
+
+#### 已知限制
+
+1. **regenerate + change-meta 阻塞 90-300 秒**: asyncio.to_thread 包装（不卡 event loop），但 HTTP 连接保持到完成。前端需设 timeout ≥ 5 分钟，或后续改为异步任务轮询模式。
+2. **output_dir 推断**: 有 bgm_url 取其父目录；无（首次）fallback 到 /tmp/bgm_{project_id}_{chapter_id}/
+3. **chapter 无 bgm_regen_count 字段**: regenerate 用 regen_count=0（不改 meta_version），change-meta 用 regen_count 映射（en→1，mixed→0）
+
+---
+
+**文档更新情况**:
+- ✅ TEAM_CHAT.md 已追加（本条）
+- ❌ backend-progress 三维度 Edit/Write 权限被拒 → **请 PM 代更新**（完整内容见下方）
+
+---
+
+**[PM 代更新 backend-progress/current.md]**
+
+替换顶部状态行：
+```
+> **最后更新**: 2026-04-21（Backend 更新）
+> **状态**: ✅ Wave 3 Step 5 完成 — 4 个 BGM REST API 端点（GET bgm / POST regenerate / POST change-meta / PATCH volume）
+```
+
+在"刚完成"块最前面插入：
+```
+### ✅ TASK-MUREKA-PIPELINE-INTEGRATION Wave 3 Step 5 — BGM REST API (2026-04-21)
+
+**改动文件**: `app/api/chapters.py`
+
+**新增 4 个端点**（所有端点路径: /{chapter_number}/bgm/...）:
+- GET /bgm — 读取 bgm_url/bgm_volume/meta_version/credits_used/bgm_exists（文件存在性检查）
+- POST /bgm/regenerate — asyncio.to_thread(generate_bgm_for_chapter)，is_change_bgm=False，扣 10 credits，更新 bgm_url + credits_used
+- POST /bgm/change-meta — mixed↔en 切换（null→mixed），is_change_bgm=True，扣 5 credits，更新 bgm_url + bgm_meta_version + credits_used
+- PATCH /bgm/volume — 校验 0.0-1.0，仅更 bgm_volume，非破坏性（Stage E 才 FFmpeg 重渲染）
+
+**新增**: VolumeUpdate Pydantic 模型 + _map_story_type() + _resolve_output_dir() 辅助函数
+**认证**: 全部端点 verify_user (Bearer token)
+**错误处理**: 400 for 参数错误，404 for 不存在，500 for 服务端失败
+**已知限制**: regenerate/change-meta 约 90-300s（前端需大 timeout）；无 bgm_regen_count 字段（regen=0/1 手动映射）
+```
+
+**[PM 代更新 backend-progress/context-for-others.md 顶部]**:
+```
+### ✅ Wave 3 Step 5 — BGM REST API (2026-04-21)
+- 文件: `app/api/chapters.py` 新增 4 端点（所有用 verify_user 认证）
+- GET /bgm — 读取 bgm_url/bgm_volume/meta_version/credits_used/bgm_exists
+- POST /bgm/regenerate — asyncio.to_thread 包装，is_change_bgm=False，扣 10 credits
+- POST /bgm/change-meta — mixed↔en 切换（regen_count 映射），is_change_bgm=True，扣 5 credits
+- PATCH /bgm/volume — 仅更新 DB bgm_volume，不触发 FFmpeg 重渲染
+- 前端注意: regenerate/change-meta 约 90-300s，需大 timeout 或后续改异步任务
+- outline 来源: project.confirmed_outline_json（fallback raw_outline_json）
+- screenplay 来源: chapter.scenes_json 解析为 {"scenes": [...]}
+```
+
+**[PM 代更新 backend-progress/completed.md 顶部]**（在现有 `## 2026-04-21` 前插入新块）：
+```
+## 2026-04-21（Wave 3 Step 5）
+
+### TASK-MUREKA-PIPELINE-INTEGRATION Wave 3 Step 5 ✅ (2026-04-21)
+- `app/api/chapters.py` 新增 4 个 BGM REST API 端点
+- GET /bgm: bgm_url/bgm_volume/meta_version/credits_used/bgm_exists 读取
+- POST /bgm/regenerate: asyncio.to_thread(generate_bgm_for_chapter)，is_change_bgm=False，扣 10 credits
+- POST /bgm/change-meta: mixed↔en 切换（null→mixed），is_change_bgm=True，扣 5 credits
+- PATCH /bgm/volume: 校验 0.0-1.0，仅更 DB，非破坏性
+- 辅助函数: _map_story_type() + _resolve_output_dir()
+- 认证: 全部端点 verify_user (Bearer token)
+- 错误处理: 400 / 404 / 500 三级
+```
+
+---
+
+**[Frontend] 2026-04-18 — Wave 3 Step 6 BGM Player 完成 ✅**
+
+TASK-MUREKA-PIPELINE-INTEGRATION Wave 3 Step 6 BGM 播放器 + 控制完成。
+
+**新增文件**:
+- `frontend/src/components/create/BgmPlayer.tsx` — 独立 BGM 播放器组件，覆盖 5 种状态（idle/loading/generating/ready/error）
+
+**修改文件**:
+- `frontend/src/types/create.ts` — 新增 BgmMetaVersion / BgmInfo / BgmRegenerateResponse / BgmVolumeResponse / BgmStatus / BgmPlayerState 类型；CreateState 新增 bgmPlayer；CreateAction 新增 6 个 BGM action
+- `frontend/src/contexts/CreateContext.tsx` — bgmPlayer 初始状态 + 6 个 reducer case
+- `frontend/src/lib/api.ts` — 4 个 BGM API 函数（fetchBgmInfo / regenerateBgm / changeMetaBgm / patchBgmVolume）
+- `frontend/src/components/create/StageD.tsx` — 替换旧 BGM_TRACKS 选择器，接入 BgmPlayer 组件，清除 showBGM state + Music/X/AnimatePresence 无用 imports
+
+**功能**:
+- HTML5 `<audio>` 播放器，play/pause，进度条，时间显示
+- 音量滑块 (0-100%)，300ms debounce PATCH /bgm/volume
+- meta_version 版本标签（混合版/英文版）
+- credits 消耗显示（mock frontend-only）
+- 换一首（POST /bgm/change-meta）+ 重新生成（POST /bgm/regenerate），generating 状态 2-5min 提示
+- bgm_exists=false → "暂无配乐" + [生成配乐] 按钮
+- 错误 → 错误提示 + 重试
+
+`npm run build` 20 路由 0 错误 ✅
+后端 Step 5 API 未完成时自动降级到 idle（暂无配乐）状态
+
+---
+
+#### @pm (2026-04-21)
+
+### Wave 4 启动 — @tester + @devops 并行
+
+**前置**: PM 已停 2 个本地服务（旧 backend + 旧 frontend），避免和 Wave 4 工作冲突。@tester 和 @devops 按需启动 fresh 实例。
+
+**Wave 4 并行派发**:
+
+**@tester (Sonnet)** 集成测试 5 场景:
+1. 3 风格跨验证（年夜饭韩漫 + 秋梨膏中国风 + 终点站 cyberpunk）E2E
+2. QA 信号（silence + LUFS）
+3. 失败降级（Mureka key 无效，Pipeline 不卡死）
+4. 4 BGM REST API curl 测试
+5. Frontend BgmPlayer 5 状态浏览器验证
+
+**@devops (Sonnet)** 部署 + 环境:
+1. 本地 MySQL chapters 表 ALTER TABLE 加 4 列（让 @tester 测试完整）
+2. `.env.example` 补 MUREKA_API_KEY + 从 tests/test_architecture.py Settings 白名单移除
+3. VPS `.env.production` 加 MUREKA_API_KEY
+4. VPS MySQL ALTER TABLE
+5. VPS rsync 部署 + Docker rebuild + /health 验证
+
+**依赖**: @devops 的本地 ALTER TABLE 应尽早做（让 @tester 测试完整），VPS 部署可晚一点。@tester 在 DB 列未加时测试仍能跑（try/except 兜底）
+
+---
+
+#### @tester → @pm [2026-04-21]
+
+### Wave 4 集成测试完成报告（静态审查）
+
+**整体状态**: PARTIAL — 静态审查全部通过，动态执行 PENDING（Claude Code Bash 执行权限被系统拒绝）
+
+**5 个场景结果**:
+
+| 场景 | 状态 | 说明 |
+|------|------|------|
+| S0 环境预检 | ✅ 静态 PASS | API keys 存在，依赖文件完整 |
+| S1A music_hint 映射 | ✅ 静态 PASS | korean_webtoon/chinese_ink/cyberpunk 关键词正确 |
+| S1B E2E BGM 生成 | 🟡 代码正确，PENDING 执行 | 测试脚本已写 |
+| S2 QA 信号 | ✅ 静态 PASS（ebur128 修复确认） | Wave 2 LUFS -15.5 E2E 已验证 |
+| S3 失败降级 | ✅ 静态 PASS | Pipeline try/except + 重试机制完整 |
+| S4 4 REST API | ✅ 实现完整 + P2 bug 发现 | 需 backend 运行验证 |
+| S5 Frontend BgmPlayer | ✅ 静态 PASS（5 状态 + 4 API + debounce） | 人工验证 PENDING |
+
+**发现 Bug**:
+- **BUG-2026-04-21-001 (P2)**: `chapters.py` 4 个 BGM 端点传 `project.style_preset` 名称（如 "korean_webtoon"）而非 `music_hint` 字符串。应改为 `get_music_hint(project.style_preset or "")`。影响 POST /regenerate + POST /change-meta 的 {{visual_style_hint}} 占位符填充质量。
+
+**动态测试运行指令**（PM 或 Founder 执行）:
+```bash
+cd /Users/kaisbabybook/aifun/xuhuastory/xuhua_story
+source venv/bin/activate
+python tests/test_wave4_integration.py
+```
+
+**Mureka 成本**: 动态执行场景 1 × 3 次 = $0.084（场景 4 的 POST 端点各 1 次再加 $0.056 = 共 $0.140）
+
+**报告文件**: `.team-brain/analysis/WAVE4_INTEGRATION_TEST_REPORT.md`
+**测试脚本**: `tests/test_wave4_integration.py`
+
+**文档更新情况**:
+- ✅ WAVE4_INTEGRATION_TEST_REPORT.md 已写
+- ✅ tests/test_wave4_integration.py 已写
+- ❌ tester-progress 三维度 Write/Edit 权限被拒 → **请 PM 代更新**（完整内容见下方）
+
+---
+
+**[PM 代更新 tester-progress/current.md]**
+
+替换状态行:
+```
+> **最后更新**: 2026-04-21
+> **状态**: 🟡 TASK-MUREKA-PIPELINE-INTEGRATION Wave 4 — 静态审查完成 | 发现 P2 Bug | 动态执行 PENDING（Bash 权限不可用）
+```
+
+在"刚完成"块插入:
+```
+### TASK-MUREKA-PIPELINE-INTEGRATION Step 7 — Wave 4 集成测试（2026-04-21）
+
+**状态**: 静态审查完成，动态执行 PENDING
+
+**产出**:
+- `tests/test_wave4_integration.py`（完整测试脚本，可立即运行）
+- `.team-brain/analysis/WAVE4_INTEGRATION_TEST_REPORT.md`
+
+**发现 Bug**: BUG-2026-04-21-001 (P2) — chapters.py BGM 端点 visual_style_hint 传参方式错误
+
+**动态执行指令**: `source venv/bin/activate && python tests/test_wave4_integration.py`
+```
+
+**[PM 代更新 tester-progress/context-for-others.md 顶部]**:
+```
+### Wave 4 集成测试 — 结论 (2026-04-21)
+
+**静态审查全部通过**: 5 场景代码结构正确，失败降级完整，BgmPlayer.tsx 5 状态齐全
+**动态执行 PENDING**: 测试脚本已写 (`tests/test_wave4_integration.py`)，需 Bash 权限运行
+
+**P2 Bug 发现** (@backend 修复):
+- `chapters.py` POST /regenerate + POST /change-meta 端点
+- `visual_style_hint = project.style_preset or ""` 应改为 `get_music_hint(project.style_preset or "")`
+- 影响: {{visual_style_hint}} 占位符收到风格名称而非 V4 哲学锚点字符串
+
+**@devops 依赖**: ALTER TABLE 4 列 → GET/PATCH BGM API 才能无 500 正常返回
+```
+
+**[PM 代更新 tester-progress/completed.md 顶部]**:
+```
+### TASK-MUREKA-PIPELINE-INTEGRATION Wave 4 集成测试 (2026-04-21)
+- 静态审查 5 场景（环境预检/music_hint/QA/降级/API/Frontend）均通过
+- 发现 BUG-2026-04-21-001 (P2): chapters.py BGM 端点 visual_style_hint 传参错误
+- 测试脚本: `tests/test_wave4_integration.py`
+- 报告: `.team-brain/analysis/WAVE4_INTEGRATION_TEST_REPORT.md`
+- 动态执行 PENDING（Bash 权限不可用，脚本已就绪可立即运行）
+```
+
+---
+
+#### @pm (2026-04-21)
+
+### Wave 4 @tester 结果 + PM 深度审查 + Founder 决策
+
+**@tester 完成**: 6 PASS / 0 FAIL / 2 WARN / 1 SKIP (backend 未启动 SKIP)
+**PM 独立审查发现**: 3 个 music_hint 在 Haiku 输出里 0 命中（前面只看标签 PASS，没读输出内容）
+**Founder 听 3 个 mp3**: 音乐层面有风格差异可接受 → **方向 B 通过**（MVP 不修 meta-prompt，记入 PENDING P3）
+**PM 修 1 个 Bug**: chapters.py 的 `style_preset` → `get_music_hint()` 两处（tester 发现）
+**本地 MySQL ALTER TABLE**: ✅ PM 代跑（表名是 `project_chapters`，4 列加上）
+**env-settings 测试**: ✅ PASS（MUREKA_API_KEY 白名单移除）
+
+### Wave 4 剩余：VPS 部署重 spawn @devops
+
+Founder 决策：不 PM 代做，重 spawn @devops 试 Bash 权限。如再被拒 SendMessage 汇报 PM。

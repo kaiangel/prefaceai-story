@@ -1526,3 +1526,391 @@ async def delete_shot(
         "status": "deleted",
         "shot_id": shot_id,
     }
+
+
+# ============ BGM REST API endpoints (Wave 3 Step 5) ============
+
+
+class VolumeUpdate(BaseModel):
+    """BGM 音量更新请求"""
+    volume: float  # 0.0-1.0
+
+
+@router.get("/{chapter_number}/bgm")
+async def get_bgm(
+    project_id: str,
+    chapter_number: int,
+    user_id: int = Depends(verify_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    获取当前 chapter 的 BGM 信息。
+
+    Returns:
+        {
+            "bgm_url": str | null,      # "/static/..." 路径或 null
+            "bgm_volume": float,         # 音量系数 0.0-1.0
+            "meta_version": str | null,  # "mixed" | "en" | null
+            "credits_used": int,         # 本 chapter 累计 BGM 消耗积分
+            "bgm_exists": bool,          # bgm_url 非 null 且文件实际存在
+        }
+    """
+    import os
+
+    project, chapter = await _get_project_and_chapter(
+        project_id, chapter_number, user_id, db
+    )
+
+    bgm_url = chapter.bgm_url
+    bgm_exists = False
+
+    if bgm_url:
+        # 判断文件是否实际存在（bgm_url 可能是绝对路径或 /static/... URL）
+        if bgm_url.startswith("/"):
+            # 绝对本地路径 or /static/ URL — 尝试文件系统检查
+            check_path = bgm_url if not bgm_url.startswith("/static/") else None
+            if check_path:
+                bgm_exists = os.path.isfile(check_path)
+            else:
+                bgm_exists = True  # /static/ URL 假设存在（由 static 服务托管）
+        else:
+            bgm_exists = os.path.isfile(bgm_url)
+
+    return {
+        "bgm_url": bgm_url,
+        "bgm_volume": chapter.bgm_volume if chapter.bgm_volume is not None else 1.0,
+        "meta_version": chapter.bgm_meta_version,
+        "credits_used": chapter.credits_used or 0,
+        "bgm_exists": bgm_exists,
+    }
+
+
+@router.post("/{chapter_number}/bgm/regenerate")
+async def regenerate_bgm(
+    project_id: str,
+    chapter_number: int,
+    user_id: int = Depends(verify_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    重新生成 BGM（同一 meta_version，重新走 Haiku + Mureka + FFmpeg）。
+
+    使用现有 meta_version 重跑，不切换版本（is_change_bgm=False）。
+    每次调用扣 10 credits（mock）。
+
+    注意：generate_bgm_for_chapter 是同步阻塞调用，约需 90-300 秒。
+    本端点使用 asyncio.to_thread 包装，避免阻塞 FastAPI event loop。
+
+    Returns:
+        {
+            "success": bool,
+            "bgm_url": str,
+            "meta_version": str,
+            "credits_used_this_call": int,   # 本次扣点（10）
+            "total_credits_used": int,        # chapter 累计总积分
+        }
+    """
+    import os
+    import json as _json
+
+    project, chapter = await _get_project_and_chapter(
+        project_id, chapter_number, user_id, db
+    )
+
+    # 读取 outline（优先 confirmed，fallback raw）
+    outline_raw = project.confirmed_outline_json or project.raw_outline_json
+    if not outline_raw:
+        raise HTTPException(status_code=400, detail="项目缺少故事大纲数据（confirmed_outline_json / raw_outline_json 均为空）")
+
+    try:
+        outline = _json.loads(outline_raw)
+    except _json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"故事大纲 JSON 解析失败: {e}")
+
+    # 读取 screenplay（从 chapter.scenes_json，格式为 scenes 列表）
+    screenplay: dict = {}
+    if chapter.scenes_json:
+        try:
+            scenes_list = _json.loads(chapter.scenes_json)
+            screenplay = {"scenes": scenes_list}
+        except _json.JSONDecodeError:
+            screenplay = {}
+
+    # 计算输出目录（使用 chapter.storyboard_json 路径旁边，或 fallback 到临时目录）
+    output_dir = _resolve_output_dir(project, chapter)
+
+    # 确定 story_type（从 project.chapter_duration_minutes）
+    story_type = _map_story_type(project.chapter_duration_minutes or 3)
+
+    # visual_style_hint 从 style_preset 转为 music_hint 值（不是名称字符串）
+    from app.models.style_config import get_music_hint
+    visual_style_hint = get_music_hint(project.style_preset or "")
+
+    # regen_count：chapter 无专用字段，用 0 保持 meta_version 稳定（is_change_bgm=False）
+    regen_count = 0
+
+    logger.info(
+        f"[BGM Regenerate] project={project_id} chapter={chapter_number} "
+        f"story_type={story_type} style={visual_style_hint}"
+    )
+
+    try:
+        from app.services.music_generation_service import generate_bgm_for_chapter
+
+        result = await asyncio.to_thread(
+            generate_bgm_for_chapter,
+            chapter.id,
+            project.id,
+            outline,
+            screenplay,
+            output_dir,
+            story_type,
+            visual_style_hint,
+            regen_count,
+            chapter.bgm_volume if chapter.bgm_volume is not None else 1.0,
+            False,  # is_change_bgm=False（重生成，不切换 meta_version）
+        )
+    except Exception as e:
+        logger.error(f"[BGM Regenerate] 生成失败: {e}")
+        raise HTTPException(status_code=500, detail=f"BGM 重新生成失败: {str(e)}")
+
+    if not result.get("success"):
+        raise HTTPException(status_code=500, detail=f"BGM 重新生成失败: {result.get('error', '未知错误')}")
+
+    # 更新 DB：bgm_url + credits_used
+    credits_this_call = result.get("credits_used", 10)
+    new_total_credits = (chapter.credits_used or 0) + credits_this_call
+
+    chapter.bgm_url = result.get("bgm_url", chapter.bgm_url)
+    chapter.credits_used = new_total_credits
+    chapter.updated_at = datetime.utcnow()
+    await db.commit()
+
+    logger.info(
+        f"[BGM Regenerate] 完成: bgm_url={chapter.bgm_url} "
+        f"credits_this_call={credits_this_call} total={new_total_credits}"
+    )
+
+    return {
+        "success": True,
+        "bgm_url": chapter.bgm_url,
+        "meta_version": result.get("meta_version", chapter.bgm_meta_version),
+        "credits_used_this_call": credits_this_call,
+        "total_credits_used": new_total_credits,
+    }
+
+
+@router.post("/{chapter_number}/bgm/change-meta")
+async def change_bgm_meta(
+    project_id: str,
+    chapter_number: int,
+    user_id: int = Depends(verify_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    切换 BGM meta-prompt 版本（mixed ↔ en）并重新生成。
+
+    换 BGM 逻辑（基于 chapter.bgm_meta_version 当前值）：
+      - 当前 "mixed" → 切到 "en"
+      - 当前 "en"   → 切回 "mixed"
+      - 首次（null）→ "mixed"（默认）
+
+    每次调用扣 5 credits（mock）。
+
+    注意：generate_bgm_for_chapter 是同步阻塞调用，约需 90-300 秒。
+    本端点使用 asyncio.to_thread 包装，避免阻塞 FastAPI event loop。
+
+    Returns:
+        {
+            "success": bool,
+            "bgm_url": str,
+            "meta_version": str,           # 新的 meta_version
+            "credits_used_this_call": int,  # 本次扣点（5）
+            "total_credits_used": int,
+        }
+    """
+    import json as _json
+
+    project, chapter = await _get_project_and_chapter(
+        project_id, chapter_number, user_id, db
+    )
+
+    # 计算下一个 meta_version
+    current_meta = chapter.bgm_meta_version
+    if current_meta == "mixed":
+        next_meta = "en"
+    elif current_meta == "en":
+        next_meta = "mixed"
+    else:
+        next_meta = "mixed"  # 首次（null）→ mixed
+
+    # 读取 outline
+    outline_raw = project.confirmed_outline_json or project.raw_outline_json
+    if not outline_raw:
+        raise HTTPException(status_code=400, detail="项目缺少故事大纲数据")
+
+    try:
+        outline = _json.loads(outline_raw)
+    except _json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"故事大纲 JSON 解析失败: {e}")
+
+    # 读取 screenplay
+    screenplay: dict = {}
+    if chapter.scenes_json:
+        try:
+            scenes_list = _json.loads(chapter.scenes_json)
+            screenplay = {"scenes": scenes_list}
+        except _json.JSONDecodeError:
+            screenplay = {}
+
+    output_dir = _resolve_output_dir(project, chapter)
+    story_type = _map_story_type(project.chapter_duration_minutes or 3)
+    # visual_style_hint 从 style_preset 转为 music_hint 值（不是名称字符串）
+    from app.models.style_config import get_music_hint
+    visual_style_hint = get_music_hint(project.style_preset or "")
+
+    # is_change_bgm=True 触发换 BGM 积分（5 points）
+    # regen_count=1 使服务内部选择 "en" 版本，但我们通过 is_change_bgm=True 标记
+    # 实际 meta_version 由服务内部 _select_meta_version(regen_count) 决定
+    # 为确保切换到目标 meta_version，使用 regen_count 调整：
+    #   next_meta="en"    → regen_count=1（_select_meta_version(1) == "en"）
+    #   next_meta="mixed" → regen_count=0（_select_meta_version(0) == "mixed"）
+    regen_count_for_meta = 1 if next_meta == "en" else 0
+
+    logger.info(
+        f"[BGM ChangeMeta] project={project_id} chapter={chapter_number} "
+        f"current_meta={current_meta} next_meta={next_meta}"
+    )
+
+    try:
+        from app.services.music_generation_service import generate_bgm_for_chapter
+
+        result = await asyncio.to_thread(
+            generate_bgm_for_chapter,
+            chapter.id,
+            project.id,
+            outline,
+            screenplay,
+            output_dir,
+            story_type,
+            visual_style_hint,
+            regen_count_for_meta,
+            chapter.bgm_volume if chapter.bgm_volume is not None else 1.0,
+            True,  # is_change_bgm=True（触发换 BGM 积分计算）
+        )
+    except Exception as e:
+        logger.error(f"[BGM ChangeMeta] 生成失败: {e}")
+        raise HTTPException(status_code=500, detail=f"BGM 切换版本失败: {str(e)}")
+
+    if not result.get("success"):
+        raise HTTPException(status_code=500, detail=f"BGM 切换版本失败: {result.get('error', '未知错误')}")
+
+    # 更新 DB：bgm_url + bgm_meta_version + credits_used
+    credits_this_call = result.get("credits_used", 5)
+    new_total_credits = (chapter.credits_used or 0) + credits_this_call
+    actual_meta_version = result.get("meta_version", next_meta)
+
+    chapter.bgm_url = result.get("bgm_url", chapter.bgm_url)
+    chapter.bgm_meta_version = actual_meta_version
+    chapter.credits_used = new_total_credits
+    chapter.updated_at = datetime.utcnow()
+    await db.commit()
+
+    logger.info(
+        f"[BGM ChangeMeta] 完成: meta_version={actual_meta_version} "
+        f"credits_this_call={credits_this_call} total={new_total_credits}"
+    )
+
+    return {
+        "success": True,
+        "bgm_url": chapter.bgm_url,
+        "meta_version": actual_meta_version,
+        "credits_used_this_call": credits_this_call,
+        "total_credits_used": new_total_credits,
+    }
+
+
+@router.patch("/{chapter_number}/bgm/volume")
+async def update_bgm_volume(
+    project_id: str,
+    chapter_number: int,
+    body: VolumeUpdate,
+    user_id: int = Depends(verify_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    调节 BGM 音量系数（0.0-1.0），仅更新 DB，不触发 FFmpeg 重渲染。
+
+    FFmpeg 重渲染发生在 Stage E 视频合成时，届时读取 bgm_volume 字段应用。
+    此接口为非破坏性操作。
+
+    Args:
+        body.volume: 新音量系数，必须在 0.0-1.0 之间
+
+    Returns:
+        {"success": bool, "bgm_volume": float}
+    """
+    if body.volume < 0.0 or body.volume > 1.0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"volume 必须在 0.0-1.0 之间，收到: {body.volume}",
+        )
+
+    project, chapter = await _get_project_and_chapter(
+        project_id, chapter_number, user_id, db
+    )
+
+    chapter.bgm_volume = body.volume
+    chapter.updated_at = datetime.utcnow()
+    await db.commit()
+
+    logger.info(
+        f"[BGM Volume] project={project_id} chapter={chapter_number} "
+        f"volume={body.volume}"
+    )
+
+    return {
+        "success": True,
+        "bgm_volume": chapter.bgm_volume,
+    }
+
+
+# ============ BGM 辅助函数 ============
+
+def _map_story_type(chapter_duration_minutes: int) -> str:
+    """
+    将 chapter_duration_minutes 映射为 story_type 字符串。
+
+    规则（与 pipeline_orchestrator.py Stage 6 一致）：
+      <= 1 分钟 → 快闪
+      <= 2 分钟 → 短篇
+      > 2 分钟  → 中篇
+    """
+    if chapter_duration_minutes <= 1:
+        return "快闪"
+    elif chapter_duration_minutes <= 2:
+        return "短篇"
+    else:
+        return "中篇"
+
+
+def _resolve_output_dir(project, chapter) -> str:
+    """
+    解析 BGM 输出目录。
+
+    策略：
+    1. 如果 chapter.bgm_url 是已存在的本地路径，取其父目录
+    2. 否则 fallback 到 /tmp/bgm_{project.id}_{chapter.id}/
+    """
+    import os
+    import tempfile
+
+    if chapter.bgm_url and not chapter.bgm_url.startswith("/static/"):
+        parent = os.path.dirname(chapter.bgm_url)
+        if parent and os.path.isdir(parent):
+            return parent
+
+    # Fallback：临时目录（确保存在）
+    fallback = os.path.join(tempfile.gettempdir(), f"bgm_{project.id}_{chapter.id}")
+    os.makedirs(fallback, exist_ok=True)
+    return fallback

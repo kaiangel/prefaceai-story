@@ -1,11 +1,21 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-04-14（自更新）
-> **状态**: ✅ TASK-ARCHIVE-LINES 完成
+> **最后更新**: 2026-04-13（Coordinator 代更新）
+> **状态**: ✅ TASK-TTS-KEY-VPS-SYNC 完成 — VPS 6/6 VOLCENGINE key 全部就位 + api 容器重建 healthy
 
 ---
 
 ## 刚完成
+
+**TASK-MUSIC-SEARCH-PY: music-prompt skill search.py 创建 (2026-04-16)**
+- 创建 `.claude/skills/music-prompt/scripts/search.py` (chmod +x)
+- 搜索 `music_theory.md` + `cross_sensory.md` 两个知识库，支持 `--domain genre/instrument/term/mood/scene/sensory/all`
+- 大小写不敏感、中英文双语、± 1 行上下文输出、终端颜色高亮
+- 5/5 验收 PASS: 文件创建 ✅ + piano 52 匹配 ✅ + 悲伤 mood ✅ + 雨夜 scene ✅ + jazz genre ✅ + --help ✅
+
+---
+
+## 上次完成
 
 **TASK-ARCHIVE-LINES: archive_team_chat.sh 新增 --max-lines 模式 (2026-04-14)**
 - `--max-lines N --keep M` 参数解析 + MODE 分支 `date` / `lines`
@@ -240,7 +250,7 @@
 | 优先级 | 任务 | 触发条件 | 状态 |
 |--------|------|----------|------|
 | P0 | Founder 填入 API Key | Founder 决策 | ⏳ 等待中 |
-| P1 | CI/CD 基础流水线 | 部署完成后 | ⏳ 待启动 |
+| ~~P1~~ | ~~CI/CD 基础流水线~~ | ~~部署完成后~~ | ✅ 完成 (GitHub Actions ci.yml, 2026-04-15) |
 | P2 | 监控告警系统 | 部署稳定后 | ⏳ 待启动 |
 
 ---
@@ -251,7 +261,7 @@
 
 | # | 风险项 | 级别 | 当前状态 | 影响 | 解决方案 | 解决时机 |
 |---|--------|------|----------|------|----------|----------|
-| R1 | ~~API Key 未填入~~ | ✅ 基本解决 | 核心 4/6 已填入 (ANTHROPIC+GEMINI+OPENAI+VOLCENGINE_AK) | TTS 的 2 Key 缺失不影响核心 | ✅ 04-05 验证 | VOLCENGINE_SECRET+APPID 待补 |
+| R1 | ~~API Key 未填入~~ | ✅ **完全解决 (6/6)** | 全部 Key 已填入本地 .env：ANTHROPIC+GEMINI+OPENAI+VOLCENGINE_APP_ID+VOLCENGINE_ACCESS_KEY+VOLCENGINE_SECRET_KEY+VOLCENGINE_API_KEY | — | ✅ 04-13 本地 .env 完成 | VPS 待 Founder 手动填入（见 TEAM_CHAT 指引）|
 | R2 | ~~CORS 全开放~~ | ✅ 已解决 | `allow_origins=["prefaceai.mov", "localhost:3000"]` | — | ✅ 03-18 部署 | — |
 | R3 | ~~无 CI/CD~~ | ✅ 已解决 | GitHub Actions CI 上线 | — | ✅ 2026-04-15 | — |
 | R4 | **无监控告警** | 🟡 P1 | 无 Sentry、无成本监控 | 线上报错无感知、API 成本失控无预警 | Sentry 错误追踪 + API 成本看板 | 第一个用户前 |
@@ -271,6 +281,8 @@
 
 | 时间 | 更新内容 |
 |------|----------|
+| 2026-04-13 | TTS-KEY-WRITE: 本地 .env 写入 VOLCENGINE_API_KEY + VOLCENGINE_SECRET_KEY，R1 完全解决 (6/6)，.env.example 补全字段 |
+| 2026-04-16 | TASK-MUSIC-SEARCH-PY: music-prompt skill search.py 创建 (scripts/ + chmod +x)，5/5 验收 PASS |
 | 2026-04-14 | TASK-ARCHIVE-LINES: archive_team_chat.sh 新增 --max-lines/--keep 行数模式，4/4 验收 PASS |
 | 2026-04-15 | TASK-HARNESS-V2 Phase 3: PreCommit hook 更新 + push(87aeaa4+ea0edb1) + VPS rsync+rebuild + 4/4 PASS |
 | 2026-04-14 | TASK-HE-DEVOPS-2: TEAM_CHAT 归档脚本创建 + 首次执行 (36079→2343行, 4个月份归档文件) |

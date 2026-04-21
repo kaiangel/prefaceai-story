@@ -678,6 +678,58 @@ class Phase2PipelineOrchestrator:
                 print(f"\n✅ Stage 5 完成: {success_count}/{len(shots)} 图像生成成功")
 
             # ============================================================
+            # Stage 6: BGM 生成（Wave 2 Pipeline Integration）
+            # 非阻塞：失败时只记录警告，不中断 Pipeline。
+            # ============================================================
+            print(f"\n{'='*40}")
+            print(f"Stage 6: BGM 音乐生成")
+            print(f"{'='*40}")
+            bgm_result = None
+            try:
+                from app.services.music_generation_service import generate_bgm_for_chapter
+                # story_type 根据 target_duration_minutes 映射
+                if target_duration_minutes <= 1:
+                    _story_type = "快闪"
+                elif target_duration_minutes <= 2:
+                    _story_type = "短篇"
+                else:
+                    _story_type = "中篇"
+
+                bgm_result = generate_bgm_for_chapter(
+                    chapter_id=0,          # 手动测试模式无真实 chapter_id，用 0
+                    project_id=0,          # 手动测试模式无真实 project_id，用 0
+                    outline=outline,
+                    screenplay=screenplay,
+                    output_dir=project_dir,
+                    story_type=_story_type,
+                    visual_style_hint=style_preset,
+                    regen_count=0,
+                    bgm_volume=1.0,
+                    is_change_bgm=False,
+                )
+                self.stage_results["bgm"] = bgm_result
+                print(f"✅ Stage 6 完成: BGM 生成成功")
+                print(f"   bgm_url: {bgm_result.get('bgm_url', 'N/A')}")
+                print(f"   meta_version: {bgm_result.get('meta_version', 'N/A')}")
+                logger.info(
+                    f"[Pipeline] Stage 6 BGM 生成成功: "
+                    f"bgm_url={bgm_result.get('bgm_url')}, "
+                    f"meta_version={bgm_result.get('meta_version')}"
+                )
+
+                # 如果有 checkpoint_callback（DB 写入），写 bgm_url + bgm_meta_version
+                if checkpoint_callback and bgm_result.get("bgm_url"):
+                    try:
+                        await checkpoint_callback("bgm_url", bgm_result["bgm_url"])
+                        await checkpoint_callback("bgm_meta_version", bgm_result.get("meta_version", ""))
+                    except Exception as _cb_e:
+                        logger.warning(f"[Pipeline] Stage 6 checkpoint_callback 失败（非阻塞）: {_cb_e}")
+
+            except Exception as bgm_e:
+                print(f"⚠️ Stage 6 BGM 生成失败（非阻塞，不影响 Pipeline 结果）: {bgm_e}")
+                logger.warning(f"[Pipeline] Stage 6 BGM 生成失败（非阻塞）: {bgm_e}")
+
+            # ============================================================
             # 完成
             # ============================================================
             end_time = datetime.now()
@@ -694,6 +746,8 @@ class Phase2PipelineOrchestrator:
                 "total_scenes": len(screenplay.get("scenes", [])),
                 "total_shots": len(storyboard.get("shots", [])),
                 "images_generated": generate_images,
+                "bgm_url": bgm_result.get("bgm_url") if bgm_result else None,
+                "bgm_meta_version": bgm_result.get("meta_version") if bgm_result else None,
                 "pipeline_duration_seconds": round(duration, 2),
                 "stages_completed": list(self.stage_results.keys()),
                 "timestamp": end_time.isoformat()

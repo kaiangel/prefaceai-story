@@ -219,7 +219,7 @@ Multiple pushes — Stage 1 E2E 联调通过。
 
 ## 待其他 Agent 注意
 
-- **API Key 核心已填入**: ANTHROPIC/GEMINI/OPENAI/VOLCENGINE_AK 4 个已填入且容器内生效。缺 VOLCENGINE_SECRET_KEY + TTS_APPID（仅影响 TTS）
+- **API Key 全部就位 (6/6)**: 本地 .env 已填入全部 TTS Key (VOLCENGINE_APP_ID + VOLCENGINE_ACCESS_KEY + VOLCENGINE_SECRET_KEY + VOLCENGINE_API_KEY)。VPS .env.production 待 Founder 手动填入（参见 TEAM_CHAT 指引）
 - **前端已可访问**: `https://prefaceai.mov` 返回 Landing Page（V2 品牌宣言 + 新 logo + 风格缩略图）
 - **API 已可访问**: `https://prefaceai.mov/api/health` 返回 healthy
 - **CORS 已限制**: `allow_origins=["https://prefaceai.mov", "http://localhost:3000"]` ✅
@@ -230,7 +230,7 @@ Multiple pushes — Stage 1 E2E 联调通过。
 
 | 风险 | 级别 | 关键时间点 |
 |------|------|-----------|
-| ~~API Key 未填入~~ | ✅ 基本解决 | 04-05 验证 (TTS 2 Key 待补) |
+| ~~API Key 未填入~~ | ✅ **完全解决 (6/6)** | 04-13 本地完成，VPS 待 Founder 填入 |
 | ~~CORS 全开放~~ | ✅ 已解决 | 03-18 部署 |
 | ~~无 CI/CD~~ | ✅ 已解决 (GitHub Actions) | 2026-04-15 |
 | 无监控告警 | 🟡 P1 | 第一个用户前 |
@@ -244,7 +244,7 @@ Multiple pushes — Stage 1 E2E 联调通过。
 ```
 远程仓库: https://github.com/kaiangel/prefaceai-story (private)
 分支: main (tracked → origin/main)
-最新 commit: 8b5c36a merge: 融合 Ben int-id+uuid 重构
+最新 commit: ea0edb1 docs: TASK-HARNESS-V2 Phase 3 (5 files)
 ```
 
 ---

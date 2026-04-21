@@ -117,6 +117,42 @@ export interface BGMTrack {
   previewUrl: string | null;
 }
 
+// BGM Player — real API types (Wave 3, Step 6)
+export type BgmMetaVersion = "mixed" | "en" | null;
+
+export interface BgmInfo {
+  bgm_url: string | null;
+  bgm_volume: number;        // 0-1
+  meta_version: BgmMetaVersion;
+  credits_used: number;
+  bgm_exists: boolean;
+}
+
+export interface BgmRegenerateResponse {
+  success: boolean;
+  bgm_url: string;
+  meta_version: string;
+  credits_used_this_call: number;
+  total_credits_used: number;
+}
+
+export interface BgmVolumeResponse {
+  success: boolean;
+  bgm_volume: number;
+}
+
+// BGM player UI state
+export type BgmStatus = "idle" | "loading" | "generating" | "ready" | "error";
+
+export interface BgmPlayerState {
+  status: BgmStatus;
+  bgmUrl: string | null;
+  volume: number;           // 0-100 (display), maps to 0-1 for API
+  metaVersion: BgmMetaVersion;
+  creditsUsed: number;
+  errorMessage: string | null;
+}
+
 // ============ Stage E: Delivery ============
 
 export type DeliveryFormat = "comic" | "video";
@@ -228,6 +264,9 @@ export interface CreateState {
   // Stage D: Preview
   bgm: BGMTrack | null;
 
+  // Stage D: BGM Player (Wave 3 real API)
+  bgmPlayer: BgmPlayerState;
+
   // Stage E: Delivery
   deliveryFormat: DeliveryFormat;
 
@@ -280,6 +319,13 @@ export type CreateAction =
   | { type: "REGENERATE_SHOT_SUCCESS"; payload: { shotId: number; imageUrl: string } }
   | { type: "DELETE_SHOT"; payload: number }
   | { type: "SET_BGM"; payload: BGMTrack | null }
+  // BGM Player actions (Wave 3)
+  | { type: "BGM_LOADING" }
+  | { type: "BGM_GENERATING" }
+  | { type: "BGM_READY"; payload: { bgmUrl: string; volume: number; metaVersion: BgmMetaVersion; creditsUsed: number } }
+  | { type: "BGM_ERROR"; payload: string }
+  | { type: "BGM_SET_VOLUME"; payload: number }
+  | { type: "BGM_NO_BGM" }
   | { type: "SET_DELIVERY_FORMAT"; payload: DeliveryFormat }
   | { type: "SET_CONTINUATION_MODE"; payload: ContinuationMode | null }
   | { type: "SET_CONTINUATION_PROMPT"; payload: string }

@@ -2,6 +2,24 @@
 
 ---
 
+### 2026-04-13 — 全面审查 + 文档同步 + Resonance 时间线清理
+
+**审查范围**: 8 Agent × progress + .team-brain 全部文档
+
+**发现**: 
+- Coordinator/Resonance 21 天休眠（3/23 后未更新）
+- 6 处文档不一致（PROJECT_STATUS/DECISIONS/PENDING/AI-ML/DevOps/Frontend）
+- TTS Key 由 Founder 提供，需 DevOps 填入 VPS
+
+**执行**:
+1. 更新 Coordinator progress 三件套（补录 3 周进展）
+2. 清理 Resonance 旧时间线（Phase 0/1/2 日期作废，待 Founder 重新定义）
+3. 修复 6 处文档不一致
+4. TTS Key 安全处理（通知 DevOps 直接在 VPS 填入，不经过文档）
+5. 记录待定事项到 Coordinator current.md（Resonance 新时间线 + 续写模式 Phase 3 #11 + api_cost_logs 建表）
+
+---
+
 ### 2026-03-23 — Resonance Agent 创建
 
 - 新建 `.claude/agents/resonance.md`（市场共鸣官 System Prompt）

@@ -4,6 +4,88 @@
 
 ---
 
+## 2026-04-21（PM 代更新）
+
+### Wave 1 Step B — 95 风格 music_hint 字段 ✅
+- style_enforcer.py + style_config.py 两个文件
+- 95 个用户可选风格 100% 覆盖 + custom fallback
+- V4 哲学：身体感觉驱动，不列乐器清单
+- Backend: `from app.models.style_config import get_music_hint`
+
+### v3.2 精修 ✅ (取代 v3.1)
+- 回退 v3.1 过度约束（ASCII 分层图 + 输出纯净规则）- PM 实测发现质量退步 8.4→6.7
+- 保留 few-shot 示例无 ``` 围栏（根因消除不回退）
+- 新加 2 行轻量长度建议（"建议 ≤400 字符，质量优先"）
+- 方案 B: 污染清理迁到 @backend clean_haiku_output() 代码层
+
+### v3.1 mixed 微调 ⚠️ (已被 v3.2 取代)
+- 初次尝试在 meta-prompt 层修字符约束 + 输出污染
+- 实测发现 Haiku 挑金句质量退步（秋梨膏/拿铁/终点站严重退步）
+- 教训：meta-prompt 加越多，Haiku 越分心
+
+### TASK-HAIKU-QUOTE-EXTRACTION Step 1 — v3 quote picking meta-prompt ✅
+- Opus 设计 Quote Selection Protocol（5 正/5 反标准 + 位置倾向 + 数量硬约束 + 忠实规则）
+- 产出 `meta_{en,mixed}_v3_quote_picking.md` (~15KB 每个)
+- few-shot 示例用年夜饭手选 2 句金句 + 为什么有效解释
+- v2 所有优点完整保留（V4 哲学 + cross_sensory + 示例 + ≤400 字符）
+
+---
+
+## 2026-04-20（PM 代更新）
+
+### TASK-MUSIC-LANG-AB-V2 Step 1 — meta-prompt v2 升级 ✅
+- 产出 `meta_{en,cn,mixed}_v2.md` 3 个文件
+- 新增: cross_sensory 4 条元原则 + 3 精选示例（2 好例 + 1 反例保守格式）+ ≤400 字符硬约束
+- 保持 14 个占位符与 v1 一致
+
+---
+
+## 2026-04-18（PM 代更新）
+
+### TASK-MUSIC-LANG-AB Step 1 — 3 个语言变体 meta-prompt ✅
+- meta_en / meta_cn / meta_mixed 三个 system+user prompt 模板
+- 14 个数据占位符完全一致，覆盖 V4 5 条创作原则
+- 路径: `test_output/manualtest/sq_upgrade_ab_test/20260304_113630/meta_prompts/`
+- 为 @backend 的 Haiku API 调用提供模板
+
+---
+
+## 2026-04-17（PM 代更新）
+
+### TASK-MUSIC-EXTRACT — 音乐 Prompt 输入格式定义 ✅
+- 定义从 outline + screenplay JSON 提取音乐 prompt 所需信息的格式规范
+- 产出: `.claude/skills/music-prompt/templates/story_input_format.md`
+- 含完整年夜饭示例 + 必须/可选字段标注 + 工作流复盘
+
+### TASK-MUSIC-TRANSITION — 年夜饭转折测试 Prompt ✅
+- 4 个显式 Section + 3 个硬转折点，856 字符
+- 产出: `transition_test_prompt.md`
+- PM 调 API 生成 bgm_transition_test.mp3
+
+### TASK-MUSIC-REWRITE — 3 首 BGM Prompt 重写 ✅
+- Founder 试听后否决 #3/#4/#6 风格选择（不贴故事）
+- 根因：上一轮过度追求差异化，风格选择服务于"和其他几首不同"而非"最适合这个故事"
+- 重写：#3 Dark jazz→Chinese NY acoustic+erhu, #4 Bossa nova→Indie acoustic, #6 Lo-fi electronic→Acoustic warmth+harmonica
+- PM 审查 PASS (5/5)
+
+---
+
+## 2026-04-16（PM 代更新）
+
+### TASK-MUSIC-PROMPT — 6 个故事 BGM Prompt 设计 ✅
+
+为 6 个测试故事编写音乐生成 prompt，使用 Music Prompt Skill 5 层结构，6 种完全不同风格：
+1. 最后一投 — Post-rock → Orchestral (felt piano + brass)
+2. 外公的秋梨膏 — Chinese folk-acoustic (dizi + nylon guitar + guzheng)
+3. 年夜饭上的战争 — Dark chamber jazz (upright piano + muted trumpet)
+4. 拿铁上的告白 — Bossa nova + dream pop (nylon guitar + Rhodes)
+5. 墨痕 — East Asian minimalist / ambient guqin (guqin + shakuhachi)
+6. 终点站前的余温 — Lo-fi ambient electronic (synth pad + rain texture + toy piano)
+
+6 个 `music_prompt.md` 文件创建，@backend 已全部调 Mureka API 生成 BGM（7 个 mp3）。
+
+---
+
 ## 2026-04-14（PM 代更新）
 
 ### TASK-HE-TESTER-1 — 架构测试参与 ✅
