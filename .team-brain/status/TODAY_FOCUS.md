@@ -1,10 +1,14 @@
-# 今日重点 (2026-04-22)
+# 今日重点 (2026-04-23)
 
 > 每天更新，所有 Agent 开工前必读
-> **当前状态**: ✅ TASK-LLM-TEMP-AUDIT-FIX 完成（15 改动点：alignment/validator/utils/story_generator/screenplay/storyboard）+ 即将派 @backend 做 8631→16384 统一（13 处）
+> **当前状态**: ✅ TASK-BUG-FIX-BATCH-1 Route B+C 完成（backend SKIP 分支写 image_url + credits_used + json.dumps 修 + DB 清理；frontend FE-5 根因修 + FE-1~4 修）→ 即将派 @devops 部署 VPS（Founder 后续测试在 prefaceai.mov）
 
-### 昨日完成 (2026-04-21)
-- TASK-MUREKA-PIPELINE-INTEGRATION Wave 1-4 + VPS 部署全部完成（commit b998cbf push + docker rebuild + /health healthy + MUREKA_API_KEY 注入容器）
+### 昨日完成 (2026-04-22)
+- TASK-LLM-TEMP-AUDIT-FIX 完成（15 改动点：alignment/validator/utils/story_generator/screenplay/storyboard）
+- TASK-8631-UNIFY 完成（13 处 max_tokens 8631→16384 统一）
+
+### 前天完成 (2026-04-21)
+- TASK-MUREKA-PIPELINE-INTEGRATION Wave 1-4 + VPS 部署全部完成（commit b998cbf）
 
 ---
 

@@ -226,17 +226,23 @@ function createReducer(state: CreateState, action: CreateAction): CreateState {
       return { ...state, generationStatus: "generating", generationMessage: "", generationLog: [] };
 
     case "UPDATE_GENERATION_PROGRESS": {
-      const lastLog = state.generationLog[state.generationLog.length - 1];
-      const isDuplicate = lastLog && lastLog.message === action.payload.message;
+      // FE-2: Full dedup — if this exact message already exists anywhere in
+      // the timeline, do not append. Previously we only compared against the
+      // last entry, which allowed "剧本编写完成(7场戏)" and "角色设计完成,..."
+      // to oscillate back and forth and each appear 2-3 times.
+      const message = action.payload.message;
+      const alreadyPresent = message
+        ? state.generationLog.some((e) => e.message === message)
+        : true;
       return {
         ...state,
         generationProgress: action.payload.progress,
-        generationMessage: action.payload.message,
-        generationLog: isDuplicate
+        generationMessage: message,
+        generationLog: alreadyPresent
           ? state.generationLog
           : [
               ...state.generationLog,
-              { timestamp: Date.now(), message: action.payload.message, progress: action.payload.progress },
+              { timestamp: Date.now(), message, progress: action.payload.progress },
             ],
       };
     }

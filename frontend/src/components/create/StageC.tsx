@@ -52,6 +52,30 @@ const friendlyError = (msg: string): string => {
   return msg;
 };
 
+// FE-1: Map backend stage name → user-facing phase label. Covers all
+// Pipeline stages (see pipeline_orchestrator.py progress_callback calls).
+const STAGE_LABEL: Record<string, string> = {
+  story_generation: "正在编写剧本...",
+  character_design: "正在设计角色...",
+  character_ready: "正在设计角色...",
+  screenplay: "正在编写剧本...",
+  storyboard: "正在创建分镜...",
+  image_generation: "正在绘制画面...",
+  bgm: "正在谱曲...",
+  music: "正在谱曲...",
+};
+
+function resolvePhaseTitle(isError: boolean, subPhase: string, stage: string | null | undefined): string {
+  if (isError) return "生成遇到问题";
+  // Prefer backend stage when available (FE-1)
+  if (stage && STAGE_LABEL[stage]) {
+    // Remove trailing ellipsis for use as a heading
+    return STAGE_LABEL[stage].replace(/\.+$/, "");
+  }
+  if (subPhase === "shot-gen") return "正在绘制画面";
+  return "正在创作你的故事";
+}
+
 export default function StageC() {
   const { state, dispatch } = useCreate();
   const { isLoggedIn } = useAuth();
@@ -77,6 +101,9 @@ export default function StageC() {
   const textGenErrorCount = useRef(0);
   const shotGenErrorCount = useRef(0);
   const [showRetryHint, setShowRetryHint] = useState(false);
+
+  // FE-1: Track current backend stage for precise phase title mapping
+  const [currentStage, setCurrentStage] = useState<string | null>(null);
 
   const token = getStoredToken();
   const projectId = state.projectId;
@@ -193,6 +220,9 @@ export default function StageC() {
         textGenErrorCount.current = 0; // F-3: reset on success
         setShowRetryHint(false);
 
+        // FE-1: capture backend stage for title mapping
+        if (status.stage) setCurrentStage(status.stage);
+
         // RF-4: Store backend estimated remaining seconds
         if (status.estimated_remaining_seconds !== undefined && status.estimated_remaining_seconds > 0) {
           backendEstimatedSecondsRef.current = status.estimated_remaining_seconds;
@@ -200,8 +230,9 @@ export default function StageC() {
           backendEstimatedSecondsRef.current = null;
         }
 
-        // F-2 (R3): Use max(simulated, real) to avoid progress bar going backwards
-        const effectiveProgress = Math.max(status.progress, simulatedProgressRef.current);
+        // FE-3: Trust real backend progress once any value > 0 comes in. Only use
+        // the simulated value when backend is still at 0 (early startup).
+        const effectiveProgress = status.progress > 0 ? status.progress : simulatedProgressRef.current;
         // Once real progress exceeds 5%, stop the simulated timer
         if (status.progress >= 5 && simulatedTimerRef.current) {
           clearInterval(simulatedTimerRef.current);
@@ -274,13 +305,73 @@ export default function StageC() {
 
     // Real API: poll until completed
     shotGenErrorCount.current = 0;
+    // FE-5: Reset completion guard on fresh entry into shot-gen. Without this,
+    // if the ref leaked `true` from a previous mount / StrictMode double-invoke,
+    // all subsequent completion ticks would `return` early and the user would
+    // be stuck on "100%" with no preview transition.
+    completedRef.current = false;
+
+    // FE-5: Robust completion handler. Accepts both `status === "completed"` and
+    // `progress >= 100` as triggers. Fetches /generation-result and transitions
+    // to preview. Includes console timing for observability.
+    const finalizeAndGoToPreview = async () => {
+      if (completedRef.current) return;
+      completedRef.current = true;
+      clearPoll();
+      // eslint-disable-next-line no-console
+      console.time("[FE-5] /generation-result roundtrip");
+      try {
+        const result = await apiFetch<{
+          storyboard: { shots: Array<{
+            shotId: number;
+            imageUrl: string | null;
+            narration?: string;
+            narrationSegment?: string;
+            textOverlay?: { type: string; text: string };
+            shotType?: string;
+            cameraAngle?: string;
+            sceneId?: number;
+          }> } | null;
+          totalShots: number;
+        }>(`/projects/${projectId}/generation-result`, {}, token);
+        // eslint-disable-next-line no-console
+        console.timeEnd("[FE-5] /generation-result roundtrip");
+
+        if (result.storyboard?.shots?.length) {
+          const mappedShots: Shot[] = result.storyboard.shots.map((s) => ({
+            shotId: s.shotId,
+            sceneId: s.sceneId || 1,
+            imagePrompt: "",
+            narrationSegment: s.narrationSegment || s.narration || "",
+            shotType: s.shotType || "medium shot",
+            cameraAngle: s.cameraAngle || "eye level",
+            textType: s.textOverlay?.type || "narration",
+            chineseText: s.textOverlay?.text ? [s.textOverlay.text] : [],
+            imageUrl: s.imageUrl,
+            charactersInScene: [],
+          }));
+          dispatch({ type: "GENERATION_COMPLETE", payload: mappedShots });
+        } else {
+          dispatch({ type: "GENERATION_COMPLETE", payload: [] });
+        }
+        dispatch({ type: "SET_STAGE", payload: "preview" });
+      } catch {
+        // eslint-disable-next-line no-console
+        console.timeEnd("[FE-5] /generation-result roundtrip");
+        dispatch({ type: "GENERATION_ERROR", payload: "加载生成结果失败" });
+      }
+    };
+
     pollRef.current = setInterval(async () => {
       try {
-        const status = await apiFetch<{ status: string; progress: number; message: string; estimated_remaining_seconds?: number }>(
+        const status = await apiFetch<{ status: string; stage: string; progress: number; message: string; estimated_remaining_seconds?: number }>(
           `/projects/${projectId}/chapters/1/status`, {}, token
         );
         shotGenErrorCount.current = 0; // F-3: reset on success
         setShowRetryHint(false);
+
+        // FE-1: capture backend stage for title mapping
+        if (status.stage) setCurrentStage(status.stage);
 
         // RF-4: Store backend estimated remaining seconds
         if (status.estimated_remaining_seconds !== undefined && status.estimated_remaining_seconds > 0) {
@@ -289,50 +380,16 @@ export default function StageC() {
           backendEstimatedSecondsRef.current = null;
         }
 
+        // FE-3: Trust backend progress directly in shot-gen (no simulated clamp)
         dispatch({ type: "UPDATE_GENERATION_PROGRESS", payload: { progress: status.progress, message: status.message } });
 
-        if (status.status === "completed") {
-          if (completedRef.current) return; // R5-1: only execute once
-          completedRef.current = true;
-          clearPoll();
-          // Load real generation result
-          try {
-            const result = await apiFetch<{
-              storyboard: { shots: Array<{
-                shotId: number;
-                imageUrl: string | null;
-                narration?: string;
-                narrationSegment?: string;
-                textOverlay?: { type: string; text: string };
-                shotType?: string;
-                cameraAngle?: string;
-                sceneId?: number;
-              }> } | null;
-              totalShots: number;
-            }>(`/projects/${projectId}/generation-result`, {}, token);
-
-            if (result.storyboard?.shots?.length) {
-              // Map backend response to frontend Shot type
-              const mappedShots: Shot[] = result.storyboard.shots.map((s) => ({
-                shotId: s.shotId,
-                sceneId: s.sceneId || 1,
-                imagePrompt: "",
-                narrationSegment: s.narrationSegment || s.narration || "",
-                shotType: s.shotType || "medium shot",
-                cameraAngle: s.cameraAngle || "eye level",
-                textType: s.textOverlay?.type || "narration",
-                chineseText: s.textOverlay?.text ? [s.textOverlay.text] : [],
-                imageUrl: s.imageUrl,
-                charactersInScene: [],
-              }));
-              dispatch({ type: "GENERATION_COMPLETE", payload: mappedShots });
-            } else {
-              dispatch({ type: "GENERATION_COMPLETE", payload: [] });
-            }
-            dispatch({ type: "SET_STAGE", payload: "preview" });
-          } catch {
-            dispatch({ type: "GENERATION_ERROR", payload: "加载生成结果失败" });
-          }
+        // FE-5: Broaden completion trigger. Previously the branch only fired
+        // on `status === "completed"`. If the backend briefly set progress=100
+        // while `status` was still `processing`, the user would see "100%"
+        // with no transition until the next poll tick + status flip.
+        if (status.status === "completed" || status.progress >= 100) {
+          await finalizeAndGoToPreview();
+          return;
         }
 
         if (status.status === "failed") {
@@ -414,7 +471,7 @@ export default function StageC() {
         </motion.div>
 
         <h1 className="text-2xl font-bold mb-2">
-          {isError ? "生成遇到问题" : state.generationSubPhase === "shot-gen" ? "正在绘制画面" : "正在创作你的故事"}
+          {resolvePhaseTitle(isError, state.generationSubPhase, currentStage)}
         </h1>
         <p className="text-text-tertiary text-sm mb-8">
           {isError

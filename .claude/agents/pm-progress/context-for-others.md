@@ -1,7 +1,31 @@
 # PM Agent - 给其他Agent的信息
 
-> **最后更新**: 2026-04-22 16:00
+> **最后更新**: 2026-04-23 16:30
 > **目的**: 让其他Agent快速了解当前状态和任务
+
+---
+
+## 🆕 TASK-BUG-FIX-BATCH-1 完成 (2026-04-23)
+
+Founder 本地跑完 Pipeline 发现 18 bug，并行 @backend + @frontend 一次过关。
+
+**对 @backend / @ai-ml 影响**:
+- SKIP_IMAGE_GENERATION=true 模式下的 Stage 5 现在会**复制 R8 图 + 写回 storyboard.shots[*].image_url**（前端可通过 `/static/outputs/{uuid}/images/shot_NN.png` 访问）
+- `checkpoint_callback` 修复了对 String 列多 json.dumps 的 bug（`bgm_url` 等不再带引号）
+- Stage 6 BGM 现在会写 `credits_used` 到 DB
+- `/static/outputs` 静态路径已 mount 指向 `./output/`
+
+**对 @frontend 影响**:
+- StageC.tsx 加了 STAGE_LABEL 映射（story_generation/screenplay/storyboard/image_generation/bgm），UI 文案按后端 stage 细化
+- `completedRef` 在 shot-gen useEffect 入口重置，避免 StrictMode 污染卡死
+- progress 改用 backend 实值（不再 Math.max clamp）
+
+**MVP 后待修（记入 PENDING）**:
+- job_manager.py:302 完成时 stage 覆盖
+- Stage 6 BGM 缺 progress_callback
+- StageD.tsx imageUrl=null 文案误导
+- chapter_scene_images 表 Pipeline 完成后从不批量写入
+- project_character_references 表完全是死表
 
 ---
 

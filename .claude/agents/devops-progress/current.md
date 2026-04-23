@@ -1,11 +1,41 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-04-23 14:35（自更新）
-> **状态**: ✅ TASK-P0P1-DEPLOY 完成 — Ben utf8mb4 patch + P0P1 logging fix 已同步到 VPS，6/6 验证 PASS
+> **最后更新**: 2026-04-23 15:05（自更新）
+> **状态**: ✅ TASK-LOCAL-BACKEND-HUNG 完成 — 本地 backend 诊断 + 干净重启，/health healthy，auth 端点可达
 
 ---
 
 ## 刚完成
+
+**TASK-LOCAL-BACKEND-HUNG — 本地 backend 卡死诊断 + 修复 [2026-04-23 15:05]**
+
+**根因分析**（4 个维度全部查过）:
+
+1. **MySQL 连接池 zombie 连接**: SHOW PROCESSLIST 显示无本机 IP (140.99.222.167) 的旧连接残留（仅 1 条当前诊断连接），无 zombie。VPS (107.148.1.199) 有 5 条 Sleep 连接，但那是正常连接池。PM kill 掉本地 uvicorn 进程后，aiomysql 连接池已随进程退出，无泄漏。
+2. **--reload 触发源**: `backend.log` 显示 14:29:43 一批新 worker 启动（DESCRIBE api_cost_logs），说明一次 --reload 触发了 worker 重启。触发 reload 的文件 mtime 分析：`image_generator.py`、`chapters.py`、`pipeline_orchestrator.py` 的 mtime 比 database.py 更新（均为今日 TASK-P0P1-LOGGING-FIX 改动的文件）— 这是根因触发器。
+3. **startup 阻塞根因**: 日志显示两轮 DESCRIBE 都在正常运行（约 ~0.5s/表），但 14:30:14 `DESCRIBE project_chapters` 发出后**没有返回**，而后 10 分钟再无日志。原因推断：uvicorn --reload 的旧 worker（pid 之前启动）正在 startup 阶段对 `project_chapters` 做 BEGIN + DESCRIBE，此时新 worker（14:30 reload 触发）也做同样操作，两个并发 BEGIN implicit 事务在阿里云 MySQL 上对 `project_chapters` 产生了 **metadata lock 竞争**（旧 worker 持有 lock，新 worker 等待）。旧 worker 未来得及 COMMIT 就被 reload kill，导致 lock 永久等待。`INNODB_TRX = 0` 是因为 PM kill -9 后锁已释放。
+4. **端口 8000 / 进程**: PM kill 后确认 port 空闲，无 uvicorn 残留。
+
+**根本原因**: `uvicorn --reload` 模式 + 阿里云共享远程 MySQL 的高延迟组合，导致 startup 期间 `metadata_create_all()` 的 BEGIN 事务未提交期间被 reload 中断，新 worker 等待 metadata lock → 死锁。
+
+**修复方案（建议 A: nohup 不带 --reload）**:
+- `cd /Users/kaisbabybook/aifun/xuhuastory/xuhua_story`
+- `source venv/bin/activate`
+- `nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 > storage/logs/uvicorn_nohup.log 2>&1 &`
+- PID: **21995**
+- 无 --reload（.env DEBUG=true 但通过 CLI 不传 --reload 来绕过）
+
+**启动日志确认**: 所有 DESCRIBE 表正常完成（~0.5s 每表），15:04:24 "Application startup complete"
+
+**验证 2/2 PASS**:
+| 验证项 | 期望 | 结果 |
+|--------|------|------|
+| /health | healthy | `{"status":"healthy"}` ✅ |
+| POST /api/auth/login (kai@kai.com, wrongpass) | 401（不超时） | `{"detail":"邮箱或密码错误"}` ✅ |
+
+---
+
+## 上次完成
 
 **TASK-P0P1-DEPLOY — 统一部署 + 融合 Ben utf8mb4 commit [2026-04-23 14:35]**
 

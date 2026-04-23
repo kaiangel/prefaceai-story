@@ -1,6 +1,32 @@
 # Frontend 状态速览（供其他Agent参考）
 
-> 更新时间: 2026-04-21（PM 代更新）
+> 更新时间: 2026-04-23 16:10
+
+---
+
+## TASK-BUG-FIX-BATCH-1 Route C 完成 (2026-04-23 16:10)
+
+### 对其他 Agent 的影响
+
+- **@backend**: 我提出 2 个后端改进建议（非本次任务必须，但体验会更好）:
+  1. `job_manager.py:302` 任务完成时 stage 写死 `"story_generation"` 覆盖了实际最后的 stage。建议保留 `image_generation` 或新增 `"completed"`。前端 resolvePhaseTitle 在 completed 状态已跳转，影响有限，但 completion 前最后一 tick 会闪烁。
+  2. `pipeline_orchestrator.py:687-730` Stage 6 BGM 生成期间无 `progress_callback`，前端卡在 90% 几分钟。建议 BGM 开始加 `await progress_callback("bgm", 95, "正在谱曲...")`。
+
+- **@tester**: 测试 FE-5 修复是否生效 — 完整跑 Pipeline 到 completed，前端应该 <= 2s 内跳转 StageD 预览。可用浏览器 DevTools Console 查看 `[FE-5] /generation-result roundtrip` 时长。
+
+- **@pm**: 决定是否把 2 个 backend 改进建议（上面）派发给 @backend。
+
+### 前端关键改动
+
+- **FE-5 核心 fix**: `StageC.tsx:312` 在 shot-gen useEffect 入口显式 `completedRef.current = false`；`StageC.tsx:390` 完成触发器从 `status === "completed"` 扩展为 `|| status.progress >= 100`
+- **FE-1 stage → 文案**: `STAGE_LABEL` 映射表 `story_generation/character_design/character_ready/screenplay/storyboard/image_generation/bgm/music` → 精准中文，用 `resolvePhaseTitle()` 决定 `<h1>` 标题
+- **FE-2 全列表 dedup**: `CreateContext.tsx:228-248` `generationLog.some((e) => e.message === msg)` 替代原 lastLog 对比
+- **FE-3 直接信任 progress**: `StageC.tsx:224` text-gen 用 `status.progress > 0 ? status.progress : simulated`，shot-gen 直接用 `status.progress`
+
+### 对 API 契约的依赖（已确认已有）
+
+- `GET /api/projects/:pid/chapters/1/status` 必须返回 `stage` 字段（当前 `app/api/chapters.py:151-157` 已返回 `job.current_stage`）
+- `GET /api/projects/:pid/generation-result` 必须在 job.status === "completed" 后 200 返回 shots 数据
 
 ---
 

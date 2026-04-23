@@ -1,6 +1,33 @@
 # Backend Agent - 给其他 Agent 的上下文
 
-> **最后更新**: [2026-04-23 11:30]
+> **最后更新**: [2026-04-23 16:15]
+
+---
+
+## ✅ TASK-BUG-FIX-BATCH-1 Route B — Pipeline SKIP/BGM/credits 修复 + DB 清理 [2026-04-23 16:15]
+
+**改动范围**: 3 个 Python 文件 + DB 一条 UPDATE
+- `app/services/job_manager.py` L201-205（checkpoint_callback 类型判断）
+- `app/services/pipeline_orchestrator.py` L381-401 / L721-728 / L872-944（SKIP + credits_used + image_url 写回）
+- `app/main.py` L82-85（新增 `/static/outputs` StaticFiles mount → `./output/`）
+- DB: chapter id=2 一条 UPDATE
+
+**对其他 Agent 的影响**:
+
+- **@frontend**: 现在 SKIP 模式（`SKIP_IMAGE_GENERATION=true`）生成的 chapter，`storyboard_json.shots[*].image_url` 字段会有值，格式 `/static/outputs/{project_uuid}/images/shot_NN.png`。前端预览页直接 `<img src={shot.image_url}>` 即可显示。本地 localhost:8000 和生产 Nginx 反代都适用。  
+  同理，chapter id=2 的 `bgm_url` 已改成 `/static/outputs/.../bgm_chapter0.mp3`，可直接 `<audio src={chapter.bgm_url}>`。
+- **@devops**: `/static/outputs` mount 对应 `./output/` 目录，VPS 部署时要确保 Docker volume 或 rsync 把 `output/` 目录带过去。否则 /static/outputs/*.png 会 404。**这是新增的静态路径，比原 /api/images/ 范围更广**。
+- **@tester**: 
+  - 建议跑一次全表扫：`SELECT id, bgm_url, bgm_meta_version FROM project_chapters WHERE bgm_url LIKE '"%' OR bgm_meta_version LIKE '"%'`，找出其他带引号的脏数据（根因修复前累积）
+  - 建议 e2e 验证 SKIP 模式：创建新 project + 触发 Pipeline（SKIP_IMAGE_GENERATION=true）→ 查 chapter.storyboard_json 的 shots[].image_url 都有值 + curl 200
+- **@ai-ml**: 不影响 prompt 工程，SKIP 模式仅影响图像生成环节
+- **@pm**: Stage 5 SKIP 分支会重新 checkpoint storyboard_json（覆盖 Stage 4 旧版），这是期望的；但非 SKIP 模式（真实生图）目前**没有**把 image_url 写回 storyboard，后续是否也要统一行为待 PM 决策
+
+**关键设计**:
+- `_run_stage5_skip_mode` 签名新增 `project_id: Optional[str] = None` 参数，用来构造 URL 前缀（fallback 从 `project_dir` basename 反推）
+- image_url 格式 `/static/outputs/{project_id}/images/shot_NN.png`（shot_id 2-digit padded）
+- SKIP 完成后 `self._save_json(project_dir, "4_storyboard.json", storyboard)` 重写本地 JSON（非阻塞主流程）
+- `checkpoint_callback("storyboard_json", storyboard)` 调用包 try/except，失败不中断 Pipeline
 
 ---
 

@@ -385,11 +385,20 @@ class Phase2PipelineOrchestrator:
                 print(f"{'='*40}")
                 print("⚠️ SKIP_IMAGE_GENERATION=true — 使用 R8 测试数据代替生图")
                 image_results = await self._run_stage5_skip_mode(
-                    project_dir, storyboard, characters, progress_callback
+                    project_dir, storyboard, characters, progress_callback,
+                    project_id=project_id,
                 )
                 self.stage_results["images"] = image_results
                 self._save_json(project_dir, "5_image_results.json", image_results)
-                print(f"\n✅ Stage 5 完成 (跳过模式): {len(image_results)} 图像已复制")
+                # storyboard.shots[*].image_url 已在 _run_stage5_skip_mode 内写回，
+                # 重新持久化 4_storyboard.json + 回写 chapter.storyboard_json
+                self._save_json(project_dir, "4_storyboard.json", storyboard)
+                if checkpoint_callback:
+                    try:
+                        await checkpoint_callback("storyboard_json", storyboard)
+                    except Exception as _cb_e:
+                        logger.warning(f"[Pipeline] Stage 5 SKIP checkpoint_callback(storyboard_json) 失败（非阻塞）: {_cb_e}")
+                print(f"\n✅ Stage 5 完成 (跳过模式): {len(image_results)} 图像已复制，image_url 已写回 storyboard")
                 generate_images = False  # 跳过下方正常 Stage 5
 
             if generate_images:
@@ -717,11 +726,12 @@ class Phase2PipelineOrchestrator:
                     f"meta_version={bgm_result.get('meta_version')}"
                 )
 
-                # 如果有 checkpoint_callback（DB 写入），写 bgm_url + bgm_meta_version
+                # 如果有 checkpoint_callback（DB 写入），写 bgm_url + bgm_meta_version + credits_used
                 if checkpoint_callback and bgm_result.get("bgm_url"):
                     try:
                         await checkpoint_callback("bgm_url", bgm_result["bgm_url"])
                         await checkpoint_callback("bgm_meta_version", bgm_result.get("meta_version", ""))
+                        await checkpoint_callback("credits_used", bgm_result.get("credits_used", 0))
                     except Exception as _cb_e:
                         logger.warning(f"[Pipeline] Stage 6 checkpoint_callback 失败（非阻塞）: {_cb_e}")
 
@@ -870,9 +880,13 @@ class Phase2PipelineOrchestrator:
 
     async def _run_stage5_skip_mode(
         self, project_dir: str, storyboard: dict, characters: dict,
-        progress_callback=None,
+        progress_callback=None, project_id: Optional[str] = None,
     ) -> list:
-        """Stage 5 跳过模式: 从 R8 测试数据复制图片，不调 Gemini/NB2"""
+        """Stage 5 跳过模式: 从 R8 测试数据复制图片，不调 Gemini/NB2
+
+        副作用: 将 image_url (/static/outputs/{project_id}/images/shot_NN.png) 写回
+        storyboard.shots[*].image_url，让前端预览页能正确加载图片。
+        """
         # 5a: 角色参考图
         char_refs_dir = os.path.join(project_dir, "character_refs")
         os.makedirs(char_refs_dir, exist_ok=True)
@@ -918,22 +932,29 @@ class Phase2PipelineOrchestrator:
 
         shots = storyboard.get("shots", [])
         image_results = []
+        # 用 project_id 作为静态 URL 的前缀段（前端访问 /static/outputs/{project_id}/images/shot_NN.png）
+        _url_project_id = project_id or os.path.basename(os.path.normpath(project_dir))
         for i, shot in enumerate(shots):
             shot_id = shot.get("shot_id", i + 1)
             # 循环复用 R8 shot 图
             r8_idx = i % r8_shot_count if r8_shot_count > 0 else 0
             src = r8_shots[r8_idx] if r8_shots else None
-            dst = os.path.join(images_dir, f"shot_{shot_id:02d}.png")
+            dst_name = f"shot_{shot_id:02d}.png"
+            dst = os.path.join(images_dir, dst_name)
             if src and os.path.exists(src):
                 shutil.copy2(src, dst)
+                image_url = f"/static/outputs/{_url_project_id}/images/{dst_name}"
+                # 写回 storyboard shot dict（前端预览依赖）
+                shot["image_url"] = image_url
                 image_results.append({
                     "shot_id": shot_id,
                     "success": True,
                     "image_path": dst,
+                    "image_url": image_url,
                 })
             else:
                 image_results.append({"shot_id": shot_id, "success": False, "error": "R8 source missing"})
-            print(f"    Shot {shot_id}: 复制 {os.path.basename(src) if src else 'N/A'} → shot_{shot_id:02d}.png")
+            print(f"    Shot {shot_id}: 复制 {os.path.basename(src) if src else 'N/A'} → {dst_name}")
 
         if progress_callback:
             await progress_callback("image_generation", 90, f"Shot 图就绪 ({len(image_results)} 张)...")

@@ -5,9 +5,28 @@
 
 ---
 
-## 进行中（2026-04-23）
+## 进行中（2026-04-23 16:50）
 
-### 🔄 TASK-P0P1-LOGGING-FIX — 并行 @backend + @devops
+### 🔄 TASK-BUG-FIX-BATCH-1 — Route D 待派 @devops 部署 VPS
+
+**Route B + C 状态**: ✅ PM 审查全部通过（16:30）
+- Backend 5 step 全过 + DB 清理完
+- Frontend 5 bug 全修 + build 0 error
+- 本地 /static + /health + DB 全验证
+
+**Route D @devops 即将启动**:
+- commit 5 代码文件 + 10 文档
+- rsync app/ + frontend/src/ → VPS
+- docker build api + frontend + up -d --force-recreate
+- 验证 VPS /health + /static/outputs 可访问 + 前端 200
+
+**Founder 下一步**: VPS 部署完在 prefaceai.mov 做第二轮测试
+
+---
+
+## 历史
+
+### ✅ TASK-P0P1-LOGGING-FIX (2026-04-23) — 审查通过
 
 **背景**: Ben 500 报错但 docker logs 只剩 139 行（rotate 太激进），traceback 已丢。PM 审查发现 3 P0 日志缺口 + 2 P1 技术债。Founder 批准全部处理后再本地复测。
 

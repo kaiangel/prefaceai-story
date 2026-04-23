@@ -199,7 +199,10 @@ async def run_story_generation_task(
                     )
                     chapter = chapter_result.scalar_one_or_none()
                     if chapter:
-                        setattr(chapter, column_name, json.dumps(data, ensure_ascii=False))
+                        if isinstance(data, (dict, list)):
+                            setattr(chapter, column_name, json.dumps(data, ensure_ascii=False))
+                        else:
+                            setattr(chapter, column_name, data)
                         await short_db.commit()
                         print(f"  [B-6] ✅ 已写入 chapter.{column_name}")
             except Exception as e:

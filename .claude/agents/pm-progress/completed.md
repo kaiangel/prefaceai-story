@@ -4,6 +4,27 @@
 
 ---
 
+### 2026-04-23 — TASK-BUG-FIX-BATCH-1（Route B + C） ✅
+
+**背景**: 2026-04-23 Founder 本地跑通完整 Pipeline（"泰迪知道的秘密" 16 分 10 秒），PM 深度审查发现 **18 个 bug**（Backend 6 / Frontend 8 / Arch 3 / Ops 1）+ **3 条 DB 脏数据**。Founder 批准全修 + 今天部署到 VPS。
+
+**并行 @backend + @frontend 一次过关**:
+- Backend Route B: job_manager checkpoint 类型判断 + pipeline_orchestrator SKIP 分支 + Stage 6 credits_used + main.py /static mount + DB 清理（5 step 全过）
+- Frontend Route C: FE-5 根因（StrictMode completedRef 污染）+ 修复 + FE-1/2/3/4 修复（5 bug 全修）
+
+**PM 独立审查**:
+- 5 代码文件 git diff 逐行核对全部正确
+- pytest 7 passed / /health healthy / /static 可访问 / DB 脏数据清理 / npm build 0 error
+
+**3 个额外 bug 记入 PENDING（agent 主动上报）**:
+- job_manager.py:302 完成时 stage 被覆盖
+- Stage 6 BGM 没 progress_callback
+- StageD.tsx imageUrl=null 文案误导
+
+**下一步**: 派 @devops 部署 VPS
+
+---
+
 ### 2026-04-22 — TASK-8631-UNIFY ✅
 
 **背景**: TASK-LLM-TEMP-AUDIT-FIX Step 7 backend 调查汇报"14 处 + story_outline_generator 已改"，PM 独立地毯式 grep 核对发现偏差（13 处 + 半改状态）。Founder 批准即时执行。

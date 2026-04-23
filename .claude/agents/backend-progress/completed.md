@@ -6,6 +6,37 @@
 
 ## 2026-04-23
 
+### TASK-BUG-FIX-BATCH-1 Route B ✅ [2026-04-23 16:15]
+
+**背景**: Founder 本地 Pipeline 测试发现 4 个 bug + chapter id=2 脏数据。PM 派 Route B。
+
+**改动清单**:
+
+| 文件 | 行号 | 改动 |
+|------|------|------|
+| `app/services/job_manager.py` | L201-205 | checkpoint_callback 加类型判断：`isinstance(data, (dict, list))` 才 json.dumps，其他直接 setattr |
+| `app/services/pipeline_orchestrator.py` | L381-401 | SKIP 分支传 `project_id` + 完成后 `_save_json("4_storyboard.json")` + `checkpoint_callback("storyboard_json", storyboard)` |
+| `app/services/pipeline_orchestrator.py` | L721-728 | Stage 6 BGM 后加 `await checkpoint_callback("credits_used", bgm_result.get("credits_used", 0))` |
+| `app/services/pipeline_orchestrator.py` | L872-881 / L919-944 | `_run_stage5_skip_mode` 加 `project_id: Optional[str]` 参数 + shot 循环内写 `shot["image_url"] = "/static/outputs/{uuid}/images/shot_NN.png"` |
+| `app/main.py` | L82-85 | `app.mount("/static/outputs", StaticFiles(directory=os.path.abspath("output")))` |
+| DB `project_chapters` id=2 | — | UPDATE：bgm_url 去引号 + 改 URL，bgm_meta_version 去引号，credits_used 0→10 |
+
+**验收**:
+- pytest test_architecture: **7 passed in 0.04s** ✅
+- backend 启动无 --reload: **Application startup complete** ✅
+- /health: `{"status":"healthy"}` ✅
+- /static/outputs bgm: **HTTP/1.1 200 OK** audio/mpeg ✅
+- /static/outputs image: **HTTP/1.1 200 OK** image/png ✅
+- DB chapter id=2 before/after: `'"./output/.../bgm.mp3"' '"mixed"' 0` → `'/static/outputs/.../bgm.mp3' 'mixed' 10` ✅
+
+**约束遵守**: 未碰 🔴 警示文件 / 前端 / VPS / .env / DB schema / Ben 侧数据。本地 backend 无 `--reload`。
+
+**待 PM 决策**:
+- 其他 chapter 是否也有脏数据（全表扫 `WHERE bgm_url LIKE '"%'`）
+- 新产出 chapter 的 bgm_url 仍是本地路径（music_generation_service 未改），是否派后续任务统一
+
+---
+
 ### TASK-P0P1-LOGGING-FIX ✅ [2026-04-23 11:30]
 
 **4 处日志治理改动落地**，3 文件：`pipeline_orchestrator.py` / `image_generator.py` / `api/chapters.py`

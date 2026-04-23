@@ -1,7 +1,32 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-04-23 14:35（自更新 — TASK-P0P1-DEPLOY 完成，VPS 已同步 Ben utf8mb4 + P0P1 logging fix）
+> **最后更新**: 2026-04-23 15:05（自更新 — TASK-LOCAL-BACKEND-HUNG 完成，本地 backend 干净重启 PID 21995）
+
+---
+
+## TASK-LOCAL-BACKEND-HUNG 完成 (2026-04-23 15:05) — 本地 backend 已恢复
+
+**全员注意 — 本地 backend 已干净重启**:
+
+- **PID**: 21995（nohup uvicorn，无 --reload）
+- **日志**: `storage/logs/uvicorn_nohup.log`
+- **启动时间**: 2026-04-23 15:04:24 Application startup complete
+- **/health**: `{"status":"healthy"}` ✅
+- **auth 端点**: POST /api/auth/login 返回 `{"detail":"邮箱或密码错误"}` ✅（不再超时）
+
+**根因（给所有 Agent 备忘）**:
+- `uvicorn --reload` + 阿里云远程 MySQL 高延迟 → reload 期间旧 worker startup 事务未提交被 kill → 新 worker DESCRIBE 等 metadata lock → 死锁
+- 触发 reload 的文件：今日 TASK-P0P1-LOGGING-FIX 改动（image_generator.py / chapters.py / pipeline_orchestrator.py）的 mtime 变化
+
+**下次避坑**:
+- 本地 backend **不要用 --reload 模式**，用 `nohup uvicorn ... &`（无 --reload）
+- 如果必须热重载：改代码后手动 kill + 重启，不要依赖 inotify 自动 reload
+- DEBUG=true 在 .env 里，但 CLI 不传 --reload，两者相互独立
+
+**其他**:
+- MySQL SHOW PROCESSLIST: 无本机 zombie 连接（kill 后连接池随进程退出，干净）
+- VPS 连接（107.148.1.199: 5 条 Sleep）正常，是 VPS api 容器的连接池
 
 ---
 

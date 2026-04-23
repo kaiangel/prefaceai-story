@@ -1,11 +1,46 @@
 # Backend Agent - 当前任务
 
-> **最后更新**: [2026-04-23 11:30]
-> **状态**: ✅ TASK-P0P1-LOGGING-FIX 完成 — 4 处日志治理改动全部落地，pytest PASS，/health healthy
+> **最后更新**: [2026-04-23 16:15]
+> **状态**: ✅ TASK-BUG-FIX-BATCH-1 Route B 完成 — 4 处代码 + DB 清理 + /static mount，pytest PASS，/health healthy
 
 ---
 
 ## 刚完成
+
+### ✅ TASK-BUG-FIX-BATCH-1 Route B — Pipeline SKIP/BGM/credits 修复 + DB 清理 [2026-04-23 16:15]
+
+**背景**: Founder 2026-04-23 本地跑 Pipeline 16 分钟发现 4 个 bug + chapter id=2 脏数据。PM 派 Route B（4 处代码 + DB 清理）。
+
+**5 Step 改动**
+
+| Step | 文件 | 行号 | 改动 |
+|------|------|------|------|
+| 1 | `app/services/job_manager.py` | L201-205 | checkpoint_callback 加类型判断：`isinstance(data, (dict, list))` 才 json.dumps，String/int/float 直接赋值 |
+| 2 | `app/services/pipeline_orchestrator.py` | L721-728 | Stage 6 BGM 后新增 `await checkpoint_callback("credits_used", bgm_result.get("credits_used", 0))` |
+| 3a | `app/services/pipeline_orchestrator.py` | L381-401 | SKIP 分支：`_run_stage5_skip_mode(..., project_id=project_id)` + 完成后重存 4_storyboard.json + 回调 `checkpoint_callback("storyboard_json", storyboard)` |
+| 3b | `app/services/pipeline_orchestrator.py` | L872-944 | `_run_stage5_skip_mode` 接 `project_id` 参数，shot 循环内写 `shot["image_url"] = "/static/outputs/{uuid}/images/shot_NN.png"` 回 storyboard dict |
+| 4 | `app/main.py` | L82-85 | 新增 `app.mount("/static/outputs", StaticFiles(directory=os.path.abspath("output")))` |
+| 5 | DB chapter id=2 | — | 一次性 UPDATE：bgm_url 去引号 + 改 `/static/outputs/...` URL，bgm_meta_version 去引号，credits_used 0→10 |
+
+**验收**
+
+| 验收项 | 结果 |
+|--------|------|
+| pytest test_architecture | ✅ 7 passed in 0.04s |
+| backend 启动无 `--reload` | ✅ 16:10:16 startup complete |
+| /health | ✅ `{"status":"healthy"}` |
+| /static/outputs/.../bgm_chapter0.mp3 | ✅ 200 audio/mpeg |
+| /static/outputs/.../shot_01.png | ✅ 200 image/png |
+| DB chapter id=2 | ✅ bgm_url 无引号 + credits_used=10 + bgm_meta_version='mixed' |
+
+**额外风险**:
+- 其他 chapter 可能也有 `"` 引号脏数据（根因修复前累积），建议 @tester 全表扫 `WHERE bgm_url LIKE '"%'`
+- 新产出 chapter 的 `bgm_url` 仍是本地路径（music_generation_service 未改），前端仍需要处理协议不统一问题 — 待 PM 决策是否派发后续任务
+- Pipeline 真实 e2e 未跑（任务标为可选，16 分钟 + LLM 成本）
+
+**未碰**: 🔴 image_generator.py / storyboard_prompts.py / storyboard_service.py / reference_image_manager.py / scene_reference_manager.py；前端/VPS/.env/DB schema；Ben 侧 MySQL 数据。
+
+---
 
 ### ✅ TASK-P0P1-LOGGING-FIX — 异常日志治理 [2026-04-23 11:30]
 

@@ -1,7 +1,44 @@
 # DevOps Agent - 已完成任务
 
 > 按时间倒序记录已完成的工作
-> **2026-04-23 14:35 注**: TASK-P0P1-DEPLOY 完成 — Ben utf8mb4 + P0P1 logging fix 已一并上生产，6/6 验证 PASS。
+> **2026-04-23 15:05 注**: TASK-LOCAL-BACKEND-HUNG 完成 — 本地 backend 诊断 + nohup 干净重启 PID 21995，/health healthy，auth 端点 401 响应。
+
+---
+
+### TASK-LOCAL-BACKEND-HUNG ✅ (2026-04-23 15:05, DevOps 自执行)
+
+**任务**: 本地 backend 卡死诊断 + 干净重启（Founder 无法登录 localhost:3000）
+
+**诊断结论 (4 维度)**:
+
+| 维度 | 发现 |
+|------|------|
+| MySQL zombie 连接 | **无**：kill 后连接池随进程退出，SHOW PROCESSLIST 无本机残留连接 |
+| --reload 触发源 | 今日 P0P1-LOGGING-FIX 改动的 3 文件（image_generator.py / chapters.py / pipeline_orchestrator.py）mtime 变化触发 inotify reload |
+| startup 阻塞根因 | reload 期间旧 worker 处于 BEGIN 事务（DESCRIBE prefacestory.project_chapters），被 reload kill 前未 COMMIT → 新 worker 等待 metadata lock → 无限等待（15:30+ 阿里云 MySQL metadata_lock 等待超时极长）|
+| 端口/进程 | PM kill 后 port 8000 空闲，无 uvicorn 进程残留 |
+
+**根本原因**: `uvicorn --reload` + 阿里云远程 MySQL（网络延迟 ~0.5s/表）→ reload 中断导致 SQLAlchemy metadata_create_all BEGIN 事务未提交 → metadata lock 死锁
+
+**修复步骤**:
+1. 确认 port 8000 空闲（PM 已 kill）
+2. `cd xuhua_story && source venv/bin/activate`
+3. `nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 > storage/logs/uvicorn_nohup.log 2>&1 &`
+4. 等待 "Application startup complete"（via until 循环监测日志，约 20s）
+5. 验证 /health + auth 端点
+
+**验证**:
+| 项 | 结果 |
+|----|------|
+| PID | **21995** |
+| Application startup complete | 2026-04-23 15:04:24 ✅ |
+| /health | `{"status":"healthy"}` ✅ |
+| POST /api/auth/login (test) | `{"detail":"邮箱或密码错误"}` (401) ✅ |
+
+**关键教训**:
+- 本地 backend 禁止 --reload 模式 + 阿里云 MySQL 组合：高延迟 DB + 热重载 = metadata lock 死锁风险
+- 正确启动方式：`nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 &`（无 --reload）
+- DEBUG=true 在 .env 控制应用行为，与 uvicorn CLI --reload 无关，可独立控制
 
 ---
 

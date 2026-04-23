@@ -72,6 +72,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Static mount: pipeline 产物（图像 / BGM / 参考图）统一通过 /static/outputs/{uuid}/... 访问
+# 对应文件系统路径: ./output/{project_uuid}/...
+_outputs_dir = os.path.abspath("output")
+os.makedirs(_outputs_dir, exist_ok=True)
+app.mount("/static/outputs", StaticFiles(directory=_outputs_dir), name="static_outputs")
+
 # Include API routes
 app.include_router(api_router)
 app.include_router(images_router)

@@ -4,6 +4,36 @@
 
 ---
 
+## 2026-04-23 16:10
+
+### TASK-BUG-FIX-BATCH-1 Route C — FE-1/2/3/4 修复 + FE-5 根因深挖 ✅
+
+**改动文件**: `StageC.tsx` + `CreateContext.tsx`
+
+**FE-5 根因分析**（3-5 min 完成→预览延迟）:
+- 高置信根因: `completedRef = useRef(false)` 在 StageC 模块作用域创建，React StrictMode/remount 时 ref 值跨生命周期污染。一旦误置 `true`，shot-gen poll 的 `status === "completed"` 分支全 `return` 早退，UI 卡 100% 不跳转，直到整个 StageC 被强制 unmount 才恢复。
+- 排除项: `/generation-result` 端点慢（纯 DB 读 < 500ms）、`apiFetch` token 刷新（无此逻辑）。
+- 关联观察: BGM Stage 6 不回 progress 导致 90% 卡几分钟，用户混记为 100%。
+
+**FE-5 修复**:
+- shot-gen useEffect 入口 `completedRef.current = false` 显式 reset
+- 完成触发器扩展: `status === "completed" || status.progress >= 100`
+- 抽出 `finalizeAndGoToPreview()` helper + `console.time("[FE-5] /generation-result roundtrip")` 观察性
+
+**FE-1 修复** (stage 文案): 新增 `STAGE_LABEL` 映射 8 个 stage name → 中文文案 + `resolvePhaseTitle()` 决定 `<h1>`
+**FE-2 修复** (时间线 dedup): `CreateContext.tsx` 全列表 `.some()` 替代 lastLog 对比
+**FE-3 修复** (progress): text-gen `progress>0 ? real : sim`，shot-gen 直接用 `status.progress`
+**FE-4**: 经审查现有代码已正确透传所有 stage 的 stage_message，无需改动
+
+**Build**: 20 路由 0 TS error ✅
+
+**发现的额外 bug**（报告给 PM）:
+1. `job_manager.py:302` 完成态 stage 写死 "story_generation" 覆盖实际最后 stage
+2. `pipeline_orchestrator.py:687-730` Stage 6 BGM 无 progress_callback
+3. StageD shot imageUrl=null 兜底文案在 pipeline 完成后误导
+
+---
+
 ## 2026-04-21（PM 代更新）
 
 ### Wave 3 Step 6 — Stage D BGM Player ✅

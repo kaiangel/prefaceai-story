@@ -7,6 +7,52 @@
 
 ## 📋 当前待处理
 
+### MVP 后 Pipeline/Frontend 细节修复批 — 💡 P2/P3（2026-04-23 TASK-BUG-FIX-BATCH-1 延出）
+
+| # | 类别 | 描述 | 文件:行 | 优先级 |
+|---|------|------|---------|------|
+| 1 | Backend | 完成时 job.stage 被写成 "story_generation"，覆盖真实最后 stage（image_generation / bgm 等）| `job_manager.py:302` | P2 |
+| 2 | Backend | Stage 6 BGM 生成期间没有 `progress_callback`，前端进度卡 90% 数分钟 | `pipeline_orchestrator.py:687-730` | P2 |
+| 3 | Frontend | `imageUrl=null` 预览页 fallback 显示"画面生成中..."，真实失败场景会误导用户 | `StageD.tsx:186-197` | P2 |
+| 4 | Frontend | BgmPlayer 显示"暂无配乐"时缺 url strip 引号 fallback（已由 BE-4 根因修复解决，但前端仍该加兜底防御）| `BgmPlayer.tsx` | P3 |
+| 5 | Frontend | Shot `<img>` onError 没有占位图（SKIP 模式修复后不再触发，但真实失败场景需要）| `StageD.tsx` | P3 |
+| 6 | Frontend | 进度条数字变化无过渡动画，35→65→100 跳变观感生硬 | `StageC.tsx` progress bar | P3 |
+
+**触发条件**: MVP 正式上线前做第二轮打磨
+
+---
+
+### 数据层架构债 — 💡 技术债（2026-04-23 发现）
+
+| # | 描述 | 严重度 |
+|---|------|------|
+| ARCH-1 | `chapter_scene_images` 表被 18+ 处代码依赖（`chapters.py` L362/458/579/...），但 **Pipeline 完成后从不批量写入**，只有 `regenerate_single_image_task` 失败路径才写一条错误记录。导致 GET /images 永远返回空，单张重生成/局部编辑功能形同虚设 | P1（功能缺失）|
+| ARCH-2 | `project_character_references` 表完整定义（12 列），但**整个代码库 0 引用**，是死表 | P2（技术债）|
+| ARCH-3 | R8 只有 10 张 shot 图，19 shots 场景需要 mod 循环（已在 2026-04-23 SKIP 分支做 mod 循环）。正式生图时无此问题 | ✅ 已临时修 |
+
+**触发条件**: ARCH-1 在"单张 shot 重新生成"或"批量编辑"功能投产前必修；ARCH-2 可等下一轮数据库清理时删表
+
+---
+
+### DevOps / 配置债 — 💡 P3
+
+| # | 描述 | 文件:配置 |
+|---|------|---------|
+| OPS-3 | uvicorn nohup stdout 不 flush（缺 `PYTHONUNBUFFERED=1`）导致实时诊断困难，日志需 sleep 等待 buffer | docker/Dockerfile.api or env |
+
+---
+
+### ✅ TASK-BUG-FIX-BATCH-1 — 完成（2026-04-23）
+
+| 字段 | 内容 |
+|------|------|
+| **状态** | ✅ 完成 — PM 独立审查通过，待 @devops 部署 VPS |
+| **Route B @backend** | job_manager.py checkpoint isinstance 判断 + pipeline_orchestrator SKIP 分支复制 R8 写 image_url + Stage 6 credits_used checkpoint + main.py /static/outputs mount + DB chapter id=2 清理 |
+| **Route C @frontend** | FE-5 根因（StrictMode completedRef 污染）+ 修复；FE-1 STAGE_LABEL 细化；FE-2 CreateContext full-dedup；FE-3 progress 直信 backend；FE-4 stage 透传 |
+| **验证** | pytest 7 passed / /health healthy / /static HTTP 200 / DB clean / npm build 0 error |
+
+---
+
 ### ✅ max_tokens=8631 魔法数字统一 — 完成（2026-04-22）
 
 | 字段 | 内容 |
