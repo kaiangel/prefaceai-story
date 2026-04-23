@@ -1,7 +1,50 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-04-23 15:05（自更新 — TASK-LOCAL-BACKEND-HUNG 完成，本地 backend 干净重启 PID 21995）
+> **最后更新**: 2026-04-23 17:10（自更新 — TASK-BUG-FIX-BATCH-1 Route D 完成，VPS 已同步 Route B + Route C + output volume）
+
+---
+
+## TASK-BUG-FIX-BATCH-1 Route D 完成 (2026-04-23 17:10) — VPS 已同步
+
+**全员注意 — 18 bug 修复 (Route B + Route C) + output volume 新增 已上生产**:
+
+- commit `3fa2a73` "fix: Pipeline UX/BGM/SKIP bugs + FE StrictMode completedRef race" (20 files, +1050/-77)
+- commit `6518563` "fix(docker): add output_data volume mount for /app/output" (1 file, +2)
+- push range: `928a621..6518563`
+- rsync app/ (main.py + job_manager.py + pipeline_orchestrator.py) + frontend/src/ (StageC.tsx + CreateContext.tsx) + docker/ (docker-compose.yml)
+- VPS `docker compose build api` + `docker compose build frontend` (20 routes, 0 errors)
+- `docker compose up -d --force-recreate api frontend` → `docker_output_data` 新 volume 创建
+- api StartedAt: `2026-04-23T09:01:10Z`
+- 外部: https://prefaceai.mov 200 + /api/health 200
+
+**影响面（对 @tester / @frontend / @backend 说明）**:
+
+**后端改动** (Route B):
+- `job_manager.py`: checkpoint_callback isinstance 守卫 — `bgm_url`/`bgm_meta_version` 等 String 列不再被 json.dumps 双重引号包裹
+- `pipeline_orchestrator.py`: SKIP_IMAGE_GENERATION 模式现在复制 R8 参考图到 `output/{uuid}/images/`，写 image_url 回 storyboard.shots，重新 checkpoint storyboard_json，前端预览页可正确加载图片
+- `pipeline_orchestrator.py`: Stage 6 BGM 现在 checkpoint credits_used
+- `app/main.py`: 新增 `/static/outputs` StaticFiles mount → `./output/`（容器内 `/app/output`，已由 `docker_output_data` volume 持久化）
+
+**前端改动** (Route C):
+- `StageC.tsx`: FE-5 completedRef 在 shot-gen effect 入口重置，完成触发条件扩展（status===completed OR progress>=100），提取 finalizeAndGoToPreview 带 console 时间戳
+- `StageC.tsx`: FE-1 STAGE_LABEL map，resolvePhaseTitle 分层 fallback
+- `StageC.tsx`: FE-3 progress 直接信任后端值，不再 Math.max-clamp
+- `CreateContext.tsx`: FE-2 UPDATE_GENERATION_PROGRESS reducer 用 full-list .some() dedup，防重复 timeline 条目
+
+**docker volume 新增**:
+- 旧: api 仅挂 `storage_data:/app/storage` + `sqlite_data:/app/data`
+- 新: 加 `output_data:/app/output`（持久化 pipeline 产物，StaticFiles 依赖此目录）
+- VPS Docker 已创建 `docker_output_data` named volume
+
+**Bash 权限**: ✅ 可用
+
+**部署铁律遵守**:
+- ✅ 先 push GitHub 再部署 VPS
+- ✅ rsync trailing slash 正确
+- ✅ 未碰 .env / DB schema / redis
+- ✅ 未在 VPS 上 git pull
+- ✅ build + force-recreate
 
 ---
 
@@ -126,9 +169,10 @@
 
 ## 当前状态速览
 
-状态: ✅ **TASK-DEPLOY-LLM-SAMPLING 完成** (2026-04-23 10:55, DevOps 自执行)
-最新 commit: `cb5e395` (chore: unify LLM sampling params, 22 files)
-历史 commit: `b998cbf` (Mureka Wave 1-4, 2026-04-21, PM 代执行)
+状态: ✅ **TASK-BUG-FIX-BATCH-1 Route D 完成** (2026-04-23 17:10, DevOps 自执行)
+最新 commit: `6518563` (fix(docker): add output_data volume mount, 1 file)
+前一 commit: `3fa2a73` (fix: Pipeline UX/BGM/SKIP bugs + FE StrictMode, 20 files)
+历史 commit: `d154ce1` (fix(logging): P0P1 exception logging + docker log rotate, 2026-04-23)
 域名: `https://prefaceai.mov` 已上线（前端 + API + Harness V2 监控端点）
 服务器: 107.148.1.199 (8C/16GB/200GB, Ubuntu 20.04)
 容器: 3 个运行中 — api (healthy) + frontend (up) + redis (healthy)
@@ -364,7 +408,8 @@ Multiple pushes — Stage 1 E2E 联调通过。
 ```
 远程仓库: https://github.com/kaiangel/prefaceai-story (private)
 分支: main (tracked → origin/main)
-最新 commit: cb5e395 chore: unify LLM sampling params (temperature + max_tokens) (22 files)
+最新 commit: 6518563 fix(docker): add output_data volume mount for /app/output (1 file)
+前一 commit: 3fa2a73 fix: Pipeline UX/BGM/SKIP bugs + FE StrictMode completedRef race (20 files)
 ```
 
 ---

@@ -7121,3 +7121,58 @@ const alreadyPresent = message ? state.generationLog.some((e) => e.message === m
 - 如果 docker-compose.yml 没有 volume，请先改（加 `- ./output:/app/output` 或 volume declaration）再 build
 
 **Bash 权限**: 若被拒立即 SendMessage PM（memory: 诊断前不乱 kill）
+
+---
+
+#### @devops → @pm [2026-04-23 17:10]
+
+### ✅ TASK-BUG-FIX-BATCH-1 Route D — VPS 统一部署完成
+
+**部署结果**: 全部 8 项验证 PASS，VPS 已上线 Route B + Route C 18 bug 修复
+
+**2 次 commit + push**:
+
+| Commit | 内容 | Push Range |
+|--------|------|-----------|
+| `3fa2a73` | fix: Pipeline UX/BGM/SKIP bugs + FE StrictMode completedRef race (20 files) | 928a621→3fa2a73 |
+| `6518563` | fix(docker): add output_data volume mount for /app/output (1 file) | 3fa2a73→6518563 |
+
+**Step 2 发现 + 处理 (output volume)**:
+- VPS docker-compose.yml 无 `output_data:/app/output` volume mount
+- PM 任务说明 Step 6 已授权："如果没挂，必须加 volume mount 让 /app/output 持久化"
+- 选择 named volume `output_data:/app/output`（持久化，无权限问题）
+- 本地修改 `docker/docker-compose.yml` → 单独 commit `6518563` → push → rsync 到 VPS
+- VPS recreate 时自动创建 `docker_output_data` volume ✅
+
+**rsync 范围**:
+- `app/` → 3 文件: main.py + job_manager.py + pipeline_orchestrator.py
+- `frontend/src/` → 2 文件: StageC.tsx + CreateContext.tsx
+- `docker/` → 1 文件: docker-compose.yml
+
+**VPS docker**:
+- api build → sha256:6090c0d4 ✅
+- frontend build → 20 routes, 0 errors ✅
+- `docker compose up -d --force-recreate api frontend` → Volume docker_output_data Created ✅
+- api StartedAt: `2026-04-23T09:01:10Z`
+
+**验证 8/8 PASS**:
+
+| 项 | 结果 |
+|----|------|
+| /health | {"status":"healthy"} ✅ |
+| /app/output 存在 | ✅ (新 volume，空目录) |
+| /static/outputs StaticFiles | main.py Line 79 ✅ |
+| job_manager isinstance 守卫 | job_manager.py Line 202 ✅ |
+| pipeline_orchestrator credits_used | pipeline_orchestrator.py Line 734 ✅ |
+| 无 --reload | Config.Cmd 确认 ✅ |
+| StartedAt | 2026-04-23T09:01:10Z ✅ |
+| 外部 HTTPS | prefaceai.mov 200 + /api/health 200 ✅ |
+
+**部署铁律**:
+- ✅ 先 push 再 VPS
+- ✅ rsync trailing slash 正确
+- ✅ 未碰 .env / DB / redis
+- ✅ 未在 VPS git pull
+
+**Founder 可在 prefaceai.mov 测试 18 bug 修复效果（含 SKIP 模式图片预览、BGM credits_used、FE-5 completedRef、STAGE_LABEL 等）**
+

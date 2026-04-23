@@ -1,11 +1,66 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-04-23 15:05（自更新）
-> **状态**: ✅ TASK-LOCAL-BACKEND-HUNG 完成 — 本地 backend 诊断 + 干净重启，/health healthy，auth 端点可达
+> **最后更新**: 2026-04-23 17:10（自更新 — TASK-BUG-FIX-BATCH-1 Route D 完成，VPS 已同步最新代码）
+> **状态**: ✅ TASK-BUG-FIX-BATCH-1 Route D 完成 — 2 commits push (3fa2a73 + 6518563) + rsync + docker build api/frontend + force-recreate + 6/6 验证 PASS + 外部 HTTP 200
 
 ---
 
 ## 刚完成
+
+**TASK-BUG-FIX-BATCH-1 Route D — VPS 统一部署 [2026-04-23 17:10]**
+
+**部署范围**: Route B (Backend BE-3/4/5 + /static mount) + Route C (Frontend FE-1~5) + docker-compose output volume 新增
+
+**2 次 commit + push**:
+
+1. `3fa2a73` "fix: Pipeline UX/BGM/SKIP bugs + FE StrictMode completedRef race"
+   - 20 files (+1050/-77): 5 代码 + 15 进度/文档
+   - push range: `928a621..3fa2a73`
+
+2. `6518563` "fix(docker): add output_data volume mount for /app/output"
+   - 1 file (+2): docker/docker-compose.yml
+   - push range: `3fa2a73..6518563`
+   - **原因**: Step 2 发现 VPS docker-compose.yml 无 output volume，`/static/outputs` StaticFiles 依赖的 `/app/output` 目录需持久化
+
+**rsync**:
+- `app/` → VPS (main.py + job_manager.py + pipeline_orchestrator.py)
+- `frontend/src/` → VPS (StageC.tsx + CreateContext.tsx)
+- `docker/docker-compose.yml` → VPS (output_data volume 新增)
+
+**VPS docker**:
+- `docker compose build api` → image sha256:6090c0d4... ✅
+- `docker compose build frontend` → 20 routes, 0 errors ✅
+- `docker compose up -d --force-recreate api frontend` → Volume "docker_output_data" Created ✅
+- api StartedAt: `2026-04-23T09:01:10Z`
+
+**验证 6/6 PASS**:
+
+| 验证项 | 期望 | 结果 |
+|--------|------|------|
+| /health | healthy | {"status":"healthy"} ✅ |
+| /app/output 目录 | 存在 | ls 返回 0 行（空目录，新 volume）✅ |
+| /static/outputs StaticFiles | app.mount 存在 | Line 79: app.mount("/static/outputs"...) ✅ |
+| job_manager isinstance 守卫 | isinstance(data, (dict, list)) | Line 202 ✅ |
+| pipeline_orchestrator credits_used | checkpoint_callback("credits_used",...) | Line 734 ✅ |
+| StartedAt | 2026-04-23 | 2026-04-23T09:01:10Z ✅ |
+| 外部 HTTPS | HTTP 200 | prefaceai.mov 200 + /api/health 200 ✅ |
+| 无 --reload | Config.Cmd 无 reload | ["uvicorn","app.main:app","--host","0.0.0.0","--port","8000"] ✅ |
+
+**部署铁律遵守**:
+- ✅ 先 push GitHub 再部署 VPS
+- ✅ rsync trailing slash 正确
+- ✅ 未碰 .env / DB schema / redis
+- ✅ 未在 VPS 上 git pull
+- ✅ build + force-recreate（代码变 + compose 变，两者都做）
+
+**新增 output volume 决策**:
+- PM 任务说明 Step 6 已授权："如果没挂，必须加 volume mount"
+- 选择 named volume `output_data:/app/output`（不用 bind mount，容器内可读写，无权限问题）
+- `docker_output_data` 已成功在 VPS 创建
+
+---
+
+## 上次完成
 
 **TASK-LOCAL-BACKEND-HUNG — 本地 backend 卡死诊断 + 修复 [2026-04-23 15:05]**
 
@@ -439,6 +494,7 @@
 
 | 时间 | 更新内容 |
 |------|----------|
+| 2026-04-23 | TASK-BUG-FIX-BATCH-1 Route D: commit 3fa2a73+6518563 + push 928a621→6518563 + rsync app/(3)+frontend/src/(2)+docker/(1) + VPS build api+frontend + force-recreate + output_data volume 创建 + 8/8 PASS + StartedAt 2026-04-23T09:01:10Z |
 | 2026-04-23 | TASK-P0P1-DEPLOY: rebase Ben 4725e9e + commit d154ce1 + push 4725e9e→d154ce1 + rsync app/(4) + docker/(1) + VPS build+force-recreate + 6/6 PASS + StartedAt 2026-04-23T06:31:38Z |
 | 2026-04-23 | TASK-P0P1-LOGGING-FIX: docker-compose.yml api 服务加 logging (max-size=50m, max-file=5)，YAML 验证 PASS，未部署（等统一部署） |
 | 2026-04-23 | TASK-DEPLOY-LLM-SAMPLING: commit cb5e395 + push b998cbf→cb5e395 + rsync app/ (8 files) + VPS api rebuild + 4/4 验证 PASS |

@@ -1,7 +1,60 @@
 # DevOps Agent - 已完成任务
 
 > 按时间倒序记录已完成的工作
-> **2026-04-23 15:05 注**: TASK-LOCAL-BACKEND-HUNG 完成 — 本地 backend 诊断 + nohup 干净重启 PID 21995，/health healthy，auth 端点 401 响应。
+> **2026-04-23 17:10 注**: TASK-BUG-FIX-BATCH-1 Route D 完成 — 18 bug 修复(Route B+C) + output volume 上生产，8/8 验证 PASS，StartedAt 2026-04-23T09:01:10Z。
+
+---
+
+### TASK-BUG-FIX-BATCH-1 Route D ✅ (2026-04-23 17:10, DevOps 自执行)
+
+**任务**: 将 Route B (Backend BE-3/4/5 + /static mount) + Route C (Frontend FE-1~5) 18 bug 修复部署到 VPS prefaceai.mov
+
+**Step 2 关键发现**: VPS docker-compose.yml api 服务无 `output_data:/app/output` volume，`/static/outputs` StaticFiles mount 依赖的 `/app/output/` 目录需持久化。PM 任务说明已授权添加，DevOps 新增 named volume `output_data:/app/output`。
+
+**执行步骤**:
+
+1. **git add + commit + push** ✅
+   - Staged 20 modified tracked files (不含未跟踪的 docs/INVESTOR_MEMO_2026Q2.md)
+   - commit `3fa2a73` "fix: Pipeline UX/BGM/SKIP bugs + FE StrictMode completedRef race" (20 files, +1050/-77)
+   - push: `928a621..3fa2a73`
+
+2. **docker-compose.yml output volume 新增** ✅
+   - 本地 `docker/docker-compose.yml`: api volumes 加 `- output_data:/app/output`，volumes 段加 `output_data:`
+   - commit `6518563` "fix(docker): add output_data volume mount for /app/output" (1 file, +2)
+   - push: `3fa2a73..6518563`
+
+3. **rsync → VPS** ✅
+   - `app/` → VPS (main.py + job_manager.py + pipeline_orchestrator.py, 3 文件)
+   - `frontend/src/` → VPS (StageC.tsx + CreateContext.tsx, 2 文件)
+   - `docker/docker-compose.yml` → VPS (1 文件)
+   - trailing slash 全部正确
+
+4. **VPS docker build + force-recreate** ✅
+   - `docker compose build api` → image sha256:6090c0d4... 1 layer changed ✅
+   - `docker compose build frontend` → 20 routes, 0 errors, 65s ✅
+   - `docker compose up -d --force-recreate api frontend` → Volume "docker_output_data" Created + api+frontend Started ✅
+
+5. **验证 8/8 PASS** ✅
+
+| 验证项 | 期望 | 结果 |
+|--------|------|------|
+| /health | healthy | {"status":"healthy"} ✅ |
+| /app/output 目录 | 存在 | ls → 空目录（新 volume）✅ |
+| /static/outputs StaticFiles | app.mount 存在 | main.py Line 79 ✅ |
+| job_manager isinstance 守卫 | isinstance(data,(dict,list)) | job_manager.py Line 202 ✅ |
+| pipeline_orchestrator credits_used | checkpoint_callback("credits_used",...) | Line 734 ✅ |
+| 无 --reload | Cmd 无 reload | uvicorn host 0.0.0.0 port 8000 only ✅ |
+| StartedAt | 2026-04-23 | 2026-04-23T09:01:10Z ✅ |
+| 外部 HTTPS | 200 | prefaceai.mov 200 + /api/health 200 ✅ |
+
+**部署铁律遵守**:
+- ✅ 先 push GitHub 再部署 VPS
+- ✅ rsync trailing slash 正确（`app/` → `/opt/xuhua-story/app/`）
+- ✅ 未碰 .env / DB schema / redis
+- ✅ 未在 VPS 上 git pull
+- ✅ build + force-recreate
+
+**Bash 权限**: ✅ 可用，全程无中断
 
 ---
 
