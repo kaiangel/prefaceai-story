@@ -26,6 +26,7 @@ services:
     volumes:
       - storage_data:/app/storage
       - sqlite_data:/app/data
+      - output_data:/app/output
     depends_on:
       redis:
         condition: service_healthy
@@ -95,6 +96,7 @@ volumes:
   storage_data:     # Generated images + audio
   sqlite_data:      # SQLite database files
   mysql_data:
+  output_data:      # Pipeline output images (SKIP mode + generated images)
 
 networks:
   xuhua_net:
