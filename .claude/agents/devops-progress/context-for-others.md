@@ -1,11 +1,55 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-04-23 11:30（自更新 — TASK-P0P1-LOGGING-FIX 完成，yml 改动就绪待部署）
+> **最后更新**: 2026-04-23 14:35（自更新 — TASK-P0P1-DEPLOY 完成，VPS 已同步 Ben utf8mb4 + P0P1 logging fix）
 
 ---
 
-## TASK-P0P1-LOGGING-FIX 完成 (2026-04-23 11:30) — 等待统一部署
+## TASK-P0P1-DEPLOY 完成 (2026-04-23 14:35) — VPS 已同步
+
+**全员注意 — Ben utf8mb4 patch + P0P1 logging fix 已一并上生产**:
+
+- git pull --rebase 融合 Ben commit `4725e9e` "fix: ensure charset=utf8mb4 is always set in database URL"
+- commit `d154ce1` "fix(logging): P0P1 exception logging + docker log rotate" (12 files, +1088/-377)
+- push origin main: `4725e9e..d154ce1`
+- rsync `app/` → VPS (4 代码文件: database.py / api/chapters.py / services/image_generator.py / services/pipeline_orchestrator.py)
+- rsync `docker/` → VPS (docker-compose.yml logging 配置)
+- VPS `docker compose build api` + `up -d --force-recreate api`
+- 容器 StartedAt: `2026-04-23T06:31:38Z`
+
+**影响面**（对 @backend / @tester / @frontend 说明）:
+- 9 个 chapters.py GET 端点现在有 try/except，500 响应会含 `{"detail":"服务异常: {type}: {msg[:200]}"}`
+- 3 个 BackgroundTasks（generate_images / regenerate_single_image / generate_audio_and_align）现在异常会写 `chapter.status='failed' + error_message=traceback[:10000]`（行为变化：failed 任务可见）
+- `regenerate_single_image_task` 现在会写 `SceneImage(error_message=..., is_active=True)` 让 GET /images 看到失败记录
+- `image_generator.py` 65 处 print 全部转 logger（logger.info/warning/error），对前端/API 无影响，只是日志可搜索
+- pipeline_orchestrator.py L1074 裸 except 改 `except Exception as e: logger.exception`（保留原吞异常行为）
+- VPS docker log rotate: `max-size=50m, max-file=5`（最多 250MB），Ben 排查 500 不再丢 traceback
+
+**6 项验证 PASS**:
+| 验证项 | 期望 | 结果 |
+|--------|------|------|
+| /health | healthy | {"status":"healthy"} ✅ |
+| logging config | max-size 50m max-file 5 | map[max-file:5 max-size:50m] ✅ |
+| logger count in image_generator | ≥ 60 | 65 ✅ |
+| Ben utf8mb4 patch | _db_url + if "charset=" not in | ✅ |
+| StartedAt | 2026-04-23 | 2026-04-23T06:31:38Z ✅ |
+| bare except in pipeline_orchestrator | 0 | 0 ✅ |
+| bonus: print count in image_generator | 0 | 0 ✅ |
+
+**Bash 权限**: ✅ 本次可用（一轮通过，无被拒）
+
+**部署铁律遵守**:
+- ✅ 先 push GitHub 再部署 VPS
+- ✅ rsync trailing slash 正确（`app/` → `/opt/xuhua-story/app/`）
+- ✅ 未碰 .env / DB schema / frontend / redis
+- ✅ 未在 VPS 上 git pull
+- ✅ build + force-recreate（compose 配置变了必须 recreate）
+
+**补充说明**: PM 任务 Step 5 只写 `up -d --force-recreate`，但由于 Dockerfile.api `COPY app/ ./app/` 是 baked-in（非 volume mount），**必须先 `docker compose build api`** 才能把新代码打进 image。首次 up -d 后发现旧代码仍在容器内，补做 build 后验证才全部通过。
+
+---
+
+## TASK-P0P1-LOGGING-FIX 完成 (2026-04-23 11:30) — 已部署（上面块）
 
 **全员注意 — docker-compose.yml api 服务已加 logging 配置，等待下一轮统一部署**:
 

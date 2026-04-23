@@ -6553,3 +6553,69 @@ PM 可在 @backend 完成后安排统一部署，部署后用 `docker inspect do
    - 容器 StartedAt 刷新到 2026-04-23
 
 **Bash 权限预警**: 上次 DevOps spawn Bash 二次被拒 + 401 auth。本次**先测试一条无害命令**（`git status | head -3`），若被拒立即 SendMessage PM，不要准备命令浪费一轮。
+
+---
+
+#### @devops → @pm [2026-04-23 14:35]
+
+### ✅ TASK-P0P1-DEPLOY 完成 — Ben utf8mb4 + P0P1 logging fix 已同步生产
+
+**Bash 权限**: ✅ 本次可用（一轮通过，无被拒，无 auth 错误）
+
+**部署摘要**:
+
+| 步骤 | 结果 |
+|------|------|
+| 1. git pull --rebase 融合 Ben `4725e9e` | ✅ Fast-forward `cb5e395..4725e9e` (app/database.py +6/-1)，零冲突 |
+| 2. commit + push | ✅ commit `d154ce1` (12 files, +1088/-377)，push `4725e9e..d154ce1` |
+| 3. rsync `app/` → VPS | ✅ 4 代码文件 (database.py / api/chapters.py / services/image_generator.py / services/pipeline_orchestrator.py) |
+| 4. rsync `docker/` → VPS | ✅ docker-compose.yml |
+| 5. VPS docker build + force-recreate | ✅ 容器 StartedAt `2026-04-23T06:31:38Z` |
+
+---
+
+### 验证 6/6 PASS
+
+| 验证项 | 期望 | 结果 |
+|--------|------|------|
+| 1. /health | healthy | `{"status":"healthy"}` ✅ |
+| 2. logging config | max-size=50m max-file=5 | `map[max-file:5 max-size:50m]` ✅ |
+| 3. logger count in image_generator.py | ≥ 60 | **65** ✅ |
+| 4. Ben utf8mb4 patch | _db_url + if "charset=" not in | ✅ 已落地 |
+| 5. StartedAt | 2026-04-23 | **2026-04-23T06:31:38Z** ✅ (从 04-23T02:52 刷新) |
+| 6. bare except in pipeline_orchestrator.py | 0 | **0** ✅ |
+| bonus: print count in image_generator.py | 0 | **0** ✅ |
+
+---
+
+### 关键教训（下次改进）
+
+**PM 任务 Step 5 只写了 `up -d --force-recreate api`，但这次不够** — Dockerfile.api 用 `COPY app/ ./app/` 是 baked-in（volume 只挂 storage 和 sqlite），代码改动必须先 `docker compose build api`。首轮 up -d 后 `grep logger` 返回 0 + bare except 仍在，补 build 后 65 / 0 / 0 全 PASS。
+
+**建议**: 凡代码改动（非 env/config），部署流程统一成 `rsync → build → up -d --force-recreate`，不要省 build 步骤。PM 之前的 TASK-DEPLOY-LLM-SAMPLING 任务描述里就写了 build，这次漏写。
+
+---
+
+### 部署铁律遵守
+
+- ✅ 先 push GitHub 再部署 VPS（`4725e9e..d154ce1` 推送后再 rsync）
+- ✅ rsync trailing slash 正确（`app/` → `/opt/xuhua-story/app/`，`docker/` → `/opt/xuhua-story/docker/`）
+- ✅ 未碰 .env / DB schema / frontend / redis
+- ✅ 未在 VPS 上 git pull
+- ✅ build + force-recreate 配合（compose 配置 + 代码都变了）
+
+---
+
+### 文档更新完整性
+
+- ✅ TEAM_CHAT.md（本条）
+- ✅ `devops-progress/current.md` — 状态行更新到 14:35 + "刚完成"块插入 TASK-P0P1-DEPLOY
+- ✅ `devops-progress/context-for-others.md` — 顶部追加 TASK-P0P1-DEPLOY 块（对 @backend / @tester / @frontend 的影响 + 6 项验证表）
+- ✅ `devops-progress/completed.md` — 顶部插入 TASK-P0P1-DEPLOY（含 5 步执行清单 + 验证 + 教训）
+- ✅ PM 维护文档（PENDING / PROJECT_STATUS / TODAY_FOCUS / DECISIONS）未动
+
+---
+
+**现在**: VPS 跑的是 `d154ce1` + Ben 的 utf8mb4 patch，全部日志改动生效。下次 500 错误会有完整 traceback + 50MB × 5 rotation，Ben 排查不再丢失。
+
+

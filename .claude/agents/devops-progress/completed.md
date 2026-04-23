@@ -1,7 +1,59 @@
 # DevOps Agent - 已完成任务
 
 > 按时间倒序记录已完成的工作
-> **2026-04-23 11:30 注**: TASK-P0P1-LOGGING-FIX 完成，docker-compose.yml api logging 配置已加，YAML 验证 PASS，等待统一部署。
+> **2026-04-23 14:35 注**: TASK-P0P1-DEPLOY 完成 — Ben utf8mb4 + P0P1 logging fix 已一并上生产，6/6 验证 PASS。
+
+---
+
+### TASK-P0P1-DEPLOY ✅ (2026-04-23 14:35, DevOps 自执行)
+
+**任务**: 融合 Ben commit `4725e9e` (utf8mb4 defensive patch) + 今日 P0P1 logging fix（4 处代码 + 1 处 compose）一起上生产 VPS。
+
+**执行步骤**:
+
+1. **git pull --rebase 融合 Ben commit** ✅
+   - fetch → 确认 `4725e9e fix: ensure charset=utf8mb4 is always set in database URL` 在 origin
+   - stash 未提交 12 files → `pull --rebase` Fast-forward `cb5e395..4725e9e` (app/database.py +6/-1) → stash pop（零冲突）
+   - 验证 `_db_url` + `if "charset=" not in _db_url` 落地
+
+2. **commit + push** ✅
+   - `git add -A` → 12 files staged
+   - commit `d154ce1` "fix(logging): P0P1 exception logging + docker log rotate" (+1088/-377, Co-Authored-By)
+   - `git push origin main` → `4725e9e..d154ce1`
+
+3. **rsync → VPS** ✅
+   - `rsync -avz -e "ssh -p 58913" --exclude '__pycache__' --exclude '*.pyc' app/ trader@107.148.1.199:/opt/xuhua-story/app/` — 4 代码文件 (database.py + api/chapters.py + services/image_generator.py + services/pipeline_orchestrator.py)
+   - `rsync -avz -e "ssh -p 58913" docker/ trader@107.148.1.199:/opt/xuhua-story/docker/` — docker-compose.yml
+
+4. **VPS build + force-recreate** ✅
+   - 首轮仅 `up -d --force-recreate api` → 验证失败（容器仍跑旧代码，Dockerfile COPY baked-in）
+   - 补 `docker compose build api` → image sha256:aaba97eb5674... → 再 `up -d --force-recreate api`
+
+5. **验证 6/6 PASS** ✅
+
+| 验证项 | 期望 | 结果 |
+|--------|------|------|
+| /health | healthy | {"status":"healthy"} ✅ |
+| logging config | max-size=50m max-file=5 | map[max-file:5 max-size:50m] ✅ |
+| logger count in image_generator.py | ≥ 60 | 65 ✅ |
+| Ben utf8mb4 patch | _db_url + if "charset=" not in | ✅ |
+| StartedAt | 2026-04-23 | 2026-04-23T06:31:38Z ✅ |
+| bare except in pipeline_orchestrator.py | 0 | 0 ✅ |
+| bonus: print count | 0 | 0 ✅ |
+
+**教训**:
+- Dockerfile.api 用 `COPY app/ ./app/` 是 baked-in（volume 只挂 storage 和 sqlite），代码改动必须 `docker compose build api`，仅 `--force-recreate` 不够
+- 前几次 DevOps 部署都有做 build，这次 PM 任务描述漏写了 build 步骤 → DevOps 按铁律发现问题后补齐
+- 下次同类任务：rsync 后无脑 `build + up -d --force-recreate`，不要省 build
+
+**部署铁律遵守**:
+- ✅ 先 push GitHub 再部署 VPS
+- ✅ rsync trailing slash 正确
+- ✅ 未碰 .env / DB schema / frontend / redis
+- ✅ 未在 VPS 上 git pull
+- ✅ 未改 PM 维护文档
+
+**Bash 权限**: ✅ 可用
 
 ---
 

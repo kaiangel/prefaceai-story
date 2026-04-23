@@ -1,11 +1,63 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-04-23 11:30（自更新）
-> **状态**: ✅ TASK-P0P1-LOGGING-FIX 完成 — docker-compose.yml api logging 配置已加，YAML 验证 PASS，未部署（等待下一轮统一部署）
+> **最后更新**: 2026-04-23 14:35（自更新）
+> **状态**: ✅ TASK-P0P1-DEPLOY 完成 — Ben utf8mb4 patch + P0P1 logging fix 已同步到 VPS，6/6 验证 PASS
 
 ---
 
 ## 刚完成
+
+**TASK-P0P1-DEPLOY — 统一部署 + 融合 Ben utf8mb4 commit [2026-04-23 14:35]**
+
+融合 Ben 的 `4725e9e` (utf8mb4 defensive patch) + 今日 P0P1 logging fix（4 处代码 + 1 处 compose）一起上生产 VPS。
+
+**Step 1: git pull --rebase 融合 Ben commit** ✅
+- `git fetch origin main` 确认有 Ben 的 `4725e9e`
+- stash 未提交改动 → `git pull --rebase origin main` (Fast-forward `cb5e395..4725e9e`, app/database.py +6/-1) → stash pop
+- `grep _db_url app/database.py` 确认 patch 落地：`_db_url = settings.DATABASE_URL` + `if "charset=" not in _db_url:`
+
+**Step 2: commit 本地所有改动** ✅
+- `git add -A` → 12 files (3 代码 + 1 compose + 8 progress/docs/TEAM_CHAT)
+- commit `d154ce1` "fix(logging): P0P1 exception logging + docker log rotate" (+1088/-377)
+- message 覆盖：pipeline_orchestrator L1074 bare except / chapters.py 9 GET + 3 BackgroundTasks / image_generator 65 print→logger / docker-compose logging max-size=50m max-file=5 + Co-Authored-By
+
+**Step 3: git push origin main** ✅
+- push range: `4725e9e..d154ce1`（Ben 的 commit 已在 origin，本次推送 d154ce1）
+
+**Step 4: rsync → VPS** ✅
+- `rsync -avz -e "ssh -p 58913" app/ trader@107.148.1.199:/opt/xuhua-story/app/` — 4 代码文件 (database.py + api/chapters.py + services/image_generator.py + services/pipeline_orchestrator.py)
+- `rsync -avz -e "ssh -p 58913" docker/ trader@107.148.1.199:/opt/xuhua-story/docker/` — docker-compose.yml
+- trailing slash 正确 ✅
+
+**Step 5: VPS docker build + force-recreate** ✅
+- 先 `docker compose up -d --force-recreate api` — 首轮验证发现容器仍跑旧代码（Dockerfile COPY baked-in）
+- 补 `docker compose build api` (sha256:aaba97eb5674...) → 再 `up -d --force-recreate api`
+- 教训：Dockerfile.api 是 `COPY app/ ./app/` 不是 volume mount，代码改动必须 build
+
+**Step 6: 6 项验证 PASS** ✅
+
+| 验证项 | 期望 | 结果 |
+|--------|------|------|
+| /health | healthy | {"status":"healthy"} ✅ |
+| logging config | max-size=50m max-file=5 | map[max-file:5 max-size:50m] ✅ |
+| logger count in image_generator.py | ≥ 60 | **65** ✅ |
+| Ben utf8mb4 patch | _db_url + if "charset=" not in | ✅ 落地 |
+| StartedAt | 2026-04-23 | **2026-04-23T06:31:38Z** ✅ |
+| bare except in pipeline_orchestrator.py | 0 | **0** ✅ |
+| bonus: print count in image_generator.py | 0 | **0** ✅ |
+
+**Bash 权限**: ✅ 本次可用（一轮通过，无被拒，无 auth 错误）
+
+**部署铁律遵守**:
+- ✅ 先 push GitHub 再部署 VPS
+- ✅ rsync trailing slash 正确
+- ✅ 未碰 .env / DB schema / frontend / redis
+- ✅ 未在 VPS 上 git pull
+- ✅ 未改 PM 维护文档（PENDING / PROJECT_STATUS / TODAY_FOCUS / DECISIONS）
+
+---
+
+## 上次完成
 
 **TASK-P0P1-LOGGING-FIX — docker-compose.yml api 服务加 logging 配置 [2026-04-23 11:30]**
 
@@ -357,6 +409,7 @@
 
 | 时间 | 更新内容 |
 |------|----------|
+| 2026-04-23 | TASK-P0P1-DEPLOY: rebase Ben 4725e9e + commit d154ce1 + push 4725e9e→d154ce1 + rsync app/(4) + docker/(1) + VPS build+force-recreate + 6/6 PASS + StartedAt 2026-04-23T06:31:38Z |
 | 2026-04-23 | TASK-P0P1-LOGGING-FIX: docker-compose.yml api 服务加 logging (max-size=50m, max-file=5)，YAML 验证 PASS，未部署（等统一部署） |
 | 2026-04-23 | TASK-DEPLOY-LLM-SAMPLING: commit cb5e395 + push b998cbf→cb5e395 + rsync app/ (8 files) + VPS api rebuild + 4/4 验证 PASS |
 | 2026-04-13 | TTS-KEY-WRITE: 本地 .env 写入 VOLCENGINE_API_KEY + VOLCENGINE_SECRET_KEY，R1 完全解决 (6/6)，.env.example 补全字段 |
