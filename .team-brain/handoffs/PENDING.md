@@ -7,18 +7,30 @@
 
 ## 📋 当前待处理
 
-### TASK-MUREKA-PIPELINE-INTEGRATION — 🔄 进行中（P1，Wave 1 启动）
+### ✅ max_tokens=8631 魔法数字统一 — 完成（2026-04-22）
+
+| 字段 | 内容 |
+|------|------|
+| **状态** | ✅ 完成 — grep 0 代码命中 + pytest passed + /health healthy |
+| **改动** | 13 处 `8631 → 16384`（5 个文件：character_designer / alignment_service / story_outline_generator L196 补齐 / storyboard_director / screenplay_writer）|
+| **教训** | 首次调查汇报"14 处 + story_outline_generator 已改"不准确。PM 独立地毯式 grep 核对为 13 处 + 半改状态。Backend 本次任务已做自我纠错记录 |
+
+---
+
+### ✅ TASK-MUREKA-PIPELINE-INTEGRATION — 完成（2026-04-21）
 
 | 字段 | 内容 |
 |------|------|
 | **优先级** | P1 |
-| **指派** | @Backend + @AI-ML + @Frontend + @DevOps |
+| **指派** | @Backend + @AI-ML + @Frontend + @DevOps + @Tester |
 | **前置闸门** | ✅ TASK-HAIKU-QUOTE-EXTRACTION 通过（方案 A mixed v3.2 作为最终版）|
 | **完整 TASK 文档** | `.team-brain/handoffs/TASK-MUREKA-PIPELINE-INTEGRATION.md` |
 | **Wave 1 状态** | ✅ 完成 — music_hint + extract_story + ffmpeg_post_processor |
-| **Wave 2 状态** | ✅ 完成（PM E2E 年夜饭跑通，Mureka task 134387356336130；alembic 4 列 ALTER TABLE 待 Ben/DevOps 在 MySQL 执行）|
+| **Wave 2 状态** | ✅ 完成 — 服务层三剑客 + Mureka E2E 跑通 |
 | **Wave 3 状态** | ✅ 完成 — @backend REST API (4 端点) + @frontend BgmPlayer + StageD 集成 (build 20 路由 0 错) |
-| **Wave 4 待启动** | @tester 集成测试（3 风格 × 失败降级 × QA 信号）+ @devops VPS 部署（.env 补 MUREKA_API_KEY + MySQL ALTER TABLE）|
+| **Wave 4 状态** | ✅ 完成 — @tester 6P/2W/1S，PM 修 style_preset→get_music_hint bug 两处，Founder 听 3 mp3 确认风格层有辨识度 |
+| **VPS 部署** | ✅ 完成（PM 代执行）— commit `b998cbf` push + rsync + MUREKA_API_KEY + docker rebuild + /health healthy |
+| **MVP 后 (P3)** | music_hint 在 Haiku 层效用有限、秋梨膏温暖故事金句重试、自定义 BGM 上传 |
 
 ---
 

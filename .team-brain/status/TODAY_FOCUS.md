@@ -1,7 +1,10 @@
-# 今日重点 (2026-04-21)
+# 今日重点 (2026-04-22)
 
 > 每天更新，所有 Agent 开工前必读
-> **当前状态**: ✅ Wave 1+2+3 全部完成（E2E PASS），等 Wave 4 (@tester + @devops)
+> **当前状态**: ✅ TASK-LLM-TEMP-AUDIT-FIX 完成（15 改动点：alignment/validator/utils/story_generator/screenplay/storyboard）+ 即将派 @backend 做 8631→16384 统一（13 处）
+
+### 昨日完成 (2026-04-21)
+- TASK-MUREKA-PIPELINE-INTEGRATION Wave 1-4 + VPS 部署全部完成（commit b998cbf push + docker rebuild + /health healthy + MUREKA_API_KEY 注入容器）
 
 ---
 

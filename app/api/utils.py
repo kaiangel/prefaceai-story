@@ -5,6 +5,7 @@ import json
 import logging
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from google import genai
+from google.genai import types
 from app.config import settings
 from app.services.file_storage import validate_image, compress_image
 
@@ -38,6 +39,7 @@ async def ocr_image(file: UploadFile = File(...)):
                     {"text": prompt},
                     {"inline_data": {"mime_type": file.content_type, "data": b64_data}},
                 ],
+                config=types.GenerateContentConfig(temperature=0.2),
             )
             result = {"text": response.text.strip()}
             logger.info(f"[OCR] ✅ 提取 {len(result.get('text',''))} 字")
@@ -54,6 +56,7 @@ async def ocr_image(file: UploadFile = File(...)):
             response = await client.messages.create(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=4096,
+                temperature=0.2,
                 messages=[{
                     "role": "user",
                     "content": [
@@ -146,6 +149,7 @@ async def _vision_analyze(contents: bytes, content_type: str, prompt: str) -> di
                     {"text": prompt},
                     {"inline_data": {"mime_type": content_type, "data": b64_data}},
                 ],
+                config=types.GenerateContentConfig(temperature=0.2),
             )
             if not response.text:
                 raise ValueError("Gemini 返回空文本")
@@ -161,6 +165,7 @@ async def _vision_analyze(contents: bytes, content_type: str, prompt: str) -> di
             response = await client.messages.create(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=4096,
+                temperature=0.2,
                 messages=[{
                     "role": "user",
                     "content": [

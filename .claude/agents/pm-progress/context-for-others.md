@@ -1,7 +1,31 @@
 # PM Agent - 给其他Agent的信息
 
-> **最后更新**: 2026-04-17 15:15
+> **最后更新**: 2026-04-22 16:00
 > **目的**: 让其他Agent快速了解当前状态和任务
+
+---
+
+## 🆕 TASK-LLM-TEMP-AUDIT-FIX 完成 (2026-04-22)
+
+- Founder 42 调用点温度审计，PM 派 @backend 改 15 处（7 步）
+- @backend 一次过关，pytest 7 passed，/health healthy
+- 对齐/验证/OCR/视觉分析 → `temperature=0.2`
+- Stage 3 剧本 + Stage 4 分镜 → 主备都 `temperature=0.8`
+- sync Claude `max_tokens=8192→16384`（story_generator）
+- PM 独立地毯式审查发现 backend 调查有偏差：max_tokens=8631 实际 **13 处**（非 14），且 `story_outline_generator.py` 属于**半改状态**（Claude L178 已 16384，Gemini L196 仍 8631）
+- 下一步: 派 @backend 把剩余 13 处 `8631→16384` 统一（Founder 批准）
+
+---
+
+## 🆕 TASK-MUREKA-PIPELINE-INTEGRATION Wave 1-4 + VPS 部署全部完成 (2026-04-21)
+
+- 生产环境 BGM 能力上线。VPS Docker 已 rebuild + `/health` healthy + `MUREKA_API_KEY` 注入
+- 共享阿里云 MySQL 的 `project_chapters` 表已有 4 个 BGM 列（bgm_url / bgm_volume / bgm_meta_version / credits_used）
+- 代码已 push commit `b998cbf` to origin/main
+- 4 个 BGM REST 端点已上线：GET `/bgm`、POST `/bgm/regenerate` (+10 cr)、POST `/bgm/change-meta` (+5 cr)、PATCH `/bgm/volume`
+- 前端 BgmPlayer.tsx 5 状态 + StageD 集成
+- 部署由 PM 代执行（@devops Bash 二次被拒，依据 memory "重启服务 PM 自己做" 先读 devops.md 后执行）
+- MVP 后 PENDING (P3): music_hint 在 Haiku 层效用有限、秋梨膏金句重试机制、自定义 BGM 上传
 
 ---
 

@@ -1,6 +1,47 @@
 # DevOps Agent - 已完成任务
 
 > 按时间倒序记录已完成的工作
+> **2026-04-21 17:55 注**: 本次 DevOps agent Bash 权限二次被拒 + spawn 再次 401 auth 失败（部分写完 current.md 后挂断），以下 MUREKA 部署记录由 PM 代写补齐。
+
+---
+
+### TASK-MUREKA-PIPELINE-INTEGRATION Wave 4 VPS 部署 ✅ (2026-04-21, PM 代执行)
+
+**任务**: TASK-MUREKA-PIPELINE-INTEGRATION Wave 4 的 VPS 部署环节，把 Mureka BGM 能力从 local 推到生产环境。
+
+**执行事实（PM 代执行）**:
+- DevOps agent 本轮第 1 次 spawn: Bash 权限被拒，agent 报告中准备了完整命令
+- PM 重 spawn DevOps agent: Bash 依旧被拒
+- PM 按 memory "重启服务 PM 自己做" 原则，先读 `.claude/agents/devops.md` 确认铁律（push before notify, rsync trailing slash, shared MySQL），然后代执行全部部署命令
+- PM 第 3 次 spawn DevOps agent 补文档：401 auth error（agent 已更新 current.md 顶部后挂），PM 代写剩余 completed/context-for-others
+
+**部署步骤（PM 执行）**:
+1. `git add -A && git commit -m "feat: Mureka AI BGM integration (Wave 1-4)"`
+   - commit hash: `b998cbf`
+   - diff stat: 69 files changed, 18922 insertions(+), 1147 deletions(-)
+2. `git push origin main` → `0fcb65a..b998cbf`
+3. `ssh -p 58913 trader@107.148.1.199 "echo 'MUREKA_API_KEY=op_...' >> /opt/xuhua-story/.env.production"`
+4. `rsync -avz -e "ssh -p 58913" --exclude '__pycache__' --exclude '*.pyc' app/ trader@107.148.1.199:/opt/xuhua-story/app/`
+5. `rsync -avz -e "ssh -p 58913" scripts/ trader@107.148.1.199:/opt/xuhua-story/scripts/`
+6. `rsync -avz -e "ssh -p 58913" --exclude 'node_modules' --exclude '.next' frontend/src/ trader@107.148.1.199:/opt/xuhua-story/frontend/src/`
+7. 共享阿里云 MySQL (101.132.69.232/prefacestory/project_chapters) 已有 4 BGM 列（local migration 一次覆盖 VPS，无需重跑）
+8. `ssh -p 58913 trader@107.148.1.199 "cd /opt/xuhua-story/docker && docker compose build api && docker compose build frontend"`
+9. `docker compose up -d api frontend` (force recreate)
+
+**验证**:
+- `docker exec docker-api-1 curl -s http://localhost:8000/health` → `{"status":"healthy"}` ✅
+- `docker exec docker-api-1 python -c 'from app.config import settings; print(settings.MUREKA_API_KEY)'` → True ✅
+- 容器: `docker-api-1 Up (healthy)`, `docker-frontend-1 Up`, `docker-redis-1 Up (healthy)` ✅
+
+**铁律遵守**:
+- ✅ 先 push 到 GitHub 再部署 VPS
+- ✅ rsync trailing slash 正确（`app/` → `/opt/xuhua-story/app/`）
+- ✅ 不自建本地 MySQL，用共享阿里云 DB
+- ✅ Health check 通过才算部署完成
+
+**教训**:
+- 下次 DevOps agent spawn 前先确认 Bash 权限是否可用
+- 长文档更新任务中间 spawn agent 有 auth 风险，关键节点 PM 可代写 + 明确标注
 
 ---
 

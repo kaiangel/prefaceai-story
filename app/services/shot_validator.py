@@ -125,6 +125,7 @@ class ShotValidator:
             response = await self.client.messages.create(
                 model=HAIKU_MODEL,
                 max_tokens=384,  # T-H: 256→384（unnaturalness_details 描述可能较长）
+                temperature=0.2,
                 messages=[{
                     "role": "user",
                     "content": [

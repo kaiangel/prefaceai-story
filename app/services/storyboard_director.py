@@ -540,7 +540,7 @@ class StoryboardDirector:
                     with open("forclaudeweb/stage4_actual_prompt.txt", "w", encoding="utf-8") as f:
                         f.write(prompt)
 
-                content = await self._call_llm_with_retry(prompt, max_tokens=8631)
+                content = await self._call_llm_with_retry(prompt, max_tokens=16384)
 
                 # DEBUG: 保存第一个scene的响应
                 if scene_idx == 0 and attempt == 0:
@@ -577,7 +577,7 @@ class StoryboardDirector:
 
         return [], None
 
-    async def _call_llm_with_retry(self, prompt: str, max_tokens: int = 8631) -> str:
+    async def _call_llm_with_retry(self, prompt: str, max_tokens: int = 16384) -> str:
         """
         RB-3: 带指数退避重试的 LLM 调用，529 特殊处理。
 
@@ -614,6 +614,7 @@ class StoryboardDirector:
                         response = self.claude_client.messages.create(
                             model=self.claude_model,
                             max_tokens=max_tokens,
+                            temperature=0.8,
                             messages=[{"role": "user", "content": prompt}]
                         )
                         content = response.content[0].text
@@ -639,7 +640,7 @@ class StoryboardDirector:
                         response = await self.gemini_client.aio.models.generate_content(
                             model=self.gemini_model,
                             contents=prompt,
-                            config={"max_output_tokens": max_tokens}
+                            config={"max_output_tokens": max_tokens, "temperature": 0.8}
                         )
                         content = response.text
                         call_elapsed = time.time() - call_start

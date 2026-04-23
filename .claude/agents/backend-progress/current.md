@@ -1,11 +1,70 @@
 # Backend Agent - 当前任务
 
-> **最后更新**: 2026-04-21（PM 代更新）
-> **状态**: ✅ Wave 2+3 完成 — music_gen_service + orchestrator + BGM REST API 全部就绪（PM E2E 年夜饭 PASS）
+> **最后更新**: [2026-04-22 16:10]
+> **状态**: ✅ TASK-8631-UNIFY 完成 — 13 处 max_tokens 统一为 16384，pytest PASS，/health healthy
 
 ---
 
 ## 刚完成
+
+### ✅ TASK-8631-UNIFY — max_tokens 统一 16384 [2026-04-22 16:10]
+
+**13 处 `max_tokens=8631 → 16384`**（5 个 Python 文件）：
+
+| # | 文件 | 行 | 类型 |
+|---|------|----|----|
+| 1 | `character_designer.py` | 84 | Claude |
+| 2 | `character_designer.py` | 105 | Gemini |
+| 3 | `alignment_service.py` | 177 | Claude 视觉 |
+| 4 | `alignment_service.py` | 193 | Gemini 视觉 |
+| 5 | `alignment_service.py` | 234 | Claude 文本 |
+| 6 | `alignment_service.py` | 250 | Gemini 文本 |
+| 7 | `story_outline_generator.py` | 196 | Gemini fallback（补齐半改遗漏）|
+| 8 | `storyboard_director.py` | 543 | 调用 |
+| 9 | `storyboard_director.py` | 580 | 函数默认参 |
+| 10 | `screenplay_writer.py` | 236 | 调用 |
+| 11 | `screenplay_writer.py` | 663 | 函数默认参 |
+| 12 | `screenplay_writer.py` | 790 | Gemini config |
+| 13 | `screenplay_writer.py` | 800 | Claude |
+
+**执行方式**: `sed -i '' 's/8631/16384/g'` 5 个文件批量替换（sed 不改变文件行号结构）。
+
+**自我纠错 (诚实记录，不是自责)**:
+- 上次 TASK-LLM-TEMP-AUDIT-FIX Step 7 汇报 **"14 处"** → PM 独立地毯式 grep 核对发现 **实际 13 处**（我数错了一处）
+- 上次汇报 "story_outline_generator 已改 8631→16384" → **实际半改状态**（L178 Claude 已 16384 ✅，L196 Gemini fallback 仍 8631 ❌，遗漏）
+- 本次 TASK-8631-UNIFY 已补齐 L196 并校对全量 13 处
+
+**验收**:
+- ✅ `grep -rn "8631" app/` 返回 0 结果（全 app/ 干净）
+- ✅ `pytest tests/test_architecture.py -x -q` → 7 passed in 0.04s
+- ✅ `curl http://localhost:8000/health` → `{"status":"healthy"}`（uvicorn --reload 自动热重载）
+
+---
+
+### ✅ TASK-LLM-TEMP-AUDIT-FIX — 全量 LLM 温度/上限审计修复 [2026-04-22 15:36]
+
+**7 步改动全部落地**（6 个 Python 文件 + 1 项调查）：
+
+| Step | 文件 | 关键改动 |
+|------|------|----------|
+| 1 | `alignment_service.py` L175, L231 | Claude `messages.create` × 2 → `temperature=0.2`（确定性对齐任务，与 Gemini 备用 0.2 对齐）|
+| 2 | `shot_validator.py` L125 | Haiku `messages.create` → `temperature=0.2`（是/否判断任务低温稳定）|
+| 3 | `app/api/utils.py` L8/L35/L55/L144/L163 | 加 types import + 4 处调用 → `temperature=0.2`（OCR + vision_analyze 识别型任务）|
+| 4 | `story_generator.py` L303 | sync Claude `max_tokens` 8192→16384（与 async 对齐防截断）|
+| 5 | `screenplay_writer.py` L697/L725/L787/L798 | Stage 3 主 Claude + 备 Gemini + _expand_narration 2 处 → `temperature=0.8`（创意任务显式化）|
+| 6 | `storyboard_director.py` L614/L642 | Stage 4 主 Claude + 备 Gemini → `temperature=0.8`（运镜差异化需创意）|
+| 7 | 多文件调查 | `max_tokens=8631` **结论: 历史遗留**（初始 commit 就存在，无注释说明，pre-git 状态不可追溯，2026-03-24 story_outline_generator 已改 16384，其他未同步）|
+
+**8631 调查建议**: 统一为 16384（与 Stage 1/2 story_outline_generator、story_generator 对齐），但**本次 PR 不改**（token 上限独立决策需 Founder 批，建议写入 PENDING.md）
+
+**验收**:
+- ✅ `pytest tests/test_architecture.py` → 7 passed in 0.05s
+- ✅ 6 个 Python 模块 import 检查通过（alignment_service / shot_validator / story_generator / screenplay_writer / storyboard_director / api/utils）
+- ✅ `curl http://localhost:8000/health` → `{"status":"healthy"}` HTTP 200
+
+**行号逐行对应（详见 TEAM_CHAT 完成报告）**
+
+---
 
 ### ✅ Wave 3 Step 5 — Stage D BGM REST API (2026-04-21)
 

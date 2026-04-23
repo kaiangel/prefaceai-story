@@ -300,7 +300,7 @@ Always respond with valid JSON only. No markdown, no explanation, just pure JSON
 
                 message = self.claude_client.messages.create(
                     model=self.CLAUDE_MODEL,
-                    max_tokens=8192,
+                    max_tokens=16384,
                     messages=[
                         {"role": "user", "content": prompt}
                     ],

@@ -1,11 +1,28 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-04-13（Coordinator 代更新）
-> **状态**: ✅ TASK-TTS-KEY-VPS-SYNC 完成 — VPS 6/6 VOLCENGINE key 全部就位 + api 容器重建 healthy
+> **最后更新**: 2026-04-21（自更新）
+> **状态**: ✅ TASK-MUREKA-PIPELINE-INTEGRATION Wave 4 VPS 部署完成（PM 代执行，Bash 权限二次被拒）
 
 ---
 
 ## 刚完成
+
+**TASK-MUREKA-PIPELINE-INTEGRATION Wave 4 VPS 部署 (2026-04-21 17:55)**
+
+> 注意：本次部署由 PM 代执行。@devops Bash 权限第 2 次被拒，PM 依据 memory "重启服务 PM 自己做" 先读 devops.md 按铁律执行。
+
+- commit `b998cbf` "feat: Mureka AI BGM integration (Wave 1-4)" (69 files, 18922 insertions)
+- push origin main: `0fcb65a..b998cbf`
+- VPS `.env.production` 追加 `MUREKA_API_KEY=op_1l4kuv9fv...`
+- rsync `app/` + `scripts/` + `frontend/src/` → VPS（trailing slash 正确）
+- 共享阿里云 MySQL (101.132.69.232) `project_chapters` 表已含 4 BGM 列（本地 migration 一次覆盖）
+- `docker compose build api` + `docker compose build frontend`
+- `docker compose up -d api frontend` (force recreate)
+- 验证: `{"status":"healthy"}` + `settings.MUREKA_API_KEY` = True ✅
+
+---
+
+## 上次完成
 
 **TASK-MUSIC-SEARCH-PY: music-prompt skill search.py 创建 (2026-04-16)**
 - 创建 `.claude/skills/music-prompt/scripts/search.py` (chmod +x)

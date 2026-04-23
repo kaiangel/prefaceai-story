@@ -1,14 +1,30 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-04-15（自更新）
+> **最后更新**: 2026-04-21 17:55（PM 代更新 — DevOps Bash 二次被拒 + spawn 401 auth 挂，部分内容 agent 自更新）
+
+---
+
+## 🆕 TASK-MUREKA-PIPELINE-INTEGRATION Wave 4 VPS 部署完成 (2026-04-21)
+
+**全员注意 — Mureka BGM 能力已上生产**:
+- VPS `/opt/xuhua-story/.env.production` 已含 `MUREKA_API_KEY`（测试过容器内 settings 能读到）
+- 共享阿里云 MySQL `project_chapters` 表已新增 4 列: `bgm_url` / `bgm_volume` / `bgm_meta_version` / `credits_used`（本地 + VPS 共用同一 MySQL，一次 ALTER 覆盖两端）
+- 最新 commit `b998cbf` 已 push origin main（69 files, 18922 insertions）
+- Docker 容器已 rebuild: `docker-api-1` (healthy) + `docker-frontend-1` + `docker-redis-1` (healthy)
+- `/health` = healthy, `settings.MUREKA_API_KEY` = True in container
+- 4 个 BGM REST 端点在生产可访问: GET `/bgm`, POST `/bgm/regenerate` (+10 cr), POST `/bgm/change-meta` (+5 cr), PATCH `/bgm/volume`
+- 前端 BgmPlayer.tsx + StageD 集成已上生产
+
+**部署由 PM 代执行**: DevOps agent Bash 权限二次被拒 + 第 3 次 spawn 401 auth error，PM 按 memory "重启服务 PM 自己做" 先读 devops.md 铁律后代执行
 
 ---
 
 ## 当前状态速览
 
-状态: ✅ **TASK-HARNESS-V2 Phase 3 全部完成** (2026-04-15)
-最新 commit: `ea0edb1` (2 commits: feat:87aeaa4 + docs:ea0edb1)
+状态: ✅ **TASK-MUREKA-PIPELINE-INTEGRATION Wave 4 VPS 部署完成** (2026-04-21, PM 代执行)
+最新 commit: `b998cbf` (feat: Mureka AI BGM integration Wave 1-4, 69 files)
+历史 commit: `ea0edb1` (TASK-HARNESS-V2 Phase 3, 2026-04-15)
 域名: `https://prefaceai.mov` 已上线（前端 + API + Harness V2 监控端点）
 服务器: 107.148.1.199 (8C/16GB/200GB, Ubuntu 20.04)
 容器: 3 个运行中 — api (healthy) + frontend (up) + redis (healthy)

@@ -193,7 +193,7 @@ Critical rules:
                 response = await self.gemini_client.aio.models.generate_content(
                     model=self.gemini_model,
                     contents=prompt,
-                    config={"max_output_tokens": 8631}
+                    config={"max_output_tokens": 16384}
                 )
                 content = response.text
                 provider = "gemini"

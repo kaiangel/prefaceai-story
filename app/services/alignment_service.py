@@ -174,7 +174,8 @@ class AlignmentService:
 
                 response = self.claude_client.messages.create(
                     model=self.claude_model,
-                    max_tokens=8631,
+                    max_tokens=16384,
+                    temperature=0.2,
                     messages=[{"role": "user", "content": claude_content}]
                 )
                 response_text = response.content[0].text
@@ -189,7 +190,7 @@ class AlignmentService:
                     contents=contents,
                     config=types.GenerateContentConfig(
                         temperature=0.2,
-                        max_output_tokens=8631
+                        max_output_tokens=16384
                     )
                 )
                 response_text = response.text
@@ -230,7 +231,8 @@ class AlignmentService:
             try:
                 response = self.claude_client.messages.create(
                     model=self.claude_model,
-                    max_tokens=8631,
+                    max_tokens=16384,
+                    temperature=0.2,
                     messages=[{"role": "user", "content": prompt}]
                 )
                 response_text = response.content[0].text
@@ -245,7 +247,7 @@ class AlignmentService:
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         temperature=0.2,
-                        max_output_tokens=8631
+                        max_output_tokens=16384
                     )
                 )
                 response_text = response.text

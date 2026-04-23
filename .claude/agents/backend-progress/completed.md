@@ -4,6 +4,45 @@
 
 ---
 
+## 2026-04-22
+
+### TASK-8631-UNIFY ✅ [2026-04-22 16:10]
+- **13 处 `max_tokens=8631 → 16384`** 统一落地（5 个 Python 文件，用 `sed -i '' 's/8631/16384/g'` 批量替换后 grep 核验 0 命中）
+- 实际修改行号（sed 原地替换不改变行号结构）：
+  - `character_designer.py`: L84 (Claude) / L105 (Gemini)
+  - `alignment_service.py`: L177 / L193 / L234 / L250（Claude 视觉 + Gemini 视觉 + Claude 文本 + Gemini 文本）
+  - `story_outline_generator.py`: L196（Gemini fallback，补齐上次半改遗漏）
+  - `storyboard_director.py`: L543 (调用) / L580 (函数默认参)
+  - `screenplay_writer.py`: L236 (调用) / L663 (默认参) / L790 (Gemini config) / L800 (Claude)
+- **自我纠错**:
+  - 上次 TASK-LLM-TEMP-AUDIT-FIX Step 7 汇报"14 处 `8631` 出现" → **实际 13 处**（PM 独立地毯式 grep 核对发现偏差）
+  - 上次汇报"story_outline_generator 已改 8631→16384" → **半改状态**（L178 Claude 已 16384，L196 Gemini fallback 仍 8631），本次 TASK-8631-UNIFY 补齐
+- **验收**: `grep -rn "8631" app/` 返回 0；`pytest tests/test_architecture.py` 7 passed in 0.04s；`curl http://localhost:8000/health` → `{"status":"healthy"}`
+- **近零风险**: Founder 已批准（token 上限独立决策通过），不涉及 🔴 警示文件，不改前端/prompt/tests
+
+---
+
+### TASK-LLM-TEMP-AUDIT-FIX ✅ [2026-04-22 15:36]
+- **Step 1** `alignment_service.py` L175, L231: Claude `messages.create` × 2 → `temperature=0.2`
+- **Step 2** `shot_validator.py` L125: Haiku `messages.create` → `temperature=0.2`
+- **Step 3** `app/api/utils.py`:
+  - L8: 新增 `from google.genai import types` import
+  - L35, L144: Gemini `generate_content` → `config=types.GenerateContentConfig(temperature=0.2)` × 2
+  - L55, L163: Claude Haiku `messages.create` → `temperature=0.2` × 2
+- **Step 4** `story_generator.py` L303: sync Claude `max_tokens` 8192 → 16384（与 async 对齐）
+- **Step 5** `screenplay_writer.py`:
+  - L697: Stage 3 主 Claude `messages.create` → `temperature=0.8`
+  - L725: Stage 3 备 Gemini config → `{"max_output_tokens": ..., "temperature": 0.8}`
+  - L787: `_expand_narration_if_needed` Gemini config → 加 `"temperature": 0.8`
+  - L798: `_expand_narration_if_needed` Claude `messages.create` → `temperature=0.8`
+- **Step 6** `storyboard_director.py`:
+  - L614: Stage 4 主 Claude → `temperature=0.8`
+  - L642: Stage 4 备 Gemini config → `{"max_output_tokens": ..., "temperature": 0.8}`
+- **Step 7** max_tokens=8631 调查：历史遗留（初始 commit acba309 就存在，无注释，无文档说明；2026-03-24 story_outline_generator 已 8631→16384，其他 Stage 未同步）。建议统一 16384 记入 PENDING
+- **验收**: `pytest tests/test_architecture.py` 7 passed；6 模块 import OK；/health → `{"status":"healthy"}`
+
+---
+
 ## 2026-04-21
 
 ### Wave 3 Step 5 — Stage D BGM REST API ✅ (2026-04-21)

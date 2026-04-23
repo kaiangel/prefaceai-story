@@ -4,6 +4,57 @@
 
 ---
 
+### 2026-04-22 — TASK-8631-UNIFY ✅
+
+**背景**: TASK-LLM-TEMP-AUDIT-FIX Step 7 backend 调查汇报"14 处 + story_outline_generator 已改"，PM 独立地毯式 grep 核对发现偏差（13 处 + 半改状态）。Founder 批准即时执行。
+
+**@backend 一次过关**:
+- 13 处 8631→16384 分布 5 文件全部改完
+- grep 核对代码侧 0 命中
+- pytest test_architecture 7 passed
+- /health healthy
+- Backend 在 progress 三维度做了自我纠错记录
+
+**教训**（记入反思）:
+- PM 审查 agent 调查类任务时**不能只看结论**，必须独立地毯式 grep 验证数字
+- 这次是 Founder 问"是不是只有 14 个"才触发 PM 做独立核对，如果 Founder 没问，错误数据会留在 PENDING
+
+---
+
+### 2026-04-22 — TASK-LLM-TEMP-AUDIT-FIX ✅
+
+**背景**: Founder 对 42 个 LLM 调用点做全量 temperature/max_tokens 审计，发现 4 类问题。PM 规划 7 步改动（含 8631 调查），Founder 批准。
+
+**@backend 一次过关**（15 改动点，规划 14 + backend 主动补 1 对）:
+- alignment_service (2) + shot_validator (1) + api/utils (4+1 import) + story_generator (1) + screenplay_writer (4) + storyboard_director (2) = 15 点
+- pytest test_architecture 7 passed / /health healthy
+
+**PM 独立地毯式审查**:
+- 对每一处 git diff 核对语义：全部正确
+- Step 7 `8631` 调查 backend 说 14 处 → 独立 grep 结果**实际 13 处**（backend 数错）
+- 且 `story_outline_generator.py` 属半改状态：Claude L178 已 16384，Gemini L196 仍 8631
+- 下一步: 派 @backend 统一 13 处 8631→16384（Founder 批准执行）
+
+**文档更新**: TEAM_CHAT 完整记录 + backend-progress 三维度 + pm-progress 三维度 + PENDING 新增 P3 条目 → 待纠正为 13 处。
+
+---
+
+### 2026-04-21 — TASK-MUREKA-PIPELINE-INTEGRATION Wave 1-4 + VPS 部署 ✅
+
+**全链路 BGM 能力落地**:
+- Wave 1 数据层（@backend）: music_hint 字段 × 28 styles + 67 MUSIC_HINTS 表 + 4 BGM 列 + MUREKA_API_KEY 配置
+- Wave 2 服务层（@backend）: story_music_extractor / music_generation_service (8 step) / ffmpeg_post_processor (atrim + ebur128 + silencedetect)
+- Wave 3 API（@backend + @frontend）: GET /bgm, POST /bgm/regenerate (+10 cr), POST /bgm/change-meta (+5 cr), PATCH /bgm/volume; BgmPlayer.tsx 5 状态 + StageD 集成 build 20 路由 0 错
+- Wave 4 集成测试（@tester + PM）: 6P/2W/1S，发现 P2 bug（chapters.py 两处 style_preset → get_music_hint()），Founder 听 3 mp3 确认风格层有辨识度，通过
+- VPS 部署（PM 代执行，@devops Bash 二次被拒）: commit `b998cbf` push + rsync + MUREKA_API_KEY + docker rebuild + health OK
+
+**已知 MVP 后 PENDING (P3)**:
+- music_hint 在 Haiku 层效用有限（但 Mureka mp3 层可辨，Founder 接受）
+- 秋梨膏温暖动作性故事金句质量重试机制
+- 用户自定义 BGM 上传
+
+---
+
 ### 2026-04-21 — TASK-HAIKU-QUOTE-EXTRACTION + v3.1/v3.2 迭代 + Pipeline Wave 1 启动
 
 **TASK-HAIKU-QUOTE-EXTRACTION（方案 A 可行性验证）**:

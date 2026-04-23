@@ -1,6 +1,48 @@
 # Backend Agent - 给其他 Agent 的上下文
 
-> **最后更新**: 2026-04-18（PM 代更新）
+> **最后更新**: [2026-04-22 16:10]
+
+---
+
+## ✅ TASK-8631-UNIFY — max_tokens 统一 16384 [2026-04-22 16:10]
+
+**改动范围**: 5 个 Python 文件（character_designer / alignment_service / story_outline_generator / storyboard_director / screenplay_writer），共 13 处 `max_tokens=8631` 全部改为 `max_tokens=16384`。
+
+**对其他 Agent 的影响**:
+- **@ai-ml**: Stage 1-4 全部 LLM 调用（主 Claude + 备 Gemini）max_tokens 统一 16384，长故事/多角色/复杂剧本的输出不再有截断风险（原 8631 容易截断）。prompt 设计时可假设输出上限稳定 16K
+- **@tester**: 基线统一后，E2E 测试更稳定（原混用 8631/16384 两个上限容易在边界用例出非确定性截断）。如触发黄金断言测试，可能需 re-baseline
+- **@pm**: 上次审计（TASK-LLM-TEMP-AUDIT-FIX Step 7）记入 PENDING 的 "统一 16384" 建议，本次已全部执行完毕，可从 PENDING 标记为完成
+
+**自我纠错 (诚实记录)**:
+- 上次汇报 `8631` **14 处** → 实际 **13 处**（PM 独立地毯式核对发现偏差）
+- 上次汇报 `story_outline_generator.py` **已改** → 实际 **半改状态**（L178 已 16384，L196 Gemini fallback 仍 8631），本次 TASK-8631-UNIFY 补齐
+- 教训：调查类任务（grep 计数 / 多行改动覆盖度）汇报前应二次核对，不仅靠心算数行。future Agent 复盘时可参考此纠错链
+
+**当前 max_tokens 基线** (全 Stage 1-4 + alignment + character_designer):
+| 位置 | max_tokens |
+|------|-----------:|
+| Claude Sonnet 4.6 主模型 | 16384 |
+| Gemini 备用 fallback | 16384 |
+| sync Claude (story_generator L303) | 16384（TASK-LLM-TEMP-AUDIT-FIX Step 4 已改）|
+
+---
+
+## ✅ TASK-LLM-TEMP-AUDIT-FIX — LLM 调用参数统一 [2026-04-22 15:36]
+
+**影响范围**：Stage 1-4 LLM 调用 + vision_analyze + OCR + shot_validator + alignment_service
+
+**对其他 Agent 的影响**：
+- **@ai-ml**: Stage 3/4 主+备模型 temperature 现在显式=0.8（创意任务不再依赖模型默认值，主备一致）。若再做 prompt 质量审查，基线已变（从"默认值参差"变成"显式 0.8"）
+- **@tester**: 旧 E2E 测试结果可能轻微变化（Stage 3/4 创意温度可能从 1.0 降到 0.8，或从无显式提升到 0.8；Haiku/alignment 从默认 1.0 降到 0.2 会更稳定）。若触发相对黄金断言测试，可能需要重新 baseline
+- **@pm**: 8631 max_tokens 历史遗留已确认，建议写入 PENDING（统一为 16384，与 story_generator/story_outline_generator 对齐）
+
+**当前显式温度基线**：
+| 场景 | 温度 | 理由 |
+|------|------|------|
+| OCR / vision_analyze / shot_validator / alignment_service | 0.2 | 识别/判断/对齐确定性任务 |
+| Stage 3 screenplay_writer | 0.8 | 剧本创意任务 |
+| Stage 4 storyboard_director | 0.8 | 运镜差异化创意任务 |
+| story_generator / story_outline_generator / character_designer | 未改（保持原状）| 不在本次审计范围 |
 
 ---
 

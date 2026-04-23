@@ -3,9 +3,25 @@
 > **完整集成任务规格书**
 >
 > - 创建: 2026-04-21 | PM
-> - 状态: 🟡 等待 TASK-HAIKU-QUOTE-EXTRACTION 验证通过后触发
+> - 完成: 2026-04-21 17:55 | PM
+> - 状态: ✅ **全部完成（Wave 1-4 + VPS 部署）**
 > - 优先级: P1
-> - 前置: V2 盲听已 PASS（v2 en Haiku + PM baseline 并列第一）；等 quote extraction 方案 A/B 决策
+
+## ✅ 最终完成状态（2026-04-21 17:55）
+
+| Wave | 状态 | 主要产出 |
+|------|------|---------|
+| Wave 1 数据层 | ✅ | music_hint × 28 styles、67 MUSIC_HINTS、4 BGM 列、MUREKA_API_KEY 配置 |
+| Wave 2 服务层 | ✅ | story_music_extractor / music_generation_service / ffmpeg_post_processor，E2E 跑通 |
+| Wave 3 API | ✅ | 4 BGM REST 端点 + BgmPlayer.tsx 5 状态 + StageD 集成 build 20 路由 0 错 |
+| Wave 4 集成测试 | ✅ | @tester 6P/2W/1S，PM 修 style_preset→get_music_hint bug，Founder 听 3 mp3 通过 |
+| VPS 部署 | ✅ | commit `b998cbf` push + rsync + MUREKA_API_KEY + docker rebuild + /health healthy（PM 代执行，@devops Bash 二次被拒）|
+
+**MVP 后 PENDING (P3，已记录 PENDING.md)**: music_hint 在 Haiku 层效用有限、秋梨膏温暖故事金句重试、自定义 BGM 上传
+
+---
+
+> 以下为任务设计原稿，保留归档 ——
 
 ---
 

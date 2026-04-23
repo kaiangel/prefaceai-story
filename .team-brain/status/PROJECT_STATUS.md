@@ -1,6 +1,6 @@
 # 序话Story 项目状态看板
 
-> 最后更新: 2026-04-16
+> 最后更新: 2026-04-21 17:55
 > 更新者: PM
 
 ---
@@ -10,8 +10,8 @@
 ```
 项目名称: 序话Story - AI条漫/短视频生成系统
 目标: 用户输入创意 → 自动生成可发布的条漫或短视频
-当前版本: v0.8.0
-当前主线: **Harness V2 + Prompt B' 默认化 + Stage D 产品逻辑 + Pipeline 全连通 + Mureka BGM 集成测试** — 部署至 VPS (commits 87aeaa4 + ea0edb1, 2026-04-15)
+当前版本: v0.9.0
+当前主线: **Mureka BGM Pipeline 集成全部完成** — Wave 1-4 + VPS 部署 (commit b998cbf push + docker rebuild + /health healthy, 2026-04-21)
 核心内容: 都市情感短剧 (DEC-005)
 产品形态: 条漫优先 → 短视频保留
 Pipeline品牌: FrameSpark™

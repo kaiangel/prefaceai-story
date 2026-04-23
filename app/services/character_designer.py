@@ -81,7 +81,7 @@ class CharacterDesigner:
                 logger.info(f"  [尝试 Claude Sonnet 4.6]")
                 response = self.claude_client.messages.create(
                     model=self.claude_model,
-                    max_tokens=8631,
+                    max_tokens=16384,
                     messages=[
                         {"role": "user", "content": prompt}
                     ]
@@ -102,7 +102,7 @@ class CharacterDesigner:
                 response = await self.gemini_client.aio.models.generate_content(
                     model=self.gemini_model,
                     contents=prompt,
-                    config={"max_output_tokens": 8631}
+                    config={"max_output_tokens": 16384}
                 )
                 content = response.text
                 provider = "gemini"

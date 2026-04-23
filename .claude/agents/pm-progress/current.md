@@ -1,7 +1,118 @@
 # PM Agent - 当前任务
 
-> **最后更新**: 2026-04-21
-> **状态**: 🔄 Wave 4 剩尾巴 — @tester 结果 6P/2W/1S + PM 修 style_hint bug，等 @devops 重 spawn 做 VPS 部署
+> **最后更新**: 2026-04-22
+> **状态**: 🔄 TASK-LLM-TEMP-AUDIT-FIX 已派 @backend（7 步改动 + 8631 调查）
+
+---
+
+## 进行中（2026-04-23）
+
+### 🔄 TASK-DEPLOY-LLM-SAMPLING — 派 @DevOps
+
+**背景**: 今日完成 2 个代码任务（TEMP-AUDIT-FIX + 8631-UNIFY）本地验证通过，但 VPS 还跑昨天 b998cbf 镜像。Founder 要求 DevOps 同步。
+
+**范围**: 22 个未提交文件（8 代码 + 14 文档），无前端/DB/env 改动，只需 commit + push + rsync app/ + docker rebuild api。
+
+**Bash 预警**: DevOps 上次被拒 2 次 + spawn 401，spawn prompt 已要求"被拒立即 SendMessage，不要白做命令准备"。
+
+---
+
+## 刚完成（2026-04-22）
+
+### ✅ TASK-8631-UNIFY — 审查通过
+
+**独立验证**:
+- `grep -rn "8631" app/` = 0 代码命中
+- 13 处全部改为 16384（character_designer ×2 + alignment_service ×4 + story_outline_generator L196 + storyboard_director ×2 + screenplay_writer ×4）
+- pytest test_architecture 7 passed
+- /health healthy
+- backend progress 三维度已做自我纠错记录
+
+**教训**: Backend 首次调查数据偏差（14 vs 13 + story_outline 半改）。PM 独立地毯式核对发现偏差才纠正。以后 Step 7 类调查任务 PM 审查时要**地毯式独立 grep 验证结论**，不能信 agent 数字。
+
+---
+
+## 历史
+
+### 🔄 TASK-8631-UNIFY (2026-04-22) — 派 @backend
+
+**背景**: PM 独立地毯式核对 TASK-LLM-TEMP-AUDIT-FIX Step 7 发现 backend 调查偏差：
+- Backend 说 14 处 → 实际 **13 处**
+- Backend 说 "story_outline_generator 已改" → 实际**半改**（L178 Claude 16384 ✅，L196 Gemini 8631 ❌）
+
+Founder 批准即时执行（近零风险）。
+
+**改动**: 13 处 `8631 → 16384` 分布 5 文件（character_designer / alignment_service / story_outline_generator L196 / storyboard_director / screenplay_writer）。
+
+**状态**: 等 @backend 完成 → PM 审查（grep 验证 + 要求 backend 同时纠正自己 progress 里 "14 处" 的错误表述）
+
+---
+
+## 刚完成
+
+### ✅ TASK-LLM-TEMP-AUDIT-FIX (2026-04-22) — 审查通过
+
+**@backend 一次通过**。15 个改动点全部落地（规划是 14 个，backend 自己发现 screenplay_writer._expand_narration 第二对 Claude+Gemini 也该加，多加了 1 对 = 15 点）。
+
+**PM 独立审查**:
+- git diff 逐行核对 6 文件 15 处：全部正确 ✅
+- pytest test_architecture: 7 passed ✅
+- /health: healthy ✅
+- Step 7 8631 调查: 历史遗留（最早 commit acba309, 2026-02-12），建议统一 16384 但本 PR 不改 — 已记入 PENDING P3
+
+**没越权**: backend 只改了 6 个代码文件 + backend-progress 三维度 + TEAM_CHAT 追加，没碰 🔴 文件/前端/prompt/tests。
+
+---
+
+## 进行中
+（无，等 Founder 最终签字）
+
+---
+
+## 历史
+
+### TASK-LLM-TEMP-AUDIT-FIX (2026-04-22, Founder 批准)
+
+**背景**: Founder 42 调用点温度审计，4 类问题 + Stage 3/4 创意温度显式化（0.8）+ 8631 来源调查。
+
+**改动**:
+1. alignment_service L175/L231 Claude 加 temperature=0.2
+2. shot_validator L125 Haiku 加 temperature=0.2
+3. utils.py (api/) 4 处 temperature=0.2（Gemini 需 import types）
+4. story_generator L303 sync max_tokens 8192→16384
+5. screenplay_writer L697/L797 Claude + L725 Gemini fallback temperature=0.8
+6. storyboard_director L614 Claude + L642 Gemini fallback temperature=0.8
+7. 调查 max_tokens=8631 14+ 出现位置来源
+
+**状态**: 等 @backend 完成 → PM 审查
+
+---
+
+## 已完成
+
+### ✅ TASK-MUREKA-PIPELINE-INTEGRATION Wave 1-4 + VPS 部署 (2026-04-21)
+
+**背景**: @devops Bash 权限二次被拒，PM 代执行部署。
+
+---
+
+## 刚完成
+
+### ✅ TASK-MUREKA-PIPELINE-INTEGRATION VPS 部署 (2026-04-21)
+
+**背景**: @devops agent Bash 权限二次被拒，依据 memory "重启服务 PM 自己做" + 先读 devops.md 按铁律执行。
+
+**部署步骤**:
+1. git commit `b998cbf` (69 files, 18922 insertions) + push origin main
+2. VPS `.env.production` 追加 MUREKA_API_KEY
+3. rsync app/ + scripts/ + frontend/src/ → VPS（trailing slash 正确）
+4. 共享阿里云 MySQL 已含 4 BGM 列（本地 migration 覆盖 VPS）
+5. docker compose build + up -d api+frontend
+6. health = healthy, MUREKA_API_KEY 注入容器 = True
+
+**验证**: `ssh trader@107.148.1.199 -p 58913 "docker exec docker-api-1 curl -s http://localhost:8000/health"` → `{"status":"healthy"}`
+
+---
 
 ---
 
