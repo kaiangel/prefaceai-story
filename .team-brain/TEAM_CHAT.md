@@ -6313,3 +6313,243 @@ Founder 批准即时执行（独立地毯式结果汇报后，近零风险判定
 - 如果能跑 Bash → 按 devops.md 铁律执行（push before notify、rsync trailing slash、共享 MySQL 不碰）
 
 **风险**: 近零。温度和上限级参数改动，不改接口、不改 DB、不改 .env、不改前端。
+
+---
+
+#### @devops → @pm [2026-04-23 10:55]
+
+### ✅ TASK-DEPLOY-LLM-SAMPLING 完成 — VPS 已同步 LLM sampling 改动
+
+**Bash 权限**: ✅ 可用（本次一轮通过，无被拒）
+
+**执行步骤**:
+
+1. **commit + push** ✅
+   - commit `cb5e395` "chore: unify LLM sampling params (temperature + max_tokens)" (22 files, +812/-38)
+   - push origin main: `b998cbf..cb5e395`
+   - Message 覆盖: TASK-LLM-TEMP-AUDIT-FIX (15 处 temperature + sync max_tokens 8192→16384) + TASK-8631-UNIFY (13 处 8631→16384, 5 files)
+
+2. **rsync `app/` → VPS** ✅
+   - `rsync -avz -e "ssh -p 58913" --exclude '__pycache__' --exclude '*.pyc' app/ trader@107.148.1.199:/opt/xuhua-story/app/`
+   - 传输 8 个代码文件 (api/utils.py + services/ 下 7 个)
+   - trailing slash 正确：`app/` → `/opt/xuhua-story/app/`
+
+3. **VPS docker rebuild + 重启** ✅
+   - `docker compose build api` — 成功 (sha256:b1d6dfe5485c...)
+   - `docker compose up -d --force-recreate api` — 成功 (Recreated + Started)
+
+4. **验证 4/4 PASS** ✅
+
+| 验证项 | 期望 | 结果 |
+|--------|------|------|
+| `/health` | healthy | `{"status":"healthy"}` ✅ |
+| character_designer grep 16384 | ≥ 2 | **2** ✅ |
+| shot_validator grep temperature=0.2 | 1 | **1** ✅ |
+| StartedAt 刷新 | 2026-04-23 | **2026-04-23T02:52:27Z** ✅ (从 2026-04-21T10:05 刷新) |
+| 额外: app/ 下 `grep 8631` | 0 命中 | **0** ✅ |
+
+**部署铁律遵守**:
+- ✅ 先 push 到 GitHub 再部署 VPS
+- ✅ rsync trailing slash 正确
+- ✅ 未碰 .env / DB schema / frontend / redis
+- ✅ 未在 VPS 上 git pull
+
+**文档更新**:
+- ✅ TEAM_CHAT.md（本条）
+- ✅ devops-progress 三维度（current / context-for-others / completed）带时间戳 [2026-04-23 10:55]
+- PM 维护文档（PENDING / PROJECT_STATUS / TODAY_FOCUS / DECISIONS）未动
+
+
+
+---
+
+#### @pm (2026-04-23)
+
+### 派发: TASK-P0P1-LOGGING-FIX — 异常日志治理 + docker log rotate
+
+**背景**: Ben 报 500 Internal Server Error (/api/projects/.../chapters/1/status)，但 VPS docker logs 只剩 139 行（rotate 太激进），Ben 11:50 测试的 traceback 已丢失。PM 独立审查发现 3 处 P0 日志缺口 + 2 处 P1 技术债。Founder 批准全部处理后再本地复测。
+
+**Founder 决策**:
+1. image_generator.py 的 print→logger 跳过真实角色一致性回归（纯机械转换 0 行为变化，只跑 pytest + import）
+2. 派活开工
+
+**派给**: @backend（4 处代码）+ @devops（1 处 compose + 最终部署）
+
+---
+
+**@backend 任务（P0×3 + P1-1×1）**:
+
+| # | 文件 | 改动 |
+|---|------|------|
+| 1 | `pipeline_orchestrator.py` L1074 裸 `except:` | 改 `except Exception as e:` + `logger.exception("...")` + 保留原行为 |
+| 2 | `chapters.py` `start-generation` 端点后台任务（asyncio.create_task 处） | wrapper 捕获异常 → 写 `job.status='failed' + error_message=traceback`，防止默默吞错；独立处理 `asyncio.CancelledError` |
+| 3 | `chapters.py` GET `/status` `/story` `/storyboard` 端点 + 所有非 mutation 端点 | try/except `HTTPException` 透传 + `Exception as e` → `logger.exception` + 返 500 JSON |
+| 4 | `image_generator.py` | 引入 `logger = logging.getLogger(__name__)`，65 处 print → logger.info/error（纯机械转换，不碰业务逻辑）|
+
+**@backend 验收**:
+- pytest test_architecture 7 passed
+- /health healthy（本地 backend shell `bxgmyw2yw` 自动热重载）
+- `grep logger app/services/image_generator.py | wc -l` >= 60
+- 裸 except 已消除（`grep -n "except:" app/services/pipeline_orchestrator.py` 无命中）
+
+---
+
+**@devops 任务（并行 P1-2）**:
+
+- 修改 `docker/docker-compose.yml` api 服务加 logging driver json-file max-size=50m max-file=5
+- **先不部署**，等 @backend 完成 + PM 审查后，再做 **统一部署**（commit + push + rsync + rebuild + 验证）
+
+**@devops 验收**（部署阶段）:
+- `docker inspect docker-api-1 --format '{{.HostConfig.LogConfig.Config}}'` 显示 max-size=50m
+- VPS /health healthy
+- 容器 StartedAt 刷新到今天
+
+---
+
+**🚨 风险提醒**:
+- `image_generator.py` 是 🔴 警示文件，但本次**只做 print→logger 机械转换**（0 行为变化，参考图传递/prompt/API 参数全部不动）
+- P0-2 是行为改动（以前可能吞错，现在写 job.failed）——这是**期望的**，便于 Ben 看见真实错误
+
+---
+
+#### @devops (2026-04-23)
+
+**TASK-P0P1-LOGGING-FIX 完成报告** — @pm
+
+**Step 1: docker-compose.yml 修改** ✅
+
+文件: `docker/docker-compose.yml`，api 服务 healthcheck 块之后新增 5 行:
+```yaml
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+```
+其他服务（redis / worker / frontend / mysql）未改动。
+
+**Step 2: YAML 语法验证** ✅
+
+```
+$ docker compose config --no-interpolate
+返回码: 0，无 STDERR 错误
+parsed 输出确认 api 服务:
+  logging:
+    driver: json-file
+    options:
+      max-file: "5"
+      max-size: 50m
+```
+
+**Step 3: 未部署** ✅（按任务要求，等待 @backend 完成后 PM 统一安排）
+
+**约束遵守**:
+- 仅改 docker-compose.yml，无代码/env/DB 改动
+- 未 commit / push / rsync / 部署
+
+**文档更新**: devops-progress 三件套已更新（current / context-for-others / completed）
+
+PM 可在 @backend 完成后安排统一部署，部署后用 `docker inspect docker-api-1 --format '{{.HostConfig.LogConfig.Config}}'` 验收。
+
+
+---
+
+#### @backend → @pm [2026-04-23 11:30]
+
+### ✅ TASK-P0P1-LOGGING-FIX 完成 — 4 处日志治理全部落地
+
+**改动清单（实际行号）**:
+
+| # | 文件 | 行号 | 改动 |
+|---|------|------|------|
+| 1 (P0) | `app/services/pipeline_orchestrator.py` | L1074-1081 | 裸 `except:` → `except Exception as e: logger.exception(...) + pass`（保留原吞异常行为：forclaudeweb/prompt_quality_report.md 写入失败不阻塞主流程）|
+| 2 (P0) | `app/api/chapters.py` | L498-657 `generate_images_task`<br>L762-790 `regenerate_single_image_task`<br>L1237-1262 `generate_audio_and_align_task` | 3 个后台任务强化：`asyncio.CancelledError` 独立 raise；`Exception` → `logger.exception` + `chapter.error_message = traceback[:10000]` + `chapter.status = 'failed'` + `job.stage_message = f"{type}: {msg[:400]}"` |
+| 3 (P0) | `app/api/chapters.py` | 9 个 GET 端点: `/` (L58) / `/status` (L89) / `/story` (L163) / `/{chapter_number}` (L237) / `/images` (L352) / `/timeline` (L883) / `/audio` (L966) / `/voices` (L1007) / `/bgm` (L1571) | 最外层 try + `HTTPException` 透传 + `logger.exception` + 返 500 JSON `{"detail":"服务异常: {type}: {msg[:200]}"}` |
+| 4 (P1) | `app/services/image_generator.py` | L3 加 `import logging` / L16 加 `logger = logging.getLogger("xuhua")` / 65 处 print → logger | 分类规则: `❌/失败` → `logger.error`；`⚠️/跳过/Warning` → `logger.warning`；其余 → `logger.info`。纯机械转换 0 行为变化 |
+
+---
+
+### 验收 7 项全部 PASS
+
+| 验收项 | 期望 | 结果 |
+|--------|------|------|
+| 1. `grep -n "except:" pipeline_orchestrator.py` | 0 | ✅ **0 命中** |
+| 2. `grep -c "print(" image_generator.py` | ≤ 5 | ✅ **0** |
+| 3. `grep -c "logger\." image_generator.py` | ≥ 60 | ✅ **65** |
+| 4. `pytest tests/test_architecture.py -x -q` | 7 passed | ✅ **7 passed in 0.06s** |
+| 5. `python3 -c "from app.api import chapters; from app.services import image_generator, pipeline_orchestrator"` | 无 ImportError | ✅ **all imports OK** |
+| 6. 本地 backend `/health` | healthy（shell `bxgmyw2yw` 自动热重载）| ✅ **`{"status":"healthy"}`** |
+| 7. chapters.py GET 端点 try/except + BackgroundTasks 异常处理 | 至少 `/status` `/story` `/storyboard` | ✅ **9 个 GET 全部包 + 3 个后台任务全部强化** |
+
+---
+
+### 发现的额外风险（必看）
+
+1. **chapters.py 没有 `start-generation` 端点** — 任务描述里写的是 `asyncio.create_task`，实际代码用的是 FastAPI `BackgroundTasks.add_task(...)`，有 3 个后台任务：`generate_images_task` / `regenerate_single_image_task` / `generate_audio_and_align_task`。我按 FastAPI BackgroundTasks 语义处理，把 3 个函数内部的 `except Exception: print(...)` 全部强化为 `CancelledError` 独立 + `logger.exception` + 写 DB error_message。**语义等价于 wrapper 方案**。
+
+2. **chapters.py 没有叫 `/storyboard` 的 GET 端点** — 实际是分镜数据存在 `chapter.storyboard_json` 里，由 `POST /shots/*` 系列操作（regenerate/update/delete）读写。本次把 9 个 GET 端点全部包了 try/except，覆盖了所有非 mutation 读接口。
+
+3. **`regenerate_single_image_task` 有行为改动** — 原代码 `except Exception: print(...)` 不写 DB（失败不可见），本次新增写一条 `SceneImage(error_message=..., is_active=True)`，让 GET /images 能看到 failed 记录。**符合"让真实错误可见"意图**，但是行为改动需要 PM/Founder 知悉。
+
+4. **`image_generator.py` 纯机械转换，不跑角色一致性回归测试** — Founder 已批准。未碰 `generate_image` / `generate_shot_image_phase2` / API 参数 / contents 数组 / prompt / 参考图传递。pytest + import + /health 三关已过。
+
+5. **VPS docker log 会涨** — logger.exception 打全 traceback，docker log rotate 必须跟上。@devops 的 P1-2 任务（`docker-compose.yml` logging driver json-file max-size=50m max-file=5）必须一并部署，否则磁盘会被撑爆。
+
+---
+
+### 文档更新完整性
+
+- ✅ TEAM_CHAT.md（本条）
+- ✅ `backend-progress/current.md` 顶部状态行更新到 11:30 + "刚完成"块插入 TASK-P0P1-LOGGING-FIX（含 4 处改动表 + 验收表）
+- ✅ `backend-progress/context-for-others.md` 顶部追加 TASK-P0P1-LOGGING-FIX 块（对 @tester/@pm/@devops/@ai-ml/@frontend 的影响 + 发现的额外风险）
+- ✅ `backend-progress/completed.md` 2026-04-23 块顶部插入 TASK-P0P1-LOGGING-FIX（含改动清单 + 验收 + 额外发现）
+- ✅ PM 维护文档（PENDING / PROJECT_STATUS / TODAY_FOCUS / DECISIONS）未动
+
+**文件权限边界**: 只改 3 个 Python 文件（`pipeline_orchestrator.py` / `image_generator.py` / `chapters.py`）+ `backend-progress/` 三维度 + TEAM_CHAT 追加。未碰 🔴 storyboard_prompts / storyboard_service / reference_image_manager / scene_reference_manager，未改前端、prompt、tests、PM 维护文档、Ben 团队文件。
+
+
+---
+
+#### @pm (2026-04-23)
+
+### 派发: TASK-P0P1-DEPLOY — 统一部署 + 融合 Ben utf8mb4 commit
+
+**背景**: @backend + @devops 都已完成 TASK-P0P1-LOGGING-FIX 代码改动，PM 审查通过。同时 Ben 刚 push commit `4725e9e` "fix: ensure charset=utf8mb4 is always set in database URL"（改 `app/database.py` +6/-1，defensive patch）。
+
+**PM 独立兼容性审查结论（100% 兼容）**:
+- 本地 `.env` + VPS `.env.production` + `config.py` fallback 的 DATABASE_URL 都已含 `charset=utf8mb4`
+- Ben 的 `if "charset=" not in _db_url` 在三个环境下都 False → Ben patch 为 noop 防御代码
+- 改动文件零重叠（Ben 改 database.py，我们改 pipeline_orchestrator / chapters / image_generator / docker-compose）
+- 行为语义零冲突（engine 对象创建方式不变）
+
+**派给**: @DevOps
+
+**部署步骤**:
+
+1. `git pull --rebase origin main` → 融合 Ben `4725e9e`
+   - rebase 本地 staged 改动（应该零冲突）
+   - 验证 `app/database.py` 含 Ben 的 _db_url 变量
+
+2. `git add -A` + `git commit` 本地两批改动 + 文档（1 个合并 commit）
+   - commit message 写清楚：TASK-P0P1-LOGGING-FIX（4 处代码 + 1 处 compose）
+   - 不包含 Ben 的 commit（已 rebase 为前驱 commit）
+
+3. `git push origin main`
+
+4. rsync:
+   - `app/` → VPS `/opt/xuhua-story/app/`（含 Ben 的 database.py + 我们的 3 个改动）
+   - `docker/docker-compose.yml` → VPS `/opt/xuhua-story/docker/docker-compose.yml`（logging 配置）
+
+5. VPS 部署:
+   - `cd /opt/xuhua-story/docker && docker compose up -d --force-recreate api`
+   - compose 配置变了必须 `--force-recreate`（不是 restart）
+   - frontend / redis 不动
+
+6. 验证（5 项）:
+   - `docker exec docker-api-1 curl -s http://localhost:8000/health` → healthy
+   - `docker inspect docker-api-1 --format '{{.HostConfig.LogConfig.Config}}'` → `map[max-file:5 max-size:50m]`
+   - `docker exec docker-api-1 grep -c 'logger\.' /app/app/services/image_generator.py` → ≥ 60
+   - `docker exec docker-api-1 grep 'charset=' /app/app/database.py` → Ben 的 patch 存在
+   - 容器 StartedAt 刷新到 2026-04-23
+
+**Bash 权限预警**: 上次 DevOps spawn Bash 二次被拒 + 401 auth。本次**先测试一条无害命令**（`git status | head -3`），若被拒立即 SendMessage PM，不要准备命令浪费一轮。

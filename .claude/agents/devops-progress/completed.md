@@ -1,7 +1,90 @@
 # DevOps Agent - 已完成任务
 
 > 按时间倒序记录已完成的工作
-> **2026-04-21 17:55 注**: 本次 DevOps agent Bash 权限二次被拒 + spawn 再次 401 auth 失败（部分写完 current.md 后挂断），以下 MUREKA 部署记录由 PM 代写补齐。
+> **2026-04-23 11:30 注**: TASK-P0P1-LOGGING-FIX 完成，docker-compose.yml api logging 配置已加，YAML 验证 PASS，等待统一部署。
+
+---
+
+### TASK-P0P1-LOGGING-FIX ✅ (2026-04-23 11:30, DevOps 自执行)
+
+**任务**: 修改 `docker/docker-compose.yml` api 服务，加 logging 配置（json-file, max-size=50m, max-file=5），解决生产 VPS 日志保留不足问题（仅 139 行，Ben 的 500 错误 traceback 丢失）。
+
+**执行步骤**:
+
+1. **读取文件确认当前状态** ✅
+   - `docker/docker-compose.yml` api 服务无 logging 块，healthcheck 结束于第 39 行
+
+2. **修改 docker-compose.yml** ✅
+   - 在 api 服务 healthcheck 块末尾（`retries: 3` 之后）插入 5 行:
+     ```yaml
+         logging:
+           driver: "json-file"
+           options:
+             max-size: "50m"
+             max-file: "5"
+     ```
+   - 其他服务（redis / worker / frontend / mysql）未改动
+
+3. **验证 YAML 语法** ✅
+   - `docker compose config --no-interpolate` 返回码 0，无 STDERR
+   - parsed 输出确认 api 服务含 `logging: {driver: json-file, options: {max-file: "5", max-size: 50m}}`
+
+**未部署**（按任务 Step 3 要求，等待 @backend 完成代码改动后 PM 统一安排）
+
+**约束遵守**:
+- ✅ 仅改 docker-compose.yml，无代码/env/DB 改动
+- ✅ 未 commit / push / rsync / 部署
+- ✅ 其他服务不受影响
+
+---
+
+### TASK-DEPLOY-LLM-SAMPLING ✅ (2026-04-23 10:55, DevOps 自执行)
+
+**任务**: 同步今日 @backend 完成的两个 LLM sampling 任务（TASK-LLM-TEMP-AUDIT-FIX + TASK-8631-UNIFY）到生产 VPS。本地已验证通过，VPS 仍跑 2026-04-21 `b998cbf` 镜像。
+
+**执行步骤**:
+
+1. **git commit + push** ✅
+   - `git add -A` → 22 files staged
+   - `git commit` → commit `cb5e395` "chore: unify LLM sampling params (temperature + max_tokens)" (22 files, +812/-38)
+   - commit message 完整覆盖两个任务:
+     - TASK-LLM-TEMP-AUDIT-FIX (15 changes): alignment_service × 2 / shot_validator × 1 / api/utils × 4+1 import / story_generator max_tokens / screenplay_writer × 4 / storyboard_director × 2 Claude+Gemini temperature 显式化
+     - TASK-8631-UNIFY (13 changes): 5 files 的 max_tokens 8631→16384
+   - `git push origin main` → `b998cbf..cb5e395`
+
+2. **rsync `app/` → VPS** ✅
+   - `rsync -avz -e "ssh -p 58913" --exclude '__pycache__' --exclude '*.pyc' app/ trader@107.148.1.199:/opt/xuhua-story/app/`
+   - 传输 8 个代码文件: api/utils.py + services/ 下 7 个
+   - trailing slash 正确: `app/` → `/opt/xuhua-story/app/`（memory 教训避坑）
+
+3. **VPS docker rebuild + 重启** ✅
+   - `cd /opt/xuhua-story/docker && docker compose build api` → image sha256:b1d6dfe5485c... 构建成功
+   - `docker compose up -d --force-recreate api` → api Recreated + Started
+   - redis / frontend 未动（本次无前端改动）
+
+4. **验证 4/4 PASS** ✅
+
+| 验证项 | 期望 | 结果 |
+|--------|------|------|
+| `docker exec docker-api-1 curl -s http://localhost:8000/health` | healthy | `{"status":"healthy"}` ✅ |
+| `grep -c '16384' /app/app/services/character_designer.py` | ≥2 | **2** ✅ |
+| `grep -c 'temperature=0.2' /app/app/services/shot_validator.py` | 1 | **1** ✅ |
+| `docker inspect ... --format '{{.State.StartedAt}}'` | 2026-04-23 | **2026-04-23T02:52:27Z** ✅ (从 2026-04-21T10:05:10Z 刷新) |
+| `grep -rn '8631' /app/app/services/ /app/app/api/` | 0 | **0** ✅ |
+
+**部署铁律遵守**:
+- ✅ 先 push 到 GitHub 再部署 VPS（push before notify）
+- ✅ rsync trailing slash 正确（`app/` → `/opt/xuhua-story/app/`）
+- ✅ 未碰 .env / DB schema / frontend / redis
+- ✅ 未在 VPS 上 git pull（rsync only）
+
+**Bash 权限**: ✅ 本次可用（上次 2026-04-21 Mureka 部署二次被拒由 PM 代执行，本次恢复正常）。
+
+**影响面**（对下游 agent）:
+- Stage 1-4 LLM 调用全部对齐: 对齐/验证/OCR/视觉分析 temperature=0.2，Stage 3/4 剧本+分镜主备 temperature=0.8
+- sync Claude max_tokens 8192→16384（story_generator.py L303）
+- 所有 max_tokens 统一 16384（character_designer / alignment_service / story_outline_generator L196 补齐 / storyboard_director / screenplay_writer）
+- 不再有 8631 遗留
 
 ---
 

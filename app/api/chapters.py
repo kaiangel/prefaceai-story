@@ -62,21 +62,32 @@ async def list_chapters(
     db: AsyncSession = Depends(get_db),
 ):
     """List all chapters for a project"""
-    # Verify project ownership
-    project_result = await db.execute(
-        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
-    )
-    project = project_result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="项目不存在")
+    try:
+        # Verify project ownership
+        project_result = await db.execute(
+            select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
+        )
+        project = project_result.scalar_one_or_none()
+        if not project:
+            raise HTTPException(status_code=404, detail="项目不存在")
 
-    result = await db.execute(
-        select(Chapter)
-        .where(Chapter.project_id == project.id)
-        .order_by(Chapter.chapter_number)
-    )
-    chapters = result.scalars().all()
-    return [serialize_chapter_response(c, project.uuid) for c in chapters]
+        result = await db.execute(
+            select(Chapter)
+            .where(Chapter.project_id == project.id)
+            .order_by(Chapter.chapter_number)
+        )
+        chapters = result.scalars().all()
+        return [serialize_chapter_response(c, project.uuid) for c in chapters]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(
+            f"[chapters/list] unhandled error project={project_id}: {e}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"服务异常: {type(e).__name__}: {str(e)[:200]}"
+        )
 
 
 @router.get("/{chapter_number}/status", response_model=ChapterStatus)
@@ -89,60 +100,71 @@ async def get_generation_status(
     """
     Query generation status (for frontend polling)
     """
-    # Verify project ownership
-    project_result = await db.execute(
-        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
-    )
-    project = project_result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="项目不存在")
-
-    # Get chapter
-    chapter_result = await db.execute(
-        select(Chapter).where(
-            Chapter.project_id == project.id,
-            Chapter.chapter_number == chapter_number,
+    try:
+        # Verify project ownership
+        project_result = await db.execute(
+            select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
         )
-    )
-    chapter = chapter_result.scalar_one_or_none()
+        project = project_result.scalar_one_or_none()
+        if not project:
+            raise HTTPException(status_code=404, detail="项目不存在")
 
-    if not chapter:
-        raise HTTPException(status_code=404, detail="章节不存在")
+        # Get chapter
+        chapter_result = await db.execute(
+            select(Chapter).where(
+                Chapter.project_id == project.id,
+                Chapter.chapter_number == chapter_number,
+            )
+        )
+        chapter = chapter_result.scalar_one_or_none()
 
-    # Get latest job
-    job_result = await db.execute(
-        select(GenerationJob)
-        .where(GenerationJob.chapter_id == chapter.id)
-        .order_by(GenerationJob.created_at.desc())
-        .limit(1)
-    )
-    job = job_result.scalar_one_or_none()
+        if not chapter:
+            raise HTTPException(status_code=404, detail="章节不存在")
 
-    if not job:
+        # Get latest job
+        job_result = await db.execute(
+            select(GenerationJob)
+            .where(GenerationJob.chapter_id == chapter.id)
+            .order_by(GenerationJob.created_at.desc())
+            .limit(1)
+        )
+        job = job_result.scalar_one_or_none()
+
+        if not job:
+            return ChapterStatus(
+                status=chapter.status,
+                stage=None,
+                progress=0,
+                estimated_remaining_seconds=None,
+                message="暂无生成任务",
+            )
+
+        # RB-6: 计算剩余秒数 = max(0, total_estimated - elapsed)
+        estimated_remaining = None
+        if job.estimated_seconds is not None:
+            if job.started_at:
+                elapsed = (datetime.utcnow() - job.started_at).total_seconds()
+                estimated_remaining = max(0, int(job.estimated_seconds - elapsed))
+            else:
+                estimated_remaining = job.estimated_seconds
+
         return ChapterStatus(
-            status=chapter.status,
-            stage=None,
-            progress=0,
-            estimated_remaining_seconds=None,
-            message="暂无生成任务",
+            status=job.status,
+            stage=job.current_stage,
+            progress=job.progress,
+            estimated_remaining_seconds=estimated_remaining,
+            message=job.stage_message,
         )
-
-    # RB-6: 计算剩余秒数 = max(0, total_estimated - elapsed)
-    estimated_remaining = None
-    if job.estimated_seconds is not None:
-        if job.started_at:
-            elapsed = (datetime.utcnow() - job.started_at).total_seconds()
-            estimated_remaining = max(0, int(job.estimated_seconds - elapsed))
-        else:
-            estimated_remaining = job.estimated_seconds
-
-    return ChapterStatus(
-        status=job.status,
-        stage=job.current_stage,
-        progress=job.progress,
-        estimated_remaining_seconds=estimated_remaining,
-        message=job.stage_message,
-    )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(
+            f"[chapters/status] unhandled error project={project_id} chapter={chapter_number}: {e}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"服务异常: {type(e).__name__}: {str(e)[:200]}"
+        )
 
 
 @router.get("/{chapter_number}/story", response_model=ChapterStory)
@@ -155,58 +177,69 @@ async def get_chapter_story(
     """
     Get generated story content
     """
-    # Verify project ownership
-    project_result = await db.execute(
-        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
-    )
-    project = project_result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="项目不存在")
-
-    # Get chapter
-    chapter_result = await db.execute(
-        select(Chapter).where(
-            Chapter.project_id == project.id, Chapter.chapter_number == chapter_number
-        )
-    )
-    chapter = chapter_result.scalar_one_or_none()
-
-    if not chapter:
-        raise HTTPException(status_code=404, detail="章节不存在")
-
-    # Check if story is ready
-    if chapter.status == "pending":
-        raise HTTPException(status_code=400, detail="故事尚未开始生成")
-
-    if chapter.status == "generating_story":
-        raise HTTPException(status_code=400, detail="故事正在生成中，请稍候")
-
-    if chapter.status == "failed":
-        raise HTTPException(
-            status_code=400,
-            detail=f"故事生成失败: {chapter.error_message or '未知错误'}",
-        )
-
-    if not chapter.full_script:
-        raise HTTPException(status_code=400, detail="故事内容不存在")
-
-    # Parse stored JSON
     try:
-        full_script = json.loads(chapter.full_script)
-        scenes = json.loads(chapter.scenes_json) if chapter.scenes_json else []
-        characters = (
-            json.loads(chapter.characters_json) if chapter.characters_json else []
+        # Verify project ownership
+        project_result = await db.execute(
+            select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
         )
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500, detail=f"数据解析错误: {str(e)}")
+        project = project_result.scalar_one_or_none()
+        if not project:
+            raise HTTPException(status_code=404, detail="项目不存在")
 
-    return ChapterStory(
-        title=full_script.get("title", "未命名"),
-        summary=chapter.summary or "",
-        full_script=full_script,
-        scenes=scenes,
-        characters=characters,
-    )
+        # Get chapter
+        chapter_result = await db.execute(
+            select(Chapter).where(
+                Chapter.project_id == project.id, Chapter.chapter_number == chapter_number
+            )
+        )
+        chapter = chapter_result.scalar_one_or_none()
+
+        if not chapter:
+            raise HTTPException(status_code=404, detail="章节不存在")
+
+        # Check if story is ready
+        if chapter.status == "pending":
+            raise HTTPException(status_code=400, detail="故事尚未开始生成")
+
+        if chapter.status == "generating_story":
+            raise HTTPException(status_code=400, detail="故事正在生成中，请稍候")
+
+        if chapter.status == "failed":
+            raise HTTPException(
+                status_code=400,
+                detail=f"故事生成失败: {chapter.error_message or '未知错误'}",
+            )
+
+        if not chapter.full_script:
+            raise HTTPException(status_code=400, detail="故事内容不存在")
+
+        # Parse stored JSON
+        try:
+            full_script = json.loads(chapter.full_script)
+            scenes = json.loads(chapter.scenes_json) if chapter.scenes_json else []
+            characters = (
+                json.loads(chapter.characters_json) if chapter.characters_json else []
+            )
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=500, detail=f"数据解析错误: {str(e)}")
+
+        return ChapterStory(
+            title=full_script.get("title", "未命名"),
+            summary=chapter.summary or "",
+            full_script=full_script,
+            scenes=scenes,
+            characters=characters,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(
+            f"[chapters/story] unhandled error project={project_id} chapter={chapter_number}: {e}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"服务异常: {type(e).__name__}: {str(e)[:200]}"
+        )
 
 
 @router.get("/{chapter_number}", response_model=ChapterResponse)
@@ -217,25 +250,36 @@ async def get_chapter(
     db: AsyncSession = Depends(get_db),
 ):
     """Get basic chapter info"""
-    # Verify project ownership
-    project_result = await db.execute(
-        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
-    )
-    project = project_result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="项目不存在")
-
-    chapter_result = await db.execute(
-        select(Chapter).where(
-            Chapter.project_id == project.id, Chapter.chapter_number == chapter_number
+    try:
+        # Verify project ownership
+        project_result = await db.execute(
+            select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
         )
-    )
-    chapter = chapter_result.scalar_one_or_none()
+        project = project_result.scalar_one_or_none()
+        if not project:
+            raise HTTPException(status_code=404, detail="项目不存在")
 
-    if not chapter:
-        raise HTTPException(status_code=404, detail="章节不存在")
+        chapter_result = await db.execute(
+            select(Chapter).where(
+                Chapter.project_id == project.id, Chapter.chapter_number == chapter_number
+            )
+        )
+        chapter = chapter_result.scalar_one_or_none()
 
-    return serialize_chapter_response(chapter, project.uuid)
+        if not chapter:
+            raise HTTPException(status_code=404, detail="章节不存在")
+
+        return serialize_chapter_response(chapter, project.uuid)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(
+            f"[chapters/get] unhandled error project={project_id} chapter={chapter_number}: {e}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"服务异常: {type(e).__name__}: {str(e)[:200]}"
+        )
 
 
 # ============ Phase 2: 图像生成端点 ============
@@ -338,73 +382,84 @@ async def get_chapter_images(
     """
     获取章节的所有分镜图像
     """
-    # 1. 验证项目
-    project_result = await db.execute(
-        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
-    )
-    project = project_result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="项目不存在")
-
-    # 2. 获取章节
-    chapter_result = await db.execute(
-        select(Chapter).where(
-            Chapter.project_id == project.id, Chapter.chapter_number == chapter_number
+    try:
+        # 1. 验证项目
+        project_result = await db.execute(
+            select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
         )
-    )
-    chapter = chapter_result.scalar_one_or_none()
+        project = project_result.scalar_one_or_none()
+        if not project:
+            raise HTTPException(status_code=404, detail="项目不存在")
 
-    if not chapter:
-        raise HTTPException(status_code=404, detail="章节不存在")
+        # 2. 获取章节
+        chapter_result = await db.execute(
+            select(Chapter).where(
+                Chapter.project_id == project.id, Chapter.chapter_number == chapter_number
+            )
+        )
+        chapter = chapter_result.scalar_one_or_none()
 
-    # 3. 获取所有活跃的场景图像
-    images_result = await db.execute(
-        select(SceneImage)
-        .where(SceneImage.chapter_id == chapter.id, SceneImage.is_active == True)
-        .order_by(SceneImage.scene_id)
-    )
-    scene_images = images_result.scalars().all()
+        if not chapter:
+            raise HTTPException(status_code=404, detail="章节不存在")
 
-    # 4. 构建响应
-    images = []
-    completed = 0
-    failed = 0
+        # 3. 获取所有活跃的场景图像
+        images_result = await db.execute(
+            select(SceneImage)
+            .where(SceneImage.chapter_id == chapter.id, SceneImage.is_active == True)
+            .order_by(SceneImage.scene_id)
+        )
+        scene_images = images_result.scalars().all()
 
-    for img in scene_images:
-        image_data = {
-            "scene_id": img.scene_id,
-            "image_url": f"/api/images/{img.image_path}" if img.image_path else None,
-            "thumbnail_url": f"/api/images/{img.thumbnail_path}" if img.thumbnail_path else None,
-            "prompt": img.image_prompt,
-            "status": "completed" if img.image_path and not img.error_message else "failed",
-            "width": img.width,
-            "height": img.height,
-            "aspect_ratio": img.aspect_ratio,
-            "model_used": img.generation_model,
-            "error": img.error_message
-        }
-        images.append(image_data)
+        # 4. 构建响应
+        images = []
+        completed = 0
+        failed = 0
 
-        if img.image_path and not img.error_message:
-            completed += 1
-        elif img.error_message:
-            failed += 1
+        for img in scene_images:
+            image_data = {
+                "scene_id": img.scene_id,
+                "image_url": f"/api/images/{img.image_path}" if img.image_path else None,
+                "thumbnail_url": f"/api/images/{img.thumbnail_path}" if img.thumbnail_path else None,
+                "prompt": img.image_prompt,
+                "status": "completed" if img.image_path and not img.error_message else "failed",
+                "width": img.width,
+                "height": img.height,
+                "aspect_ratio": img.aspect_ratio,
+                "model_used": img.generation_model,
+                "error": img.error_message
+            }
+            images.append(image_data)
 
-    # 获取总场景数
-    total_scenes = 0
-    if chapter.scenes_json:
-        try:
-            scenes = json.loads(chapter.scenes_json)
-            total_scenes = len(scenes)
-        except json.JSONDecodeError:
-            pass
+            if img.image_path and not img.error_message:
+                completed += 1
+            elif img.error_message:
+                failed += 1
 
-    return ChapterImagesResponse(
-        images=images,
-        total=total_scenes,
-        completed=completed,
-        failed=failed
-    )
+        # 获取总场景数
+        total_scenes = 0
+        if chapter.scenes_json:
+            try:
+                scenes = json.loads(chapter.scenes_json)
+                total_scenes = len(scenes)
+            except json.JSONDecodeError:
+                pass
+
+        return ChapterImagesResponse(
+            images=images,
+            total=total_scenes,
+            completed=completed,
+            failed=failed
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(
+            f"[chapters/images] unhandled error project={project_id} chapter={chapter_number}: {e}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"服务异常: {type(e).__name__}: {str(e)[:200]}"
+        )
 
 
 @router.post("/{chapter_number}/images/{scene_id}/regenerate")
@@ -490,6 +545,11 @@ async def generate_images_task(
 ):
     """
     图像生成后台任务
+
+    TASK-P0P1-LOGGING-FIX (2026-04-23):
+    - asyncio.CancelledError 单独处理（用户取消不算 failed）
+    - Exception 用 logger.exception 输出完整 traceback 到日志
+    - 错误信息写入 job.stage_message + chapter.error_message（含 traceback 摘要）
     """
     from app.database import async_session_maker
     from app.services.storyboard_service import StoryboardService
@@ -620,16 +680,28 @@ async def generate_images_task(
             chapter.updated_at = datetime.utcnow()
             await db.commit()
 
+        except asyncio.CancelledError:
+            # 用户主动取消，不算错误；让协程正常终止
+            logger.info(
+                f"[generate_images_task] task cancelled job_id={job_id} chapter_id={chapter_id}"
+            )
+            raise
         except Exception as e:
-            print(f"Image generation error: {e}")
+            import traceback as _tb
+            error_tb = _tb.format_exc()
+            logger.exception(
+                f"[generate_images_task] 后台任务异常 job_id={job_id} chapter_id={chapter_id}: {e}"
+            )
             if job:
                 job.status = "failed"
-                job.stage_message = f"图像生成失败: {str(e)}"
+                job.stage_message = f"图像生成失败: {type(e).__name__}: {str(e)[:400]}"
+                job.completed_at = datetime.utcnow()
                 await db.commit()
 
             chapter = await db.get(Chapter, chapter_id)
             if chapter:
-                chapter.error_message = str(e)
+                chapter.error_message = error_tb[:10000]
+                chapter.status = "failed"
                 await db.commit()
 
 
@@ -733,8 +805,33 @@ async def regenerate_single_image_task(
             db.add(scene_image)
             await db.commit()
 
+        except asyncio.CancelledError:
+            logger.info(
+                f"[regenerate_single_image_task] task cancelled chapter_id={chapter_id} scene_id={scene_id}"
+            )
+            raise
         except Exception as e:
-            print(f"Regenerate image error: {e}")
+            logger.exception(
+                f"[regenerate_single_image_task] 后台任务异常 "
+                f"chapter_id={chapter_id} scene_id={scene_id}: {e}"
+            )
+            # 写一个失败记录到 DB，让 GET /images 能看到 error
+            try:
+                failed_image = SceneImage(
+                    chapter_id=chapter_id,
+                    scene_id=scene_id,
+                    image_prompt="",
+                    image_path="",
+                    error_message=f"{type(e).__name__}: {str(e)[:500]}",
+                    is_active=True,
+                    created_at=datetime.utcnow()
+                )
+                db.add(failed_image)
+                await db.commit()
+            except Exception as db_e:
+                logger.exception(
+                    f"[regenerate_single_image_task] failed 记录写 DB 也失败: {db_e}"
+                )
 
 
 # ============ Phase 3: 音频生成和对齐端点 ============
@@ -867,60 +964,71 @@ async def get_chapter_timeline(
 
     返回每个场景对应的时间段和图片
     """
-    # 1. 验证项目
-    project_result = await db.execute(
-        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
-    )
-    project = project_result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="项目不存在")
-
-    # 2. 获取章节
-    chapter_result = await db.execute(
-        select(Chapter).where(
-            Chapter.project_id == project.id, Chapter.chapter_number == chapter_number
-        )
-    )
-    chapter = chapter_result.scalar_one_or_none()
-
-    if not chapter:
-        raise HTTPException(status_code=404, detail="章节不存在")
-
-    # 3. 检查是否有时间轴数据
-    if not chapter.timeline_json:
-        raise HTTPException(status_code=400, detail="时间轴尚未生成，请先生成音频")
-
-    # 4. 解析时间轴
     try:
-        timeline = json.loads(chapter.timeline_json)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="时间轴数据解析失败")
+        # 1. 验证项目
+        project_result = await db.execute(
+            select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
+        )
+        project = project_result.scalar_one_or_none()
+        if not project:
+            raise HTTPException(status_code=404, detail="项目不存在")
 
-    # 5. 获取图像信息并补充到时间轴
-    images_result = await db.execute(
-        select(SceneImage)
-        .where(SceneImage.chapter_id == chapter.id, SceneImage.is_active == True)
-    )
-    scene_images = {img.scene_id: img for img in images_result.scalars().all()}
+        # 2. 获取章节
+        chapter_result = await db.execute(
+            select(Chapter).where(
+                Chapter.project_id == project.id, Chapter.chapter_number == chapter_number
+            )
+        )
+        chapter = chapter_result.scalar_one_or_none()
 
-    for item in timeline:
-        scene_id = item.get("scene_id")
-        if scene_id in scene_images:
-            img = scene_images[scene_id]
-            item["image_url"] = f"/api/images/{img.image_path}" if img.image_path else None
-            item["thumbnail_url"] = f"/api/images/{img.thumbnail_path}" if img.thumbnail_path else None
+        if not chapter:
+            raise HTTPException(status_code=404, detail="章节不存在")
 
-    # 6. 构建音频URL
-    audio_url = None
-    if chapter.audio_path:
-        audio_url = f"/api/audio/{project_id}/{chapter.id}/narration.mp3"
+        # 3. 检查是否有时间轴数据
+        if not chapter.timeline_json:
+            raise HTTPException(status_code=400, detail="时间轴尚未生成，请先生成音频")
 
-    return ChapterTimelineResponse(
-        timeline=timeline,
-        audio_url=audio_url,
-        audio_duration_seconds=chapter.audio_duration_seconds,
-        voice_preset=chapter.voice_preset
-    )
+        # 4. 解析时间轴
+        try:
+            timeline = json.loads(chapter.timeline_json)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=500, detail="时间轴数据解析失败")
+
+        # 5. 获取图像信息并补充到时间轴
+        images_result = await db.execute(
+            select(SceneImage)
+            .where(SceneImage.chapter_id == chapter.id, SceneImage.is_active == True)
+        )
+        scene_images = {img.scene_id: img for img in images_result.scalars().all()}
+
+        for item in timeline:
+            scene_id = item.get("scene_id")
+            if scene_id in scene_images:
+                img = scene_images[scene_id]
+                item["image_url"] = f"/api/images/{img.image_path}" if img.image_path else None
+                item["thumbnail_url"] = f"/api/images/{img.thumbnail_path}" if img.thumbnail_path else None
+
+        # 6. 构建音频URL
+        audio_url = None
+        if chapter.audio_path:
+            audio_url = f"/api/audio/{project_id}/{chapter.id}/narration.mp3"
+
+        return ChapterTimelineResponse(
+            timeline=timeline,
+            audio_url=audio_url,
+            audio_duration_seconds=chapter.audio_duration_seconds,
+            voice_preset=chapter.voice_preset
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(
+            f"[chapters/timeline] unhandled error project={project_id} chapter={chapter_number}: {e}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"服务异常: {type(e).__name__}: {str(e)[:200]}"
+        )
 
 
 @router.get("/{chapter_number}/audio")
@@ -933,35 +1041,46 @@ async def get_chapter_audio_info(
     """
     获取章节音频信息
     """
-    # 1. 验证项目
-    project_result = await db.execute(
-        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
-    )
-    project = project_result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="项目不存在")
-
-    # 2. 获取章节
-    chapter_result = await db.execute(
-        select(Chapter).where(
-            Chapter.project_id == project.id, Chapter.chapter_number == chapter_number
+    try:
+        # 1. 验证项目
+        project_result = await db.execute(
+            select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
         )
-    )
-    chapter = chapter_result.scalar_one_or_none()
+        project = project_result.scalar_one_or_none()
+        if not project:
+            raise HTTPException(status_code=404, detail="项目不存在")
 
-    if not chapter:
-        raise HTTPException(status_code=404, detail="章节不存在")
+        # 2. 获取章节
+        chapter_result = await db.execute(
+            select(Chapter).where(
+                Chapter.project_id == project.id, Chapter.chapter_number == chapter_number
+            )
+        )
+        chapter = chapter_result.scalar_one_or_none()
 
-    # 3. 返回音频信息
-    has_audio = bool(chapter.audio_path)
+        if not chapter:
+            raise HTTPException(status_code=404, detail="章节不存在")
 
-    return {
-        "has_audio": has_audio,
-        "audio_url": f"/api/audio/{project_id}/{chapter.id}/narration.mp3" if has_audio else None,
-        "audio_duration_seconds": chapter.audio_duration_seconds,
-        "voice_preset": chapter.voice_preset,
-        "has_timeline": bool(chapter.timeline_json)
-    }
+        # 3. 返回音频信息
+        has_audio = bool(chapter.audio_path)
+
+        return {
+            "has_audio": has_audio,
+            "audio_url": f"/api/audio/{project_id}/{chapter.id}/narration.mp3" if has_audio else None,
+            "audio_duration_seconds": chapter.audio_duration_seconds,
+            "voice_preset": chapter.voice_preset,
+            "has_timeline": bool(chapter.timeline_json)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(
+            f"[chapters/audio] unhandled error project={project_id} chapter={chapter_number}: {e}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"服务异常: {type(e).__name__}: {str(e)[:200]}"
+        )
 
 
 @router.get("/{chapter_number}/voices")
@@ -973,15 +1092,26 @@ async def get_available_voices(
     """
     获取可用的音色列表
     """
-    from app.services.tts_service import TTSService
+    try:
+        from app.services.tts_service import TTSService
 
-    tts = TTSService()
-    voices = tts.get_available_voices()
+        tts = TTSService()
+        voices = tts.get_available_voices()
 
-    return {
-        "voices": voices,
-        "default": "zh_female_shuangkuai"
-    }
+        return {
+            "voices": voices,
+            "default": "zh_female_shuangkuai"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(
+            f"[chapters/voices] unhandled error project={project_id} chapter={chapter_number}: {e}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"服务异常: {type(e).__name__}: {str(e)[:200]}"
+        )
 
 
 # ============ Phase 3 后台任务 ============
@@ -1192,19 +1322,29 @@ async def generate_audio_and_align_task(
                 job.completed_at = datetime.utcnow()
                 await db.commit()
 
+        except asyncio.CancelledError:
+            logger.info(
+                f"[generate_audio_and_align_task] task cancelled "
+                f"job_id={job_id} chapter_id={chapter_id}"
+            )
+            raise
         except Exception as e:
-            print(f"Audio generation error: {e}")
             import traceback
-            traceback.print_exc()
+            error_tb = traceback.format_exc()
+            logger.exception(
+                f"[generate_audio_and_align_task] 后台任务异常 "
+                f"job_id={job_id} chapter_id={chapter_id}: {e}"
+            )
 
             if job:
                 job.status = "failed"
-                job.stage_message = f"音频生成失败: {str(e)}"
+                job.stage_message = f"音频生成失败: {type(e).__name__}: {str(e)[:400]}"
+                job.completed_at = datetime.utcnow()
                 await db.commit()
 
             chapter = await db.get(Chapter, chapter_id)
             if chapter:
-                chapter.error_message = str(e)
+                chapter.error_message = error_tb[:10000]
                 chapter.status = "failed"
                 await db.commit()
 
@@ -1555,34 +1695,45 @@ async def get_bgm(
             "bgm_exists": bool,          # bgm_url 非 null 且文件实际存在
         }
     """
-    import os
+    try:
+        import os
 
-    project, chapter = await _get_project_and_chapter(
-        project_id, chapter_number, user_id, db
-    )
+        project, chapter = await _get_project_and_chapter(
+            project_id, chapter_number, user_id, db
+        )
 
-    bgm_url = chapter.bgm_url
-    bgm_exists = False
+        bgm_url = chapter.bgm_url
+        bgm_exists = False
 
-    if bgm_url:
-        # 判断文件是否实际存在（bgm_url 可能是绝对路径或 /static/... URL）
-        if bgm_url.startswith("/"):
-            # 绝对本地路径 or /static/ URL — 尝试文件系统检查
-            check_path = bgm_url if not bgm_url.startswith("/static/") else None
-            if check_path:
-                bgm_exists = os.path.isfile(check_path)
+        if bgm_url:
+            # 判断文件是否实际存在（bgm_url 可能是绝对路径或 /static/... URL）
+            if bgm_url.startswith("/"):
+                # 绝对本地路径 or /static/ URL — 尝试文件系统检查
+                check_path = bgm_url if not bgm_url.startswith("/static/") else None
+                if check_path:
+                    bgm_exists = os.path.isfile(check_path)
+                else:
+                    bgm_exists = True  # /static/ URL 假设存在（由 static 服务托管）
             else:
-                bgm_exists = True  # /static/ URL 假设存在（由 static 服务托管）
-        else:
-            bgm_exists = os.path.isfile(bgm_url)
+                bgm_exists = os.path.isfile(bgm_url)
 
-    return {
-        "bgm_url": bgm_url,
-        "bgm_volume": chapter.bgm_volume if chapter.bgm_volume is not None else 1.0,
-        "meta_version": chapter.bgm_meta_version,
-        "credits_used": chapter.credits_used or 0,
-        "bgm_exists": bgm_exists,
-    }
+        return {
+            "bgm_url": bgm_url,
+            "bgm_volume": chapter.bgm_volume if chapter.bgm_volume is not None else 1.0,
+            "meta_version": chapter.bgm_meta_version,
+            "credits_used": chapter.credits_used or 0,
+            "bgm_exists": bgm_exists,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(
+            f"[chapters/bgm GET] unhandled error project={project_id} chapter={chapter_number}: {e}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"服务异常: {type(e).__name__}: {str(e)[:200]}"
+        )
 
 
 @router.post("/{chapter_number}/bgm/regenerate")

@@ -1,6 +1,36 @@
 # Backend Agent - 给其他 Agent 的上下文
 
-> **最后更新**: [2026-04-22 16:10]
+> **最后更新**: [2026-04-23 11:30]
+
+---
+
+## ✅ TASK-P0P1-LOGGING-FIX — 异常日志治理 [2026-04-23 11:30]
+
+**改动范围**: 3 个文件 / 4 处改动
+- `app/services/pipeline_orchestrator.py` L1074-1081（消除裸 except）
+- `app/services/image_generator.py`（65 处 print → logger，新增 `logger = logging.getLogger("xuhua")`）
+- `app/api/chapters.py`（9 个 GET 端点加 try/except + 3 个后台任务强化异常处理）
+
+**对其他 Agent 的影响**:
+
+- **@tester / @pm**: 现在所有 chapters API 的 500 错误都会在 uvicorn 日志输出完整 traceback（`logger.exception`），不会再被 FastAPI 默认的 "Internal Server Error" 页面吞掉。response body 也会有 `{"detail":"服务异常: {ExceptionType}: {msg[:200]}"}`，前端/curl 能看到具体异常类型。Ben 以后踩 500 可以直接看返回 body 判断是 DB/KeyError/NPE 还是真正的业务错误。
+
+- **@devops**: 
+  - VPS 上的 uvicorn 输出现在会有大量 `logger.exception` 打出的 traceback，docker log rotate 不够激进的话会撑爆磁盘。本次 @devops 的 P1-2 任务（`docker/docker-compose.yml` 加 `logging.driver=json-file` + `max-size=50m` + `max-file=5`）必须跟上
+  - `logger = logging.getLogger("xuhua")` 统一 namespace，方便 filter
+
+- **@ai-ml**: image_generator.py 的 65 处 print 全部变 logger，`[ImageGenerator]` 前缀保留在 message 里。如果 AI-ML 之前有过"看 print 输出调试 prompt 工程"的习惯，现在应该看 uvicorn 日志的 logger.info 输出（依然有）。**纯机械转换无行为变化**。
+
+- **@frontend**: 3 个后台任务现在失败时会写 `chapter.error_message = traceback[:10000]`（以前只存 `str(e)` 可能只有一行）。前端展示 chapter 错误时 UI 要能显示长 traceback 或做截断，避免直接全量渲染破坏布局。
+
+**关键设计**:
+- 3 个后台任务独立处理 `asyncio.CancelledError`（用户主动取消不算 failed，保留 FastAPI 生命周期语义）
+- GET 端点 HTTPException 透传（404/400 等业务异常不被 500 吞）
+- 其他异常统一 logger.exception + 返 500 JSON 含 type+msg
+
+**发现的额外风险**:
+- 任务描述里提到 `chapters.py` 有 `start-generation` 端点 + `asyncio.create_task(...)` — **实际没有**。chapters.py 用的是 FastAPI `BackgroundTasks.add_task(...)`（3 个后台任务：generate_images / regenerate_single_image / generate_audio_and_align）。本次按 FastAPI BackgroundTasks 语义处理，把 3 个函数内部的 `except Exception: print(...)` 全部强化为 `asyncio.CancelledError` 独立 + `logger.exception` 全打 traceback + 写 DB error_message。语义等价于 wrapper 方案。
+- `regenerate_single_image_task` 原代码的 `except Exception: print(...)` 不写 DB（失败不可见），本次新增失败时写一条 `SceneImage(error_message=..., is_active=True)`，让 GET /images 能看到 failed 记录。这是行为改动但符合任务意图（让真实错误可见）。
 
 ---
 

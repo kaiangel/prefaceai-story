@@ -1,11 +1,70 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-04-21（自更新）
-> **状态**: ✅ TASK-MUREKA-PIPELINE-INTEGRATION Wave 4 VPS 部署完成（PM 代执行，Bash 权限二次被拒）
+> **最后更新**: 2026-04-23 11:30（自更新）
+> **状态**: ✅ TASK-P0P1-LOGGING-FIX 完成 — docker-compose.yml api logging 配置已加，YAML 验证 PASS，未部署（等待下一轮统一部署）
 
 ---
 
 ## 刚完成
+
+**TASK-P0P1-LOGGING-FIX — docker-compose.yml api 服务加 logging 配置 [2026-04-23 11:30]**
+
+背景：Ben 在生产 VPS 排查 500 错误，PM 检查 `docker logs` 只剩 139 行，Ben 11:50 的 traceback 已丢失。根因：Docker 默认日志驱动无大小限制，但容器重启时缓冲区被截断，有效保留行数极少。
+
+**执行**:
+- 修改 `docker/docker-compose.yml` api 服务，在 `healthcheck:` 块之后添加 `logging:` 配置
+- 改动位置：原文件第 38-39 行之后（healthcheck retries: 3 末尾）
+- 新增内容（5 行）:
+  ```yaml
+      logging:
+        driver: "json-file"
+        options:
+          max-size: "50m"
+          max-file: "5"
+  ```
+- 其他服务（redis / worker / frontend / mysql）未改动
+
+**语法验证**:
+- `docker compose config --no-interpolate` 返回码 0，无 STDERR 错误
+- parsed 输出中 api 服务确认有 `logging: {driver: json-file, options: {max-file: "5", max-size: 50m}}`
+
+**未部署**（按任务要求 Step 3：等待 @backend 完成代码改动后 PM 统一安排部署）
+
+---
+
+## 上次完成
+
+**TASK-DEPLOY-LLM-SAMPLING — VPS 同步 LLM sampling 改动 [2026-04-23 10:55]**
+
+今日 @backend 完成的两个 LLM sampling 任务（TASK-LLM-TEMP-AUDIT-FIX + TASK-8631-UNIFY）部署到生产 VPS。
+
+**执行**:
+- commit `cb5e395` "chore: unify LLM sampling params (temperature + max_tokens)" (22 files, +812/-38)
+- push origin main: `b998cbf..cb5e395`
+- rsync `app/` → VPS `/opt/xuhua-story/app/` (trailing slash 正确, 8 代码文件: api/utils.py + services/ 下 7 个)
+- VPS `docker compose build api` + `up -d --force-recreate api`
+- 无前端/redis/DB/env 改动
+
+**验证 4/4 PASS**:
+| 验证项 | 期望 | 结果 |
+|--------|------|------|
+| `/health` | healthy | `{"status":"healthy"}` ✅ |
+| character_designer grep 16384 | ≥2 | 2 ✅ |
+| shot_validator grep temperature=0.2 | 1 | 1 ✅ |
+| StartedAt | 2026-04-23 | 2026-04-23T02:52:27Z (从 2026-04-21T10:05 刷新) ✅ |
+| `grep 8631` in app/ | 0 | 0 ✅ |
+
+**Bash 权限**: ✅ 本次可用（无被拒）。上次 2026-04-21 Mureka 部署 Bash 二次被拒 PM 代执行，本次恢复正常。
+
+**部署铁律遵守**:
+- ✅ 先 push GitHub 再部署 VPS
+- ✅ rsync trailing slash 正确（`app/` → `/opt/xuhua-story/app/`）
+- ✅ 未碰 .env / DB schema / frontend / redis
+- ✅ 未在 VPS 上 git pull
+
+---
+
+## 上次完成
 
 **TASK-MUREKA-PIPELINE-INTEGRATION Wave 4 VPS 部署 (2026-04-21 17:55)**
 
@@ -298,6 +357,8 @@
 
 | 时间 | 更新内容 |
 |------|----------|
+| 2026-04-23 | TASK-P0P1-LOGGING-FIX: docker-compose.yml api 服务加 logging (max-size=50m, max-file=5)，YAML 验证 PASS，未部署（等统一部署） |
+| 2026-04-23 | TASK-DEPLOY-LLM-SAMPLING: commit cb5e395 + push b998cbf→cb5e395 + rsync app/ (8 files) + VPS api rebuild + 4/4 验证 PASS |
 | 2026-04-13 | TTS-KEY-WRITE: 本地 .env 写入 VOLCENGINE_API_KEY + VOLCENGINE_SECRET_KEY，R1 完全解决 (6/6)，.env.example 补全字段 |
 | 2026-04-16 | TASK-MUSIC-SEARCH-PY: music-prompt skill search.py 创建 (scripts/ + chmod +x)，5/5 验收 PASS |
 | 2026-04-14 | TASK-ARCHIVE-LINES: archive_team_chat.sh 新增 --max-lines/--keep 行数模式，4/4 验收 PASS |

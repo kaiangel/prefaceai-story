@@ -4,6 +4,41 @@
 
 ---
 
+## 2026-04-23
+
+### TASK-P0P1-LOGGING-FIX ✅ [2026-04-23 11:30]
+
+**4 处日志治理改动落地**，3 文件：`pipeline_orchestrator.py` / `image_generator.py` / `api/chapters.py`
+
+- **改动 1 (P0)**: `pipeline_orchestrator.py` L1074-1081 裸 `except:` → `except Exception as e: logger.exception(...) + pass` 保留原吞异常行为（forclaudeweb 写入失败不阻塞）
+- **改动 2 (P0)**: `api/chapters.py` 3 个后台任务（`generate_images_task` L498 起 / `regenerate_single_image_task` L762 起 / `generate_audio_and_align_task` L1237 起）强化异常处理：
+  - `asyncio.CancelledError` 独立 raise（用户取消不算 failed）
+  - `Exception` 用 `logger.exception(...)` 输出 traceback
+  - `chapter.error_message = traceback[:10000]` + `chapter.status = 'failed'`
+  - `job.stage_message = f"{type}: {msg[:400]}"`
+- **改动 3 (P0)**: `api/chapters.py` 9 个 GET 端点加 try/except: `/`, `/status`, `/story`, `/{chapter_number}`, `/images`, `/timeline`, `/audio`, `/voices`, `/bgm`。HTTPException 透传，其他异常 `logger.exception(...)` + 返 500 JSON 含 `{type}: {msg}`
+- **改动 4 (P1)**: `image_generator.py` 65 处 print → logger 机械转换（L3 加 `import logging`，L16 加 `logger = logging.getLogger("xuhua")`）。分类规则：`❌/失败` → `error`，`⚠️/跳过/Warning` → `warning`，其余 → `info`
+
+**验收 7 项全部 PASS**:
+- `grep -n "except:" app/services/pipeline_orchestrator.py` → 0 ✅
+- `grep -c "print(" app/services/image_generator.py` → 0（目标 ≤5）✅
+- `grep -c "logger\." app/services/image_generator.py` → 65（目标 ≥60）✅
+- `pytest tests/test_architecture.py -x -q` → 7 passed in 0.06s ✅
+- `python3 -c "from app.api import chapters; from app.services import image_generator, pipeline_orchestrator"` → OK ✅
+- `curl http://localhost:8000/health` → `{"status":"healthy"}`（本地 shell `bxgmyw2yw` 自动热重载）✅
+- chapters.py GET 端点全部 try/except 包装（9 个）+ start-generation wrapper 语义等价的 BackgroundTasks 处理 ✅
+
+**跳过角色一致性回归**（Founder 批准）:
+- image_generator.py 本次是纯机械 print→logger 转换，0 行为变化
+- 未碰 generate_image / generate_shot_image_phase2 / API 参数 / contents / prompt / 参考图
+- pytest + import + /health 已足够
+
+**额外发现**:
+- chapters.py **没有** `start-generation` 端点（任务描述有误）— 实际用 FastAPI `BackgroundTasks.add_task`，3 个后台任务函数内部已强化，语义等价于 wrapper
+- `regenerate_single_image_task` 原来失败不写 DB（用户看不到失败），本次新增写一条 `SceneImage(error_message=...)` — 行为改动但符合"让真实错误可见"意图
+
+---
+
 ## 2026-04-22
 
 ### TASK-8631-UNIFY ✅ [2026-04-22 16:10]

@@ -1,6 +1,7 @@
 """Image generation service using Gemini API"""
 
 import asyncio
+import logging
 import time
 import base64
 from io import BytesIO
@@ -10,6 +11,8 @@ from PIL import Image
 
 from google import genai
 from google.genai import types
+
+logger = logging.getLogger("xuhua")
 
 from app.config import settings
 from app.prompts.storyboard_prompts import (
@@ -343,7 +346,7 @@ def build_dialogue_scene_embed(
             speaker_zh = _extract_speaker_name(txt)
             # T6: speaker 不在画面中时跳过该 dialogue 行
             if not _is_speaker_visible(speaker_zh):
-                print(f"    [T6] 跳过不可见 speaker dialogue: {speaker_zh}")
+                logger.warning(f"    [T6] 跳过不可见 speaker dialogue: {speaker_zh}")
                 continue
             speaker = _resolve_speaker_label(speaker_zh, characters, speaker_format)
             dialogue_lines.append(_build_bubble_line(speaker, clean))
@@ -371,7 +374,7 @@ def build_dialogue_scene_embed(
                 speaker_zh = _extract_speaker_name(txt)
                 # T6: speaker 不在画面中时跳过该 dialogue 行
                 if not _is_speaker_visible(speaker_zh):
-                    print(f"    [T6] 跳过不可见 speaker dialogue(compound): {speaker_zh}")
+                    logger.warning(f"    [T6] 跳过不可见 speaker dialogue(compound): {speaker_zh}")
                     continue
                 speaker = _resolve_speaker_label(speaker_zh, characters, speaker_format)
                 dialogue_lines.append(_build_bubble_line(speaker, clean))
@@ -439,7 +442,7 @@ class ImageGenerator:
                 from app.services.prompt_rewriter import PromptRewriter
                 self._prompt_rewriter = PromptRewriter()
             except ImportError as e:
-                print(f"[ImageGenerator] ⚠️ 无法导入 PromptRewriter: {e}")
+                logger.warning(f"[ImageGenerator] ⚠️ 无法导入 PromptRewriter: {e}")
         return self._prompt_rewriter
 
     def _init_client(self):
@@ -448,7 +451,7 @@ class ImageGenerator:
         if api_key:
             self.client = genai.Client(api_key=api_key)
         else:
-            print("Warning: GEMINI_API_KEY not set, image generation will fail")
+            logger.warning("Warning: GEMINI_API_KEY not set, image generation will fail")
 
     def _classify_error(self, response=None, exception: Exception = None) -> Tuple[ErrorType, str]:
         """分类错误类型，用于智能重试策略
@@ -483,7 +486,7 @@ class ImageGenerator:
                 else:
                     error_msg = "Content safety blocked: response.parts is None (no block_reason provided)"
 
-                print(f"    [ImageGenerator] ⚠️ 错误分类: CONTENT_SAFETY - {error_msg}")
+                logger.error(f"    [ImageGenerator] ⚠️ 错误分类: CONTENT_SAFETY - {error_msg}")
                 return ErrorType.CONTENT_SAFETY, error_msg
 
             # 1b. 检查是否有 candidates 且状态异常
@@ -493,7 +496,7 @@ class ImageGenerator:
                         reason = str(candidate.finish_reason).upper()
                         if 'SAFETY' in reason or 'BLOCKED' in reason:
                             error_msg = f"Content safety blocked: candidate finish_reason={reason}"
-                            print(f"    [ImageGenerator] ⚠️ 错误分类: CONTENT_SAFETY - {error_msg}")
+                            logger.error(f"    [ImageGenerator] ⚠️ 错误分类: CONTENT_SAFETY - {error_msg}")
                             return ErrorType.CONTENT_SAFETY, error_msg
 
         # 2. 检查异常消息
@@ -505,21 +508,21 @@ class ImageGenerator:
                              'content policy', 'violat', 'offensive', 'dangerous']
             if any(kw in error_str for kw in safety_keywords):
                 error_msg = f"Content safety exception: {str(exception)}"
-                print(f"    [ImageGenerator] ⚠️ 错误分类: CONTENT_SAFETY - {error_msg}")
+                logger.error(f"    [ImageGenerator] ⚠️ 错误分类: CONTENT_SAFETY - {error_msg}")
                 return ErrorType.CONTENT_SAFETY, error_msg
 
             # 2b. 限流相关
             rate_limit_keywords = ['rate limit', 'quota', '429', 'too many requests', 'resource exhausted']
             if any(kw in error_str for kw in rate_limit_keywords):
                 error_msg = f"Rate limit: {str(exception)}"
-                print(f"    [ImageGenerator] ⚠️ 错误分类: RATE_LIMIT - {error_msg}")
+                logger.error(f"    [ImageGenerator] ⚠️ 错误分类: RATE_LIMIT - {error_msg}")
                 return ErrorType.RATE_LIMIT, error_msg
 
             # 2c. 参数/格式错误
             format_keywords = ['invalid', 'parameter', 'argument', 'format', 'malformed', '400']
             if any(kw in error_str for kw in format_keywords):
                 error_msg = f"Format error: {str(exception)}"
-                print(f"    [ImageGenerator] ⚠️ 错误分类: FORMAT_ERROR - {error_msg}")
+                logger.error(f"    [ImageGenerator] ⚠️ 错误分类: FORMAT_ERROR - {error_msg}")
                 return ErrorType.FORMAT_ERROR, error_msg
 
             # 2d. API/网络错误
@@ -527,20 +530,20 @@ class ImageGenerator:
                            'internal', 'unavailable', 'service error']
             if any(kw in error_str for kw in api_keywords):
                 error_msg = f"API error: {str(exception)}"
-                print(f"    [ImageGenerator] ⚠️ 错误分类: API_ERROR - {error_msg}")
+                logger.error(f"    [ImageGenerator] ⚠️ 错误分类: API_ERROR - {error_msg}")
                 return ErrorType.API_ERROR, error_msg
 
             # 2e. 特殊情况：'NoneType' object is not iterable - 这是 response.parts 为 None 时迭代导致
             if "'nonetype' object is not iterable" in error_str:
                 error_msg = "Content safety blocked: response.parts is None (iteration failed)"
-                print(f"    [ImageGenerator] ⚠️ 错误分类: CONTENT_SAFETY - {error_msg}")
+                logger.error(f"    [ImageGenerator] ⚠️ 错误分类: CONTENT_SAFETY - {error_msg}")
                 return ErrorType.CONTENT_SAFETY, error_msg
 
             error_msg = f"Unknown exception: {str(exception)}"
         else:
             error_msg = "Unknown error (no response or exception provided)"
 
-        print(f"    [ImageGenerator] ⚠️ 错误分类: UNKNOWN - {error_msg}")
+        logger.error(f"    [ImageGenerator] ⚠️ 错误分类: UNKNOWN - {error_msg}")
         return ErrorType.UNKNOWN, error_msg
 
     def _preprocess_reference_to_aspect_ratio(self, ref_img: Image.Image, target_ratio: str) -> Image.Image:
@@ -566,14 +569,14 @@ class ImageGenerator:
             left = (w - new_w) // 2
             cropped = ref_img.crop((left, 0, left + new_w, h))
             pct = round((1 - new_w / w) * 100, 1)
-            print(f"    [ImageGenerator] 参考图预处理: {w}x{h} → {new_w}x{h} (裁剪宽度{pct}%)")
+            logger.info(f"    [ImageGenerator] 参考图预处理: {w}x{h} → {new_w}x{h} (裁剪宽度{pct}%)")
             return cropped
         else:  # 图太高，上下裁
             new_h = int(w / target)
             top = (h - new_h) // 2
             cropped = ref_img.crop((0, top, w, top + new_h))
             pct = round((1 - new_h / h) * 100, 1)
-            print(f"    [ImageGenerator] 参考图预处理: {w}x{h} → {w}x{new_h} (裁剪高度{pct}%)")
+            logger.info(f"    [ImageGenerator] 参考图预处理: {w}x{h} → {w}x{new_h} (裁剪高度{pct}%)")
             return cropped
 
     async def generate_image(
@@ -629,23 +632,23 @@ class ImageGenerator:
         contents = [full_prompt]
         if reference_images:
             # 添加参考图（预处理到目标宽高比）
-            print(f"    [ImageGenerator] 传入 {len(reference_images)} 张参考图")
+            logger.info(f"    [ImageGenerator] 传入 {len(reference_images)} 张参考图")
             for i, ref_img in enumerate(reference_images[:14]):  # 最多14张
                 if hasattr(ref_img, 'size'):
-                    print(f"      参考图 {i+1}: {ref_img.size[0]}x{ref_img.size[1]}")
+                    logger.info(f"      参考图 {i+1}: {ref_img.size[0]}x{ref_img.size[1]}")
                     ref_img = self._preprocess_reference_to_aspect_ratio(ref_img, aspect_ratio)
                 contents.append(ref_img)
-            print(f"    [ImageGenerator] contents 共 {len(contents)} 个元素 (1个prompt + {len(contents)-1}张图)")
+            logger.info(f"    [ImageGenerator] contents 共 {len(contents)} 个元素 (1个prompt + {len(contents)-1}张图)")
 
         # 调试日志：记录Gemini请求结构
-        print(f"\n    [ImageGenerator] === Gemini请求结构 ===")
-        print(f"      model: {model}")
-        print(f"      contents类型: [str] + [{len(contents)-1} x PIL.Image]")
-        print(f"      config.response_modalities: ['IMAGE']")
-        print(f"      config.aspect_ratio: {aspect_ratio}")
-        print(f"      system_instruction: 无 (Gemini图像生成不使用)")
-        print(f"      prompt前200字符: {full_prompt[:200]}...")
-        print(f"    [ImageGenerator] ========================")
+        logger.info(f"\n    [ImageGenerator] === Gemini请求结构 ===")
+        logger.info(f"      model: {model}")
+        logger.info(f"      contents类型: [str] + [{len(contents)-1} x PIL.Image]")
+        logger.info(f"      config.response_modalities: ['IMAGE']")
+        logger.info(f"      config.aspect_ratio: {aspect_ratio}")
+        logger.info(f"      system_instruction: 无 (Gemini图像生成不使用)")
+        logger.info(f"      prompt前200字符: {full_prompt[:200]}...")
+        logger.info(f"    [ImageGenerator] ========================")
 
         # 配置
         config = types.GenerateContentConfig(
@@ -673,7 +676,7 @@ class ImageGenerator:
                     error_type, error_msg = self._classify_error(response=response)
                     last_error_type = error_type
                     last_error = error_msg
-                    print(f"    [ImageGenerator] 尝试 {attempt + 1}/{self.MAX_RETRIES} 失败: {error_msg}")
+                    logger.error(f"    [ImageGenerator] 尝试 {attempt + 1}/{self.MAX_RETRIES} 失败: {error_msg}")
 
                     # 内容安全错误不直接重试（需要改写prompt），但先完成本轮重试循环
                     if error_type == ErrorType.CONTENT_SAFETY:
@@ -736,7 +739,7 @@ class ImageGenerator:
                 error_type, error_msg = self._classify_error(exception=e)
                 last_error_type = error_type
                 last_error = error_msg
-                print(f"    [ImageGenerator] 尝试 {attempt + 1}/{self.MAX_RETRIES} 失败: {error_msg}")
+                logger.error(f"    [ImageGenerator] 尝试 {attempt + 1}/{self.MAX_RETRIES} 失败: {error_msg}")
 
                 # 内容安全错误不直接重试
                 if error_type == ErrorType.CONTENT_SAFETY:
@@ -745,7 +748,7 @@ class ImageGenerator:
                 # 限流错误等待更长时间
                 if error_type == ErrorType.RATE_LIMIT:
                     wait_time = self.RETRY_DELAY * (attempt + 1) * 2  # 双倍等待
-                    print(f"    [ImageGenerator] 限流等待 {wait_time}s...")
+                    logger.info(f"    [ImageGenerator] 限流等待 {wait_time}s...")
                     await asyncio.sleep(wait_time)
                 elif attempt < self.MAX_RETRIES - 1:
                     await asyncio.sleep(self.RETRY_DELAY * (attempt + 1))
@@ -806,13 +809,13 @@ class ImageGenerator:
                     image_prompt,
                     client=self.client
                 )
-                print(f"    [ImageGenerator] prompt翻译完成 (LLM)")
+                logger.info(f"    [ImageGenerator] prompt翻译完成 (LLM)")
             except Exception as e:
-                print(f"    [ImageGenerator] LLM翻译失败，使用简单翻译: {e}")
+                logger.error(f"    [ImageGenerator] LLM翻译失败，使用简单翻译: {e}")
                 translated_prompt = _simple_translate_prompt(image_prompt)
         else:
             translated_prompt = _simple_translate_prompt(image_prompt)
-            print(f"    [ImageGenerator] prompt翻译完成 (字典)")
+            logger.info(f"    [ImageGenerator] prompt翻译完成 (字典)")
 
         # 3. 添加负面提示（如果shot有）
         negative_prompt = shot.get('negative_prompt', '')
@@ -1031,7 +1034,7 @@ class ImageGenerator:
         # Determine prompt format: parameter > env var > default "b_prime"
         active_format = prompt_format or settings.PROMPT_FORMAT or "b_prime"
         if active_format not in ("b_prime", "legacy"):
-            print(f"    [ImageGenerator Phase2] Unknown prompt_format '{active_format}', falling back to b_prime")
+            logger.info(f"    [ImageGenerator Phase2] Unknown prompt_format '{active_format}', falling back to b_prime")
             active_format = "b_prime"
 
         prompt_package = {}  # will be populated by legacy path
@@ -1050,7 +1053,7 @@ class ImageGenerator:
                 use_native_text=use_native_text,
             )
             # B' already includes its own MANDATORY STYLE block — skip StyleEnforcer
-            print(f"    [ImageGenerator Phase2] Using B' prompt format ({len(full_prompt)} chars)")
+            logger.info(f"    [ImageGenerator Phase2] Using B' prompt format ({len(full_prompt)} chars)")
 
         else:
             # ============================================================
@@ -1132,7 +1135,7 @@ class ImageGenerator:
             # 主prompt（场景描述）+ 嵌入的对话气泡
             if dialogue_embed:
                 full_prompt_parts.append(f"[SCENE DESCRIPTION]\n{main_prompt}\n{dialogue_embed}")
-                print(f"    [ImageGenerator Phase2] 对话气泡已嵌入场景描述 ({len(dialogue_embed)} chars)")
+                logger.info(f"    [ImageGenerator Phase2] 对话气泡已嵌入场景描述 ({len(dialogue_embed)} chars)")
             else:
                 full_prompt_parts.append(f"[SCENE DESCRIPTION]\n{main_prompt}")
 
@@ -1166,9 +1169,9 @@ class ImageGenerator:
                 )
                 if native_text_block:
                     full_prompt += "\n\n" + native_text_block
-                    print(f"    [ImageGenerator Phase2] 原生文字渲染 (thought/narration): text_type={text_overlay.get('text_type', 'none')}")
+                    logger.info(f"    [ImageGenerator Phase2] 原生文字渲染 (thought/narration): text_type={text_overlay.get('text_type', 'none')}")
 
-            print(f"    [ImageGenerator Phase2] Using legacy (A) prompt format ({len(full_prompt)} chars)")
+            logger.info(f"    [ImageGenerator Phase2] Using legacy (A) prompt format ({len(full_prompt)} chars)")
 
         # DEBUG: 保存shot的完整prompt用于验证
         shot_id = shot.get("shot_id", 0)
@@ -1184,32 +1187,32 @@ class ImageGenerator:
                     f.write(f"prompt_format: {active_format}\n\n")
                     f.write(f"=== 完整Prompt ===\n\n")
                     f.write(full_prompt)
-                print(f"    [DEBUG] Shot {shot_id} prompt已保存至 {debug_dir}/{filename}")
+                logger.info(f"    [DEBUG] Shot {shot_id} prompt已保存至 {debug_dir}/{filename}")
             except Exception as e:
-                print(f"    [DEBUG] 保存prompt失败: {e}")
+                logger.error(f"    [DEBUG] 保存prompt失败: {e}")
 
         # 4. 构建contents (DEC-014: previous_shot_image removed)
         contents = [full_prompt]
 
         # 添加参考图（预处理到目标宽高比）
         if reference_images:
-            print(f"    [ImageGenerator Phase2] 传入 {len(reference_images)} 张参考图")
+            logger.info(f"    [ImageGenerator Phase2] 传入 {len(reference_images)} 张参考图")
             for i, ref_img in enumerate(reference_images[:14]):  # 最多14张
                 if hasattr(ref_img, 'size'):
-                    print(f"      参考图 {i+1}: {ref_img.size[0]}x{ref_img.size[1]}")
+                    logger.info(f"      参考图 {i+1}: {ref_img.size[0]}x{ref_img.size[1]}")
                     ref_img = self._preprocess_reference_to_aspect_ratio(ref_img, aspect_ratio)
                 contents.append(ref_img)
 
         # 5. 调试日志
-        print(f"\n    [ImageGenerator Phase2] === Gemini请求结构 ===")
-        print(f"      model: {self.NB2_MODEL}")
-        print(f"      style_preset: {style_preset}")
-        print(f"      prompt_format: {active_format}")
-        print(f"      has_continuity: False (DEC-014: removed)")
-        print(f"      reference_images: {len(reference_images) if reference_images else 0}")
-        print(f"      shot camera: {shot.get('camera', {}).get('shot_size', 'N/A')}")
-        print(f"      prompt前300字符: {full_prompt[:300]}...")
-        print(f"    [ImageGenerator Phase2] ========================\n")
+        logger.info(f"\n    [ImageGenerator Phase2] === Gemini请求结构 ===")
+        logger.info(f"      model: {self.NB2_MODEL}")
+        logger.info(f"      style_preset: {style_preset}")
+        logger.info(f"      prompt_format: {active_format}")
+        logger.info(f"      has_continuity: False (DEC-014: removed)")
+        logger.info(f"      reference_images: {len(reference_images) if reference_images else 0}")
+        logger.info(f"      shot camera: {shot.get('camera', {}).get('shot_size', 'N/A')}")
+        logger.info(f"      prompt前300字符: {full_prompt[:300]}...")
+        logger.info(f"    [ImageGenerator Phase2] ========================\n")
 
         # 6. 配置
         config = types.GenerateContentConfig(
@@ -1237,7 +1240,7 @@ class ImageGenerator:
                     error_type, error_msg = self._classify_error(response=response)
                     last_error_type = error_type
                     last_error = error_msg
-                    print(f"    [ImageGenerator Phase2] 尝试 {attempt + 1}/{self.MAX_RETRIES} 失败: {error_msg}")
+                    logger.error(f"    [ImageGenerator Phase2] 尝试 {attempt + 1}/{self.MAX_RETRIES} 失败: {error_msg}")
 
                     # 内容安全错误不直接重试（需要改写prompt）
                     if error_type == ErrorType.CONTENT_SAFETY:
@@ -1297,7 +1300,7 @@ class ImageGenerator:
                 error_type, error_msg = self._classify_error(exception=e)
                 last_error_type = error_type
                 last_error = error_msg
-                print(f"    [ImageGenerator Phase2] 尝试 {attempt + 1}/{self.MAX_RETRIES} 失败: {error_msg}")
+                logger.error(f"    [ImageGenerator Phase2] 尝试 {attempt + 1}/{self.MAX_RETRIES} 失败: {error_msg}")
 
                 # 内容安全错误不直接重试
                 if error_type == ErrorType.CONTENT_SAFETY:
@@ -1306,7 +1309,7 @@ class ImageGenerator:
                 # 限流错误等待更长时间
                 if error_type == ErrorType.RATE_LIMIT:
                     wait_time = self.RETRY_DELAY * (attempt + 1) * 2
-                    print(f"    [ImageGenerator Phase2] 限流等待 {wait_time}s...")
+                    logger.info(f"    [ImageGenerator Phase2] 限流等待 {wait_time}s...")
                     await asyncio.sleep(wait_time)
                 elif attempt < self.MAX_RETRIES - 1:
                     await asyncio.sleep(self.RETRY_DELAY * (attempt + 1))
@@ -1362,7 +1365,7 @@ class ImageGenerator:
             生成结果字典，额外包含 rewrite_info 如果进行了改写
         """
         shot_id = shot.get("shot_id", "?")
-        print(f"\n[ImageGenerator] === Shot {shot_id} 安全生成开始 ===")
+        logger.info(f"\n[ImageGenerator] === Shot {shot_id} 安全生成开始 ===")
 
         # 1. 首次尝试生成
         result = await self.generate_shot_image_phase2(
@@ -1379,27 +1382,27 @@ class ImageGenerator:
 
         # 2. 如果成功，直接返回
         if result.get("success"):
-            print(f"[ImageGenerator] ✅ Shot {shot_id} 首次生成成功")
+            logger.info(f"[ImageGenerator] ✅ Shot {shot_id} 首次生成成功")
             return result
 
         # 3. 检查是否是内容安全错误
         error_type = result.get("error_type")
         if error_type != ErrorType.CONTENT_SAFETY.value:
             # 不是内容安全错误，直接返回失败结果
-            print(f"[ImageGenerator] ❌ Shot {shot_id} 失败（非内容安全错误）: {error_type}")
+            logger.error(f"[ImageGenerator] ❌ Shot {shot_id} 失败（非内容安全错误）: {error_type}")
             return result
 
         # 4. 内容安全错误，尝试改写
-        print(f"[ImageGenerator] ⚠️ Shot {shot_id} 触发内容安全过滤，开始智能改写...")
+        logger.warning(f"[ImageGenerator] ⚠️ Shot {shot_id} 触发内容安全过滤，开始智能改写...")
 
         original_prompt = result.get("original_prompt", "")
         if not original_prompt:
-            print(f"[ImageGenerator] ❌ 无法获取原始 prompt，跳过改写")
+            logger.error(f"[ImageGenerator] ❌ 无法获取原始 prompt，跳过改写")
             return result
 
         rewriter = self.prompt_rewriter
         if not rewriter:
-            print(f"[ImageGenerator] ❌ PromptRewriter 不可用，跳过改写")
+            logger.error(f"[ImageGenerator] ❌ PromptRewriter 不可用，跳过改写")
             return result
 
         rewrite_info = {
@@ -1410,7 +1413,7 @@ class ImageGenerator:
 
         # 4a. 第一次改写：使用 Sonnet 4.6 智能改写
         for rewrite_attempt in range(self.MAX_REWRITE_ATTEMPTS):
-            print(f"[ImageGenerator] 🔄 改写尝试 {rewrite_attempt + 1}/{self.MAX_REWRITE_ATTEMPTS}")
+            logger.info(f"[ImageGenerator] 🔄 改写尝试 {rewrite_attempt + 1}/{self.MAX_REWRITE_ATTEMPTS}")
 
             if rewrite_attempt == 0:
                 # 第一次：使用 Sonnet 4.6 智能改写
@@ -1422,7 +1425,7 @@ class ImageGenerator:
                 rewrite_method = "simple"
 
             if not rewritten_prompt:
-                print(f"[ImageGenerator] ⚠️ 改写失败，跳过本次尝试")
+                logger.warning(f"[ImageGenerator] ⚠️ 改写失败，跳过本次尝试")
                 continue
 
             rewrite_info["rewrites"].append({
@@ -1435,7 +1438,7 @@ class ImageGenerator:
             modified_shot = shot.copy()
             modified_shot["image_prompt"] = rewritten_prompt
 
-            print(f"[ImageGenerator] 🔄 使用改写后 prompt 重新生成 Shot {shot_id}...")
+            logger.info(f"[ImageGenerator] 🔄 使用改写后 prompt 重新生成 Shot {shot_id}...")
             retry_result = await self.generate_shot_image_phase2(
                 shot=modified_shot,
                 storyboard=storyboard,
@@ -1449,7 +1452,7 @@ class ImageGenerator:
             )
 
             if retry_result.get("success"):
-                print(f"[ImageGenerator] ✅ Shot {shot_id} 改写后生成成功 (方法: {rewrite_method})")
+                logger.info(f"[ImageGenerator] ✅ Shot {shot_id} 改写后生成成功 (方法: {rewrite_method})")
                 retry_result["rewrite_info"] = rewrite_info
                 retry_result["rewrite_info"]["success"] = True
                 retry_result["rewrite_info"]["successful_method"] = rewrite_method
@@ -1458,13 +1461,13 @@ class ImageGenerator:
             # 检查是否仍是内容安全错误
             if retry_result.get("error_type") != ErrorType.CONTENT_SAFETY.value:
                 # 改成了其他错误，可能是改写过度导致的
-                print(f"[ImageGenerator] ⚠️ 改写后出现其他错误: {retry_result.get('error_type')}")
+                logger.error(f"[ImageGenerator] ⚠️ 改写后出现其他错误: {retry_result.get('error_type')}")
 
             # 更新 original_prompt 为改写后的版本，用于下一次改写尝试
             original_prompt = rewritten_prompt
 
         # 5. 所有改写尝试都失败
-        print(f"[ImageGenerator] ❌ Shot {shot_id} 所有改写尝试均失败")
+        logger.error(f"[ImageGenerator] ❌ Shot {shot_id} 所有改写尝试均失败")
         result["rewrite_info"] = rewrite_info
         result["rewrite_info"]["success"] = False
         return result
@@ -1618,7 +1621,7 @@ class CharacterConsistencyManager:
                     "reference_image": None,
                     "description": char_desc
                 }
-                print(f"Warning: Failed to generate portrait for {char_name}: {portrait_result.get('error')}")
+                logger.warning(f"Warning: Failed to generate portrait for {char_name}: {portrait_result.get('error')}")
 
         return references
 

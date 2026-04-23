@@ -7,7 +7,25 @@
 
 ## 进行中（2026-04-23）
 
-### 🔄 TASK-DEPLOY-LLM-SAMPLING — 派 @DevOps
+### 🔄 TASK-P0P1-LOGGING-FIX — 并行 @backend + @devops
+
+**背景**: Ben 500 报错但 docker logs 只剩 139 行（rotate 太激进），traceback 已丢。PM 审查发现 3 P0 日志缺口 + 2 P1 技术债。Founder 批准全部处理后再本地复测。
+
+**@backend**:
+1. pipeline_orchestrator.py L1074 裸 except → logger.exception
+2. chapters.py start-generation asyncio.create_task wrapper 捕获异常 → job.failed + error_message
+3. chapters.py GET 端点加 try/except logger.exception
+4. image_generator.py 65 print → logger（纯机械，0 行为变化，跳过真实回归）
+
+**@devops**: docker/docker-compose.yml api 服务加 logging max-size=50m max-file=5（先不部署，等 backend 完成 PM 审查后统一部署）
+
+**状态**: 并行 spawn 中
+
+---
+
+## 刚完成
+
+### ✅ TASK-DEPLOY-LLM-SAMPLING (2026-04-23) — 审查通过
 
 **背景**: 今日完成 2 个代码任务（TEMP-AUDIT-FIX + 8631-UNIFY）本地验证通过，但 VPS 还跑昨天 b998cbf 镜像。Founder 要求 DevOps 同步。
 

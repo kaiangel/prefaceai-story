@@ -1,11 +1,46 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-04-21 17:55（PM 代更新 — DevOps Bash 二次被拒 + spawn 401 auth 挂，部分内容 agent 自更新）
+> **最后更新**: 2026-04-23 11:30（自更新 — TASK-P0P1-LOGGING-FIX 完成，yml 改动就绪待部署）
 
 ---
 
-## 🆕 TASK-MUREKA-PIPELINE-INTEGRATION Wave 4 VPS 部署完成 (2026-04-21)
+## TASK-P0P1-LOGGING-FIX 完成 (2026-04-23 11:30) — 等待统一部署
+
+**全员注意 — docker-compose.yml api 服务已加 logging 配置，等待下一轮统一部署**:
+
+- 文件: `docker/docker-compose.yml`，api 服务 healthcheck 块之后新增 5 行 logging 配置
+- 配置: `driver: json-file`, `max-size: 50m`, `max-file: 5`（最多 250MB 日志保留，5 个文件轮转）
+- 效果: 下次 api 容器重建后，VPS `docker logs docker-api-1` 将保留更长历史，Ben 排查 500 错误不再丢 traceback
+- YAML 语法验证: `docker compose config --no-interpolate` 返回码 0，无错误
+- **此改动已就绪，等待 @backend 完成当前代码改动后 PM 统一安排 rsync + Docker rebuild 部署**
+- 其他服务（redis / worker / frontend / mysql）未改动
+
+---
+
+## TASK-DEPLOY-LLM-SAMPLING 完成 (2026-04-23 10:55)
+
+**全员注意 — 今日 LLM sampling 改动已同步到生产 VPS**:
+
+- commit `cb5e395` "chore: unify LLM sampling params (temperature + max_tokens)" 已 push origin main
+- 覆盖两个任务: TASK-LLM-TEMP-AUDIT-FIX (15 处 temperature 显式化 + sync max_tokens 8192→16384) + TASK-8631-UNIFY (13 处 8631→16384, 5 files)
+- rsync `app/` → VPS `/opt/xuhua-story/app/`（8 代码文件: api/utils.py + services/ 下 7 个）
+- VPS docker compose build api + force-recreate api
+- 4/4 验证 PASS: /health healthy + character_designer 16384×2 + shot_validator temperature=0.2 + StartedAt 刷新到 2026-04-23 + app/ 下 8631 零命中
+- 容器 StartedAt: `2026-04-23T02:52:27Z`（从 2026-04-21T10:05:10Z 刷新）
+- **无前端 / redis / DB / env 改动**
+
+**影响面**（对 @backend / @ai-ml / @tester 说明）:
+- 对齐/验证/OCR/视觉分析的 Claude + Gemini 调用：temperature=0.2（稳定性提升）
+- Stage 3 剧本 + Stage 4 分镜：主备模型都 temperature=0.8（显式化，主备一致）
+- sync Claude `messages.create` max_tokens=16384（防长故事截断）
+- 所有 LLM token 上限统一 16384，不再有 8631 遗留（character_designer / alignment_service / story_outline_generator L196 / storyboard_director / screenplay_writer 全量覆盖）
+
+**Bash 权限**: ✅ 本次恢复正常（上次 2026-04-21 Mureka 部署二次被拒，PM 代执行）
+
+---
+
+## TASK-MUREKA-PIPELINE-INTEGRATION Wave 4 VPS 部署完成 (2026-04-21)
 
 **全员注意 — Mureka BGM 能力已上生产**:
 - VPS `/opt/xuhua-story/.env.production` 已含 `MUREKA_API_KEY`（测试过容器内 settings 能读到）
@@ -22,9 +57,9 @@
 
 ## 当前状态速览
 
-状态: ✅ **TASK-MUREKA-PIPELINE-INTEGRATION Wave 4 VPS 部署完成** (2026-04-21, PM 代执行)
-最新 commit: `b998cbf` (feat: Mureka AI BGM integration Wave 1-4, 69 files)
-历史 commit: `ea0edb1` (TASK-HARNESS-V2 Phase 3, 2026-04-15)
+状态: ✅ **TASK-DEPLOY-LLM-SAMPLING 完成** (2026-04-23 10:55, DevOps 自执行)
+最新 commit: `cb5e395` (chore: unify LLM sampling params, 22 files)
+历史 commit: `b998cbf` (Mureka Wave 1-4, 2026-04-21, PM 代执行)
 域名: `https://prefaceai.mov` 已上线（前端 + API + Harness V2 监控端点）
 服务器: 107.148.1.199 (8C/16GB/200GB, Ubuntu 20.04)
 容器: 3 个运行中 — api (healthy) + frontend (up) + redis (healthy)
@@ -260,7 +295,7 @@ Multiple pushes — Stage 1 E2E 联调通过。
 ```
 远程仓库: https://github.com/kaiangel/prefaceai-story (private)
 分支: main (tracked → origin/main)
-最新 commit: ea0edb1 docs: TASK-HARNESS-V2 Phase 3 (5 files)
+最新 commit: cb5e395 chore: unify LLM sampling params (temperature + max_tokens) (22 files)
 ```
 
 ---

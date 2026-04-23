@@ -1,11 +1,56 @@
 # Backend Agent - 当前任务
 
-> **最后更新**: [2026-04-22 16:10]
-> **状态**: ✅ TASK-8631-UNIFY 完成 — 13 处 max_tokens 统一为 16384，pytest PASS，/health healthy
+> **最后更新**: [2026-04-23 11:30]
+> **状态**: ✅ TASK-P0P1-LOGGING-FIX 完成 — 4 处日志治理改动全部落地，pytest PASS，/health healthy
 
 ---
 
 ## 刚完成
+
+### ✅ TASK-P0P1-LOGGING-FIX — 异常日志治理 [2026-04-23 11:30]
+
+**背景**: Ben 在 VPS 踩 500 错误 (/api/projects/.../chapters/1/status)，但 docker logs 只剩 139 行，11:50 traceback 被 rotate 冲掉。PM 审查发现 3 处 P0 日志缺口 + image_generator.py 0 logger。Founder 批准全部处理。
+
+**4 处改动实际行号**:
+
+| # | 文件 | 位置 | 改动 |
+|---|------|------|------|
+| 1 (P0) | `app/services/pipeline_orchestrator.py` | L1074-1081 | 裸 `except:` → `except Exception as e: logger.exception(...)` + `pass` 保留原吞异常行为（forclaudeweb/prompt_quality_report.md 写入失败不阻塞主流程）|
+| 2a (P0) | `app/api/chapters.py` | L498-501（import + try 包裹 async with）/ L630-657（asyncio.CancelledError + logger.exception + write DB + error_message=traceback[:10000]）| `generate_images_task` 强化异常处理 |
+| 2b (P0) | `app/api/chapters.py` | L762-790（`regenerate_single_image_task` 的 CancelledError 透传 + logger.exception + 写失败 SceneImage 记录）|
+| 2c (P0) | `app/api/chapters.py` | L1237-1262（`generate_audio_and_align_task` 的 CancelledError 透传 + logger.exception + error_message=traceback[:10000] + chapter.status=failed）|
+| 3 (P0) | `app/api/chapters.py` | 9 个 GET 端点全部加 try/except: `/` (L58) / `/status` (L89) / `/story` (L163) / `/{chapter_number}` (L237) / `/images` (L352) / `/timeline` (L883) / `/audio` (L966) / `/voices` (L1007) / `/bgm` (L1571) | HTTPException 透传 + `logger.exception(...)` + 返 500 JSON `{"detail":"服务异常: {type}: {msg}"}` |
+| 4 (P1) | `app/services/image_generator.py` | L3 加 `import logging`，L16 加 `logger = logging.getLogger("xuhua")`，65 处 print 机械转换：`❌/失败` → `logger.error`，`⚠️/跳过/Warning` → `logger.warning`，其余 → `logger.info` |
+
+**执行方式**:
+- P0-1: 手动 Edit（单点位置）
+- P0-2/3: 手动 Edit 每个 endpoint 一次（避免破坏缩进）
+- P1-4: Python 脚本批量扫描分类替换（`print(` → `logger.{level}(`，按行内 emoji/关键词分流），run 后做 1 次 syntax + 1 次 import 确认
+
+**关键设计决策**:
+- 3 个后台任务的 `asyncio.CancelledError` 独立 raise（用户主动取消不算 failed，保留 FastAPI 生命周期语义）
+- 错误 traceback 切片 10000 字符写入 `chapter.error_message` + stage_message 400 字符，让 Ben 能直接在 DB 读到真实报错
+- GET 端点的 try/except 是**最外层**包装，HTTPException 原样透传（404/400 等业务异常不被吞），其他异常统一 logger.exception 打 traceback 并返 500 含 type+msg
+
+**验收结果**:
+
+| 验收项 | 期望 | 结果 |
+|--------|------|------|
+| `grep -n "except:" app/services/pipeline_orchestrator.py` | 0 命中 | ✅ 0 |
+| `grep -c "print(" app/services/image_generator.py` | ≤ 5 | ✅ **0** |
+| `grep -c "logger\." app/services/image_generator.py` | ≥ 60 | ✅ **65** |
+| `pytest tests/test_architecture.py -x -q` | 7 passed | ✅ **7 passed in 0.06s** |
+| `python3 -c "from app.api import chapters; from app.services import image_generator, pipeline_orchestrator"` | 无 ImportError | ✅ OK |
+| `curl http://localhost:8000/health` | healthy | ✅ `{"status":"healthy"}`（本地后端 shell `bxgmyw2yw` 自动热重载）|
+| chapters.py GET 端点 try/except 包装 | ≥ `/status` `/story` `/storyboard` | ✅ 9 个 GET 端点全部包（含 /bgm /audio /timeline /voices /images）|
+| start-generation asyncio.create_task wrapper | 有 | ⚠️ **N/A**（chapters.py 没有 `start-generation` 端点，实际用的是 FastAPI `BackgroundTasks.add_task`，3 个后台任务函数内部都已强化异常处理）|
+
+**跳过真实图像生成回归测试**（Founder 批准）:
+- image_generator.py 本次是 **纯机械 print → logger 转换**（0 行为变化）
+- 未碰 `generate_image` / `generate_shot_image_phase2` / API 参数 / contents 数组 / prompt / 参考图传递
+- pytest test_architecture 7 passed + import 检查通过 + backend /health healthy 已足够验证机械转换正确性
+
+---
 
 ### ✅ TASK-8631-UNIFY — max_tokens 统一 16384 [2026-04-22 16:10]
 

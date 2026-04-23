@@ -1071,7 +1071,12 @@ class Phase2PipelineOrchestrator:
         try:
             with open("forclaudeweb/prompt_quality_report.md", "w", encoding="utf-8") as f:
                 f.write("".join(report_lines))
-        except:
+        except Exception as e:
+            logger.exception(
+                f"[PipelineOrchestrator] 未预期异常 at forclaudeweb/prompt_quality_report.md 写入"
+                f"（可能 forclaudeweb/ 目录不存在或权限不足）: {e}"
+            )
+            # 保留原逻辑：原来 pass 吞掉，继续 pass（不阻塞主流程）
             pass
 
     def _convert_characters_for_ref_manager(self, characters: dict) -> List[dict]:
