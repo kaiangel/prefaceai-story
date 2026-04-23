@@ -5,9 +5,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.orm import declarative_base
 from app.config import settings
 
+# Ensure charset=utf8mb4 is in the URL regardless of how DATABASE_URL was set
+_db_url = settings.DATABASE_URL
+if "charset=" not in _db_url:
+    _db_url += ("&" if "?" in _db_url else "?") + "charset=utf8mb4"
+
 # Create async engine
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    _db_url,
     echo=settings.DEBUG,
     pool_pre_ping=True,      # 每次使用前 ping 验证连接存活，断了自动重连
     pool_recycle=1800,        # 30 分钟回收连接，防止 MySQL 服务器关闭长空闲连接
