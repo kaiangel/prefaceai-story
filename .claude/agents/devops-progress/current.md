@@ -1,11 +1,90 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-04-24 13:32（自更新 — TASK-VPS-SKIP-IMAGE 完成，VPS api 容器 SKIP_IMAGE_GENERATION=True 生效）
-> **状态**: ✅ TASK-VPS-SKIP-IMAGE 完成 — .env.production 追加 SKIP_IMAGE_GENERATION=true + force-recreate api + 3/3 验证 PASS + StartedAt 2026-04-24T05:30:37Z
+> **最后更新**: 2026-04-29（自更新 — TASK-T6-FIXBATCH Wave 4 完成，VPS 部署 + 生产 T8 验证全通过）
+> **状态**: ✅ TASK-T6-FIXBATCH Wave 4 完成 — commit 84a2d35 push + Ben 通知 + rsync + Docker rebuild api+frontend + 生产 T8 UUID a3966a40 完整故事生成 16 shots PASS + D.15/R7-1/R7-3/UX-16 全部验证 PASS
 
 ---
 
 ## 刚完成
+
+**TASK-T6-FIXBATCH Wave 4 — VPS 部署 Wave 1.1+1.2+2+2.5+3.5 全批修复 [2026-04-29]**
+
+**Step 1: commit + push**
+
+| 项 | 内容 | 结果 |
+|----|------|------|
+| commit hash | `84a2d35` | ✅ |
+| push range | `434c2f0..84a2d35` | ✅ main |
+| commit message | 覆盖 Wave 1.1+1.2+2+2.5+3.5 全部改动 | ✅ |
+| 文件数 | 84 files, +18818/-1069 | ✅ |
+
+**Step 2: Ben 通知**
+
+- `.team-brain/team_ben/TEAM_CHAT.md` 追加通知（2026-04-29）
+- 列出 10 个后端改动文件 + 无 DB schema 变更说明
+- ✅ 已 append
+
+**Step 3: rsync VPS**
+
+| 命令 | 目标 | 结果 |
+|------|------|------|
+| `rsync app/ vps:/opt/xuhua-story/app/` | backend 全量 | ✅ trailing slash 正确 |
+| `rsync frontend/src/ vps:/opt/xuhua-story/frontend/src/` | frontend src 全量 | ✅ |
+| `rsync [projectUuid]/ vps:.../[projectUuid]/` | dynamic route 目录 | ✅ |
+| `rsync package.json package-lock.json` | 前端依赖 | ✅ |
+
+关键文件 VPS 确认：`seedream_generator.py` / `character_prompt_builder.py` / `[projectUuid]/[stage]/page.tsx` / `url.ts` / `createUrl.ts` 全部到位 ✅
+
+**Step 4: Docker rebuild + restart**
+
+| 操作 | 结果 |
+|------|------|
+| `docker compose build api` | sha256:... Built ✅ |
+| `docker compose build frontend` | sha256:032df3... Built ✅ |
+| `docker compose up -d --force-recreate api frontend` | Recreated + Started ✅ |
+| api StartedAt | `2026-04-29T08:02:18Z` ✅ |
+
+**Step 5: /health 验证**
+
+| 验证项 | 期望 | 结果 |
+|--------|------|------|
+| 容器内 `/health` | `{"status":"healthy"}` | ✅ |
+| 3 容器状态 | api(healthy) + frontend(up) + redis(healthy) | ✅ |
+
+**关键修复代码落地验证（容器内 grep）**:
+
+| 修复 | 验证项 | 结果 |
+|------|--------|------|
+| R7-3 character_prompt_builder | `isinstance.*dict` 防御 6 处 | ✅ |
+| D.15 aspect_ratio | `pipeline_orchestrator.py L221 aspect_ratio: str = "2:3"` 参数 | ✅ |
+| Wave 2.5 seedream | `seedream_generator.py _ASPECT_RATIO_TO_SIZE` 2 处 | ✅ |
+| R7-9 mark_completed | `job_manager.py L320 stage="completed"` | ✅ |
+| R7-1 dashboard | `schemas/project.py cover_image_url + shot_count` | ✅ |
+
+**Step 6: 生产环境 T8 完整故事验证**
+
+| 项 | 内容 |
+|----|------|
+| 故事 | 牵手走过的街（晚饭后散步 / 老夫妻 / 简单生活短篇） |
+| 画幅 | **1:1（朋友圈）** |
+| 项目 UUID | `a3966a40-6d27-42c0-a7cf-109729e453e7` |
+| 生成 shots | 16 张（NB2 真实生图，1024x1024 正方形）|
+| Pipeline 完成 | stage=completed, progress=100%, message="故事生成完成！" ✅ |
+
+**D.15 / R7-1 / R7-3 / UX-16 关键修复验证**:
+
+| 修复 | 验证方法 | 结果 |
+|------|----------|------|
+| **D.15** aspect_ratio 不再 hardcoded | 选 1:1 → PIL 实测 1024x1024（NB2 正方形） | ✅ PASS |
+| **R7-1** Dashboard 封面+shot 数+时区 | `/api/projects/` cover_image_url + shot_count=16 | ✅ PASS |
+| **R7-3** adjust portrait 重生 | adjust 前后 portrait mtime 变化（1777452340→1777452385，+45s）| ✅ PASS |
+| **UX-16** URL 动态路由 | `GET /create/{uuid}/preview` HTTP 200 | ✅ PASS |
+
+**注**: T8 临时关 SKIP_IMAGE_GENERATION=false 跑真生图验证，验证完毕后已恢复 true。VPS api 容器最终 StartedAt: 2026-04-29T08:xx:xxZ，SKIP_IMAGE_GENERATION: True。
+
+---
+
+## 上次完成
 
 **TASK-VPS-SKIP-IMAGE — VPS 配置 SKIP_IMAGE_GENERATION=true [2026-04-24 13:32]**
 

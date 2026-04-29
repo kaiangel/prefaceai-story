@@ -1519,11 +1519,19 @@ await progress_callback(stage, progress, message, estimated_remaining_seconds=..
 
 ### Wave 4 — DevOps 部署
 
-#### 🟨 Agent H (DevOps Sonnet)
-- push GitHub（commit 包含本批 Wave 1 + Wave 2 全部改动）
-- rsync VPS（注意 trailing slash 陷阱）
-- /api/health 验证
-- 生产环境再跑 1 次完整故事
+#### ✅ Agent H (DevOps Sonnet) — 完成 2026-04-29
+- [x] push GitHub — commit 84a2d35（Wave 1.1+1.2+2+2.5+3.5 全批，16 文件）
+- [x] 通知 Ben — `.team-brain/team_ben/TEAM_CHAT.md` 后端改动清单已 append
+- [x] rsync VPS — `rsync -avz app/ vps:/opt/xuhua-story/app/` + `rsync -avz frontend/ vps:/opt/xuhua-story/frontend/`（trailing slash 正确）
+- [x] Docker rebuild + force-recreate api + frontend — `docker compose build --no-cache api frontend` → `docker compose up -d --force-recreate`
+- [x] `/health` 验证 200 ✅
+- [x] 生产 T8 完整故事验证 — UUID a3966a40-6d27-42c0-a7cf-109729e453e7，1:1 朋友圈，16 shots NB2 真生图，status=completed
+
+**验证结果**:
+- D.15: PIL 实测 1024x1024（1:1 正方形，不再 hardcoded 2:3）✅
+- R7-1: cover_image_url + shot_count=16 返回正常 ✅
+- R7-3: portrait mtime +45s（adjust 后真实重生）✅
+- UX-16: GET /create/{uuid}/preview → HTTP 200 ✅
 
 ---
 

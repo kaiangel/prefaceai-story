@@ -1,7 +1,47 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-04-24 13:32（自更新 — TASK-VPS-SKIP-IMAGE 完成，VPS api 容器 SKIP_IMAGE_GENERATION=True 生效）
+> **最后更新**: 2026-04-29（TASK-T6-FIXBATCH Wave 4 完成）
+
+---
+
+## TASK-T6-FIXBATCH Wave 4 完成 (2026-04-29) — Wave 1.1+1.2+2+2.5+3.5 全部上生产
+
+**全员注意 — T6 修复批次已全部部署到生产 VPS**:
+
+- commit `84a2d35` push range `434c2f0..84a2d35` (84 files, +18818/-1069)
+- rsync app/ + frontend/src/ + [projectUuid]/ + package.json → VPS
+- docker compose build api + frontend + force-recreate
+- api StartedAt: `2026-04-29T08:02:18Z`
+- /health: `{"status":"healthy"}` ✅
+
+**后端改动上线（@backend / @tester 注意）**:
+- `pipeline_orchestrator.py`: stage label 重构 + ETA + aspect_ratio 穿透 + ARCH-1 批量写
+- `job_manager.py`: mark_completed stage='completed' + aspect_ratio
+- `projects.py`: adjust_character() 触发 portrait 重生 + regenerate-portrait 端点
+- `chapters.py`: /status 接入 estimate_remaining() ETA
+- `character_prompt_builder.py`: isinstance(dict) 防御（R7-3 修复）
+- `schemas/project.py`: cover_image_url + shot_count + mood + ISO 时区
+- `seedream_generator.py` (新): Seedream 生图服务（7 种比例）
+
+**前端改动上线（@frontend 注意）**:
+- `[projectUuid]/[stage]/page.tsx` (新): dynamic route
+- `url.ts` + `createUrl.ts` (新): toAbsoluteUrl 共享工具
+- StageD: toAbsoluteUrl 修复 404（R7-12）
+- StageC: portrait_url fetch + 完成态 + carousel fix
+- StageE: outline.summary
+- StoryCard + AuthContext: 读新 Dashboard 字段
+
+**生产 T8 验证 PASS**:
+- UUID: `a3966a40-6d27-42c0-a7cf-109729e453e7`（"牵手走过的街"，1:1 画幅，16 shots NB2 真生图）
+- D.15 PASS（1:1→1024x1024 正方形，不再 hardcoded 2:3）
+- R7-1 PASS（cover_image_url + shot_count=16 在 /api/projects/ 返回）
+- R7-3 PASS（adjust portrait mtime 变化验证）
+- UX-16 PASS（/create/{uuid}/preview HTTP 200）
+
+**当前 VPS 状态**:
+- SKIP_IMAGE_GENERATION: True（验证完恢复，节省成本）
+- 3 容器: api(healthy) + frontend(up) + redis(healthy)
 
 ---
 

@@ -96,3 +96,31 @@ Ben 团队群聊初始化完成。欢迎 @frontend_Ben @backend_Ben 加入。
 - 不混入其他无关前端调整
 
 ---
+
+### 2026-04-29
+
+**@devops (Founder 团队) → @backend_Ben**:
+
+通知：Founder 团队完成 TASK-T6-FIXBATCH Wave 1.1+1.2+2+2.5+3.5 大批修复，已 push 到 GitHub main。
+
+**commit**: `84a2d35`
+**push range**: `434c2f0..84a2d35`
+**84 files changed**, 18818 insertions(+), 1069 deletions(-)
+
+**后端改动（需 Ben 知悉，8+ 文件）**:
+1. `app/services/pipeline_orchestrator.py` — stage label 重构 + ETA STAGE_DURATIONS + aspect_ratio 参数穿透(Wave 2.5) + ARCH-1 chapter_scene_images 批量写入 + Stage 5 prep freshness check
+2. `app/services/job_manager.py` — mark_completed 设 stage='completed' + aspect_ratio 参数 + ARCH-1 chapter_id 传递
+3. `app/api/projects.py` — adjust_character() 触发 portrait 重生 + regenerate-portrait 端点 + start-generation 传 aspect_ratio
+4. `app/api/chapters.py` — /status 端点接入 estimate_remaining() ETA 链路
+5. `app/services/reference_image_manager.py` — freshness check 逻辑
+6. `app/services/character_prompt_builder.py` — isinstance(dict) 防御修复 str.get() 异常
+7. `app/schemas/project.py` — ProjectList 新增 cover_image_url/shot_count/mood/ISO 时区
+8. `app/services/seedream_generator.py` (新文件) — Seedream 生图服务
+9. `app/services/api_cost_logger.py` (新文件) — API 成本记录
+10. `app/config.py` — 新增配置项
+
+**DB schema**: 无新列需要 ALTER TABLE（aspect_ratio 列是之前 R6 加的，chapter_scene_images 早已存在）。
+
+**注意**: 接下来会 rsync 代码到 VPS + Docker rebuild，不在 VPS 上 git pull。如有冲突请告知。
+
+---

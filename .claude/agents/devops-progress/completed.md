@@ -1,7 +1,39 @@
 # DevOps Agent - 已完成任务
 
 > 按时间倒序记录已完成的工作
-> **2026-04-24 13:32 注**: TASK-VPS-SKIP-IMAGE 完成 — .env.production 追加 SKIP_IMAGE_GENERATION=true + force-recreate api + 3/3 验证 PASS，StartedAt 2026-04-24T05:30:37Z。
+> **2026-04-29 注**: TASK-T6-FIXBATCH Wave 4 完成 — commit 84a2d35 push + rsync + Docker rebuild + T8 生产验证全 PASS。
+
+---
+
+### TASK-T6-FIXBATCH Wave 4 ✅ (2026-04-29, DevOps Sonnet)
+
+**任务**: 将 Wave 1.1+1.2+2+2.5+3.5 全批代码修复部署到生产 VPS，完成生产环境验证
+
+**部署范围（16 文件）**:
+- Backend (8): pipeline_orchestrator.py / job_manager.py / projects.py / chapters.py / character_prompt_builder.py / reference_image_manager.py / schemas/project.py / seedream_generator.py(新)
+- Frontend (8): [projectUuid]/[stage]/page.tsx(新) / url.ts(新) / createUrl.ts(新) / StageD.tsx / StageC.tsx / 其他
+
+**执行步骤**:
+
+| 步骤 | 操作 | 结果 |
+|------|------|------|
+| Step 1 | git commit + push GitHub | commit 84a2d35, branch main ✅ |
+| Step 2 | 通知 Ben (.team-brain/team_ben/TEAM_CHAT.md) | 后端 10 文件清单已发 ✅ |
+| Step 3 | rsync app/ → VPS app/ + frontend/ → VPS frontend/ | trailing slash 正确 ✅ |
+| Step 4 | docker compose build --no-cache api frontend + force-recreate | api + frontend 重建 ✅ |
+| Step 5 | docker exec api curl /health | {"status":"healthy"} 200 ✅ |
+| Step 6 | 生产 T8 故事验证 (1:1 朋友圈, NB2 真生图) | status=completed, 16 shots ✅ |
+
+**T8 验证数据**:
+- 项目 UUID: a3966a40-6d27-42c0-a7cf-109729e453e7
+- 画幅: 1:1（朋友圈）
+- Shots: 16 张（NB2 真生图，1024x1024）
+- D.15: PIL 实测 1024x1024（不再 hardcoded 2:3）✅
+- R7-1: cover_image_url + shot_count=16 返回正常 ✅
+- R7-3: portrait mtime +45s（adjust 后真实重生）✅
+- UX-16: GET /create/{uuid}/preview → HTTP 200 ✅
+
+**验证后**: SKIP_IMAGE_GENERATION 恢复 true（节省后续测试成本）
 
 ---
 
