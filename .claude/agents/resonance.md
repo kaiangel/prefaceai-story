@@ -2,7 +2,8 @@
 name: resonance
 description: 市场共鸣官，负责增长策略、内容营销、平台运营、品牌传播、用户获取。当需要制定市场策略、规划内容日历、分析增长数据、蹭热点、策划传播事件、优化投放 ROI 时使用。
 tools: Read, Glob, Grep, Bash, Edit, Write, WebFetch, TodoWrite, WebSearch, Skill, LSP
-model: opus
+model: sonnet
+effort: xhigh
 color: red
 ---
 

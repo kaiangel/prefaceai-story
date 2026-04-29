@@ -1,13 +1,30 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Sparkles, AlertCircle, Loader2 } from "lucide-react";
 import { useCreate } from "@/contexts/CreateContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetch, getStoredToken } from "@/lib/api";
+import { apiFetch, getStoredToken, fetchBgmInfo } from "@/lib/api";
 import { mockOutline } from "@/lib/mock-data";
-import type { StoryOutline, StoryLength } from "@/types/create";
+import type {
+  StoryOutline,
+  StoryLength,
+  Shot,
+  PreviewCharacter,
+  PreviewScene,
+  AspectRatio,
+} from "@/types/create";
+import {
+  buildCreateUrl,
+  deriveUrlStageFromState,
+  isUrlStage,
+  reconcileBackendVsUrl,
+  stateFromUrlStage,
+  type UrlStage,
+} from "@/lib/createUrl";
+import { toAbsoluteUrl } from "@/lib/url";
 import CreateHeader from "@/components/layout/CreateHeader";
 import StoryIdeaInput from "@/components/ui/StoryIdeaInput";
 import LengthSelector from "@/components/ui/LengthSelector";
@@ -40,6 +57,7 @@ const OUTLINE_STAGES = [
 function StageA() {
   const { state, dispatch } = useCreate();
   const { isLoggedIn } = useAuth();
+  const router = useRouter();
   const [ideaError, setIdeaError] = useState("");
   const [apiError, setApiError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -164,6 +182,9 @@ function StageA() {
       await new Promise((r) => setTimeout(r, 500));
       dispatch({ type: "SET_OUTLINE", payload: outline });
       dispatch({ type: "SET_STAGE", payload: "confirm" });
+      // UX-16: Navigate to dynamic route so URL reflects state. Use replace so
+      // back button doesn't return to the form (which would re-create the project).
+      router.replace(`/create/${project.project_id}/outline`);
     } catch (err) {
       const message = err instanceof Error ? err.message : "生成失败，请稍后重试";
       setApiError(message);
@@ -399,8 +420,487 @@ function StageA() {
   );
 }
 
-export default function CreateContent() {
-  const { state } = useCreate();
+// ============ UX-16: State hydration + URL sync ============
+
+interface ChapterStatusResp {
+  status: string;
+  stage: string | null;
+  progress: number;
+  message: string;
+  estimated_remaining_seconds?: number | null;
+}
+
+interface ProjectDetailResp {
+  id: string;
+  title: string;
+  original_idea: string;
+  style_preset: string;
+  aspect_ratio: string | null;
+  created_at: string;
+  confirmed_outline?: {
+    title?: string;
+    title_en?: string;
+    summary?: string;
+    mood?: string;
+    user_selected_mood?: string | null;
+    plot_points?: Array<{ description?: string; content?: string }>;
+    characters?: Array<{
+      id?: string;
+      name?: string;
+      name_en?: string;
+      description?: string;
+      personality?: string;
+      portrait_url?: string | null;
+    }>;
+    scenes?: Array<{ id?: string; name?: string; description?: string; description_zh?: string; location_type?: string }>;
+    endings?: Array<{ id?: string; description?: string; isSelected?: boolean }>;
+  } | null;
+}
+
+interface ChapterStoryResp {
+  characters?: Array<{ id?: string; name: string; description?: string; portrait_url?: string | null }>;
+  scenes?: Array<{ scene_id?: number; visual_description?: string; narration?: string }>;
+}
+
+interface StoryboardResp {
+  storyboard: unknown;
+  chapter_number: number;
+  project_id: string;
+}
+
+/**
+ * UX-16: Pull all backend data and dispatch a HYDRATE_FROM_BACKEND action so
+ * the rest of the app behaves exactly like it just walked the user through
+ * Stages A-D in this session.
+ *
+ * Returns the reconciled UrlStage we should redirect to.
+ */
+// Payload shape for HYDRATE_FROM_BACKEND — see CreateAction in types/create.ts
+type HydratePayload = Extract<
+  import("@/types/create").CreateAction,
+  { type: "HYDRATE_FROM_BACKEND" }
+>["payload"];
+
+async function hydrateProjectFromBackend(
+  projectUuid: string,
+  token: string,
+  urlStage: UrlStage
+): Promise<{
+  hydratePayload: HydratePayload | null;
+  reconciledStage: UrlStage;
+  notFound: boolean;
+}> {
+  try {
+    // Pull project + status (always needed)
+    const [project, status] = await Promise.all([
+      apiFetch<ProjectDetailResp>(`/projects/${projectUuid}`, {}, token),
+      apiFetch<ChapterStatusResp>(`/projects/${projectUuid}/chapters/1/status`, {}, token).catch(
+        () => ({ status: "pending", stage: null, progress: 0, message: "" } as ChapterStatusResp)
+      ),
+    ]);
+
+    // Pull storyboard + story (best-effort — empty if not yet generated)
+    const [storyboardData, storyData] = await Promise.all([
+      apiFetch<StoryboardResp>(`/projects/${projectUuid}/chapters/1/storyboard`, {}, token).catch(
+        () => null
+      ),
+      apiFetch<ChapterStoryResp>(`/projects/${projectUuid}/chapters/1/story`, {}, token).catch(
+        () => null
+      ),
+    ]);
+
+    // Reconcile URL vs backend BEFORE we know charactersConfirmed/scenesConfirmed
+    // (we'll infer them from backend stage progression below).
+    // Heuristic: if backend stage is past "character_ready", characters are confirmed.
+    // If backend stage is past "screenplay", scenes are confirmed.
+    const ADVANCED_STAGES = new Set([
+      "screenplay",
+      "storyboard",
+      "image_preparation",
+      "image_generation",
+      "bgm",
+      "completed",
+    ]);
+    const charactersConfirmed =
+      ADVANCED_STAGES.has(status.stage || "") || status.status === "completed";
+    const scenesConfirmed =
+      ADVANCED_STAGES.has(status.stage || "") || status.status === "completed";
+
+    const reconciledStage = reconcileBackendVsUrl({
+      urlStage,
+      backendStatus: status.status,
+      backendStage: status.stage,
+      charactersConfirmed,
+      scenesConfirmed,
+    });
+
+    // Build outline from confirmed_outline (or null if user hasn't confirmed yet)
+    const co = project.confirmed_outline;
+    let outline: StoryOutline | null = null;
+    if (co) {
+      outline = {
+        title: co.title || project.title || "",
+        titleEn: co.title_en || "",
+        summary: co.summary || "",
+        characters: (co.characters || []).map((c, i) => ({
+          id: c.id || `char_${i + 1}`,
+          name: c.name || "",
+          nameEn: c.name_en || "",
+          description: c.description || "",
+          personality: c.personality || "",
+          portrait_url: c.portrait_url || null,
+        })),
+        plotPoints: (co.plot_points || []).map((p, i) => ({
+          id: `pp_${i + 1}`,
+          description: p.description || p.content || "",
+          order: i + 1,
+        })),
+        endings: (co.endings || []).map((e, i) => ({
+          id: e.id || `ending_${i + 1}`,
+          description: e.description || "",
+          isSelected: !!e.isSelected,
+        })),
+        mood: co.user_selected_mood || co.mood || "",
+        scenes: (co.scenes || []).map((s, i) => ({
+          id: s.id || `scene_${i + 1}`,
+          name: s.name || "",
+          description: s.description || "",
+          description_zh: s.description_zh,
+          locationType: s.location_type || "",
+        })),
+      };
+    }
+
+    // Build previewCharacters with portrait_url (from chapter.characters_json)
+    const portraitByName: Record<string, string | null> = {};
+    const portraitById: Record<string, string | null> = {};
+    for (const cc of storyData?.characters || []) {
+      if (cc.name) portraitByName[cc.name] = cc.portrait_url || null;
+      if (cc.id) portraitById[cc.id] = cc.portrait_url || null;
+    }
+    const previewCharacters: PreviewCharacter[] = outline
+      ? outline.characters.map((c) => ({
+          id: c.id,
+          name: c.name,
+          description: c.description,
+          fullbodyUrl: "/brand/logo-48.png",
+          portraitUrl:
+            portraitById[c.id] ?? portraitByName[c.name] ?? c.portrait_url ?? null,
+          adjustments: [],
+        }))
+      : [];
+
+    const previewScenes: PreviewScene[] = outline
+      ? outline.scenes.map((s) => ({
+          id: s.id,
+          name: s.name,
+          description: s.description_zh || s.description,
+          userEdit: "",
+        }))
+      : [];
+
+    // Build shots from storyboard (only when generation completed)
+    let shots: Shot[] = [];
+    if (storyboardData?.storyboard) {
+      const sb = storyboardData.storyboard as Record<string, unknown> | unknown[];
+      const rawShots: unknown[] = Array.isArray(sb)
+        ? sb
+        : Array.isArray((sb as Record<string, unknown>)["shots"])
+          ? ((sb as Record<string, unknown>)["shots"] as unknown[])
+          : [];
+      shots = rawShots.map((shot, i) => {
+        const s = shot as Record<string, unknown>;
+        const rawImageUrl = (s["image_url"] as string | null | undefined) || null;
+        const textOverlay = s["text_overlay"] as { type?: string; text?: string } | undefined;
+        return {
+          shotId: (s["shot_id"] as number) || i + 1,
+          sceneId:
+            (s["scene_id"] as number) ||
+            (s["original_scene_id"] as number) ||
+            i + 1,
+          imagePrompt: (s["image_prompt"] as string) || "",
+          narrationSegment: (s["narration_segment"] as string) || "",
+          shotType: (s["shot_type"] as string) || "medium shot",
+          cameraAngle: (s["camera_angle"] as string) || "eye level",
+          textType: textOverlay?.type || "narration",
+          chineseText: textOverlay?.text ? [textOverlay.text] : [],
+          imageUrl: toAbsoluteUrl(rawImageUrl),
+          charactersInScene: (s["characters_in_scene"] as string[]) || [],
+        };
+      });
+    }
+
+    // Best-effort BGM info
+    let bgmUrl: string | null = null;
+    try {
+      const bgmInfo = await fetchBgmInfo(projectUuid, 1, token);
+      if (bgmInfo.bgm_exists && bgmInfo.bgm_url) {
+        bgmUrl = toAbsoluteUrl(bgmInfo.bgm_url);
+      }
+    } catch {
+      // ignore — BGM is optional
+    }
+
+    // Map reconciled URL stage → CreateStage / GenerationSubPhase for hydrate payload
+    const { currentStage, subPhase } = stateFromUrlStage(reconciledStage);
+
+    // Determine generationStatus: if backend completed → "complete", else "generating", else "idle"
+    let generationStatus: "idle" | "generating" | "complete" | "error" = "idle";
+    if (status.status === "completed") generationStatus = "complete";
+    else if (status.status === "generating") generationStatus = "generating";
+    else if (status.status === "failed") generationStatus = "error";
+
+    const hydratePayload = {
+      projectId: projectUuid,
+      currentStage,
+      generationSubPhase: subPhase ?? "text-gen",
+      idea: project.original_idea || "",
+      stylePreset: project.style_preset || null,
+      aspectRatio: (project.aspect_ratio || "2:3") as AspectRatio,
+      outline,
+      outlineConfirmed: !!outline && status.status !== "pending",
+      previewCharacters,
+      previewScenes,
+      charactersConfirmed,
+      scenesConfirmed,
+      shots,
+      generationStatus,
+      generationProgress: status.progress || 0,
+      generationMessage: status.message || "",
+      bgmPlayer: bgmUrl
+        ? {
+            status: "ready" as const,
+            bgmUrl,
+            volume: 70,
+            metaVersion: null,
+            creditsUsed: 0,
+            errorMessage: null,
+          }
+        : undefined,
+    };
+
+    return { hydratePayload, reconciledStage, notFound: false };
+  } catch (err) {
+    // 404 / 401 / network — let caller route to /create or /login as appropriate
+    const msg = err instanceof Error ? err.message : "";
+    const notFound = /404|不存在|not found/i.test(msg);
+    return { hydratePayload: null, reconciledStage: urlStage, notFound };
+  }
+}
+
+interface CreateContentProps {
+  urlProjectUuid?: string;
+  urlStage?: string;
+}
+
+export default function CreateContent({ urlProjectUuid, urlStage }: CreateContentProps = {}) {
+  const { state, dispatch } = useCreate();
+  const router = useRouter();
+  const { isLoggedIn, loadingUser } = useAuth();
+
+  // UX-16: hydration tracking — prevents redundant fetches per project.
+  const hydratedFor = useRef<string | null>(null);
+  const [hydrating, setHydrating] = useState(!!urlProjectUuid);
+  const [hydrateError, setHydrateError] = useState<string | null>(null);
+
+  // UX-16: track the last URL we pushed so the URL→state effect can ignore the echo.
+  const lastPushedUrlRef = useRef<string | null>(null);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Hydration: when the page mounts with a URL projectUuid, fetch backend data.
+  // ──────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!urlProjectUuid) {
+      setHydrating(false);
+      return;
+    }
+    // Already hydrated this exact project this session → skip
+    if (hydratedFor.current === urlProjectUuid && state.projectId === urlProjectUuid) {
+      setHydrating(false);
+      return;
+    }
+    // If we're still figuring out auth, wait
+    if (loadingUser) return;
+
+    if (!isLoggedIn) {
+      router.replace("/login");
+      return;
+    }
+
+    const token = getStoredToken();
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+
+    const safeUrlStage: UrlStage = isUrlStage(urlStage) ? urlStage : "outline";
+
+    setHydrating(true);
+    setHydrateError(null);
+
+    void (async () => {
+      const result = await hydrateProjectFromBackend(urlProjectUuid, token, safeUrlStage);
+      if (result.notFound) {
+        setHydrateError("项目不存在或已删除");
+        setHydrating(false);
+        return;
+      }
+      if (!result.hydratePayload) {
+        setHydrateError("加载项目失败，请刷新重试");
+        setHydrating(false);
+        return;
+      }
+      hydratedFor.current = urlProjectUuid;
+      dispatch({ type: "HYDRATE_FROM_BACKEND", payload: result.hydratePayload });
+
+      // If backend reconciled to a different stage than the URL says, redirect.
+      if (result.reconciledStage !== safeUrlStage) {
+        const newUrl = buildCreateUrl(urlProjectUuid, result.reconciledStage);
+        if (newUrl) {
+          lastPushedUrlRef.current = newUrl;
+          router.replace(newUrl);
+        }
+      } else {
+        lastPushedUrlRef.current = `/create/${urlProjectUuid}/${safeUrlStage}`;
+      }
+      setHydrating(false);
+    })();
+  }, [urlProjectUuid, urlStage, isLoggedIn, loadingUser, dispatch, router, state.projectId]);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // State → URL sync: whenever currentStage / subPhase / projectId changes,
+  // compute the canonical URL and replace if it differs from current pathname.
+  // ──────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    // Skip until hydration is complete (avoid stomping the redirect above)
+    if (hydrating) return;
+
+    const desiredStage = deriveUrlStageFromState(state.currentStage, state.generationSubPhase);
+    const projectId = state.projectId;
+
+    // No project yet (Stage A) — should be at /create. Don't push.
+    if (!projectId || !desiredStage) return;
+
+    const desiredUrl = buildCreateUrl(projectId, desiredStage);
+    if (!desiredUrl) return;
+
+    // Read current pathname directly to avoid stale closure
+    const currentPath = typeof window !== "undefined" ? window.location.pathname : null;
+    if (currentPath === desiredUrl) {
+      lastPushedUrlRef.current = desiredUrl;
+      return;
+    }
+
+    lastPushedUrlRef.current = desiredUrl;
+    // UX-16 nav semantics:
+    //   - Use router.push so each semantic stage transition (outline → generating
+    //     → characters → scenes → generating → preview → delivery) creates a
+    //     browser history entry. Back button returns user to previous stage.
+    //   - This effect ONLY fires when state.currentStage / subPhase / projectId
+    //     change — pollers and progress ticks DON'T trigger it. So we won't pollute
+    //     history with one entry per poll. (Each push corresponds to a real stage.)
+    //   - Hydration redirects use router.replace separately (in the hydrate effect)
+    //     to avoid creating a back-button trap that loops to the same URL.
+    router.push(desiredUrl);
+  }, [
+    state.currentStage,
+    state.generationSubPhase,
+    state.projectId,
+    hydrating,
+    router,
+  ]);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // URL → state sync: when user navigates back/forward, urlStage prop changes.
+  // Update React state to match (only if it doesn't already match what state implies).
+  // ──────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (hydrating) return;
+    if (!urlProjectUuid || !urlStage) return;
+    if (!isUrlStage(urlStage)) return;
+    // Only act once initial hydration has completed and projectId matches URL.
+    if (state.projectId !== urlProjectUuid) return;
+
+    const derivedFromState = deriveUrlStageFromState(state.currentStage, state.generationSubPhase);
+    if (derivedFromState === urlStage) return; // already in sync
+
+    // Echo guard: if the URL change was triggered by us, skip.
+    const echoUrl = lastPushedUrlRef.current;
+    const incomingUrl = `/create/${urlProjectUuid}/${urlStage}`;
+    if (echoUrl === incomingUrl) return;
+
+    // UX-16 protection: if generation is already complete and user back-navigates
+    // into a pre-completion stage, force them back to /preview. The pipeline can't
+    // be re-run; allowing them into "generating" would restart pollers harmfully.
+    const completedRedirectStages: UrlStage[] = ["generating", "characters", "scenes", "outline"];
+    if (
+      state.generationStatus === "complete" &&
+      completedRedirectStages.includes(urlStage)
+    ) {
+      const preview = buildCreateUrl(urlProjectUuid, "preview");
+      if (preview) {
+        lastPushedUrlRef.current = preview;
+        router.replace(preview);
+      }
+      return;
+    }
+
+    // URL stage differs from state → adopt URL (user pressed back/forward)
+    const { currentStage, subPhase } = stateFromUrlStage(urlStage);
+    dispatch({ type: "SET_STAGE", payload: currentStage });
+    if (subPhase) {
+      dispatch({ type: "SET_GENERATION_SUB_PHASE", payload: subPhase });
+    }
+  }, [
+    urlStage,
+    urlProjectUuid,
+    state.projectId,
+    state.currentStage,
+    state.generationSubPhase,
+    state.generationStatus,
+    hydrating,
+    dispatch,
+    router,
+  ]);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Render
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // UX-16: hydrating spinner (URL deep link / refresh)
+  if (urlProjectUuid && hydrating) {
+    return (
+      <div className="min-h-screen bg-bg-primary">
+        <CreateHeader />
+        <main className="container-lg py-8 pb-24">
+          <div className="max-w-lg mx-auto text-center pt-20">
+            <Loader2 className="w-8 h-8 text-brand-primary mx-auto mb-3 animate-spin" />
+            <p className="text-text-muted text-sm">正在加载你的故事...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (urlProjectUuid && hydrateError) {
+    return (
+      <div className="min-h-screen bg-bg-primary">
+        <CreateHeader />
+        <main className="container-lg py-8 pb-24">
+          <div className="max-w-lg mx-auto text-center pt-20">
+            <AlertCircle className="w-8 h-8 text-error mx-auto mb-3" />
+            <p className="text-text-secondary text-sm mb-4">{hydrateError}</p>
+            <button
+              onClick={() => router.replace("/dashboard")}
+              className="btn-primary px-8"
+            >
+              返回工作台
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   const renderStage = () => {
     switch (state.currentStage) {

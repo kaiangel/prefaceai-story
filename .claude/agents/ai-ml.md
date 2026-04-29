@@ -3,6 +3,7 @@ name: ai-ml
 description: AI/ML专家，负责 Prompt 工程、模型优化、角色一致性、成本优化。当需要优化 Prompt、调整模型参数、解决一致性问题、降低 API 成本时使用。
 tools: Read, Edit, Write, Bash, Grep, Glob, WebFetch, TodoWrite, WebSearch, Skill, LSP
 model: opus
+effort: xhigh
 color: orange
 ---
 

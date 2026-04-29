@@ -792,6 +792,13 @@ class ImageGenerator:
         Returns:
             生成结果字典
         """
+        # TASK-SEEDREAM-INTEGRATION dispatcher: Seedream 路径 + NB2 fallback（NB2 原逻辑零改动）
+        if settings.IMAGE_GEN_PROVIDER == "seedream" and not kwargs.pop("_seedream_fallback", False):
+            from app.services.seedream_generator import generate_shot_image_seedream
+            return await generate_shot_image_seedream(
+                shot=shot, reference_images=reference_images, aspect_ratio=aspect_ratio,
+                fallback_callback=lambda: self.generate_shot_image(shot, reference_images,
+                    aspect_ratio, use_llm_translation, _seedream_fallback=True, **kwargs))
         # 1. 获取shot的image_prompt
         image_prompt = shot.get('image_prompt', '')
 
@@ -1277,6 +1284,20 @@ class ImageGenerator:
 
                         generation_time = time.time() - start_time
 
+                        # TASK-PARALLEL-M1 ARCH-4: 写入 api_cost_logs INSERT 路径（NB2 路径）
+                        # Bug 4 fix: 用 await 代替 ensure_future，避免 event loop 关闭后仍有 pending task
+                        try:
+                            from app.services.api_cost_logger import log_api_cost, NB2_COST_PER_IMAGE
+                            await log_api_cost(
+                                project_id=kwargs.get("project_id"),
+                                stage=f"Stage 5 Shot {shot.get('shot_id', '?')}",
+                                model=self.NB2_MODEL,
+                                cost_usd=NB2_COST_PER_IMAGE,
+                                detail="NB2 generate_shot_image_phase2",
+                            )
+                        except Exception as _cost_log_err:
+                            logger.warning(f"[ImageGenerator] api_cost_log 写入失败（非阻塞）: {_cost_log_err}")
+
                         return {
                             "success": True,
                             "image_data": image_data,
@@ -1364,6 +1385,19 @@ class ImageGenerator:
         Returns:
             生成结果字典，额外包含 rewrite_info 如果进行了改写
         """
+        # TASK-SEEDREAM-INTEGRATION dispatcher: Seedream 路径 + NB2 fallback（NB2 原逻辑零改动）
+        if settings.IMAGE_GEN_PROVIDER == "seedream" and not kwargs.pop("_seedream_fallback", False):
+            from app.services.seedream_generator import generate_shot_image_seedream
+            _kwargs_copy = dict(kwargs)
+            return await generate_shot_image_seedream(
+                shot=shot, reference_images=reference_images, aspect_ratio=aspect_ratio,
+                fallback_callback=lambda: self.generate_shot_image_phase2_safe(
+                    shot=shot, storyboard=storyboard, characters=characters,
+                    style_preset=style_preset, reference_images=reference_images,
+                    screenplay=screenplay, aspect_ratio=aspect_ratio, genre=genre,
+                    use_native_text=use_native_text, _seedream_fallback=True, **_kwargs_copy),
+                **_kwargs_copy)  # Bug 1 fix: 透传 project_id 等 kwargs 到 seedream_generator
+
         shot_id = shot.get("shot_id", "?")
         logger.info(f"\n[ImageGenerator] === Shot {shot_id} 安全生成开始 ===")
 

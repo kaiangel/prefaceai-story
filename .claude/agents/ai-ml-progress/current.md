@@ -1,11 +1,62 @@
-# AI-ML Agent - 当前任务
+# AI-ML Engineer 当前任务
 
-> **最后更新**: 2026-04-21（PM 代更新）
-> **状态**: ✅ Wave 1 Step B 完成 — 95 风格 music_hint 字段全覆盖
+> 更新时间: 2026-04-27 16:25 (PM 代更 — agent 自报文件权限 600 拒绝)
+> 状态: ✅ TASK-T5-FIXBATCH BGM-1 95 风格 music_hint 字典完成
 
 ---
 
+## 最新完成: TASK-T5-FIXBATCH BGM-1 (2026-04-27 16:25)
+
+**改动**: 新建 `app/services/style_music_hints.py` (49KB)
+
+**字典覆盖**:
+- 105 entries (97 styles + __default__ + custom + 别名)
+- 28 StyleEnforcer 上架风格: 手工高质量填 V4 极简哲学
+- 67 style_config 独有: fallback + TODO 标记
+
+**helper 函数**:
+- `get_music_hint(style_id) -> dict` 完整 5 字段 (primary_genre/instruments/tempo/mood_modifier/raw_hint)
+- `get_raw_hint(style_id) -> str` 快捷字符串
+
+**T5 关键场景验证**:
+- pencil_sketch → "intimate acoustic, bare and unhurried, pencil-on-paper quietness" (悲伤故事正确味道)
+- ink → "guqin/dizi/xiao 东亚水墨"
+- paper_cut → "erhu/pipa/jianzhi 民俗节庆"
+
+**测试**:
+- ✅ 187/187 test_style_music_hints 全过 (新建)
+- ✅ 7/7 test_architecture 全过 (零破坏)
+
+**接口给 Backend BGM-1 修复用**:
+```python
+from app.services.style_music_hints import get_raw_hint
+raw_hint = get_raw_hint(visual_style_preset)
+outline["music_hint"] = raw_hint
+```
+---
+
 ## 刚完成
+
+### ✅ TASK-SEEDREAM-INTEGRATION Prompt 层 — Seedream 2D 风格硬约束 (2026-04-24)
+
+**改动文件**: `app/services/style_enforcer.py`（仅此 1 个文件，L677-L768 新增 3 项）
+
+**新增内容**:
+- `_SEEDREAM_2D_LOCK_BLOCK` 类属性 — 硬编码 Seedream 2D 风格锁定块全文（纯英文，1169 字符）
+- `build_seedream_2d_boost_prefix()` — 返回锁定块，供 Backend 独立调用
+- `enforce_prompt_for_provider(prompt, style_name, provider="nb2")` — Backend 主调方法，`provider="seedream"` 时在最开头注入 2D 锁定块，`provider="nb2"` 时完全等价于原 `enforce_prompt()`
+
+**NB2 零影响验证**: `enforce_prompt_for_provider(p, s, "nb2") == enforce_prompt(p, s)` 字符串完全相同，pytest test_architecture 7/7 PASS
+
+**Backend 使用方式**:
+```python
+enforced = StyleEnforcer.enforce_prompt_for_provider(
+    original_prompt=shot_prompt, style_name=style_config.style_preset,
+    provider=settings.IMAGE_GEN_PROVIDER,
+)
+```
+
+---
 
 ### ✅ Wave 1 Step B — 95 风格 music_hint 字段 (2026-04-21)
 

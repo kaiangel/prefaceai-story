@@ -2,7 +2,8 @@
 name: tester
 description: 测试工程师，负责单元测试、集成测试、E2E测试、回归测试。当需要编写测试、运行测试、检查覆盖率、验证Bug修复时使用。
 tools: Read, Edit, Write, Bash, Grep, Glob, WebFetch, TodoWrite, WebSearch, Skill, LSP
-model: opus
+model: sonnet
+effort: xhigh
 color: yellow
 ---
 

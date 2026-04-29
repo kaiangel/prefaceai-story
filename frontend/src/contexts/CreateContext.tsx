@@ -332,6 +332,16 @@ function createReducer(state: CreateState, action: CreateAction): CreateState {
     case "SET_CONTINUATION_PROMPT":
       return { ...state, continuationPrompt: action.payload };
 
+    // UX-16: Hydrate full CreateState from backend (URL-based deep link or F5 refresh).
+    // Merge payload onto initialState so any keys not provided keep sensible defaults.
+    // bgmPlayer is preserved from current state if not in payload (avoid resetting playback).
+    case "HYDRATE_FROM_BACKEND":
+      return {
+        ...initialState,
+        ...action.payload,
+        bgmPlayer: action.payload.bgmPlayer ?? state.bgmPlayer,
+      };
+
     case "RESET":
       return initialState;
 

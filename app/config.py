@@ -56,6 +56,16 @@ class Settings(BaseSettings):
     # Prompt 格式：b_prime（默认，省 46% token）| legacy（A 格式原版）
     PROMPT_FORMAT: str = "b_prime"
 
+    # 图像生成 Provider（TASK-SEEDREAM-INTEGRATION）
+    # "nb2"      → Nano Banana 2（Gemini 3.1 Flash Image Preview），MVP 默认主力
+    # "seedream" → Seedream 5.0-lite（火山方舟国内版），测试期主力（成本降 55%）
+    # Seedream 路径会在 sanitize 3 次失败后自动降级到 NB2，保证 Pipeline 不断
+    IMAGE_GEN_PROVIDER: str = "nb2"
+
+    # 火山方舟 Ark API Key（Seedream 5.0-lite 调用鉴权）
+    # 仅当 IMAGE_GEN_PROVIDER=seedream 时必需
+    ARK_API_KEY: str = ""
+
     # 单次 Pipeline 成本上限（美元），超过时中止并抛 PipelineCostLimitExceeded
     PIPELINE_COST_LIMIT: float = 10.0
 

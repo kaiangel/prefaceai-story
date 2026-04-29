@@ -1,7 +1,43 @@
 # DevOps Agent - 已完成任务
 
 > 按时间倒序记录已完成的工作
-> **2026-04-23 17:10 注**: TASK-BUG-FIX-BATCH-1 Route D 完成 — 18 bug 修复(Route B+C) + output volume 上生产，8/8 验证 PASS，StartedAt 2026-04-23T09:01:10Z。
+> **2026-04-24 13:32 注**: TASK-VPS-SKIP-IMAGE 完成 — .env.production 追加 SKIP_IMAGE_GENERATION=true + force-recreate api + 3/3 验证 PASS，StartedAt 2026-04-24T05:30:37Z。
+
+---
+
+### TASK-VPS-SKIP-IMAGE ✅ (2026-04-24 13:32, DevOps 自执行)
+
+**任务**: VPS .env.production 追加 SKIP_IMAGE_GENERATION=true，让生产环境 Stage 5 使用 R8 mock 图跳过 NB2 真实生图
+
+**执行步骤**:
+
+1. **幂等追加 env** ✅
+   - `grep -q '^SKIP_IMAGE_GENERATION=' /opt/xuhua-story/.env.production || echo '...' >> .env.production`
+   - 判断不存在才追加，防重复写入
+
+2. **验证 .env.production** ✅
+   - `grep SKIP_IMAGE_GENERATION /opt/xuhua-story/.env.production`
+   - 返回: `SKIP_IMAGE_GENERATION=true` ✅
+
+3. **force-recreate api 容器** ✅
+   - `cd /opt/xuhua-story/docker && docker compose up -d --force-recreate api`
+   - docker-api-1 Recreated → Started ✅（frontend / redis 不动）
+
+4. **容器内验证 3/3 PASS** ✅
+
+| 验证项 | 期望 | 结果 |
+|--------|------|------|
+| `/health` | `{"status":"healthy"}` | ✅ `{"status":"healthy"}` |
+| `settings.SKIP_IMAGE_GENERATION` | `True` | ✅ `SKIP_IMAGE_GENERATION = True` |
+| 容器 StartedAt | 2026-04-24 今天 | ✅ `2026-04-24T05:30:37.588742043Z` |
+
+**约束遵守**:
+- ✅ 不改代码、不 push、不 commit
+- ✅ 不动共享 MySQL / frontend 容器 / redis
+- ✅ 不改其他 env 配置
+- ✅ 未改 PM 维护文档
+
+**Bash 权限**: ✅ 可用（一轮通过）
 
 ---
 

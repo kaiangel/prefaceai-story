@@ -1,7 +1,33 @@
 # AI-ML Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 AI-ML 的工作状态和 Prompt 约束
-> **最后更新**: 2026-04-17（PM 代更新）
+> **最后更新**: 2026-04-24 19:45
+
+---
+
+## ✅ TASK-SEEDREAM-INTEGRATION Prompt 层 — Seedream 2D 风格硬约束 (2026-04-24)
+
+**@backend 必读** — 接入 `seedream_generator.py` 时用这个新方法替代 `enforce_prompt()`:
+
+```python
+from app.services.style_enforcer import StyleEnforcer
+from app.config import settings
+
+# 替代旧的: StyleEnforcer.enforce_prompt(shot_prompt, style_config.style_preset)
+# 新的:
+enforced_prompt = StyleEnforcer.enforce_prompt_for_provider(
+    original_prompt=shot_prompt,
+    style_name=style_config.style_preset,
+    provider=settings.IMAGE_GEN_PROVIDER,  # "seedream" or "nb2"
+)
+```
+
+- `provider="nb2"` → 完全等价于旧的 `enforce_prompt()`，零变化
+- `provider="seedream"` → 在 prompt 最开头注入 2D 锁定块（1169 字符），禁止 3D/Pixar/CGI，强制 2D watercolor 画风
+
+**风险提示给 @backend**:
+- 锁定块有 Unicode 特殊字符 `▌`，如 Seedream API 不接受请在 `seedream_generator.py` 调用时用 `StyleEnforcer.build_seedream_2d_boost_prefix()` 检查并替换
+- 2D 锁定块新增约 1169 字符到 prompt 开头，请确认 Seedream token 限制不会截断
 
 ---
 
@@ -80,3 +106,16 @@
 ## Prompt Format A/B 分析 (2026-04-14)
 
 - 结论：B' 质量等价 A，省 46% token → 已切为默认格式
+
+
+---
+
+## 🆕 TASK-T5-FIXBATCH BGM-1 完成 (2026-04-27 PM 代更)
+
+**对其他 agent**:
+- **@backend**: 用 `from app.services.style_music_hints import get_raw_hint` 给 outline LLM 注入 music_hint。BGM-1 后端部分配合：Stage 1 后 `outline["music_hint"] = get_raw_hint(visual_style_preset)`，下游 story_music_extractor 透传给 Haiku.
+- **@tester**: T6 测试时验证 outline.music_hint 字段非空，BGM 听感与故事情绪契合
+- **@frontend**: 无影响
+
+**未碰**: style_config.py / style_enforcer.py / music_generation_service.py / meta_mixed_v3_quote_picking.md (Wave 4 + v3.2 已稳)
+

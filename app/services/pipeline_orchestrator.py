@@ -46,18 +46,54 @@ from app.services.pipeline_schemas import (
 )
 
 
+# P1-1 / P1-2: Stage durations (seconds) for backend-driven ETA
+STAGE_DURATIONS = {
+    "story_generation": 60,
+    "character_design": 90,
+    "character_ready": 30,
+    "screenplay": 60,
+    "storyboard": 300,
+    "image_preparation": 60,
+    "image_generation": 300,
+    "bgm": 120,
+}
+
+
+def estimate_remaining(current_stage: str, stage_progress: float = 0.0) -> int:
+    """
+    P1-2: 根据当前 stage 和阶段内进度估算剩余秒数。
+    stage_progress: 0.0-1.0，当前 stage 已完成比例
+    """
+    seq = list(STAGE_DURATIONS.keys())
+    try:
+        idx = seq.index(current_stage)
+    except ValueError:
+        return 0
+    remaining = int(STAGE_DURATIONS[current_stage] * (1.0 - stage_progress))
+    for s in seq[idx + 1 :]:
+        remaining += STAGE_DURATIONS[s]
+    return remaining
+
+
 class PipelineCostLimitExceeded(Exception):
     """Pipeline API 成本超过单次上限时抛出"""
     pass
 
 
 class PipelineCostTracker:
-    """Pipeline 运行期间的 API 成本追踪"""
+    """Pipeline 运行期间的 API 成本追踪
 
-    def __init__(self, cost_limit: float = 10.0):
+    ARCH-4 (TASK-PARALLEL-M1): 双层追踪
+    - 层 1: 内存追踪（同步，快，当前 run 精确）
+    - 层 2: DB 追踪（异步，查 api_cost_logs 表，跨 run 累计）
+      通过 check_db_cost_limit() 在 Stage 5 开始前调用，确保 $10 熔断有真实数据支撑。
+    """
+
+    def __init__(self, cost_limit: float = 10.0, project_id: Optional[int] = None):
         self.cost_limit = cost_limit  # 单次 Pipeline 上限（默认 $10）
         self.total_cost = 0.0
         self.calls = []  # 记录每次 API 调用
+        self.project_id = project_id  # 用于 DB 查询（ARCH-4）
 
     def add_cost(self, service: str, cost: float, detail: str = "") -> None:
         """
@@ -78,6 +114,54 @@ class PipelineCostTracker:
                 f"Pipeline 成本已超过上限 ${self.cost_limit}! "
                 f"当前: ${self.total_cost:.2f}, "
                 f"最近调用: {detail}"
+            )
+
+    async def check_db_cost_limit(self, detail: str = "DB cost check") -> None:
+        """
+        ARCH-4: 查询 api_cost_logs 表获取项目历史累计成本，叠加内存追踪后检查上限。
+
+        应在 Stage 5（高成本阶段）开始前调用一次，确保熔断判断有真实数据。
+        失败时（DB 不可达等）记录 warning 但不抛异常，降级到纯内存追踪。
+
+        Raises:
+            PipelineCostLimitExceeded: 历史累计 + 当前 run 超过上限时抛出
+        """
+        if self.project_id is None:
+            logger.debug("[CostTracker] project_id 为 None，跳过 DB 成本查询")
+            return
+        try:
+            from sqlalchemy import select, func as sa_func
+            from app.database import async_session_maker
+            from app.models.api_cost_log import ApiCostLog
+
+            async with async_session_maker() as session:
+                result = await session.execute(
+                    select(sa_func.coalesce(sa_func.sum(ApiCostLog.cost_usd), 0.0)).where(
+                        ApiCostLog.project_id == self.project_id
+                    )
+                )
+                db_total: float = float(result.scalar() or 0.0)
+
+            combined_total = db_total + self.total_cost
+            logger.info(
+                f"[CostTracker] ARCH-4 DB 查询: project_id={self.project_id}, "
+                f"db_total=${db_total:.4f}, in_memory=${self.total_cost:.4f}, "
+                f"combined=${combined_total:.4f}, limit=${self.cost_limit:.2f}"
+            )
+
+            if combined_total > self.cost_limit:
+                raise PipelineCostLimitExceeded(
+                    f"Pipeline 累计成本（DB+本次）超过上限 ${self.cost_limit}! "
+                    f"DB历史: ${db_total:.2f}, 本次: ${self.total_cost:.2f}, "
+                    f"合计: ${combined_total:.2f}. detail={detail}"
+                )
+
+        except PipelineCostLimitExceeded:
+            raise  # 熔断异常直接上抛
+        except Exception as e:
+            logger.warning(
+                f"[CostTracker] ⚠️ DB 成本查询失败（降级到纯内存追踪）: "
+                f"project_id={self.project_id}, error={type(e).__name__}: {e}"
             )
 
 
@@ -133,6 +217,8 @@ class Phase2PipelineOrchestrator:
         scene_seeds: dict = None,
         confirmed_outline: dict = None,
         project_uuid: str = None,
+        chapter_id: Optional[int] = None,  # ARCH-1: 用于批量写入 chapter_scene_images
+        aspect_ratio: str = "2:3",  # D.15 P0: 用户选择的画幅，传给真生图调用，不再 hardcoded
         progress_callback: Optional[Callable[..., Awaitable]] = None,
         checkpoint_callback: Optional[Callable[..., Awaitable]] = None,
     ) -> dict:
@@ -172,8 +258,50 @@ class Phase2PipelineOrchestrator:
         logger.info(f"[Pipeline] has_confirmed_outline={'是' if confirmed_outline else '否'}, generate_images={generate_images}")
 
         try:
-            # 成本熔断: 单次 Pipeline 成本上限
-            cost_tracker = PipelineCostTracker(cost_limit=settings.PIPELINE_COST_LIMIT)
+            # ARCH-4 修复 + Bug 1 fix (round 3):
+            # 策略: project_uuid 有值 → 查 DB；
+            #        project_uuid 为 None（driver/test 模式）→ 新建临时 Project record 拿 integer id
+            # 目的: 保证 api_cost_logs.project_id 永远是真实 integer，不是 None
+            db_project_id: Optional[int] = None
+            try:
+                from app.database import async_session_maker
+                from sqlalchemy import select
+                from app.models.project import Project as _Project
+
+                if project_uuid:
+                    # 生产路径: FastAPI 已创建 Project record，直接查 integer id
+                    async with async_session_maker() as _id_db:
+                        _id_result = await _id_db.execute(
+                            select(_Project.id).where(_Project.uuid == project_uuid)
+                        )
+                        db_project_id = _id_result.scalar_one_or_none()
+                    if db_project_id:
+                        logger.info(f"[Pipeline] ARCH-4: project_uuid={project_uuid} → db_project_id={db_project_id}")
+                    else:
+                        logger.warning(f"[Pipeline] ARCH-4: project_uuid={project_uuid} 在 DB 找不到 integer id，降级内存追踪")
+                else:
+                    # 测试/driver 脚本路径: project_uuid 为 None，新建临时 Project record
+                    async with async_session_maker() as _id_db:
+                        _tmp_project = _Project(
+                            uuid=project_id,        # 用时间戳 project_id 作 uuid 占位
+                            user_id=0,              # 0 = 测试模式（无真实用户）
+                            title=idea[:100] if idea else "test_run",
+                            original_idea=idea or "test_run",
+                            style_preset=style_preset or "anime",
+                        )
+                        _id_db.add(_tmp_project)
+                        await _id_db.commit()
+                        await _id_db.refresh(_tmp_project)
+                        db_project_id = _tmp_project.id
+                    logger.info(
+                        f"[Pipeline] ARCH-4 Bug1 fix: 无 project_uuid，新建临时 Project record "
+                        f"id={db_project_id}, uuid={project_id}"
+                    )
+            except Exception as _e:
+                logger.warning(f"[Pipeline] ARCH-4: 查询/创建 db_project_id 失败（降级内存追踪）: {_e}")
+
+            # 成本熔断: 单次 Pipeline 成本上限（ARCH-4: 传入 db_project_id 启用跨 run DB 查询）
+            cost_tracker = PipelineCostTracker(cost_limit=settings.PIPELINE_COST_LIMIT, project_id=db_project_id)
 
             # RB-5 + B-7: 启动空白期 — 根据是否有 confirmed_outline 调整初始消息
             if progress_callback:
@@ -206,6 +334,14 @@ class Phase2PipelineOrchestrator:
 
             self.stage_results["outline"] = outline
 
+            # BGM-1: 注入 music_hint（风格→音乐提示映射）到 outline dict
+            try:
+                from app.services.style_music_hints import get_raw_hint as _get_raw_hint
+                outline["music_hint"] = _get_raw_hint(style_preset)
+                logger.info(f"[Pipeline] BGM-1: outline.music_hint 已注入 ({style_preset}): {outline['music_hint'][:80]}...")
+            except Exception as _bm_e:
+                logger.warning(f"[Pipeline] BGM-1: music_hint 注入失败（非阻塞）: {_bm_e}")
+
             # N13-FIX: 自动补全 spouse_of 对称关系
             family_rels = outline.get("family_relationships", [])
             for rel in list(family_rels):  # 遍历副本，避免修改遍历中的列表
@@ -228,9 +364,9 @@ class Phase2PipelineOrchestrator:
             validate_outline(outline, "Stage 1 -> 2")
 
             print(f"✅ Stage 1 完成: {outline.get('title', 'N/A')}")
-            # B-5: Stage 1 = 0→5%
+            # P1-1: Stage 1 完成 → 切换到 character_design stage（entry callback）
             if progress_callback:
-                await progress_callback("story_generation", 5, "大纲生成完成，正在设计角色...")
+                await progress_callback("character_design", 5, "大纲生成完成，正在设计角色...")
 
             # ============================================================
             # Stage 2: 角色设计
@@ -252,7 +388,59 @@ class Phase2PipelineOrchestrator:
 
             char_names = [c.get("name", "N/A") for c in characters.get("characters", [])]
             print(f"✅ Stage 2 完成: {', '.join(char_names)}")
-            # B-6: Stage 2 完成后存中间结果到 chapter 表
+
+            # P1-5 / P1-1: LLM 角色设计完成 → 告知前端正在生成画像（portrait gen 开始前）
+            if progress_callback:
+                await progress_callback("character_design", 6, "角色设计完成，正在生成画像...")
+
+            # UX-1 + UX-14: Stage 2 后立即为每个角色生成 portrait（肖像）
+            # 非阻塞：失败时只记录警告，不中断 Pipeline
+            # 用 generate_images 开关控制（跳图模式时跳过）
+            if generate_images and not settings.SKIP_IMAGE_GENERATION:
+                print("\n--- UX-1: 生成角色肖像（portrait）---")
+                try:
+                    _char_refs_dir = os.path.join(project_dir, "character_refs")
+                    os.makedirs(_char_refs_dir, exist_ok=True)
+                    _portrait_ref_manager = ReferenceImageManager()
+                    _portrait_style = ProjectStyleConfig(style_preset=style_preset)
+                    if custom_style_analysis:
+                        from app.services.style_enforcer import StyleEnforcer as _SE
+                        _portrait_style.custom_enforcement = _SE.create_custom_enforcement(custom_style_analysis)
+                    _char_list = characters.get("characters", [])
+                    _portrait_updated = False
+                    for _char in _char_list:
+                        _char_id = _char.get("id", "unknown")
+                        _char_name = _char.get("name", _char_id)
+                        print(f"  生成 {_char_name} 肖像...", end=" ")
+                        try:
+                            _portrait_result = await _portrait_ref_manager.generate_character_reference(
+                                character=_char,
+                                project_style=_portrait_style,
+                                image_generator=self.image_generator,
+                                ref_type="portrait",
+                            )
+                            if _portrait_result.get("success") and _portrait_result.get("pil_image"):
+                                _portrait_path = os.path.join(_char_refs_dir, f"{_char_id}_portrait.png")
+                                _portrait_result["pil_image"].save(_portrait_path)
+                                _portrait_http_url = f"/static/outputs/{project_id}/character_refs/{_char_id}_portrait.png"
+                                _char["portrait_url"] = _portrait_http_url
+                                _portrait_updated = True
+                                print(f"✅ ({_portrait_http_url})")
+                                logger.info(f"[Pipeline] UX-1: {_char_name} portrait → {_portrait_http_url}")
+                            else:
+                                print(f"❌ {_portrait_result.get('error', 'unknown error')}")
+                                logger.warning(f"[Pipeline] UX-1: {_char_name} portrait 生成失败: {_portrait_result.get('error')}")
+                        except Exception as _pe:
+                            print(f"❌ 异常: {_pe}")
+                            logger.warning(f"[Pipeline] UX-1: {_char_name} portrait 生成异常: {_pe}")
+                    if _portrait_updated:
+                        self._save_json(project_dir, "2_characters.json", characters)
+                        logger.info(f"[Pipeline] UX-14: 2_characters.json 已更新（含 portrait_url）")
+                except Exception as _portrait_batch_e:
+                    print(f"⚠️ UX-1 portrait 批量生成异常（非阻塞）: {_portrait_batch_e}")
+                    logger.warning(f"[Pipeline] UX-1: portrait 批量生成异常（非阻塞）: {_portrait_batch_e}")
+
+            # B-6: Stage 2 完成后存中间结果到 chapter 表（portrait_url 已写入 characters）
             if checkpoint_callback:
                 await checkpoint_callback(
                     "characters_json", characters.get("characters", [])
@@ -330,9 +518,9 @@ class Phase2PipelineOrchestrator:
             scene_count = len(screenplay.get("scenes", []))
             beat_count = screenplay.get("total_action_beats", 0)
             print(f"✅ Stage 3 完成: {scene_count}场戏, {beat_count}个动作节拍")
-            # B-5: Stage 3 = 10→35%（进度已由 screenplay_writer 内部回调更新）
+            # P1-1: Stage 3 完成 → 切换到 storyboard stage（entry callback）
             if progress_callback:
-                await progress_callback("screenplay", 35, "剧本编写完成，正在创建分镜...")
+                await progress_callback("storyboard", 35, "剧本编写完成，正在创建分镜...")
 
             # ============================================================
             # Stage 4: 分镜脚本
@@ -370,9 +558,9 @@ class Phase2PipelineOrchestrator:
 
             shot_count = len(storyboard.get("shots", []))
             print(f"✅ Stage 4 完成: {shot_count}个镜头")
-            # B-5: Stage 4 = 35→65%（进度已由 storyboard_director 内部回调更新）
+            # P1-1: Stage 4 完成 → 切换到 image_preparation stage（entry callback）
             if progress_callback:
-                await progress_callback("storyboard", 65, "分镜创建完成，正在生成图像...")
+                await progress_callback("image_preparation", 65, "分镜创建完成，正在准备画面...")
 
             # ============================================================
             # Stage 5: 图像生成（可选）
@@ -431,12 +619,46 @@ class Phase2PipelineOrchestrator:
 
                 # 为每个角色生成参考图
                 char_list = characters.get("characters", [])
+                _char_refs_dir_stage5 = os.path.join(project_dir, "character_refs")
                 for char in char_list:
                     char_id = char.get("id", "unknown")
                     char_name = char.get("name", char_id)
                     seed = (character_seeds or {}).get(char_id)
+
+                    # P1-3 / R7-4: freshness check — 若 Stage 2 已为该角色生成过肖像
+                    # 且肖像文件 mtime >= char.updated_at（adjust_character 后会更新），
+                    # 则跳过肖像重生成（skip_portrait=True），直接复用已有肖像生成全身图。
+                    _portrait_seed: "Image.Image | None" = None
+                    _skip_portrait = False
+                    _portrait_path = os.path.join(_char_refs_dir_stage5, f"{char_id}_portrait.png")
+                    if os.path.exists(_portrait_path):
+                        try:
+                            _portrait_mtime = os.path.getmtime(_portrait_path)
+                            # char.updated_at 为字符串 ISO 格式（Stage 2 写入时来自 characters_json）
+                            _char_updated_at_str = char.get("updated_at")
+                            _portrait_fresh = True  # 默认认为足够新鲜
+                            if _char_updated_at_str:
+                                from datetime import timezone
+                                _char_dt = datetime.fromisoformat(
+                                    _char_updated_at_str.replace("Z", "+00:00")
+                                )
+                                _char_ts = _char_dt.timestamp()
+                                # 肖像文件比角色最后更新时间新才算新鲜
+                                _portrait_fresh = _portrait_mtime > (_char_ts + 30)  # 30s buffer 避免文件系统精度漂移
+                            if _portrait_fresh:
+                                from PIL import Image as _PilImage
+                                _portrait_seed = _PilImage.open(_portrait_path).convert("RGB")
+                                _skip_portrait = True
+                                print(f"  [R7-4] {char_name} 肖像已新鲜，跳过重生成，直接生成全身图")
+                        except Exception as _fe:
+                            logger.warning(f"[Pipeline] R7-4: 读取 {char_id} 肖像失败，重新生成: {_fe}")
+                            _portrait_seed = None
+                            _skip_portrait = False
+
                     if seed:
                         print(f"  生成 {char_name} 参考图（使用用户 seed 图）...", end=" ")
+                    elif _skip_portrait:
+                        print(f"  生成 {char_name} 参考图（复用新鲜肖像，只生成全身图）...", end=" ")
                     else:
                         print(f"  生成 {char_name} 参考图...", end=" ")
                     try:
@@ -444,10 +666,12 @@ class Phase2PipelineOrchestrator:
                             character=char,
                             project_style=project_style,
                             image_generator=self.image_generator,
-                            seed_image=seed,
+                            seed_image=seed or _portrait_seed,
+                            skip_portrait=_skip_portrait and not seed,
                         )
-                        # 成本计数: portrait + fullbody = 2 张参考图（Gemini Flash 生成）
-                        cost_tracker.add_cost("gemini_nb2", 0.067 * 2, f"Ref {char_id} portrait+fullbody")
+                        # 成本计数: skip_portrait 时只生成 fullbody（1 张），否则 2 张
+                        _ref_count = 1 if (_skip_portrait and not seed) else 2
+                        cost_tracker.add_cost("gemini_nb2", 0.067 * _ref_count, f"Ref {char_id} {'fullbody' if _ref_count == 1 else 'portrait+fullbody'}")
                         print("✅")
                     except Exception as e:
                         print(f"❌ {e}")
@@ -521,9 +745,14 @@ class Phase2PipelineOrchestrator:
                 image_results = []
                 reference_images_log = []  # 记录每个shot的参考图使用情况
 
+                # ARCH-4: Stage 5 开始前查 api_cost_logs 表做跨 run 累计熔断检查
+                await cost_tracker.check_db_cost_limit(detail="Stage 5 pre-check")
+
+                # ── TASK-PARALLEL-M1: Stage 5 串行 → 并行 ──────────────────
+                # 预先构建所有 shot 的参考图上下文（仍是串行，读 ref_manager 无 API 调用）
+                shot_contexts = []
                 for i, shot in enumerate(shots):
                     shot_id = shot.get("shot_id", i + 1)
-                    print(f"\n  生成 Shot {shot_id}/{len(shots)}...")
 
                     # 获取角色参考图 - SQ-2: 智能选择，每角色1张
                     char_direction = shot.get("character_direction", {})
@@ -542,7 +771,6 @@ class Phase2PipelineOrchestrator:
                         if location_id:
                             scene_refs = scene_ref_manager.get_references_for_location(location_id)
 
-                    # 合并参考图：角色参考图 + 场景参考图
                     all_refs = char_refs + scene_refs
 
                     # 日志输出
@@ -552,7 +780,7 @@ class Phase2PipelineOrchestrator:
                     if location_id and scene_refs:
                         ref_info.append(f"场景: {location_id} ({len(scene_refs)}张)")
                     if ref_info:
-                        print(f"    {', '.join(ref_info)}")
+                        logger.info(f"  Shot {shot_id} refs: {', '.join(ref_info)}")
 
                     # 记录参考图使用情况
                     reference_images_log.append({
@@ -567,70 +795,111 @@ class Phase2PipelineOrchestrator:
                     # T-I: Prompt Pre-Check (v1 log-only, 不阻断不修改 prompt)
                     pre_check_warnings = self._pre_check_prompt(shot, characters)
                     for w in pre_check_warnings:
-                        print(f"    [PromptPreCheck] Shot {shot_id}: ⚠️ {w}")
+                        logger.info(f"    [PromptPreCheck] Shot {shot_id}: ⚠️ {w}")
 
-                    # T17: Shot 生成 + Haiku 视觉验证 + Auto-Retry
-                    MAX_SHOT_RETRIES = 1  # T-B: 最多 retry 1 次，共 2 次尝试（R7 数据：第 3 次尝试 0% 通过率）
-                    best_result = None
+                    shot_contexts.append({
+                        "shot": shot,
+                        "shot_id": shot_id,
+                        "shot_index": i,
+                        "chars_in_scene": chars_in_scene,
+                        "all_refs": all_refs,
+                    })
+
+                # 并行生成：Semaphore 限流 + 每张完成后回调进度
+                semaphore = asyncio.Semaphore(settings.IMAGE_MAX_CONCURRENT)
+                completed_count = 0
+                completed_lock = asyncio.Lock()
+
+                async def _generate_one_shot(ctx: dict) -> dict:
+                    """单张 Shot 完整生成流程（含 API 调用 + Haiku 验证），在 Semaphore 内执行。"""
+                    import gc as _gc
+                    nonlocal completed_count
+
+                    shot = ctx["shot"]
+                    shot_id = ctx["shot_id"]
+                    shot_index = ctx["shot_index"]
+                    chars_in_scene = ctx["chars_in_scene"]
+                    all_refs = ctx["all_refs"]
                     text_overlay_data = shot.get("text_overlay", {})
 
-                    for attempt in range(MAX_SHOT_RETRIES + 1):
-                        if attempt > 0:
-                            print(f"    [T17] Retry {attempt}/{MAX_SHOT_RETRIES} Shot {shot_id}...")
+                    # Q2 累积态兜底: 每 5 shot 触发 GC + asyncio 让权，清空事件循环积压
+                    if shot_index > 0 and shot_index % 5 == 0:
+                        logger.info(f"[Pipeline] Shot {shot_id}: 触发 GC 兜底（shot_index={shot_index}）")
+                        _gc.collect()
+                        await asyncio.sleep(0)
 
-                        # 使用Phase 2.0增强生成 (DEC-014: previous_shot removed)
-                        # TASK-SAFE-INTEGRATION: 使用 safe 版本（含 PromptRewriter CONTENT_SAFETY 恢复）
-                        result = await self.image_generator.generate_shot_image_phase2_safe(
-                            shot=shot,
-                            storyboard=storyboard,
-                            characters=characters,
-                            style_preset=style_preset,
-                            reference_images=all_refs,
-                            screenplay=screenplay,
-                            aspect_ratio="2:3",
-                            use_native_text=self.use_native_text
-                        )
+                    async with semaphore:
+                        logger.info(f"  [Stage5] 生成 Shot {shot_id}/{len(shots)}...")
 
-                        if not result.get("success"):
-                            best_result = result
-                            break  # 生成失败不 retry（API 错误由 image_generator 内部处理）
+                        # T17: Shot 生成 + Haiku 视觉验证 + Auto-Retry
+                        MAX_SHOT_RETRIES = 1  # T-B: 最多 retry 1 次，共 2 次尝试
+                        best_result = None
 
-                        best_result = result
-
-                        # T28: 从 composition 中提取关键道具（Stage 4 输出含 foreground/background）
-                        key_props = []
-                        composition = shot.get("composition", {})
-                        if composition:
-                            for field in ["foreground", "background", "key_object"]:
-                                val = composition.get(field, "")
-                                if val and isinstance(val, str) and len(val) > 2:
-                                    key_props.append(val)
-
-                        # T17+T28+T30: Haiku 视觉验证（含道具存在性检测）
-                        props_log = f" + {len(key_props)} props" if key_props else ""
-                        print(f"    [ShotValidator] Shot {shot_id}: 开始验证 (expect {len(chars_in_scene)} chars{props_log})")
-                        validation = await self.shot_validator.validate_shot(
-                            pil_image=result["pil_image"],
-                            expected_character_count=len(chars_in_scene),
-                            text_overlay_data=text_overlay_data,
-                            key_props=key_props if key_props else None
-                        )
-                        print(f"    [ShotValidator] Shot {shot_id}: valid={validation['valid']}, reason={validation['reason']}")
-
-                        if validation["valid"]:
+                        for attempt in range(MAX_SHOT_RETRIES + 1):
                             if attempt > 0:
-                                print(f"    [T17] ✅ Shot {shot_id} retry 后验证通过")
-                            break
-                        else:
-                            print(f"    [T17] ⚠️ Shot {shot_id} 验证失败: {validation['reason']}")
-                            if attempt == MAX_SHOT_RETRIES:
-                                print(f"    [T17] Shot {shot_id} 已达最大重试次数，使用当前结果")
+                                logger.info(f"    [T17] Retry {attempt}/{MAX_SHOT_RETRIES} Shot {shot_id}...")
 
-                    # 处理最终结果
+                            # TASK-PARALLEL-M1: dispatcher provider-agnostic（不写死 provider 判断）
+                            # ARCH-4: 传入 db_project_id 让 log_api_cost 真实 INSERT（NB2 路径通过 **kwargs 透传）
+                            # D.15 P0: aspect_ratio 从 run() 参数读取，不再 hardcoded "2:3"
+                            result = await self.image_generator.generate_shot_image_phase2_safe(
+                                shot=shot,
+                                storyboard=storyboard,
+                                characters=characters,
+                                style_preset=style_preset,
+                                reference_images=all_refs,
+                                screenplay=screenplay,
+                                aspect_ratio=aspect_ratio,
+                                use_native_text=self.use_native_text,
+                                project_id=db_project_id,
+                            )
+
+                            if not result.get("success"):
+                                best_result = result
+                                break  # 生成失败不 retry（API 错误由 image_generator 内部处理）
+
+                            best_result = result
+
+                            # T28: 从 composition 中提取关键道具
+                            key_props = []
+                            composition = shot.get("composition", {})
+                            if composition:
+                                for field in ["foreground", "background", "key_object"]:
+                                    val = composition.get(field, "")
+                                    if val and isinstance(val, str) and len(val) > 2:
+                                        key_props.append(val)
+
+                            # T17+T28+T30: Haiku 视觉验证（并行 Semaphore 内执行）
+                            props_log = f" + {len(key_props)} props" if key_props else ""
+                            logger.info(f"    [ShotValidator] Shot {shot_id}: 开始验证 (expect {len(chars_in_scene)} chars{props_log})")
+                            validation = await self.shot_validator.validate_shot(
+                                pil_image=result["pil_image"],
+                                expected_character_count=len(chars_in_scene),
+                                text_overlay_data=text_overlay_data,
+                                key_props=key_props if key_props else None
+                            )
+                            logger.info(f"    [ShotValidator] Shot {shot_id}: valid={validation['valid']}, reason={validation['reason']}")
+
+                            if validation["valid"]:
+                                if attempt > 0:
+                                    logger.info(f"    [T17] ✅ Shot {shot_id} retry 后验证通过")
+                                break
+                            else:
+                                logger.info(f"    [T17] ⚠️ Shot {shot_id} 验证失败: {validation['reason']}")
+                                if attempt == MAX_SHOT_RETRIES:
+                                    logger.info(f"    [T17] Shot {shot_id} 已达最大重试次数，使用当前结果")
+
+                        # 0.5s 冷却移至 Semaphore 内（保留限流语义）
+                        await asyncio.sleep(0.5)
+
+                    # Semaphore 释放后处理结果（图像保存等 IO 不占并发槽位）
                     result = best_result
-                    if result.get("success"):
-                        # 成本计数: NB2 图像生成（$0.067/张，官方定价）
-                        cost_tracker.add_cost("gemini_nb2", 0.067, f"Shot {shot_id}")
+                    if result and result.get("success"):
+                        # 成本计数: 根据 provider 计费（NB2 $0.067 / Seedream $0.030）
+                        provider = getattr(settings, "IMAGE_GEN_PROVIDER", "nb2")
+                        unit_cost = 0.030 if provider == "seedream" else 0.067
+                        service_key = "seedream" if provider == "seedream" else "gemini_nb2"
+                        cost_tracker.add_cost(service_key, unit_cost, f"Shot {shot_id}")
 
                         # 保存无文字版图像
                         image_path = os.path.join(images_dir, f"shot_{shot_id:02d}.png")
@@ -639,12 +908,9 @@ class Phase2PipelineOrchestrator:
                         # TextOverlay: 生成带文字版本
                         with_text_path = None
                         text_type = text_overlay_data.get("text_type", "none") if text_overlay_data else "none"
-                        # T12-UNIFY + T22: use_native_text 时 NB2 已渲染所有文字（DEC-012 架构），
-                        # 直接指向 raw image，不复制；仅 use_native_text=False 时走 TextOverlay 备用通道
-                        use_native_text = self.use_native_text
+                        _use_native_text = self.use_native_text
                         if text_type != "none":
-                            if use_native_text:
-                                # T22: NB2 原生渲染，with_text_path 直接指向 raw image（不复制）
+                            if _use_native_text:
                                 with_text_path = image_path
                             else:
                                 try:
@@ -653,28 +919,100 @@ class Phase2PipelineOrchestrator:
                                     )
                                     with_text_path = os.path.join(with_text_dir, f"shot_{shot_id:02d}.png")
                                     with_text_image.save(with_text_path)
-                                    print(f"    ✅ TextOverlay: {with_text_path}")
+                                    logger.info(f"    ✅ TextOverlay: {with_text_path}")
                                 except Exception as te:
-                                    print(f"    ⚠️ TextOverlay失败: {te}")
+                                    logger.warning(f"    ⚠️ TextOverlay失败: {te}")
 
-                        image_results.append({
+                        logger.info(f"    ✅ Shot {shot_id} 保存: {image_path}")
+
+                        # BE-3: 将 HTTP URL 写回 shot dict（让前端预览页能正确加载）
+                        _image_http_url = f"/static/outputs/{project_id}/images/shot_{shot_id:02d}.png"
+                        shot["image_url"] = _image_http_url
+
+                        # 每张完成后回调进度
+                        async with completed_lock:
+                            completed_count += 1
+                            _done = completed_count
+                        if progress_callback:
+                            try:
+                                _pct = 65 + int(30 * _done / max(len(shots), 1))
+                                await progress_callback(
+                                    "image_generation", _pct,
+                                    f"已生成 {_done}/{len(shots)} 张图像..."
+                                )
+                            except Exception as _cb_e:
+                                logger.warning(f"[Pipeline] progress_callback 失败: {_cb_e}")
+
+                        return {
                             "shot_id": shot_id,
                             "success": True,
                             "image_path": image_path,
+                            "image_url": _image_http_url,
                             "with_text_path": with_text_path,
                             "generation_time": result.get("generation_time_seconds", 0)
-                        })
-                        print(f"    ✅ Shot {shot_id} 保存: {image_path}")
+                        }
                     else:
-                        image_results.append({
+                        err = (result.get("error", "Unknown error") if result else "No result returned")
+                        logger.error(f"    ❌ Shot {shot_id} 失败: {err}")
+
+                        async with completed_lock:
+                            completed_count += 1
+                        if progress_callback:
+                            try:
+                                async with completed_lock:
+                                    _done = completed_count
+                                _pct = 65 + int(30 * completed_count / max(len(shots), 1))
+                                await progress_callback(
+                                    "image_generation", _pct,
+                                    f"已生成 {completed_count}/{len(shots)} 张图像（含失败）..."
+                                )
+                            except Exception:
+                                pass
+
+                        return {
                             "shot_id": shot_id,
                             "success": False,
-                            "error": result.get("error", "Unknown error")
-                        })
-                        print(f"    ❌ Shot {shot_id} 失败: {result.get('error')}")
+                            "error": err,
+                            "image_path": None,
+                            "with_text_path": None,
+                        }
 
-                    # 控制并发（简单串行，可优化为并行）
-                    await asyncio.sleep(0.5)
+                logger.info(
+                    f"\n[Pipeline] Stage 5 并行生成开始: "
+                    f"{len(shot_contexts)} shots, max_concurrent={settings.IMAGE_MAX_CONCURRENT}"
+                )
+                print(f"\n  Stage 5 并行生成: {len(shot_contexts)} shots, 并发={settings.IMAGE_MAX_CONCURRENT}")
+
+                # P1-1: 进入真生图阶段 → 切换到 image_generation stage（entry callback）
+                if progress_callback:
+                    try:
+                        await progress_callback("image_generation", 75, "开始绘制画面...")
+                    except Exception as _cb_e:
+                        logger.warning(f"[Pipeline] P1-1 progress_callback(image_generation) 失败: {_cb_e}")
+
+                # asyncio.gather 并发所有 shot（Semaphore 控流，return_exceptions 防止单张失败阻断全批）
+                raw_results = await asyncio.gather(
+                    *[_generate_one_shot(ctx) for ctx in shot_contexts],
+                    return_exceptions=True,
+                )
+
+                # 处理异常（return_exceptions=True 时异常会作为返回值）
+                for i, raw in enumerate(raw_results):
+                    if isinstance(raw, Exception):
+                        _sid = shot_contexts[i]["shot_id"]
+                        logger.error(f"[Pipeline] Shot {_sid} gather 异常: {type(raw).__name__}: {raw}")
+                        image_results.append({
+                            "shot_id": _sid,
+                            "success": False,
+                            "error": f"{type(raw).__name__}: {raw}",
+                            "image_path": None,
+                            "with_text_path": None,
+                        })
+                    else:
+                        image_results.append(raw)
+
+                # 保持 shot_id 顺序
+                image_results.sort(key=lambda r: r.get("shot_id", 0))
 
                 self.stage_results["images"] = image_results
                 self._save_json(project_dir, "5_image_results.json", image_results)
@@ -686,6 +1024,78 @@ class Phase2PipelineOrchestrator:
                 success_count = sum(1 for r in image_results if r.get("success"))
                 print(f"\n✅ Stage 5 完成: {success_count}/{len(shots)} 图像生成成功")
 
+                # BE-3: 重新持久化 4_storyboard.json（已含 image_url）+ 回写 chapter.storyboard_json
+                self._save_json(project_dir, "4_storyboard.json", storyboard)
+                if checkpoint_callback:
+                    try:
+                        await checkpoint_callback("storyboard_json", storyboard)
+                        logger.info("[Pipeline] BE-3: storyboard_json checkpoint 成功（含 image_url）")
+                    except Exception as _cb_e:
+                        logger.warning(f"[Pipeline] BE-3: checkpoint(storyboard_json) 失败（非阻塞）: {_cb_e}")
+
+                # ARCH-1: 批量写入 chapter_scene_images 表（让单 shot 重生成 / 局部编辑功能生效）
+                # 在 storyboard.shots[*].image_url 全部写回完成后才执行，确保顺序正确。
+                # 失败不阻塞 pipeline（非阻塞，log warning 即可）。
+                if chapter_id:
+                    try:
+                        from app.database import async_session_maker
+                        from app.models.scene_image import SceneImage
+                        from sqlalchemy import delete as sa_delete
+                        # D.15 P0: 用 _ASPECT_RATIO_TO_SIZE 查真实 width/height（移到循环外，只执行一次）
+                        from app.services.seedream_generator import _ASPECT_RATIO_TO_SIZE as _AR_MAP
+                        _size_str = _AR_MAP.get(aspect_ratio, _AR_MAP["2:3"])
+                        _size_parts = _size_str.split("x")
+                        _ar_width = int(_size_parts[0])
+                        _ar_height = int(_size_parts[1])
+
+                        async with async_session_maker() as arch1_db:
+                            # 先 DELETE 该 chapter 下所有既有 SceneImage 记录（防止重复写入）
+                            # 适用场景：pipeline 重跑、重生成后再跑整批等情况
+                            await arch1_db.execute(
+                                sa_delete(SceneImage).where(SceneImage.chapter_id == chapter_id)
+                            )
+
+                            # 批量 INSERT 成功的 shots（image_url 不为空）
+                            inserted_count = 0
+                            for shot_idx, shot in enumerate(shots):
+                                _image_url = shot.get("image_url")
+                                if not _image_url:
+                                    # 失败的 shot（image_url 为 null）跳过
+                                    continue
+
+                                _shot_id = shot.get("shot_id", shot_idx + 1)
+                                _image_path = os.path.join(
+                                    project_dir, "images", f"shot_{_shot_id:02d}.png"
+                                )
+
+                                si = SceneImage(
+                                    chapter_id=chapter_id,
+                                    scene_id=_shot_id,          # scene_id 存 shot_id，与 regenerate 端点查询对应
+                                    image_prompt=shot.get("image_prompt", ""),
+                                    image_path=_image_path,     # 本地绝对路径
+                                    image_url=_image_url,       # HTTP URL /static/outputs/...
+                                    width=_ar_width,            # D.15 P0: 真实宽度，从 aspect_ratio 参数派生
+                                    height=_ar_height,          # D.15 P0: 真实高度，从 aspect_ratio 参数派生
+                                    aspect_ratio=aspect_ratio,  # D.15 P0: 真实比例，从 run() 参数读取
+                                    is_active=True,
+                                )
+                                arch1_db.add(si)
+                                inserted_count += 1
+
+                            await arch1_db.commit()
+                            logger.info(
+                                f"[Pipeline] ARCH-1: chapter_scene_images 批量写入完成 "
+                                f"chapter_id={chapter_id}, inserted={inserted_count}/{len(shots)}"
+                            )
+                            print(f"  [ARCH-1] ✅ chapter_scene_images 写入 {inserted_count} 条")
+                    except Exception as _arch1_e:
+                        logger.warning(
+                            f"[Pipeline] ARCH-1: chapter_scene_images 写入失败（非阻塞）: {_arch1_e}"
+                        )
+                        print(f"  [ARCH-1] ⚠️ chapter_scene_images 写入失败（非阻塞）: {_arch1_e}")
+                else:
+                    logger.info("[Pipeline] ARCH-1: chapter_id 为 None（测试模式），跳过 chapter_scene_images 写入")
+
             # ============================================================
             # Stage 6: BGM 生成（Wave 2 Pipeline Integration）
             # 非阻塞：失败时只记录警告，不中断 Pipeline。
@@ -694,6 +1104,12 @@ class Phase2PipelineOrchestrator:
             print(f"Stage 6: BGM 音乐生成")
             print(f"{'='*40}")
             bgm_result = None
+            # UX-10: BGM 开始前发送进度回调
+            if progress_callback:
+                try:
+                    await progress_callback("bgm", 92, "正在生成配乐...")
+                except Exception as _cb_e:
+                    logger.warning(f"[Pipeline] UX-10 progress_callback(bgm) 失败: {_cb_e}")
             try:
                 from app.services.music_generation_service import generate_bgm_for_chapter
                 # story_type 根据 target_duration_minutes 映射
@@ -704,6 +1120,9 @@ class Phase2PipelineOrchestrator:
                 else:
                     _story_type = "中篇"
 
+                # BGM-1: 优先用 outline.music_hint（已在 Stage 1 后注入），降级到 style_preset
+                _visual_style_hint = outline.get("music_hint") or style_preset
+
                 bgm_result = generate_bgm_for_chapter(
                     chapter_id=0,          # 手动测试模式无真实 chapter_id，用 0
                     project_id=0,          # 手动测试模式无真实 project_id，用 0
@@ -711,12 +1130,23 @@ class Phase2PipelineOrchestrator:
                     screenplay=screenplay,
                     output_dir=project_dir,
                     story_type=_story_type,
-                    visual_style_hint=style_preset,
+                    visual_style_hint=_visual_style_hint,
                     regen_count=0,
                     bgm_volume=1.0,
                     is_change_bgm=False,
                 )
                 self.stage_results["bgm"] = bgm_result
+
+                # BE-5: 将本地 bgm 文件路径转换为 HTTP URL（/static/outputs/{uuid}/bgm_chapterN.mp3）
+                _bgm_local_path = bgm_result.get("bgm_url", "")
+                _bgm_http_url = _bgm_local_path  # 默认原样保留（兜底）
+                if _bgm_local_path and project_uuid:
+                    # 取文件名，组装 HTTP URL
+                    _bgm_filename = os.path.basename(_bgm_local_path)
+                    _bgm_http_url = f"/static/outputs/{project_uuid}/{_bgm_filename}"
+                    bgm_result["bgm_url"] = _bgm_http_url
+                    logger.info(f"[Pipeline] BE-5: bgm_url 转换: {_bgm_local_path} → {_bgm_http_url}")
+
                 print(f"✅ Stage 6 完成: BGM 生成成功")
                 print(f"   bgm_url: {bgm_result.get('bgm_url', 'N/A')}")
                 print(f"   meta_version: {bgm_result.get('meta_version', 'N/A')}")
@@ -735,9 +1165,22 @@ class Phase2PipelineOrchestrator:
                     except Exception as _cb_e:
                         logger.warning(f"[Pipeline] Stage 6 checkpoint_callback 失败（非阻塞）: {_cb_e}")
 
+                # UX-11: BGM 完成后发送 completed 回调
+                if progress_callback:
+                    try:
+                        await progress_callback("completed", 100, "故事生成完成")
+                    except Exception as _cb_e:
+                        logger.warning(f"[Pipeline] UX-11 progress_callback(completed) 失败: {_cb_e}")
+
             except Exception as bgm_e:
                 print(f"⚠️ Stage 6 BGM 生成失败（非阻塞，不影响 Pipeline 结果）: {bgm_e}")
                 logger.warning(f"[Pipeline] Stage 6 BGM 生成失败（非阻塞）: {bgm_e}")
+                # UX-11: BGM 失败时仍发送 completed（Pipeline 成功，BGM 只是可选项）
+                if progress_callback:
+                    try:
+                        await progress_callback("completed", 100, "故事生成完成")
+                    except Exception as _cb_e:
+                        logger.warning(f"[Pipeline] UX-11 progress_callback(completed/bgm_fail) 失败: {_cb_e}")
 
             # ============================================================
             # 完成

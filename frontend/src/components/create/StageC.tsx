@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, CheckCircle2, AlertCircle, User, MapPin, ChevronRight, RotateCcw, Pencil, Play } from "lucide-react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCreate } from "@/contexts/CreateContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch, getStoredToken } from "@/lib/api";
+import { toAbsoluteUrl } from "@/lib/url";
 import { useToast } from "@/components/ui/Toast";
 import { mockShotGenProgress, mockPreviewCharacters, mockPreviewScenes } from "@/lib/mock-data";
 import type { PreviewCharacter, PreviewScene, Shot } from "@/types/create";
@@ -52,26 +52,53 @@ const friendlyError = (msg: string): string => {
   return msg;
 };
 
-// FE-1: Map backend stage name → user-facing phase label. Covers all
-// Pipeline stages (see pipeline_orchestrator.py progress_callback calls).
-const STAGE_LABEL: Record<string, string> = {
-  story_generation: "正在编写剧本...",
-  character_design: "正在设计角色...",
-  character_ready: "正在设计角色...",
-  screenplay: "正在编写剧本...",
-  storyboard: "正在创建分镜...",
-  image_generation: "正在绘制画面...",
-  bgm: "正在谱曲...",
-  music: "正在谱曲...",
+// UX-8: Replace "张图像" with "个片段" in any backend progress message
+// Example: "已生成 12/18 张图像..." → "已生成 12/18 个片段..."
+const friendlyMessage = (msg: string): string => {
+  return msg.replace(/张图像/g, "个片段");
 };
+
+// UX-9 / FE-1: Map backend stage name → user-facing phase label. Covers all
+// Pipeline stages (see pipeline_orchestrator.py progress_callback calls).
+// TASK-T6-FIXBATCH: Added character_design (5-7%) and image_preparation (65-75%) per Agent A
+const STAGE_LABEL: Record<string, string> = {
+  story_generation: "正在生成故事大纲",
+  character_design: "正在生成角色画像",    // Agent A 新加 stage (5-7%)
+  character_ready: "角色设计完成",
+  screenplay: "正在编写剧本",
+  storyboard: "正在创建分镜",
+  image_preparation: "正在准备画面",        // Agent A 新加 stage (65-75%)
+  image_generation: "正在绘制画面",
+  bgm: "正在生成配乐",
+  music: "正在生成配乐",
+  completed: "故事生成完成",
+};
+
+// UX-12: Sub-title copy varies by pipeline stage
+const STAGE_SUBTITLE: Record<string, string> = {
+  story_generation: "AI 正在创作故事，可以选择后台生成",
+  character_design: "AI 正在创作故事，可以选择后台生成",
+  character_ready: "AI 正在创作故事，可以选择后台生成",
+  screenplay: "AI 正在创作故事，可以选择后台生成",
+  storyboard: "AI 正在创作故事，可以选择后台生成",
+  image_preparation: "AI 正在逐张绘制画面，可以选择后台生成",
+  image_generation: "AI 正在逐张绘制画面，可以选择后台生成",
+  bgm: "AI 正在生成配乐，可以选择后台生成",
+  music: "AI 正在生成配乐，可以选择后台生成",
+};
+
+function resolveSubtitle(stage: string | null | undefined): string {
+  if (stage && STAGE_SUBTITLE[stage]) return STAGE_SUBTITLE[stage];
+  // Default: show text-gen subtitle for early/unknown stages
+  return "AI 正在创作故事，可以选择后台生成";
+}
 
 function resolvePhaseTitle(isError: boolean, subPhase: string, stage: string | null | undefined): string {
   if (isError) return "生成遇到问题";
-  // Prefer backend stage when available (FE-1)
-  if (stage && STAGE_LABEL[stage]) {
-    // Remove trailing ellipsis for use as a heading
-    return STAGE_LABEL[stage].replace(/\.+$/, "");
-  }
+  // P2-4: stage='completed' → show completion title directly (no "即将完成" branch)
+  if (stage === "completed") return STAGE_LABEL.completed;
+  // UX-9: Prefer backend stage when available — never cache, always re-map
+  if (stage && STAGE_LABEL[stage]) return STAGE_LABEL[stage];
   if (subPhase === "shot-gen") return "正在绘制画面";
   return "正在创作你的故事";
 }
@@ -92,6 +119,10 @@ export default function StageC() {
 
   // RF-4: Backend estimated remaining seconds
   const backendEstimatedSecondsRef = useRef<number | null>(null);
+
+  // UX-7: Monotonicity guard — ETA must never increase. Track the last displayed
+  // ETA in seconds; only allow new ETA if strictly smaller.
+  const lastEtaSecondsRef = useRef<number | null>(null);
 
   // F-2 (R3): Simulated early progress ref — advances 1% per 12s up to 5%, prevents "0% stuck" perception
   const simulatedProgressRef = useRef(0);
@@ -114,16 +145,19 @@ export default function StageC() {
   }, []);
 
   // F-1: Carousel timer — 8 second rotation
+  // P2-4: Stop rotation when progress >= 100 or stage is completed
   useEffect(() => {
+    const isCompleted = state.generationProgress >= 100 || currentStage === "completed";
     const isGenerating = (state.generationSubPhase === "text-gen" || state.generationSubPhase === "shot-gen")
-      && state.generationStatus !== "error";
+      && state.generationStatus !== "error"
+      && !isCompleted;
     if (!isGenerating) return;
 
     const interval = setInterval(() => {
       setTipIndex((prev) => (prev + 1) % CAROUSEL_TIPS.length);
     }, 8000);
     return () => clearInterval(interval);
-  }, [state.generationSubPhase, state.generationStatus]);
+  }, [state.generationSubPhase, state.generationStatus, state.generationProgress, currentStage]);
 
   // F-2: Reset start time when entering a new generation sub-phase
   useEffect(() => {
@@ -132,31 +166,53 @@ export default function StageC() {
     }
   }, [state.generationSubPhase]);
 
-  // RF-4: Compute estimated remaining minutes — prefer backend value, fallback to linear extrapolation
+  // UX-7 / RF-4: Compute estimated remaining minutes with monotonicity guard.
+  // ETA must never increase — if new estimate > last shown, clamp to last - epsilon.
+  // epsilon = 0.8 × poll_interval (2s) = 1.6s minimum descent per tick.
   const estimatedMinutes = (() => {
-    // RF-4: If backend provides estimated_remaining_seconds, use it
+    const POLL_INTERVAL_SEC = 2;
+    const EPSILON = POLL_INTERVAL_SEC * 0.8; // 1.6s minimum descent per poll
+
+    let rawSec: number | null = null;
+
+    // RF-4: If backend provides estimated_remaining_seconds, prefer it
     const backendSec = backendEstimatedSecondsRef.current;
     if (backendSec !== null && backendSec > 0) {
-      const minutes = Math.ceil(backendSec / 60);
-      return minutes > 0 ? Math.min(minutes, 20) : null;
+      rawSec = backendSec;
+    } else {
+      // Fallback: linear extrapolation
+      const progress = state.generationProgress;
+      if (progress < 10) return null; // wait until Stage 2 done to avoid divergence
+      const elapsed = (Date.now() - startTimeRef.current) / 1000;
+      if (elapsed < 5) return null;
+      const totalEstimated = elapsed / (progress / 100);
+      const remaining = totalEstimated - elapsed;
+      if (remaining > 0) rawSec = remaining;
     }
-    // Fallback: linear extrapolation
-    const progress = state.generationProgress;
-    if (progress < 10) return null; // 等 Stage 2 完成（10%）后再显示，避免低进度线性外推发散
-    const elapsed = (Date.now() - startTimeRef.current) / 1000; // seconds
-    if (elapsed < 5) return null;
-    const totalEstimated = elapsed / (progress / 100);
-    const remaining = totalEstimated - elapsed;
-    const minutes = Math.ceil(remaining / 60);
-    return minutes > 0 ? Math.min(minutes, 20) : null; // 上限 20 分钟
+
+    if (rawSec === null) return null;
+
+    // Cap at 20 minutes, floor at 0
+    rawSec = Math.min(rawSec, 20 * 60);
+    rawSec = Math.max(rawSec, 0);
+
+    // UX-7: Monotonicity guard — never let ETA increase
+    const last = lastEtaSecondsRef.current;
+    if (last !== null) {
+      const cap = last - EPSILON;
+      if (rawSec > cap) rawSec = cap;
+    }
+    // When nearing 100%, force ETA to 0
+    if (state.generationProgress >= 100) rawSec = 0;
+
+    lastEtaSecondsRef.current = rawSec;
+
+    const minutes = Math.ceil(rawSec / 60);
+    return minutes > 0 ? minutes : null;
   })();
 
-  // F-2: Checkpoint preview messages
-  const checkpointPreview = (() => {
-    const progress = state.generationProgress;
-    if (progress >= 55 && progress <= 63) return "即将到达角色预览检查点";
-    return null;
-  })();
+  // P2-2: Removed stale checkpointPreview logic (L209-214).
+  // Character preview is now triggered by character_ready stage event, not progress thresholds.
 
   useEffect(() => { return () => clearPoll(); }, [clearPoll]);
 
@@ -245,10 +301,37 @@ export default function StageC() {
         if (status.stage === "character_ready" || status.status === "completed") {
           clearPoll();
           if (simulatedTimerRef.current) { clearInterval(simulatedTimerRef.current); simulatedTimerRef.current = null; }
-          // Use real outline data for character/scene previews
+
+          // P0-3: portrait_url lives in chapter.characters_json (not outline.characters).
+          // Fetch /chapters/1/story to get real portrait_url values.
+          // Agent A P1-5 ensures character_ready fires only after all portraits are ready.
+          let chapterCharacters: Array<{ id?: string; name: string; portrait_url?: string | null }> = [];
+          if (projectId && token) {
+            try {
+              const storyResp = await apiFetch<{
+                characters: Array<{ id?: string; name: string; portrait_url?: string | null }>;
+              }>(`/projects/${projectId}/chapters/1/story`, {}, token);
+              chapterCharacters = storyResp.characters || [];
+            } catch {
+              // Non-fatal: fall back to outline data
+            }
+          }
+
+          // Build portrait lookup from chapter API response
+          const portraitByName: Record<string, string | null> = {};
+          for (const cc of chapterCharacters) {
+            if (cc.name) portraitByName[cc.name] = cc.portrait_url || null;
+            if (cc.id) portraitByName[cc.id] = cc.portrait_url || null;
+          }
+
+          // UX-1: Use real outline data for character/scene previews,
+          // with portrait_url fetched from chapter.characters_json.
           const chars: PreviewCharacter[] = state.outline?.characters?.map(c => ({
             id: c.id, name: c.name, description: c.description,
-            fullbodyUrl: "/brand/logo-48.png", adjustments: [],
+            fullbodyUrl: "/brand/logo-48.png",
+            // P0-3: prefer chapter portrait over outline portrait (chapter has the real generated URL)
+            portraitUrl: portraitByName[c.id] ?? portraitByName[c.name] ?? c.portrait_url ?? null,
+            adjustments: [],
           })) || mockPreviewCharacters;
           // F-3 (R3): Prefer description_zh (Chinese) if available, fallback to description (English)
           const scenes: PreviewScene[] = state.outline?.scenes?.map(s => ({
@@ -383,11 +466,12 @@ export default function StageC() {
         // FE-3: Trust backend progress directly in shot-gen (no simulated clamp)
         dispatch({ type: "UPDATE_GENERATION_PROGRESS", payload: { progress: status.progress, message: status.message } });
 
-        // FE-5: Broaden completion trigger. Previously the branch only fired
-        // on `status === "completed"`. If the backend briefly set progress=100
-        // while `status` was still `processing`, the user would see "100%"
-        // with no transition until the next poll tick + status flip.
-        if (status.status === "completed" || status.progress >= 100) {
+        // UX-11 / FE-5: Broaden completion trigger. Detect any of:
+        //   1. status.status === "completed"
+        //   2. status.stage === "completed" (backend sets this after Stage 6 BGM done)
+        //   3. status.progress >= 100
+        // Trigger immediately — do NOT wait for next tick.
+        if (status.status === "completed" || status.stage === "completed" || status.progress >= 100) {
           await finalizeAndGoToPreview();
           return;
         }
@@ -473,12 +557,15 @@ export default function StageC() {
         <h1 className="text-2xl font-bold mb-2">
           {resolvePhaseTitle(isError, state.generationSubPhase, currentStage)}
         </h1>
+        {/* UX-12 / P2-4: sub-title is stage-aware. Completed stage shows message only. */}
         <p className="text-text-tertiary text-sm mb-8">
           {isError
             ? friendlyError(state.generationMessage)
-            : state.generationSubPhase === "shot-gen"
-              ? "AI 正在逐张绘制画面，可以选择后台生成"
-              : "AI 正在全力创作，请耐心等待"}
+            : (currentStage === "completed" || state.generationProgress >= 100)
+              ? (state.generationMessage || "故事生成完成！")
+              : state.generationSubPhase === "shot-gen"
+                ? resolveSubtitle(currentStage)
+                : "AI 正在全力创作，请耐心等待"}
         </p>
 
         {!isError && (
@@ -488,17 +575,17 @@ export default function StageC() {
               <span className="text-xs text-text-muted">{state.generationProgress}%</span>
             </div>
             <div className="w-full h-2 bg-bg-secondary rounded-full overflow-hidden">
+              {/* P3-6: spring transition for smooth progress bar animation instead of jumpy 35→65→100 */}
               <motion.div
                 className="h-full bg-gradient-to-r from-brand-primary to-purple-500 rounded-full"
                 initial={{ width: 0 }}
                 animate={{ width: `${state.generationProgress}%` }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
+                transition={{ type: "spring", stiffness: 60, damping: 20, mass: 1 }}
               />
             </div>
-            {/* F-2: Estimated remaining time / R5-2: show "即将完成" when progress >= 100 */}
-            {state.generationProgress >= 100 ? (
-              <p className="text-xs text-text-muted mt-2">即将完成</p>
-            ) : estimatedMinutes !== null && (
+            {/* P2-4: Remove "即将完成" branch — completion info now in subtitle only.
+                Show ETA only when not completed yet. */}
+            {state.generationProgress < 100 && estimatedMinutes !== null && (
               <p className="text-xs text-text-muted mt-2">
                 预计还需约 {estimatedMinutes} 分钟
               </p>
@@ -519,21 +606,12 @@ export default function StageC() {
             animate={{ opacity: 1, y: 0 }}
             className="text-sm text-brand-primary mb-6"
           >
-            {state.generationMessage}
+            {/* UX-8: replace "张图像" with "个片段" for user-friendly copy */}
+            {friendlyMessage(state.generationMessage)}
           </motion.p>
         )}
 
-        {/* F-2: Checkpoint preview */}
-        {!isError && checkpointPreview && (
-          <motion.p
-            key={checkpointPreview}
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-sm text-amber-400 mb-4 font-medium"
-          >
-            {checkpointPreview}
-          </motion.p>
-        )}
+        {/* P2-2: checkpointPreview removed (was stale 55-63% threshold, replaced by character_ready stage event) */}
 
         {/* F-3: Network retry indicator (3-14 consecutive errors) */}
         {!isError && showRetryHint && (
@@ -667,9 +745,27 @@ function CharacterPreview({
     setAdjustInput("");
   };
 
-  const handleRegenerate = (charId: string) => {
+  // F-2: Call real regenerate-portrait API (Agent A P1-3 endpoint)
+  // POST /api/projects/{projectId}/characters/{charId}/regenerate-portrait
+  // Response: { portrait_url: string } with new portrait URL
+  const handleRegenerate = async (charId: string) => {
     setRegeneratingId(charId);
-    setTimeout(() => setRegeneratingId(null), 2000);
+    if (projectId && token) {
+      try {
+        const result = await apiFetch<{ portrait_url: string; success: boolean }>(
+          `/projects/${projectId}/characters/${charId}/regenerate-portrait`,
+          { method: "POST", body: JSON.stringify({}) },
+          token
+        );
+        if (result.portrait_url) {
+          onUpdateCharacter(charId, { portraitUrl: result.portrait_url });
+        }
+      } catch {
+        // Non-fatal: silently fail, portrait stays as-is
+        toast("error", "重新生成失败，请稍后重试");
+      }
+    }
+    setRegeneratingId(null);
   };
 
   // RF-5: Real API for character adjustment with mock fallback
@@ -731,11 +827,23 @@ function CharacterPreview({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
           {characters.map((char) => (
             <motion.div key={char.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-bg-secondary rounded-xl border border-white/5 overflow-hidden">
+              {/* UX-1: Show real portrait if available, otherwise silhouette placeholder (no play-button icon) */}
               <div className="relative aspect-[3/4] bg-bg-tertiary">
                 {regeneratingId === char.id ? (
                   <div className="absolute inset-0 flex items-center justify-center"><Loader2 className="w-8 h-8 text-brand-primary animate-spin" /></div>
+                ) : char.portraitUrl ? (
+                  // P0-3: Use plain <img> with toAbsoluteUrl to avoid Next.js Image domain restrictions
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={toAbsoluteUrl(char.portraitUrl) ?? char.portraitUrl} alt={char.name} className="absolute inset-0 w-full h-full object-cover" />
                 ) : (
-                  <Image src={char.fullbodyUrl} alt={char.name} fill className="object-cover" sizes="300px" />
+                  // Silhouette placeholder — grey human-shape icon, no play button
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="w-16 h-16 text-text-muted/30">
+                      <circle cx="12" cy="7" r="4" />
+                      <path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" />
+                    </svg>
+                    <span className="text-text-muted/40 text-xs">生成中</span>
+                  </div>
                 )}
                 <button onClick={() => handleRegenerate(char.id)} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70 transition-colors cursor-pointer" title="重新生成">
                   <RotateCcw className="w-3.5 h-3.5" />

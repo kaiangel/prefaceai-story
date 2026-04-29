@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy import select, delete
@@ -25,7 +26,96 @@ from app.models.user import User
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 
-def serialize_project_detail(project: Project) -> ProjectDetail:
+def _to_utc_iso(dt: datetime | None) -> str:
+    """Convert naive UTC datetime (from DB) to ISO 8601 string with 'Z' suffix.
+
+    DB stores datetime.utcnow() which has no tzinfo.
+    Adding timezone.utc + isoformat() + 'Z' gives '2026-04-28T15:38:00+00:00Z'
+    which is redundant, so we use replace(tzinfo=timezone.utc).isoformat() to get
+    '2026-04-28T15:38:00+00:00', then replace '+00:00' → 'Z' for compactness.
+    """
+    if dt is None:
+        return ""
+    if dt.tzinfo is None:
+        # Naive datetime from DB — treat as UTC
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat().replace("+00:00", "Z")
+
+
+def _parse_storyboard_cover_and_count(storyboard_json_str: str | None) -> tuple[str | None, int]:
+    """Parse storyboard_json to extract cover_image_url (shots[0].image_url) and shot_count.
+
+    Handles two formats:
+      - list of shots (legacy): [{shot_id, image_url, ...}, ...]
+      - dict with shots key: {"shots": [...], ...}
+
+    Returns (cover_image_url, shot_count).
+    cover_image_url is None if no shots or shots[0] has no image_url.
+    """
+    if not storyboard_json_str:
+        return None, 0
+    try:
+        sb = json.loads(storyboard_json_str)
+    except (json.JSONDecodeError, TypeError):
+        return None, 0
+
+    # Normalise to list of shots
+    if isinstance(sb, list):
+        shots = sb
+    elif isinstance(sb, dict):
+        shots = sb.get("shots", [])
+        if not isinstance(shots, list):
+            shots = []
+    else:
+        return None, 0
+
+    shot_count = len(shots)
+    cover_image_url: str | None = None
+    if shots:
+        first = shots[0]
+        if isinstance(first, dict):
+            url = first.get("image_url")
+            if url and isinstance(url, str):
+                cover_image_url = url
+
+    return cover_image_url, shot_count
+
+
+def _parse_mood(confirmed_outline_json_str: str | None) -> str | None:
+    """Parse confirmed_outline_json and return user_selected_mood → mood → None (3-level fallback)."""
+    if not confirmed_outline_json_str:
+        return None
+    try:
+        outline = json.loads(confirmed_outline_json_str)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(outline, dict):
+        return None
+    # 3-layer fallback: user_selected_mood → mood → None
+    return outline.get("user_selected_mood") or outline.get("mood") or None
+
+
+def serialize_project_detail(project: Project, chapter: "Chapter | None" = None) -> ProjectDetail:
+    """Serialize a Project ORM object to ProjectDetail schema.
+
+    Args:
+        project: Project ORM instance.
+        chapter: Optional chapter_number=1 Chapter ORM instance for list-endpoint
+                 enrichment (cover_image_url, shot_count, mood). If None,
+                 those fields default to null/0.
+    """
+    confirmed_outline = None
+    if project.confirmed_outline_json:
+        try:
+            confirmed_outline = json.loads(project.confirmed_outline_json)
+        except json.JSONDecodeError:
+            confirmed_outline = None
+
+    # R7-1: Extract cover + shot_count from chapter storyboard; mood from outline
+    storyboard_json_str = chapter.storyboard_json if chapter else None
+    cover_image_url, shot_count = _parse_storyboard_cover_and_count(storyboard_json_str)
+    mood = _parse_mood(project.confirmed_outline_json)
+
     return ProjectDetail(
         id=project.uuid,
         user_id=project.user_id,
@@ -37,8 +127,13 @@ def serialize_project_detail(project: Project) -> ProjectDetail:
         character_count=project.character_count,
         language=project.language,
         voice_preset=project.voice_preset,
-        created_at=project.created_at,
-        updated_at=project.updated_at,
+        created_at=_to_utc_iso(project.created_at),     # R7-1: ISO 8601 with Z
+        updated_at=_to_utc_iso(project.updated_at),     # R7-1: ISO 8601 with Z
+        aspect_ratio=project.aspect_ratio,              # R6: 透传画面比例
+        confirmed_outline=confirmed_outline,            # R6: 解析后的大纲（含 summary/mood/user_selected_mood）
+        cover_image_url=cover_image_url,                # R7-1: storyboard shots[0].image_url
+        shot_count=shot_count,                          # R7-1: storyboard shots 数组长度
+        mood=mood,                                      # R7-1: user_selected_mood ?? mood ?? None
     )
 
 
@@ -131,6 +226,7 @@ async def _run_generation_in_background(
     characters_json: str | None = None,
     confirmed_outline: dict | None = None,
     project_uuid: str | None = None,
+    aspect_ratio: str = "2:3",  # D.15 P0: 用户选择的画幅，默认 "2:3" 兼容旧调用
 ):
     """Run story generation in background with new database session"""
     async with async_session_maker() as db:
@@ -149,6 +245,7 @@ async def _run_generation_in_background(
             characters_json=characters_json,
             confirmed_outline=confirmed_outline,
             project_uuid=project_uuid,
+            aspect_ratio=aspect_ratio,  # D.15 P0: 透传用户选择的画幅
         )
 
 
@@ -157,14 +254,40 @@ async def list_projects(
     user_id: int = Depends(verify_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all projects for current user"""
+    """List all projects for current user.
+
+    R7-1: Returns cover_image_url + shot_count + mood + ISO time fields.
+    Uses a single additional query for chapter_number=1 rows to avoid N+1.
+    """
+    # 1. Fetch all projects for this user
     result = await db.execute(
         select(Project)
         .where(Project.user_id == user_id)
         .order_by(Project.created_at.desc())
     )
     projects = result.scalars().all()
-    return [serialize_project_detail(p) for p in projects]
+
+    if not projects:
+        return []
+
+    # 2. Batch-fetch chapter_number=1 for all projects in ONE query (avoid N+1)
+    project_ids = [p.id for p in projects]
+    ch_result = await db.execute(
+        select(Chapter)
+        .where(
+            Chapter.project_id.in_(project_ids),
+            Chapter.chapter_number == 1,
+        )
+    )
+    chapters_by_project_id: dict[int, Chapter] = {
+        ch.project_id: ch for ch in ch_result.scalars().all()
+    }
+
+    # 3. Serialize each project with its chapter-1 (or None if not yet created)
+    return [
+        serialize_project_detail(p, chapters_by_project_id.get(p.id))
+        for p in projects
+    ]
 
 
 @router.get("/{project_id}", response_model=ProjectDetail)
@@ -294,6 +417,7 @@ async def generate_outline(
 class ConfirmOutlineRequest(BaseModel):
     """用户确认/修改后的大纲"""
     outline: dict
+    user_selected_mood: str | None = None  # OBS-4: 顶层情绪选择（可选，也可在 outline.mood 中传）
 
 
 @router.post("/{project_id}/confirm-outline")
@@ -360,12 +484,16 @@ async def confirm_outline(
         raw["selected_ending"] = user["selected_ending"]
         # 前端 R6-2 已改为把 selected_ending 追加到 plot_points 末尾，后端不再替换
 
-    # 情绪
-    if user.get("mood"):
+    # 情绪 — 优先级: user_selected_mood (顶层) > outline.mood (嵌套)
+    # OBS-4: 同时支持 req.user_selected_mood（新增顶层字段）和 req.outline.mood（旧方式）
+    _effective_mood = req.user_selected_mood or user.get("mood") or ""
+    if _effective_mood:
         if "visual_tone" not in raw:
             raw["visual_tone"] = {}
-        raw["visual_tone"]["overall_mood"] = user["mood"]
-        raw["mood"] = user["mood"]  # R6-1b: 同步更新顶层 mood，Pipeline 读的是这个字段
+        raw["visual_tone"]["overall_mood"] = _effective_mood
+        raw["mood"] = _effective_mood  # R6-1b: 同步更新顶层 mood，Pipeline 读的是这个字段
+        raw["user_selected_mood"] = _effective_mood  # OBS-4: 明确标记为用户选择的情绪
+        logger.info(f"[ConfirmOutline] OBS-4: user_selected_mood={_effective_mood!r}")
 
     project.confirmed_outline_json = json.dumps(raw, ensure_ascii=False)
     if user.get("title"):
@@ -373,8 +501,50 @@ async def confirm_outline(
     db.add(project)
     await db.commit()
 
+    # UX-2 (A2): Sonnet 4.6 大纲一致性检查（非阻塞，失败时不影响确认流程）
+    warnings: list[str] = []
+    has_inconsistency = False
+    try:
+        from app.config import settings as _settings
+        import anthropic as _anthropic
+        _claude = _anthropic.AsyncAnthropic(api_key=_settings.ANTHROPIC_API_KEY)
+        _outline_summary = json.dumps({
+            "title": raw.get("title", ""),
+            "mood": raw.get("mood", ""),
+            "characters_overview": raw.get("characters_overview", [])[:5],
+            "plot_points": raw.get("plot_points", [])[:6],
+            "selected_ending": raw.get("selected_ending", ""),
+        }, ensure_ascii=False)
+        _check_prompt = f"""你是一个故事大纲质量检查员。请检查以下大纲的内在一致性：
+- 角色设定是否与情节节拍相符？
+- 情绪基调（mood）是否与故事走向一致？
+- 是否有明显矛盾或不合逻辑之处？
+
+大纲摘要：
+{_outline_summary}
+
+请输出 JSON，格式：{{"warnings": ["问题描述1", "问题描述2"], "has_inconsistency": true/false}}
+如果无问题，warnings 为空数组，has_inconsistency 为 false。只输出 JSON，不要其他文字。"""
+        _resp = await _claude.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=512,
+            messages=[{"role": "user", "content": _check_prompt}],
+        )
+        _check_text = _resp.content[0].text.strip()
+        # 解析 JSON（可能带 markdown 代码块）
+        if "```" in _check_text:
+            _check_text = _check_text.split("```")[1]
+            if _check_text.startswith("json"):
+                _check_text = _check_text[4:]
+        _check_result = json.loads(_check_text.strip())
+        warnings = _check_result.get("warnings", [])
+        has_inconsistency = _check_result.get("has_inconsistency", False)
+        logger.info(f"[ConfirmOutline] UX-2: 一致性检查完成, has_inconsistency={has_inconsistency}, warnings={len(warnings)}")
+    except Exception as _ux2_e:
+        logger.warning(f"[ConfirmOutline] UX-2: 一致性检查失败（非阻塞）: {_ux2_e}")
+
     logger.info(f"[ConfirmOutline] ✅ 大纲已确认: project={project_id}")
-    return {"success": True, "message": "大纲已确认"}
+    return {"success": True, "message": "大纲已确认", "warnings": warnings, "has_inconsistency": has_inconsistency}
 
 
 @router.post("/{project_id}/confirm-characters")
@@ -444,6 +614,7 @@ async def start_generation(
     await db.commit()
 
     # 启动 pipeline，传入 confirmed_outline
+    # D.15 P0: 传入 project.aspect_ratio，确保用户选择的画幅真正生效
     asyncio.create_task(
         _run_generation_in_background(
             job_id=job.id,
@@ -457,6 +628,7 @@ async def start_generation(
             language=project.language,
             confirmed_outline=confirmed_outline,
             project_uuid=project.uuid,
+            aspect_ratio=project.aspect_ratio or "2:3",  # D.15 P0: 真实画幅，None 兜底 "2:3"
         )
     )
 
@@ -758,9 +930,183 @@ async def adjust_character(
 
     logger.info(f"[AdjustCharacter] ✅ 角色 {char_id} 已调整: {req.adjustment[:30]}...")
 
+    # 7. P1-3 / R7-3: 角色描述更新后立即重生成 portrait，并写入 updated_at 时间戳
+    portrait_url: str | None = None
+    try:
+        from app.services.reference_image_manager import ReferenceImageManager as _RIM
+        from app.models.style_config import ProjectStyleConfig as _PSC
+        from app.services.image_generator import ImageGenerator as _IG
+        import os as _os
+
+        _ref_manager = _RIM()
+        _project_style = _PSC(style_preset=project.style_preset or "realistic")
+        _image_gen = _IG()
+
+        _portrait_result = await _ref_manager.generate_character_reference(
+            character=updated_char,
+            project_style=_project_style,
+            image_generator=_image_gen,
+            ref_type="portrait",
+        )
+        if _portrait_result.get("success") and _portrait_result.get("pil_image"):
+            # 确保 character_refs 目录存在
+            _outputs_root = _os.path.abspath("output")
+            _char_refs_dir = _os.path.join(_outputs_root, str(project.uuid), "character_refs")
+            _os.makedirs(_char_refs_dir, exist_ok=True)
+            _portrait_path = _os.path.join(_char_refs_dir, f"{char_id}_portrait.png")
+            _portrait_result["pil_image"].save(_portrait_path)
+            portrait_url = f"/static/outputs/{project.uuid}/character_refs/{char_id}_portrait.png"
+            logger.info(f"[AdjustCharacter] R7-3: {char_id} 肖像已重生成 → {_portrait_path}")
+
+            # 更新 updated_at 时间戳到角色 JSON，Stage 5 freshness check 用此判断肖像是否新鲜
+            from datetime import datetime as _dt
+            _now_iso = _dt.utcnow().isoformat() + "Z"
+            updated_char["updated_at"] = _now_iso
+            characters_overview[char_index] = updated_char
+            outline["characters_overview"] = characters_overview
+            if project.confirmed_outline_json:
+                project.confirmed_outline_json = json.dumps(outline, ensure_ascii=False)
+            else:
+                project.raw_outline_json = json.dumps(outline, ensure_ascii=False)
+
+            # 同步更新 characters_json 中的 portrait_url 和 updated_at
+            if chapter and chapter.characters_json:
+                try:
+                    chars_list = json.loads(chapter.characters_json)
+                    if char_index < len(chars_list):
+                        chars_list[char_index]["portrait_url"] = portrait_url
+                        chars_list[char_index]["updated_at"] = _now_iso
+                        chapter.characters_json = json.dumps(chars_list, ensure_ascii=False)
+                except (json.JSONDecodeError, IndexError):
+                    pass
+
+            db.add(project)
+            await db.commit()
+        else:
+            logger.warning(f"[AdjustCharacter] R7-3: {char_id} 肖像重生成失败: {_portrait_result.get('error')}")
+    except Exception as _pe:
+        logger.warning(f"[AdjustCharacter] R7-3: 肖像重生成异常（非阻塞）: {_pe}")
+
     return {
         "success": True,
         "character": updated_char,
         "char_id": char_id,
+        "portrait_url": portrait_url,
         "message": "角色已调整",
+    }
+
+
+@router.post("/{project_id}/characters/{char_id}/regenerate-portrait")
+async def regenerate_portrait(
+    project_id: str,
+    char_id: str,
+    user_id: int = Depends(verify_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    P1-3 / R7-3: 手动重生成指定角色的 portrait。
+
+    触发场景：用户在角色确认界面点击"重绘头像"按钮。
+    - 读取项目当前角色数据
+    - 调用 ReferenceImageManager.generate_character_reference()（portrait 类型）
+    - 保存到 character_refs/{char_id}_portrait.png
+    - 更新 characters_json 中的 portrait_url 和 updated_at
+    返回: { success, portrait_url, char_id }
+    """
+    from app.services.reference_image_manager import ReferenceImageManager as _RIM
+    from app.models.style_config import ProjectStyleConfig as _PSC
+    from app.services.image_generator import ImageGenerator as _IG
+    from datetime import datetime as _dt
+
+    # 1. 验证项目归属
+    result = await db.execute(
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    # 2. 读取角色数据
+    outline_json = project.confirmed_outline_json or project.raw_outline_json
+    if not outline_json:
+        raise HTTPException(status_code=400, detail="项目尚未生成大纲")
+
+    outline = json.loads(outline_json)
+    characters_overview = outline.get("characters_overview", [])
+
+    target_char = None
+    char_index = None
+    try:
+        idx = int(char_id.replace("char_", "")) - 1
+        if 0 <= idx < len(characters_overview):
+            target_char = characters_overview[idx]
+            char_index = idx
+    except (ValueError, IndexError):
+        pass
+
+    if target_char is None:
+        raise HTTPException(status_code=404, detail=f"角色 {char_id} 不存在")
+
+    # 3. 生成新 portrait
+    _ref_manager = _RIM()
+    _project_style = _PSC(style_preset=project.style_preset or "realistic")
+    _image_gen = _IG()
+
+    try:
+        _portrait_result = await _ref_manager.generate_character_reference(
+            character=target_char,
+            project_style=_project_style,
+            image_generator=_image_gen,
+            ref_type="portrait",
+        )
+    except Exception as e:
+        logger.error(f"[RegeneratePortrait] ❌ {char_id} 生图失败: {e}")
+        raise HTTPException(status_code=500, detail=f"肖像生成失败: {str(e)}")
+
+    if not (_portrait_result.get("success") and _portrait_result.get("pil_image")):
+        raise HTTPException(status_code=500, detail=f"肖像生成失败: {_portrait_result.get('error', '未知错误')}")
+
+    # 4. 保存图片
+    _outputs_root = os.path.abspath("output")
+    _char_refs_dir = os.path.join(_outputs_root, str(project.uuid), "character_refs")
+    os.makedirs(_char_refs_dir, exist_ok=True)
+    _portrait_path = os.path.join(_char_refs_dir, f"{char_id}_portrait.png")
+    _portrait_result["pil_image"].save(_portrait_path)
+    portrait_url = f"/static/outputs/{project.uuid}/character_refs/{char_id}_portrait.png"
+    logger.info(f"[RegeneratePortrait] ✅ {char_id} → {_portrait_path}")
+
+    # 5. 更新 updated_at 时间戳（Stage 5 freshness check 依赖此字段）
+    _now_iso = _dt.utcnow().isoformat() + "Z"
+    target_char["updated_at"] = _now_iso
+    target_char["portrait_url"] = portrait_url
+    characters_overview[char_index] = target_char
+    outline["characters_overview"] = characters_overview
+    if project.confirmed_outline_json:
+        project.confirmed_outline_json = json.dumps(outline, ensure_ascii=False)
+    else:
+        project.raw_outline_json = json.dumps(outline, ensure_ascii=False)
+
+    # 6. 同步更新 chapter.characters_json
+    chapter_result = await db.execute(
+        select(Chapter).where(Chapter.project_id == project.id).order_by(Chapter.chapter_number).limit(1)
+    )
+    chapter = chapter_result.scalar_one_or_none()
+    if chapter and chapter.characters_json:
+        try:
+            chars_list = json.loads(chapter.characters_json)
+            if char_index < len(chars_list):
+                chars_list[char_index]["portrait_url"] = portrait_url
+                chars_list[char_index]["updated_at"] = _now_iso
+                chapter.characters_json = json.dumps(chars_list, ensure_ascii=False)
+        except (json.JSONDecodeError, IndexError):
+            pass
+
+    db.add(project)
+    await db.commit()
+
+    return {
+        "success": True,
+        "char_id": char_id,
+        "portrait_url": portrait_url,
+        "message": "肖像已重新生成",
     }

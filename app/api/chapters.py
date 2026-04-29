@@ -18,6 +18,7 @@ from app.models.job import GenerationJob
 from app.models.scene_image import SceneImage
 from app.schemas.chapter import ChapterStatus, ChapterStory, ChapterResponse
 from app.api.projects import verify_user
+from app.services.pipeline_orchestrator import estimate_remaining
 
 router = APIRouter(prefix="/api/projects/{project_id}/chapters", tags=["chapters"])
 
@@ -139,14 +140,20 @@ async def get_generation_status(
                 message="暂无生成任务",
             )
 
-        # RB-6: 计算剩余秒数 = max(0, total_estimated - elapsed)
+        # P1-2: stage-aware ETA — 调 estimate_remaining 函数计算剩余秒
         estimated_remaining = None
-        if job.estimated_seconds is not None:
-            if job.started_at:
-                elapsed = (datetime.utcnow() - job.started_at).total_seconds()
-                estimated_remaining = max(0, int(job.estimated_seconds - elapsed))
-            else:
-                estimated_remaining = job.estimated_seconds
+        if job.current_stage and job.current_stage != "completed":
+            try:
+                estimated_remaining = estimate_remaining(job.current_stage, stage_progress=0.5)
+            except (KeyError, ValueError):
+                # fallback to old logic if stage name unknown
+                if job.estimated_seconds is not None:
+                    elapsed = (datetime.utcnow() - job.started_at).total_seconds() if job.started_at else 0
+                    estimated_remaining = max(0, int(job.estimated_seconds - elapsed))
+                else:
+                    estimated_remaining = None
+        else:
+            estimated_remaining = 0  # completed
 
         return ChapterStatus(
             status=job.status,
@@ -275,6 +282,48 @@ async def get_chapter(
     except Exception as e:
         logger.exception(
             f"[chapters/get] unhandled error project={project_id} chapter={chapter_number}: {e}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"服务异常: {type(e).__name__}: {str(e)[:200]}"
+        )
+
+
+@router.get("/{chapter_number}/storyboard")
+async def get_chapter_storyboard(
+    project_id: str,
+    chapter_number: int,
+    user_id: int = Depends(verify_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """BE-4: 获取章节分镜数据（storyboard_json）"""
+    try:
+        project_result = await db.execute(
+            select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
+        )
+        project = project_result.scalar_one_or_none()
+        if not project:
+            raise HTTPException(status_code=404, detail="项目不存在")
+
+        chapter_result = await db.execute(
+            select(Chapter).where(
+                Chapter.project_id == project.id, Chapter.chapter_number == chapter_number
+            )
+        )
+        chapter = chapter_result.scalar_one_or_none()
+        if not chapter:
+            raise HTTPException(status_code=404, detail="章节不存在")
+
+        if not chapter.storyboard_json:
+            raise HTTPException(status_code=404, detail="分镜数据尚未生成")
+
+        storyboard = json.loads(chapter.storyboard_json)
+        return {"storyboard": storyboard, "chapter_number": chapter_number, "project_id": project_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(
+            f"[chapters/storyboard] unhandled error project={project_id} chapter={chapter_number}: {e}"
         )
         raise HTTPException(
             status_code=500,

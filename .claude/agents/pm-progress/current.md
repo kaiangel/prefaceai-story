@@ -1,503 +1,115 @@
 # PM Agent - 当前任务
 
-> **最后更新**: 2026-04-22
-> **状态**: 🔄 TASK-LLM-TEMP-AUDIT-FIX 已派 @backend（7 步改动 + 8631 调查）
+> **最后更新**: 2026-04-29 15:50
+> **状态**: ✅ Wave 1.1+1.2+2+2.5+3+3.5+3.6 全部 PASS（R7-3 修复 + Tester 复测 6 证据点 + PM 5 角度地毯式深挖）→ Wave 4 DevOps 部署准备 spawn
 
----
+## 2026-04-29 15:50 Wave 3.5/3.6 + D.17 简化
+- Wave 3.5 R7-3 修复 (character_prompt_builder isinstance) ✅
+- Wave 3.6 Tester 真彩色复测 6 证据点 ✅ + PM 5 角度地毯式深挖 ✅
+- D.17 CONTENT_SAFETY 脱敏策略族 — Founder 简化为只 Layer 3 末端 fallback（不前置脱敏，保护故事生动性）
+- D.17 含 Seedream 未来首发生产可能性备注
 
-## 进行中（2026-04-23 16:50）
+## 2026-04-28 21:30 Wave 3 Tester ✅ + R7-3 P1 立即修
+- T7 真生图 1:1 朋友圈 16 shots，11 PASS / 1 FAIL
+- D.15 P0 PIL 实测全部 2048x2048（用户选 1:1 真生效）
+- R7-3 portrait 重生 `'str' object has no attribute 'get'` (projects.py L945) → 立即派 Backend (subagent_type: "backend") 修
+- 修后 Tester 复测 adjust 路径（不重跑 T7 完整，省成本）
+- Wave 4 DevOps 待 R7-3 PASS
 
-### 🔄 TASK-BUG-FIX-BATCH-1 — Route D 待派 @devops 部署 VPS
+## 2026-04-28 17:00 subagent_type symlink 修复完成
+- ✅ 验证 `/Users/kaisbabybook/AIFun/xuhuastory/.claude/agents` symlink 存在
+- ✅ feedback_use_custom_subagent_type.md 重写（旧"PM 主对话只能用内置 type"结论纠正）
+- ✅ MEMORY.md 索引重写
+- ✅ 新建 reference_subagent_symlink.md
+- TEAM_CHAT + pm-progress/completed.md 历史"general-purpose"引用是事件描述，无需改
 
-**Route B + C 状态**: ✅ PM 审查全部通过（16:30）
-- Backend 5 step 全过 + DB 清理完
-- Frontend 5 bug 全修 + build 0 error
-- 本地 /static + /health + DB 全验证
+## 2026-04-28 16:35 Wave 2.5 D.15 P0 ✅
+完整调用链路 10 段全接通（frontend → projects.py → DB → job_manager → pipeline → image_gen → seedream → NB2）
+0 处 hardcoded "2:3" 残留 | _ASPECT_RATIO_TO_SIZE 7 比例 | pytest 292/292
 
-**Route D @devops 即将启动**:
-- commit 5 代码文件 + 10 文档
-- rsync app/ + frontend/src/ → VPS
-- docker build api + frontend + up -d --force-recreate
-- 验证 VPS /health + /static/outputs 可访问 + 前端 200
+## 🆕 2026-04-28 15:35 D.14 决议落地
 
-**Founder 下一步**: VPS 部署完在 prefaceai.mov 做第二轮测试
+Founder 同意 D.14 F-Lock-Family **升 P2 + 扩展为家族修复**（outline / characters / scenes 三处同源）：
+- 不进本批 Wave 2，作为下批"产品打磨批次"优先项
+- 工时 ~25 min frontend（共享 useStageLock hook + 3 处 banner）
+- 完整方案 / UX 走查 / 决议背景 见 PENDING.md D.14 + TEAM_CHAT 15:30/15:35
 
----
+## Wave 2 派发就绪
 
-## 历史
+- D (Backend Sonnet 4.6 effort high): /api/projects/ 加 cover_image_url + shot_count + mood + ISO 时区 (~10min)
+- F (Backend Sonnet 4.6 effort high) 与 D 并行: ARCH-1 chapter_scene_images 写入 (~30min, 高风险 18+ 引用先 grep 评估)
+- E (Frontend Sonnet 4.6 effort high) 等 D 完成: AuthContext mapProject 读后端新字段 (~10min)
+- 总工时 ~45min
 
-### ✅ TASK-P0P1-LOGGING-FIX (2026-04-23) — 审查通过
 
-**背景**: Ben 500 报错但 docker logs 只剩 139 行（rotate 太激进），traceback 已丢。PM 审查发现 3 P0 日志缺口 + 2 P1 技术债。Founder 批准全部处理后再本地复测。
 
-**@backend**:
-1. pipeline_orchestrator.py L1074 裸 except → logger.exception
-2. chapters.py start-generation asyncio.create_task wrapper 捕获异常 → job.failed + error_message
-3. chapters.py GET 端点加 try/except logger.exception
-4. image_generator.py 65 print → logger（纯机械，0 行为变化，跳过真实回归）
+## 🆕 TASK-T6-FIXBATCH 进度
 
-**@devops**: docker/docker-compose.yml api 服务加 logging max-size=50m max-file=5（先不部署，等 backend 完成 PM 审查后统一部署）
+详细规划见 `.team-brain/handoffs/PENDING.md` TASK-T6-FIXBATCH 章节（5 R7 + 4 Wave + 12 风险 + 12 暂缓）。
 
-**状态**: 并行 spawn 中
+### Wave 状态
 
----
+| Wave | Agent | 工时 | 状态 |
+|------|-------|------|:-:|
+| Wave 0 PM 文档 | PM | 10 min | ✅ 12:10 完成 |
+| Wave 1.1 Agent A Backend (Sonnet) | 5 子任务 | ~2 hr | ✅ 14:13-15:05 完成（一轮地毯式审查 → 1 修复 round → 二轮深挖通过）|
+| Wave 1.1 Agent B Frontend (Sonnet) | 7 子任务 | ~1.5 hr | ✅ 14:14-14:26 完成（一轮通过）|
+| **Wave 1.2 Agent C UX-16 (Frontend Opus)** | dynamic route | ~3 hr | ⏳ **准备 spawn** |
+| Wave 2 D Backend → E Frontend + F ARCH-1 | dashboard 列表 + chapter_scene_images | ~50 min | ⏳ |
+| Wave 3 G Tester T7 真生图 | 端到端验证 + 回归 | ~1 hr + ¥1.5 | ⏳ |
+| Wave 4 H DevOps 部署 | push + rsync | ~30 min | ⏳ |
 
-## 刚完成
+### Wave 1.1 关键产出（已上线代码）
 
-### ✅ TASK-DEPLOY-LLM-SAMPLING (2026-04-23) — 审查通过
+**Backend (4 文件)**:
+- `app/services/job_manager.py` — P0-2 mark_completed stage='completed' / P1-2 progress 单调 guard + estimated_remaining_seconds 参数
+- `app/services/pipeline_orchestrator.py` — P1-1 9 处 callback stage 名重构 / P1-2 STAGE_DURATIONS + estimate_remaining 函数 / P1-3 freshness check 含 30s buffer / P1-5 character_design 中间态
+- `app/api/projects.py` — P1-3 adjust_character Step 7 重生 portrait + 新端点 POST /characters/{id}/regenerate-portrait
+- `app/services/reference_image_manager.py` — P1-3 generate_character_multi_refs 加 skip_portrait + seed_image 参数
+- `app/api/chapters.py` — P1-2 修复 round 1: import estimate_remaining + /status 调用计算 stage-aware ETA
 
-**背景**: 今日完成 2 个代码任务（TEMP-AUDIT-FIX + 8631-UNIFY）本地验证通过，但 VPS 还跑昨天 b998cbf 镜像。Founder 要求 DevOps 同步。
+**Frontend (5 文件)**:
+- `frontend/src/lib/url.ts` — 新建 toAbsoluteUrl + SERVER_BASE 共享
+- `frontend/src/components/create/StageD.tsx` — P0-1 image src 用 toAbsoluteUrl + onError 占位
+- `frontend/src/components/create/StageC.tsx` — P0-3 fetch chapter / P2-2 删 checkpointPreview / P2-4 完成态 + carousel 停 / F-2 真 API / STAGE_LABEL 加 character_design + image_preparation
+- `frontend/src/components/create/StageE.tsx` — P1-6 outline.summary 三层 fallback
+- `frontend/src/components/ui/BgmPlayer.tsx` — P0-1 audio src 用 toAbsoluteUrl
+- `frontend/src/app/dashboard/[storyId]/StoryDetailContent.tsx` — 改用共享 toAbsoluteUrl
 
-**范围**: 22 个未提交文件（8 代码 + 14 文档），无前端/DB/env 改动，只需 commit + push + rsync app/ + docker rebuild api。
+### Wave 1.1 教训（已写入 memory + xhteam SKILL.md）
 
-**Bash 预警**: DevOps 上次被拒 2 次 + spawn 401，spawn prompt 已要求"被拒立即 SendMessage，不要白做命令准备"。
+`feedback_carpet_review_deep_dive.md` 永久保存：地毯式审查必须追到调用链路最末端（函数定义 → 调用点 → 参数传递 → 数据流向 → 消费点）。Wave 1.1 第一轮 PM grep 验证函数定义存在就差点放过 estimate_remaining 死代码 + freshness check 缺 30s buffer，Founder 提醒后深挖发现。
 
----
+xhteam SKILL.md 第四步独立审查 加了"地毯式审查铁律"双保险。
 
-## 刚完成（2026-04-22）
+### Wave 1.2 派发计划
 
-### ✅ TASK-8631-UNIFY — 审查通过
+**Agent C (Frontend Opus 4.6)** — UX-16 URL 路由 dynamic route 改造：
 
-**独立验证**:
-- `grep -rn "8631" app/` = 0 代码命中
-- 13 处全部改为 16384（character_designer ×2 + alignment_service ×4 + story_outline_generator L196 + storyboard_director ×2 + screenplay_writer ×4）
-- pytest test_architecture 7 passed
-- /health healthy
-- backend progress 三维度已做自我纠错记录
+- 改 `/create` 单页为 `/create/[projectUuid]/[stage]` Next.js dynamic route
+- 各 Stage 切换时 router.replace() 同步 URL
+- 刷新时根据 URL 还原 state（拉 backend chapter API + project API）
+- useGenerationStatus hook 跟 URL 联动
+- 浏览器后退按钮行为
+- 跟现有 dashboard 详情页 `/dashboard/[storyId]` 路由不冲突
 
-**教训**: Backend 首次调查数据偏差（14 vs 13 + story_outline 半改）。PM 独立地毯式核对发现偏差才纠正。以后 Step 7 类调查任务 PM 审查时要**地毯式独立 grep 验证结论**，不能信 agent 数字。
+**为什么用 Opus**: 大改造跨多文件，需要深度状态管理思考（feedback memory: spawn_use_sonnet_for_simple_tasks — 深度思考类→ Opus）
 
----
+**单独 spawn 不混 1.1**: feedback_docs_before_spawn 风险最低做法。
 
-## 历史
+### 协作上下文（给后续 Wave 用）
 
-### 🔄 TASK-8631-UNIFY (2026-04-22) — 派 @backend
+- backend 新加 stage 名: `character_design`（5-7%）和 `image_preparation`（65-75%）— frontend STAGE_LABEL 已就绪
+- backend 新加 endpoint: `POST /api/projects/{project_id}/characters/{char_id}/regenerate-portrait`
+- backend /api/projects/{project_id}/chapters/{chapter_number}/status 现返 stage-aware estimated_remaining_seconds
+- backend Stage 5 prep 自动 freshness check 30s buffer 复用 portrait
 
-**背景**: PM 独立地毯式核对 TASK-LLM-TEMP-AUDIT-FIX Step 7 发现 backend 调查偏差：
-- Backend 说 14 处 → 实际 **13 处**
-- Backend 说 "story_outline_generator 已改" → 实际**半改**（L178 Claude 16384 ✅，L196 Gemini 8631 ❌）
+### Wave 2-4 提醒（不在本轮）
 
-Founder 批准即时执行（近零风险）。
+- Wave 2: dashboard 列表 backend 加 cover_image_url + shot_count + mood + ISO 时区，frontend mapProject 读字段；ARCH-1 单独 backend agent 做 chapter_scene_images 写入
+- Wave 3: Tester T7 真生图（简单生活短篇，避高 sanitize 题材，预算 ≤ ¥1.5）
+- Wave 4: DevOps push + rsync VPS（trailing slash 陷阱）
 
-**改动**: 13 处 `8631 → 16384` 分布 5 文件（character_designer / alignment_service / story_outline_generator L196 / storyboard_director / screenplay_writer）。
+## 历史完成（2026-04-27）
 
-**状态**: 等 @backend 完成 → PM 审查（grep 验证 + 要求 backend 同时纠正自己 progress 里 "14 处" 的错误表述）
-
----
-
-## 刚完成
-
-### ✅ TASK-LLM-TEMP-AUDIT-FIX (2026-04-22) — 审查通过
-
-**@backend 一次通过**。15 个改动点全部落地（规划是 14 个，backend 自己发现 screenplay_writer._expand_narration 第二对 Claude+Gemini 也该加，多加了 1 对 = 15 点）。
-
-**PM 独立审查**:
-- git diff 逐行核对 6 文件 15 处：全部正确 ✅
-- pytest test_architecture: 7 passed ✅
-- /health: healthy ✅
-- Step 7 8631 调查: 历史遗留（最早 commit acba309, 2026-02-12），建议统一 16384 但本 PR 不改 — 已记入 PENDING P3
-
-**没越权**: backend 只改了 6 个代码文件 + backend-progress 三维度 + TEAM_CHAT 追加，没碰 🔴 文件/前端/prompt/tests。
-
----
-
-## 进行中
-（无，等 Founder 最终签字）
-
----
-
-## 历史
-
-### TASK-LLM-TEMP-AUDIT-FIX (2026-04-22, Founder 批准)
-
-**背景**: Founder 42 调用点温度审计，4 类问题 + Stage 3/4 创意温度显式化（0.8）+ 8631 来源调查。
-
-**改动**:
-1. alignment_service L175/L231 Claude 加 temperature=0.2
-2. shot_validator L125 Haiku 加 temperature=0.2
-3. utils.py (api/) 4 处 temperature=0.2（Gemini 需 import types）
-4. story_generator L303 sync max_tokens 8192→16384
-5. screenplay_writer L697/L797 Claude + L725 Gemini fallback temperature=0.8
-6. storyboard_director L614 Claude + L642 Gemini fallback temperature=0.8
-7. 调查 max_tokens=8631 14+ 出现位置来源
-
-**状态**: 等 @backend 完成 → PM 审查
-
----
-
-## 已完成
-
-### ✅ TASK-MUREKA-PIPELINE-INTEGRATION Wave 1-4 + VPS 部署 (2026-04-21)
-
-**背景**: @devops Bash 权限二次被拒，PM 代执行部署。
-
----
-
-## 刚完成
-
-### ✅ TASK-MUREKA-PIPELINE-INTEGRATION VPS 部署 (2026-04-21)
-
-**背景**: @devops agent Bash 权限二次被拒，依据 memory "重启服务 PM 自己做" + 先读 devops.md 按铁律执行。
-
-**部署步骤**:
-1. git commit `b998cbf` (69 files, 18922 insertions) + push origin main
-2. VPS `.env.production` 追加 MUREKA_API_KEY
-3. rsync app/ + scripts/ + frontend/src/ → VPS（trailing slash 正确）
-4. 共享阿里云 MySQL 已含 4 BGM 列（本地 migration 覆盖 VPS）
-5. docker compose build + up -d api+frontend
-6. health = healthy, MUREKA_API_KEY 注入容器 = True
-
-**验证**: `ssh trader@107.148.1.199 -p 58913 "docker exec docker-api-1 curl -s http://localhost:8000/health"` → `{"status":"healthy"}`
-
----
-
----
-
-## 刚完成
-
-### ✅ TASK-MUSIC-BGM-TEST — 6 个故事 BGM 音乐生成测试 (2026-04-16)
-
-**背景**: 集成 Mureka AI 音乐生成 API，测试 6 个不同故事的 BGM 质量。
-
-**完成工作**:
-1. Music Prompt Skill 创建（9 个文件: 知识库+模板+脚本）
-2. @ai-ml 为 6 个故事编写音乐 prompt（6 种完全不同风格，5 层结构）
-3. @backend 调 Mureka API 生成 7 个 mp3（story 1 n=2，其余 n=1）
-
-| # | 故事 | 风格 | 时长 | 文件大小 |
-|---|------|------|------|---------|
-| 1 | 最后一投 | Post-rock → Orchestral | 2:55 + 3:23 | 5.4M + 6.2M |
-| 2 | 外公的秋梨膏 | Chinese folk-acoustic | 3:54 | 7.2M |
-| 3 | 年夜饭上的战争 | Dark chamber jazz | 2:58 | 5.5M |
-| 4 | 拿铁上的告白 | Bossa nova + dream pop | 2:52 | 5.2M |
-| 5 | 墨痕 | East Asian minimalist / ambient guqin | 3:25 | 6.3M |
-| 6 | 终点站前的余温 | Lo-fi ambient electronic | 3:39 | 6.7M |
-
-**技术发现**: EP-015 curl 中文 JSON 报错 → Python urllib 解决；n 必须设为 1 节省成本
-
-**等待**: Founder 试听评估 → 决定是否集成到 Pipeline
-
----
-
-## 已完成（历史）
-
-### TASK-HARNESS-ENGINEERING-V1 — Harness Engineering 升级 (2026-04-14)
-
-**背景**: Sensor 评分 4/10，几乎没有自动化验证。Founder 批准 P0 级升级。
-
-**Phase 1 ✅ 完成**:
-- @devops: TASK-HE-DEVOPS-1 — hooks 配置升级 ✅ PM Review PASS
-- @tester: TASK-HE-TESTER-1 — 10/10 PASS, 0.05s ✅ PM Review PASS
-- PreCommit `|| true` 已去掉，完整闭环激活 ✅
-- PM 补装 pytest-timeout ✅
-
-**Phase 2 ✅ 完成**:
-- @devops: TASK-HE-DEVOPS-2 — TEAM_CHAT 归档 36079→2387 行 ✅ PM Review PASS
-- PM: TASK-HE-PM-1 — ERROR_PATTERNS.md 14 个错误模式 ✅
-- PM: TASK-HE-PM-2 — 上下文预算管理 6 角色清单 ✅
-
-**Phase 3 ✅ 完成**:
-- @backend: TASK-HE-BACKEND-1 — pipeline_schemas.py + orchestrator 验证调用 ✅ PM Review PASS
-- @ai-ml: TASK-HE-AIML-1 — A/B Test 分析文档 36KB ✅ PM Review PASS
-  - 推荐变体 B'（38% token 节省），待 Founder 批准后实施
-
-**Phase 4 ✅ 完成**: HARNESS_HEALTH.md 健康度看板已创建
-
----
-
-### R6 Founder 测试 (2026-04-14)
-
-**测试故事**: "泰迪的秘密"（宠物美容师听懂动物说话）
-**Pipeline**: 807s，20 shots，零错误
-
-| R6 修复项 | 结果 |
-|-----------|------|
-| R6-1b mood "紧张" | ✅ DB 确认（顶层 + visual_tone） |
-| R6-2/R6-2b selected_ending 追加 plot_points[8] | ✅ DB 确认（9 个节点） |
-| R6-3 confirm 后立即切换 | ✅ 日志确认 |
-| R6-4 倒计时 20s + 点调整暂停 | ✅ Founder 实测确认 |
-| R6-5 超时 1800s | ✅ Pipeline 807s 完成 |
-| 角色调整（卷发+32岁） | ✅ DB 确认 |
-| Schema 验证（Harness） | ✅ Stage 2→3 + Stage 4→5 首次实战通过 |
-
-**发现 3 个 StageD 未接通功能** → 记录到 KNOWN_ISSUES.md：
-- KI-001 (P0): 重新生成按钮纯 UI 壳
-- KI-002 (P0): 旁白编辑不回写 DB
-- KI-003 (P1): 删除 shot 未接通后端
-
----
-
-### Prompt Format A vs B' 盲测 (2026-04-14)
-
-**状态**: 20 张图已生成（@backend），等待 Founder 盲测评分
-**路径**: `test_output/manualtest/prompt_ab_test/blind/`
-**揭盲**: `test_output/manualtest/prompt_ab_test/blind_mapping.json`
-
----
-
-### 变体 D 设计 + 10-Shot 三方对比分析 (2026-04-14)
-
-**状态**: ✅ 分析完成，D+ 跳过（收益 13% 不值得风险），直接推进 B' 切换
-**文档**: `.team-brain/analysis/VARIANT_D_DESIGN.md` + `PROMPT_FORMAT_10SHOT_COMPARISON.md`
-
----
-
-### TASK-PROMPT-B-PRIME + TASK-KI-FIX (2026-04-14 16:30)
-
-**状态**: 🔄 @backend 执行中
-
-**工作项 1 — B' 默认格式**: image_generator.py prompt_format 参数，默认 b_prime，legacy 可切回
-**工作项 2 — 3 个 shot API**: regenerate(POST) + edit(PATCH) + delete(DELETE)，SKIP 模式
-**Backend 审查**: ✅ PASS (10/10 + 10/10 + 架构测试 10/10)
-**Frontend 审查**: ✅ PASS (8/8 + build 18 路由 0 错误)
-
----
-
-### TASK-PIPELINE-OPT-R2 — Round 2 全面优化 (2026-04-09)
-
-**背景**: R1 修复后 Founder 第二轮测试：batch 失败 fallback、84×529 错误、full_script 溢出、18min 才到角色确认。
-
-**派发**:
-- @Backend: 7 项 (RB-1 LONGTEXT P0 → RB-2 batch debug → RB-3 529+Sem(3) → RB-4 检查点前移 P0 → RB-5 初始消息 → RB-6 estimated_seconds → RB-7 角色调整 API)
-- @Frontend: 6 项 (RF-1 进度不重置 → RF-2 错误不暴露SQL → RF-3 提示分离+20条 → RF-4 后端预估时间 → RF-5 角色调整真实API → RF-6 检查点前移适配)
-- @AI-ML: 1 项 (AM-1 Stage 1 prompt description_zh)
-
----
-
-## 刚完成
-
-### PM 全量审查闭环 (2026-03-17 15:30)
-
-**3 个 Agent 工作全部审查通过**:
-
-| Agent | 任务 | 审查结果 |
-|-------|------|----------|
-| @AI-ML | TASK-OB1-CLEANUP (11 处 Haiku→Sonnet 4.6) | ✅ PASS — 零残留 |
-| @Backend | TASK-OB2-MODEL-SYNC + OB-3 (5 处) + OB-4 (L28 docstring) | ✅ PASS — 零残留 |
-| @Tester | TASK-SAFE-DRYRUN (3 链路 7/7 PASS) | ✅ PASS — 覆盖 phase2_safe 全路径 |
-
-**OB-4 (非阻塞)**: alignment_service.py L28 "Gemini 3 Flash" → "Gemini 3.1 Flash"，Backend 已修复 ✅
-
-**安全链路全覆盖确认**:
-- Shot 图 phase2_safe: ✅ TASK-SAFE-DRYRUN 7/7
-- 角色参考图 L3b: ✅ IMG-SAFETY-VERIFY 17/17
-- 场景参考图 L2+L3a: ✅ IMG-SAFETY-VERIFY 17/17
-
----
-
-## 当前等待
-
-| # | 事项 | 等谁 |
-|---|------|------|
-| 1 | ~~TASK-OUTLINE-PROMPT-UPGRADE~~ | ~~@AI-ML~~ ✅ |
-| 2 | ~~TASK-STAGE1-API~~ | ~~@Backend~~ ✅ |
-| 3 | ~~TASK-STAGE1-FRONTEND~~ | ~~@Frontend~~ ✅ |
-| 4 | ~~DevOps: 搭本地 MySQL + push~~ | ~~@DevOps~~ ✅ |
-| 5 | ~~TASK-ENVVAR-FIX~~ | ~~@Backend~~ ✅ PM Review PASS |
-| 6 | ~~DevOps push ENVVAR-FIX~~ | ~~@DevOps~~ ✅ |
-| 7 | ~~TASK-OUTLINE-LLM-FIX 第 1 项 AI-ML~~ | ✅ PM Review PASS |
-| 8 | ~~TASK-OUTLINE-LLM-FIX 第 1-3 项 Backend~~ | ✅ PM Review PASS |
-| 9 | ~~Founder 第三次联调~~ | ✅ 通过 |
-| 10 | ~~TASK-GEMINI-MODEL-FIX~~ | ~~@Backend~~ ✅ PM Review PASS |
-| 11 | ~~TASK-OUTLINE-STORAGE~~ | ~~@Backend~~ ✅ PM Review PASS |
-| 12 | ~~TASK-ASPECT-RATIO-WIRE~~ | ~~@Frontend + @Backend~~ ✅ |
-| — | **=== Phase 1 ===** | |
-| 13 | ~~TASK-STYLE-LITERAL-FIX~~ | ~~@Backend~~ ✅ |
-| 14 | ~~TASK-STYLE-EXPAND-28~~ (13 新风格设计) | ~~@AI-ML~~ ✅ |
-| 15 | ~~TASK-DOC-TEXT-WIRE~~ | ~~@Backend + @Frontend~~ ✅ |
-| 16 | ~~TASK-OCR-ENDPOINT~~ | ~~@Backend~~ ✅ |
-| 17 | ~~TASK-OCR-REAL~~ | ~~@Frontend~~ ✅ |
-| 18 | ~~13 新风格写入 StyleEnforcer + Literal 28~~ | ~~@Backend~~ ✅ |
-| 19 | ~~STYLE_PRESETS 扩展 28~~ | ~~@Frontend~~ ✅ |
-| 20 | ~~TASK-UTILS-ASYNC-FIX~~ | ~~@Backend~~ ✅ |
-| 21 | ~~13 张 thumbnails~~ | ~~@PM~~ ✅ 13/13 |
-| 22 | ~~Founder 联调~~ | ✅ 3 点发现 |
-| 23 | ~~TASK-VALIDATION-FIX~~ | ~~@Frontend~~ ✅ |
-| — | **=== Phase 2 Step 1 (基础层) ===** | |
-| 24 | ~~TASK-PHASE2-PROMPTS~~ | ~~@AI-ML~~ ✅ |
-| 25 | ~~TASK-PHASE2-INFRA~~ | ~~@Backend~~ ✅ |
-| — | **=== Phase 2 Step 2 (集成层) ===** | |
-| 26 | ~~TASK-PHASE2-INTEGRATE Frontend~~ | ~~@Frontend~~ ✅ |
-| 27 | ~~TASK-PHASE2-INTEGRATE Backend~~ (含 else 修复) | ~~@Backend~~ ✅ |
-| — | **=== Phase 2 Step 3 (Pipeline 层) ===** | |
-| 28 | ~~TASK-PHASE2-PIPELINE~~ (含 ProjectStyleConfig 修复) | ~~@Backend~~ ✅ |
-| — | **=== 收尾 ===** | |
-| 29 | ~~DevOps push~~ | ✅ 4 commits pushed |
-| 30 | ~~TASK-SHARED-DB~~ | ~~@DevOps~~ ✅ PM Review PASS (7/7) |
-| 31 | ~~TASK-DEBUG-LOGGING~~ | ~~@Backend~~ ✅ |
-| 32 | ~~Founder 联调~~ | ✅ 发现静默登出 bug |
-| 33 | ~~TASK-AUTH-RESILIENCE~~ | ~~@Frontend~~ ✅ PM Review PASS (10/10) |
-| 34 | ~~Founder 重新联调~~ | ✅ 发现 JSON 引号 bug |
-| 35 | ~~TASK-JSON-REPAIR~~ | ~~@Backend~~ ✅ PM Review PASS (8/8) |
-| 36 | ~~Founder 再次联调~~ | ✅ 发现纯文档 422 bug |
-| 37 | ~~TASK-DOC-ONLY-FIX~~ | ~~@Backend + @Frontend~~ ✅ |
-| 38 | ~~Founder 联调~~ | ✅ Stage 1 E2E 通了 |
-| 39 | ~~TASK-DOC-FORMAT~~ | ~~@Backend~~ ✅ (3/3) |
-| 40 | ~~TASK-STYLE-PRIORITY~~ | ~~@Frontend~~ ✅ (8/8) |
-| 41 | ~~Founder 测试~~ | ✅ 全链路通过 |
-| 42 | ~~DevOps push~~ | ✅ |
-| 43 | ~~TASK-JSON-REPAIR-V2~~ | ~~@Backend~~ ✅ (6/6) |
-| 44 | ~~TASK-PERSISTENT-LOG~~ | ~~@Backend~~ ✅ (5/5) |
-| 45 | ~~Founder 重测殡仪馆~~ | ✅ JSON 修复确认 |
-| 46 | ~~TASK-LOGGING-FIX~~ | ~~@Backend~~ ✅ (6/6) |
-| 47 | ~~DevOps push + VPS 部署~~ | ~~@DevOps~~ ✅ |
-| 48 | ~~TASK-OUTLINE-PROGRESS~~ | ~~@Frontend~~ ✅ (16/16) |
-| 50 | ~~TASK-JSON-REPAIR-V3~~ (状态机修复) | ~~@Backend~~ ✅ PM Review PASS (24/24) |
-| 51 | ~~V3 修复 4a/4b/4c~~ | ~~@Backend~~ ✅ PM 确认 PASS |
-| — | ~~DevOps push + VPS 部署~~ | ~~@DevOps~~ ✅ 4 commits + VPS 部署完成 |
-| 52 | ~~TASK-UPLOADER-ENV-FIX~~ (5 Uploader 环境变量修复) | ~~@Frontend~~ ✅ PM Review 5/5 |
-| — | ~~DevOps push + VPS 部署 (ENV-FIX)~~ | ~~@DevOps~~ ✅ PM Review PASS |
-| 53 | ~~TASK-CONFIRM-OUTLINE-WIRE Step 1~~ (前端接通) | ~~@Frontend~~ ✅ PM Review 9/9 |
-| 54 | ~~TASK-CONFIRM-OUTLINE-WIRE Step 2~~ (后端 pipeline + 链路修复) | ~~@Backend~~ ✅ PM Review 7/7 + 7/7 |
-| 55 | ~~TASK-CONFIRM-OUTLINE-TEST~~ (37/37 PASS) | ~~@Tester~~ ✅ PM 独立确认 |
-| 56 | ~~TASK-PLOTPOINT-REORDER-FIX~~ (元数据跟随排序) | ~~三方~~ ✅ PM Review PASS + 39/39 |
-| — | ~~DevOps push + VPS 部署~~ (WIRE + REORDER-FIX) | ~~@DevOps~~ ✅ 708e362 |
-| — | ~~Ben DB 脏数据清理~~ | ~~@backend_Ben~~ ✅ 完成 (微信确认 04-07) |
-| — | ~~confirm-outline 前端接入验证~~ | ~~PM~~ ✅ 已验证（WIRE 修复中完成）|
-| — | ~~DevOps 验证 VPS API Key~~ | ~~@DevOps~~ ✅ 核心 4/4 已填入生效，R1 基本解决 |
-| — | ~~TASK-OUTLINE-MERGE-FIX~~ | ~~@Backend~~ ✅ PM Review PASS |
-| — | ~~TASK-OUTLINE-MERGE-TEST~~ | ~~@Tester~~ ✅ 55/55 PASS + PM 独立确认 |
-| — | ~~DevOps: pull Ben → push → VPS 部署~~ | ~~@DevOps~~ ✅ 69ebc02 |
-| — | ~~TASK-REAL-PIPELINE-UX Step 1~~ (Backend 3 项 + Tester 35/35) | ~~@Backend + @Tester~~ ✅ PM Review PASS |
-| — | ~~TASK-REAL-PIPELINE-UX Step 2~~ (Frontend: 真实进度+角色+场景+StageD) | ~~@Frontend~~ ✅ |
-| — | ~~TASK-BUGFIX-STAGEC~~ (Bug 3 stage 不匹配 + Bug 4 日志重复) | ~~@Frontend~~ ✅ PM Review PASS (4/4) |
-| — | **=== 待启动 ===** | |
-| — | Phase 3 #11 续写模式 | PM 设计 → 全员 |
-| — | Resonance Phase 0 蓄水期 | Founder 触发 |
-
----
-
-## 执行计划
-
-**主线 (R8 E2E)**:
-```
-Phase 1-5 + Code Review 12/12:                               ✅ 全部完成
-OB-1 修复 @Backend:                                           ✅ 完成 + PM Review PASS
-DevOps 代码推送+部署:                                         ✅ 完成 + PM 复核 PASS
-R8 E2E @Tester (44 维度):                                     ✅ 完成 (42/44)
-PM R8 独立复核:                                                ✅ 有条件通过
-N13-FIX @Backend:                                              ✅ PM Review PASS
-TASK-IMG-SAFETY-RETRY @Backend:                                ✅ PM Review PASS
-AI-ML 2 项小补充:                                              ✅ PM Review PASS
-Tester 验证 (17 项测试):                                       ✅ 17/17 PASS + PM 确认
-DevOps 部署:                                                   ✅ R8B 完成 + PM PASS
-TASK-REWRITER-CLEANUP @Backend:                                ✅ 完成 + PM Review 3/3 PASS
-TASK-OB1-CLEANUP @AI-ML:                                       ✅ 完成 + PM Review PASS
-TASK-OB2-MODEL-SYNC + OB-3 + OB-4 @Backend:                   ✅ 完成 + PM Review PASS
-Tester dry-run:                                                ✅ 7/7 PASS + PM 确认
-→ DevOps 部署:                                                 ✅ TASK-DEPLOY-CLEANUP 完成 (16:00)
-```
-
-**并行线 (BRAND-MANIFESTO + LOGO)**:
-```
-PM 阅读+规划:                                                 ✅ 完成
-Founder 确认 3 决策点:                                         ✅ 确认
-PM 文案指引:                                                   ✅ 已派发 Frontend
-Frontend 实现:                                                 ✅ 完成
-PM 文案审查:                                                   ✅ 全部 PASS
-Founder 终审:                                                  ⏳
-```
-
----
-
-## 累计 Code Review 成绩
-
-| Phase | 范围 | 结果 |
-|-------|------|------|
-| Phase 2 | 8 项 | 8/8 PASS |
-| Phase 4 | 3 项 | 3/3 PASS |
-| Phase 6 | 1 项 | 1/1 PASS |
-| **合计** | **12 项** | **12/12 PASS** |
-
----
-
-## 更新记录
-
-| 时间 | 更新内容 |
-|------|----------|
-| 2026-03-29 | TASK-DOC-ONLY-FIX Review PASS (6/6) → 重启后端 → Founder 联调 |
-| 2026-04-01 | Founder 测试 JSON 引号 bug → PM 根因分析 → TASK-JSON-REPAIR-V3 @Backend |
-| 2026-04-01 | OUTLINE-PROGRESS Review PASS (16/16) → DevOps push + VPS |
-| 2026-03-31 | VPS 审查 PASS + OUTLINE-PROGRESS 派发 |
-| 2026-03-30 | Ben 反馈 + 新规则 + confirm-outline 待办 |
-| 2026-03-30 | LOGGING-FIX Review PASS (6/6) → DevOps push + VPS 部署 |
-| 2026-03-29 | 殡仪馆重测 ✅ + LOGGING-FIX @Backend + DevOps push |
-| 2026-03-29 | REPAIR-V2 + PERSISTENT-LOG Review PASS |
-| 2026-03-29 | 殡仪馆中篇 JSON 失败 → 正则 2 缺陷 → REPAIR-V2 + PERSISTENT-LOG @Backend |
-| 2026-03-29 | 联调全链路通过 → DevOps push ✅ |
-| 2026-03-29 | DOC-FORMAT (3/3) + STYLE-PRIORITY (8/8) Review PASS |
-| 2026-03-29 | Stage 1 E2E 通了 + 日志审查 → 4 项改进派发 |
-| 2026-03-29 | TASK-DOC-ONLY-FIX Review PASS + 纯文档 422 排查 |
-| 2026-03-29 | TASK-JSON-REPAIR Review PASS (8/8) |
-| 2026-03-29 | Founder 联调: JSON 引号 bug → TASK-JSON-REPAIR @Backend |
-| 2026-03-29 | TASK-AUTH-RESILIENCE Review PASS (10/10) |
-| 2026-03-29 | Founder 联调: 自定义上传返回 mock → 根因分析 → TASK-AUTH-RESILIENCE @Frontend |
-| 2026-03-27 | TASK-DEBUG-LOGGING 完成 + Founder 联调 |
-| 2026-03-27 | TASK-SHARED-DB Review PASS (7/7) |
-| 2026-03-26 | Ben 发现双数据库问题 → TASK-SHARED-DB 派发 @DevOps |
-| 2026-03-26 | Step 3 PASS → Phase 1+2 完成 → DevOps push 4 commits |
-| 2026-03-25 | Step 3 Review: 11/12 + 1 bug → 修复 |
-| 2026-03-25 | Step 2 PASS + Step 3 派发 |
-| 2026-03-25 | Step 2 Review: Frontend PASS (11/11) + Backend else bug → 修复 |
-| 2026-03-25 | Phase 2 Step 1 Review PASS (18/18) + Step 2 派发 |
-| 2026-03-25 | Phase 2 设计复查 + Step 1 派发 |
-| 2026-03-25 | VALIDATION-FIX Review PASS + Founder 联调 3 发现 + Phase 2 设计更新 |
-| 2026-03-25 | ASYNC-FIX Review PASS (5/5) + Thumbnails 13/13 ✅ |
-| 2026-03-25 | 全面审计 16 文件 12 项 PASS + ASYNC-FIX 派发 + DB 迁移提醒 memory |
-| 2026-03-25 | Phase 1 Step 2 Review PASS (10/10) |
-| 2026-03-25 | Phase 1 Step 1 Review PASS (25/25) |
-| 2026-03-25 | StageA 全面审计 + Phase 1-3 计划 + Phase 1 派发 |
-| 2026-03-25 | ASPECT-RATIO-WIRE Review PASS (10/10 + 全链路 + StageA 全参数扫描) |
-| 2026-03-25 | TASK-ASPECT-RATIO-WIRE 派发 + Backend/Frontend 完成 |
-| 2026-03-25 | GEMINI-FIX + OUTLINE-STORAGE Review PASS (21/21 各) → DevOps push 暂停 |
-| 2026-03-25 | TASK-GEMINI-MODEL-FIX + TASK-OUTLINE-STORAGE 派发 @Backend |
-| 2026-03-24 | 🎉 Founder 第三次联调成功 — Stage 1 E2E 通了 → DevOps push 派发 |
-| 2026-03-24 | TASK-OUTLINE-LLM-FIX Backend Review PASS (14/14) |
-| 2026-03-24 | AI-ML system prompt Review PASS (10/10, 18 字段抽查全匹配) |
-| 2026-03-24 | Founder 第二次联调新 Bug "无法从LLM响应中提取JSON" → TASK-OUTLINE-LLM-FIX 派发 @AI-ML + @Backend |
-| 2026-03-24 | DevOps ENVVAR-FIX push 审查 PASS + TASK-ENVVAR-FIX Review PASS (12/12) |
-| 2026-03-24 | Founder 联调发现 Bug "无可用的LLM服务" → PM 排查: os.getenv vs settings 不兼容 → TASK-ENVVAR-FIX @Backend + PM 自查教训记录 |
-| 2026-03-24 | DevOps MySQL + push 审查: 8/8 ✅, DevOps 无责 |
-| 2026-03-24 | TASK-STAGE1-FRONTEND Review PASS (降级 mock + API 两步链路) → DevOps MySQL + push 派发 |
-| 2026-03-24 | TASK-STAGE1-API Review PASS (Ben 架构对齐 ✅ + 数据映射 ✅) |
-| 2026-03-24 | Ben 确认分工(我们做 Pipeline API) + TASK-STAGE1-API 派发 @Backend |
-| 2026-03-24 | AI-ML TASK-OUTLINE-PROMPT-UPGRADE Review PASS |
-| 2026-03-24 | Stage 1 前后端联动派发: AI-ML prompt 升级 + API 端点(分工TBD) + Frontend 对接 |
-| 2026-03-24 | 注册修复 Review PASS + DevOps 完整 push (修复 + Resonance + skills) |
-| 2026-03-24 | Ben commit e4ada3e 全维度分析 (29 files, API 对照+安全+数据模型) + 注册成功态修复派发 @Frontend |
-| 2026-03-23 | 修复 Review PASS (6/6 + 1 记录) + DevOps push 派发 |
-| 2026-03-23 | Founder 走查 + PM 独立审查: 7 项问题 → 派发 @Frontend |
-| 2026-03-22 | DevOps push 审查 PASS (8 commits 全部在 GitHub) — Batch 1A-4 全部闭环 |
-| 2026-03-22 | Batch 4 Review PASS (3/3) — Batch 1A-4 前端 mock 全部完成 + DevOps push 派发 |
-| 2026-03-22 | Batch 3 Review PASS (4/4) + Batch 4 派发 (会员等级UI + 比例选择器 + Pricing页) |
-| 2026-03-22 | Batch 3 派发 @Frontend (图片OCR + 语音输入 + 故事模板 + 骨架屏) |
-| 2026-03-22 | Batch 2 Review PASS (16/16) + DevOps push 完成 + Ben 已通知 |
-| 2026-03-22 | Batch 1A+1B Review PASS (27/30+3暂缓) + Ben 通知已写入 TEAM_CHAT + Batch 2 派发 (16项) |
-| 2026-03-22 | Founder 产品决策（MVP 邀请码流程+会员等级+故事模板+个人页规划）+ Batch 1A+1B 派发 @Frontend |
-| 2026-03-20 10:00 | Ben 首次 push 审查 (20641ac, 25 files) — contact_us MySQL 模块，未碰 Pipeline ✅ + DevOps pull 指令 |
-| 2026-03-19 18:00 | Ben 团队文件重组 (codex-agents/ → .team-brain/team_ben/) + Git 工作流简化 (分支保护移除) + 30+ 文件路径引用更新 |
-| 2026-03-19 15:30 | 双团队文档更新 (TODAY_FOCUS/PROJECT_STATUS/PENDING) + DevOps 派发 + CREATE_UX_EVOLUTION_PLAN 补充 |
-| 2026-03-18 11:45 | DevOps 部署审查 PASS (f76ac1e, CORS 实测通过, OB-5 修复确认) — Founder 可填 API Key |
-| 2026-03-18 11:00 | 安全加固 PM Review PASS (CORS ✅ + 脱敏 ✅ OB-5 非阻塞) → DevOps 可部署 |
-| 2026-03-18 10:30 | 文档清理 (TODAY_FOCUS/PENDING 3 条过期) + 安全加固派发 (CORS + 日志脱敏 @Backend) |
-| 2026-03-17 17:00 | Founder 终审 BRAND-MANIFESTO ✅ — 主线+并行线全部闭环，零待办 |
-| 2026-03-17 15:30 | PM 全量审查闭环: AI-ML OB1 ✅ + Backend OB2/3/4 ✅ + Tester SAFE-DRYRUN ✅ — 主线可部署 |
-| 2026-03-17 12:10 | OB-1 派发 @AI-ML (prompt_safety_rewrite.py Haiku 清理) + OB-2 派发 @Backend (2 服务 gemini-3-pro 清理) |
-| 2026-03-17 12:00 | TASK-REWRITER-CLEANUP PM Code Review 3/3 PASS + 通知 Tester 启动 dry-run |
-| 2026-03-17 11:00 | Founder 反馈 → TASK-REWRITER-CLEANUP 扩展派发 (3 项: phase2_safe + 注释清理 + 备用模型 3.1 Flash) |
-| 2026-03-17 10:00 | DevOps R8B 审查 PASS + phase2_safe 分析 + Backend/Tester 派发 |
-| 2026-03-16 21:30 | Tester 17/17 确认 + DevOps TASK-DEPLOY-R8B 派发 |
-| 2026-03-16 20:45 | AI-ML 小补充审查 PASS → Tester 可开始验证 |
-| 2026-03-16 20:00 | Code Review PASS + AI-ML 小补充 + Tester 验证派发 |
-| 2026-03-16 18:30 | IMG-SAFETY 分工修正: AI-ML prompt + Backend 基础设施 |
-| 2026-03-16 18:00 | Frontend 审查 PASS + IMG-SAFETY 初版派发 (已修正) |
-| 2026-03-16 17:00 | R8 PM 独立复核 有条件通过 + N13-FIX 派发 @Backend |
-| 2026-03-16 12:00 | Founder 确认 + 详细文案指引派发 @Frontend |
-| 2026-03-16 11:30 | TASK-BRAND-MANIFESTO 方案制定完成 |
-| 2026-03-16 10:00 | TASK-DEPLOY-R8 PM 独立复核 PASS (7 维度) |
-| 2026-03-13 20:35 | OB-1 Review PASS + DevOps TASK-DEPLOY-R8 派发 |
-| 2026-03-13 20:15 | 派发 OB-1 + T-J + R8 E2E (44 维度) |
-| 2026-03-13 20:00 | Phase 6 Code Review 1/1 PASS |
-| 2026-03-13 19:30 | Phase 4 Code Review 3/3 PASS |
-| 2026-03-13 18:00 | Phase 2 Code Review 8/8 PASS |
-| 2026-03-13 16:00 | 交叉核对 + 风险评估 + 正式派发 |
+详见 completed.md

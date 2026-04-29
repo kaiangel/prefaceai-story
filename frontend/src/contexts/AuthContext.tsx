@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import type { User, RegisterForm, StoryCard } from "@/types/create";
 import { apiFetch, ApiError, getStoredToken, setStoredToken } from "@/lib/api";
+import { toAbsoluteUrl } from "@/lib/url";
 
 interface AuthContextValue {
   user: User | null;
@@ -40,6 +41,9 @@ interface ApiProject {
   style_preset: string;
   created_at: string;
   updated_at: string;
+  cover_image_url: string | null;
+  shot_count: number;
+  mood: string | null;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -68,11 +72,12 @@ function mapProject(project: ApiProject): StoryCard {
   return {
     id: project.id,
     title: project.title || "未命名故事",
-    coverImageUrl: "/brand/logo-48.png",
+    coverImageUrl: toAbsoluteUrl(project.cover_image_url) ?? "/brand/logo-48.png",
     style: project.style_preset,
     length: inferLength(project.original_idea || project.title),
-    shotCount: 0,
-    createdAt: project.created_at,
+    shotCount: project.shot_count,
+    mood: project.mood,
+    createdAt: project.created_at,   // ISO 8601 with Z from backend; new Date() parses correctly as UTC
     updatedAt: project.updated_at,
     status: "draft",
     canContinue: true,

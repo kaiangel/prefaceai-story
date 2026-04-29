@@ -4,6 +4,64 @@
 
 ---
 
+## 2026-04-29: Wave 3.6 — R7-3 P1 portrait 重生 Bug 独立复测
+
+**任务**: 独立验证 Wave 3.5 Backend 对 R7-3 的修复（character_prompt_builder.py isinstance 防御）
+**UUID**: 631eef3c-4a26-413a-bcb1-1f038d176e85 (T7 项目)
+**时间**: 2026-04-29 15:04 - 15:12
+
+**6 证据点验收**:
+
+| 证据点 | 结果 | 实测数据 |
+|--------|------|----------|
+| 1. adjust API HTTP 200 + portrait_url 非 null | PASS | char_001 HTTP 200, portrait_url 有值, 35.5s |
+| 2. portrait mtime 真变 | PASS | 2026-04-28 21:42:03 → 2026-04-29 15:10:47 (+62923s) |
+| 3. portrait 文件 HTTP 200 + 大小合理 | PASS | HTTP 200, 1524775 bytes (1489.0 KB) |
+| 4. DB chapter.characters_json updated_at 更新 | PASS | 2026-04-29T07:10:47.273465Z (DB SQL 直查) |
+| 5. backend log 无 str.get() 错误 | PASS | 全日志 'str' object has no attribute 'get' 计数=0 |
+| 6. character_prompt_builder.py isinstance 检查 L106-116 真生效 | PASS | 代码存在 + 日志无异常 |
+
+**测试说明**:
+- char_002（七岁小孩，"小宝"）触发 CONTENT_SAFETY — 这是 NB2 模型内容安全问题，非 R7-3 bug，portrait_url=null 是正常非阻塞失败
+- char_001（陈伯，老年男性）portrait 重生成功，独立验证 R7-3 修复有效
+- backend log 成功行: `[AdjustCharacter] R7-3: char_001 肖像已重生成 → ...char_001_portrait.png`
+
+**附带发现**: 调整 char_002 "把外套换成蓝色" 遇到 CONTENT_SAFETY（七岁男孩角色可能触发审查），建议 Backend 加入测试角色或调整 prompt 策略规避。新增 BUG-2026-04-29-001（P3，CONTENT_SAFETY 拦截儿童角色）。
+
+**复测结论**: R7-3 P1 修复 PASS — 代码 bug 已消除，adjust path 正常运行
+
+---
+
+## 2026-04-28: TASK-T6-FIXBATCH Wave 3 — T7 真生图端到端验收
+
+**项目**: T7 《深夜灯火》便利店暖心故事
+**UUID**: 631eef3c-4a26-413a-bcb1-1f038d176e85
+**时间**: 2026-04-28 17:44 - 20:52
+
+**12 项验收结果**: 见 TEAM_CHAT 2026-04-28 [21:00] 完整报告
+
+| 验收项 | 结果 |
+|--------|------|
+| D.15 shot 尺寸 1664x1664 P0 | ✅ PASS — 全部 2048x2048 (1:1) |
+| R7-9 job.current_stage=completed | ✅ PASS — DB confirmed |
+| R7-5 stage label 9 stages | ✅ PASS — character_design/ready/storyboard/image_prep/image_gen/completed |
+| R7-7 ETA 单调下降 | ✅ PASS — 855s → 270s → 0s |
+| R7-8 progress 不倒退 | ✅ PASS — 10%→35%→75%→100%，无倒退 |
+| R7-3+R7-4 adjust portrait 重生 | ❌ FAIL — 'str' object has no attribute 'get' 异常 |
+| F-1 character_ready portrait 显示 | ✅ PASS — portrait 文件生成，DB portrait_url 写回 |
+| R7-12 StageD 16 shots + BGM | ✅ PASS — 16/16 shots, BGM 200 OK |
+| UX-17 Stage E summary | ✅ PASS — confirmed_outline.summary 非 original_idea |
+| UX-16 URL routes | ✅ PASS — 6 stages 200, invalid 404 |
+| R7-1 Dashboard 字段 | ✅ PASS — cover/shot_count/timezone/mood 全有 |
+| ARCH-1 /images endpoint | ✅ PASS (带注) — 16 rows DB, URL格式是预存问题 |
+
+**回归测试**: 2 角色场景参考图传递完整 (refs=2~3)，16/16 shots 全成功
+**风险路径**: IncompleteRead 重试正常; 无 429/CONTENT_SAFETY; ShotValidator Bug 5 fail-open
+
+**新发现 Bug**: R7-3 portrait regen exception: `'str' object has no attribute 'get'` — 派 @backend 修
+
+---
+
 ## 2026-04-14: TASK-HE-TESTER-1 — 架构测试 + 质量门测试 10/10 PASS
 
 **结果**: 10/10 PASS (pytest, 0.06 秒)
@@ -1758,3 +1816,24 @@ PM独立审查发现V1版本有32+个问题（AI气泡20+、留白10+、乱码5+
 
 **发现的Bug**: (如有)
 ```
+
+---
+
+### TASK-PARALLEL-M1 Phase 2 D1 redo ✅ (2026-04-25, PM 代更归档 2026-04-27)
+
+**完成时间**: 2026-04-25 16:40 - 18:40 (约 2 小时)
+**验收状态**: 14/14 全过
+
+**完成内容**:
+- [x] perf 第 1 + 第 2 run (29 shots)
+- [x] quality teststory6.4 / 6.5_wuxia / 6.6_multichar (43 shots)
+- [x] 跨题材 modern_urban / wuxia / realistic / ink (61 shots)
+- [x] 8 失败分支 unit test 17/17 真实 venv
+- [x] 内存峰值 198 MB
+- [x] api_cost_logs INSERT 121 new records
+- [x] ShotValidator 37 PASS
+
+**实际成本**: ¥34.3 / 预算 ¥48
+**残留 bug**: 1 (project_id=None dispatcher) + 4 partial (event loop aiomysql) + 5 (ShotValidator 5MB)
+**Founder 反馈**: 可用，比 NB2 稍逊
+

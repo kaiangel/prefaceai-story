@@ -97,9 +97,23 @@ class CharacterPromptBuilder:
         parts = []
 
         # 获取数据源
-        human = character.get('human', {})
-        physical = character.get('physical', {})
-        clothing = character.get('clothing', {})
+        # 防御性处理：LLM（如 Haiku adjust）有时把 physical/clothing/human 返回为 str 而非 dict
+        # 若为 str，直接作为 fallback 描述追加到 parts，不做细粒度 .get() 调用
+        human_raw = character.get('human', {})
+        physical_raw = character.get('physical', {})
+        clothing_raw = character.get('clothing', {})
+
+        human = human_raw if isinstance(human_raw, dict) else {}
+        physical = physical_raw if isinstance(physical_raw, dict) else {}
+        clothing = clothing_raw if isinstance(clothing_raw, dict) else {}
+
+        # 若 physical / clothing 是 str，直接追加其文字内容（跳过细粒度字段解析）
+        if isinstance(physical_raw, str) and physical_raw.strip():
+            parts.append(physical_raw.strip())
+        if isinstance(clothing_raw, str) and clothing_raw.strip():
+            parts.append(f"CLOTHING: {clothing_raw.strip()}")
+        if isinstance(human_raw, str) and human_raw.strip():
+            parts.append(human_raw.strip())
 
         # === 种族信息（最先声明，影响面部特征渲染）===
         ethnicity = physical.get('ethnicity', '')
@@ -214,7 +228,9 @@ class CharacterPromptBuilder:
         构建精确的面部特征描述 - 用于正面肖像参考图
         从 physical 字段读取数据
         """
-        physical = character.get('physical', {})
+        physical_raw = character.get('physical', {})
+        # 防御性处理：physical 可能是 str（LLM 返回格式不一致）
+        physical = physical_raw if isinstance(physical_raw, dict) else {}
         face_parts = []
 
         face_shape = physical.get('face_shape', '')

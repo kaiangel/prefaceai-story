@@ -674,6 +674,99 @@ Maintain visual consistency with all other images in this project.
 
         return f"{prefix}{original_prompt}{suffix}"
 
+    # ----------------------------------------------------------------
+    # Seedream 专用：2D 水彩条漫风格硬约束
+    # 对冲 Seedream 5.0-lite 的 3D Pixar 风格倾向
+    # 只在 provider="seedream" 时注入，NB2 路径零影响
+    # ----------------------------------------------------------------
+
+    # Seedream 2D 风格锁定块的固定文本（全英文，避免触发 test_prompt_templates_are_english）
+    _SEEDREAM_2D_LOCK_BLOCK: str = (
+        "▌▌▌▌▌ SEEDREAM RENDERING OVERRIDE — READ THIS FIRST ▌▌▌▌▌\n"
+        "\n"
+        "THIS IMAGE MUST BE 2D ILLUSTRATION. NOT 3D. NOT PIXAR. NOT CGI.\n"
+        "\n"
+        "ABSOLUTE RENDERING PROHIBITIONS (violating any of these is a critical failure):\n"
+        "  - NO 3D rendering of any kind\n"
+        "  - NO Pixar-style or Disney 3D animation aesthetic\n"
+        "  - NO photorealistic rendering\n"
+        "  - NO CGI surfaces, subsurface scattering, or volumetric lighting\n"
+        "  - NO smooth 3D-modeled skin or plastic-looking surfaces\n"
+        "  - NO depth-of-field blur that implies 3D camera optics\n"
+        "\n"
+        "MANDATORY 2D ILLUSTRATION QUALITIES:\n"
+        "  - 2D hand-drawn illustration style with visible brushwork\n"
+        "  - Watercolor-influenced soft color washes and gentle gradients\n"
+        "  - Flat or semi-flat color fills with clean linework boundaries\n"
+        "  - Soft painterly edges — NOT sharp 3D silhouettes\n"
+        "  - Warm, muted color palette with ink-wash undertones\n"
+        "  - Characters rendered as illustrated figures, NOT 3D models\n"
+        "\n"
+        "STYLE ANCHOR: Think Korean webtoon watercolor illustration, Chinese comics "
+        "ink-and-wash hybrid, or Japanese manga with soft color fills. "
+        "The output must look like it was painted by a 2D artist, NOT rendered by a 3D engine.\n"
+        "\n"
+        "▌▌▌▌▌ END SEEDREAM RENDERING OVERRIDE ▌▌▌▌▌\n"
+        "\n"
+    )
+
+    @classmethod
+    def build_seedream_2d_boost_prefix(cls) -> str:
+        """
+        构建 Seedream 专用的 2D 风格硬约束前缀。
+
+        用于对冲 Seedream 5.0-lite 模型的 3D Pixar 风格倾向。
+        此块会被注入到 enforce_prompt_for_provider() 输出的最开头，
+        优先级高于普通风格前缀，确保模型优先读取。
+
+        Returns:
+            Seedream 2D 风格锁定块（纯英文）
+        """
+        return cls._SEEDREAM_2D_LOCK_BLOCK
+
+    @classmethod
+    def enforce_prompt_for_provider(
+        cls,
+        original_prompt: str,
+        style_name: str,
+        provider: str = "nb2",
+        add_quality_suffix: bool = True
+    ) -> str:
+        """
+        根据图像生成 provider 对 prompt 应用风格强制。
+
+        NB2 路径（provider="nb2"）：行为与 enforce_prompt() 完全相同，零影响。
+        Seedream 路径（provider="seedream"）：在普通风格前缀之前再注入一个
+        硬编码的 2D 水彩条漫风格锁定块，对冲 Seedream 5.0-lite 的 3D Pixar 倾向。
+
+        Args:
+            original_prompt: 原始 image prompt
+            style_name: 风格预设名称（如 "korean_webtoon"）
+            provider: 图像生成 provider（"nb2" | "seedream"），默认 "nb2"
+            add_quality_suffix: 是否追加质量关键词后缀
+
+        Returns:
+            应用风格强制后的完整 prompt
+
+        Usage (by @backend in image_generator.py / seedream_generator.py):
+            from app.services.style_enforcer import StyleEnforcer
+            from app.config import settings
+
+            enforced = StyleEnforcer.enforce_prompt_for_provider(
+                original_prompt=shot_prompt,
+                style_name=style_config.style_preset,
+                provider=settings.IMAGE_GEN_PROVIDER,
+            )
+        """
+        if provider == "seedream":
+            # Seedream 路径：在普通风格前缀之前插入 2D 锁定块
+            seedream_boost = cls.build_seedream_2d_boost_prefix()
+            normal_enforced = cls.enforce_prompt(original_prompt, style_name, add_quality_suffix)
+            return f"{seedream_boost}{normal_enforced}"
+        else:
+            # NB2 及其他 provider：与 enforce_prompt() 完全相同，零影响
+            return cls.enforce_prompt(original_prompt, style_name, add_quality_suffix)
+
     @classmethod
     def get_supported_styles(cls) -> List[str]:
         """获取所有支持强制锁定的风格列表"""

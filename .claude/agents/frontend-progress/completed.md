@@ -4,6 +4,136 @@
 
 ---
 
+## 2026-04-28 16:30
+
+### TASK-T6-FIXBATCH Wave 2 Agent E — R7-1 Dashboard 列表前端读字段 ✅
+
+**完成时间**: 2026-04-28 16:30
+**验收状态**: ✅ npm build 21 routes 0 errors
+
+**修改文件 (4)**:
+- `frontend/src/contexts/AuthContext.tsx` — `ApiProject` 接口加 3 字段 + `mapProject()` 读 4 字段 + `toAbsoluteUrl` 导入
+- `frontend/src/types/create.ts` — `StoryCard` 接口加 `mood: string | null`
+- `frontend/src/components/dashboard/StoryCard.tsx` — 卡片 metadata 加 mood 标签（条件渲染）
+- `frontend/src/lib/mock-data.ts` — 6 条 mock story 加 `mood` 字段
+
+**修复 4 bug**:
+- #1 缩略图永远 logo → `toAbsoluteUrl(cover_image_url) ?? "/brand/logo-48.png"`
+- #2 shotCount 永远 0 → `project.shot_count`
+- #3 时区错位 → ISO Z 字符串直接赋值，`new Date()` 正确解析 UTC → 本地时区
+- #4 总画面数 0 → shotCount 有值后 reduce 自动恢复
+
+---
+
+## 2026-04-28 15:06
+
+### TASK-T6-FIXBATCH Wave 1.2 Agent C (Opus 4.7) — UX-16 URL 路由 dynamic route ✅
+
+**完成时间**: 2026-04-28 15:06
+**验收状态**: ✅ npm build 21 routes 0 errors（新增 `/create/[projectUuid]/[stage]`）
+
+**URL 命名方案**: 单 dynamic route `/create/[projectUuid]/[stage]`，stage ∈ {outline, characters, scenes, generating, preview, delivery}
+**理由**: backend 7 个 pipeline stage 在用户视角全是"等待"，不该映射 7 个独立 URL。1 个 page.tsx 集中 hydrate / reconcile 逻辑，比 6 个嵌套 page 更易维护。详尽 trade-off 见 TEAM_CHAT 15:06 条。
+
+**新建文件 (2)**:
+- `frontend/src/app/create/[projectUuid]/[stage]/page.tsx` — Dynamic route + isUrlStage() 校验 + notFound() 防误输
+- `frontend/src/lib/createUrl.ts` — URL ↔ state 映射 + reconcileBackendVsUrl() 决策树
+
+**改动文件 (3)**:
+| 文件 | 改动 |
+|------|------|
+| `frontend/src/app/create/CreateContent.tsx` | 加 props `urlProjectUuid` / `urlStage`；加 hydrate hook（拉 /projects, /status, /storyboard, /story, /bgm 5 endpoint）；加 state→URL push useEffect；加 URL→state useEffect (echo guard + completion guard) |
+| `frontend/src/contexts/CreateContext.tsx` | 新增 `HYDRATE_FROM_BACKEND` reducer case |
+| `frontend/src/types/create.ts` | 新增 `HYDRATE_FROM_BACKEND` action 类型 |
+
+**未碰**:
+- `frontend/src/app/create/page.tsx`（StageA 入口保持 /create 单页流程兜底）
+- StageB / StageC / StageD / StageE 核心逻辑（仅 StageA submit 后加 router.replace 一行）
+- BgmPlayer / lib/url.ts（Wave 1.1 Agent B 改动）✅
+- backend 任何文件 ✅
+- dashboard /dashboard/[storyId] 路由 ✅（确认零冲突）
+
+**反馈环避免（3 层防护）**:
+1. `lastPushedUrlRef` echo guard — URL→state useEffect 跳过自己 push 的 URL
+2. `derivedFromState === urlStage` 短路 — 已同步则跳过
+3. completion guard — generationStatus="complete" 时不允许后退到 [generating, characters, scenes, outline]，强制 redirect /preview（pipeline 不可重启）
+
+**4 核心场景实测**:
+| 场景 | 步骤 | 实测结果 |
+|------|------|---------|
+| F5 刷新 | curl /create/abc/preview → 渲染"正在加载你的故事..." spinner | ✅ hydrate 拉 backend → reconcile → render 对应 stage |
+| 浏览器后退 | /preview → back → /generating | ✅ completion guard 拦截，自动 redirect /preview（pipeline 已结束不允许回 generating） |
+| 复制链接 | /create/{uuid}/preview 新 tab 打开（已登录） | ✅ hydrate 含 shots，render StageD |
+| 跨 stage 切换 | /create → /outline → /generating → /characters → /scenes → /generating → /preview → /delivery | ✅ 每 stage 1 次 router.push（非 polling tick），后退按钮可用 |
+
+**HTTP smoke test (curl)**:
+- /create 200 / /create/abc/{outline,characters,scenes,generating,preview,delivery} 全 200 / /create/abc/typo-stage **404** / /dashboard 200 ✅
+
+**已知遗留**:
+1. Hydrate 后 StageC text-gen useEffect 入口的 START_GENERATION 会 reset progress=0，~1.6s 后 polling 拿到真值恢复 — 轻微闪烁，下批可加 hydrate guard 优化
+2. 用户后退到 /outline 后想再编辑大纲：confirm-outline 已不可逆，StageB UI 不警告（建议下批 StageB 加"已确认仅展示"提示）
+
+---
+
+## 2026-04-28 14:30
+
+### TASK-T6-FIXBATCH Wave 1.1 Agent B — 7 子任务 + STAGE_LABEL 全修 ✅
+
+**完成时间**: 2026-04-28 14:30
+**验收状态**: ✅ npm build 20 routes 0 errors
+
+**新建文件**:
+- `frontend/src/lib/url.ts` — toAbsoluteUrl() 共享 URL 工具（含引号 strip P3-4）
+
+**改动文件**:
+| 文件 | 改动 |
+|------|------|
+| `frontend/src/components/create/StageD.tsx` | P0-1 toAbsoluteUrl + P3-5 onError 占位图 |
+| `frontend/src/components/create/BgmPlayer.tsx` | P0-1 toAbsoluteUrl |
+| `frontend/src/components/create/StageC.tsx` | P0-3 / P2-2 / P2-4 / F-2 / P3-6 + STAGE_LABEL 2 新 key |
+| `frontend/src/components/create/StageE.tsx` | P1-6 outline.summary fallback |
+| `frontend/src/app/dashboard/[storyId]/StoryDetailContent.tsx` | 迁移共享 toAbsoluteUrl，移除本地定义 |
+
+**7 子任务清单**:
+| 项 | P | 修复 |
+|----|---|------|
+| P0-1 | P0 | StageD `<img>` + BgmPlayer `<audio>` src 走 toAbsoluteUrl()，修 /static/... 404 |
+| P0-3 | P0 | character_ready handler fetch `/chapters/1/story`，portrait_url 从 chapter.characters_json 读 |
+| P1-6 | P1 | Stage E 显示 `outline.summary` 不是 `original_idea`，三层 fallback |
+| P2-2 | P2 | 删除 StageC checkpointPreview IIFE (55-63% 旧阈值) + 对应 render 区域 |
+| P2-4 | P2 | stage=completed / progress≥100 时停 carousel setInterval；副标题统一读 message |
+| F-2 | F2 | handleRegenerate → POST /projects/{id}/characters/{charId}/regenerate-portrait 真 API |
+| P3-4/5/6 | P3 | toAbsoluteUrl 内 strip 引号 + Shot onError 灰色占位图 + 进度条 spring(60/20) |
+
+**STAGE_LABEL 新增**: `character_design` + `image_preparation`（Agent A 新 stage）
+**F-2 说明**: 端点由 Agent A P1-3 添加，前端已就绪，Agent A 完成后自动生效
+**npm build**: ✅ 20 routes 0 errors
+
+---
+
+## 2026-04-27 17:55
+
+### TASK-T5-FIXBATCH-R6 子任务 2 — StoryDetailContent.tsx 7 bug 全修 ✅
+
+**改动文件**:
+- `frontend/src/app/dashboard/[storyId]/StoryDetailContent.tsx` — 完全重写（原 MVP 占位实现）
+- `frontend/src/types/create.ts` — StoryDetail.characters 扩 portrait_url 字段
+
+**7 bug 修复清单**:
+| Bug | P | 修复 |
+|-----|---|------|
+| A loading state | P0 | loading + notFound state，spinner "加载中..." |
+| B /storyboard endpoint | P0 | 并行 3 endpoint fetch |
+| C image_url 真实 | P0 | buildShotsFromStoryboard + toAbsoluteUrl |
+| D summary 大纲 | P1 | confirmed_outline?.summary fallback |
+| E mood 真实值 | P1 | user_selected_mood \|\| mood \|\| "—" |
+| F portrait + silhouette | P1 | portrait_url img + SVG 人形 fallback |
+| G BGM player | P2 | fetchBgmInfo + audio controls 内联 |
+
+**npm build**: ✅ 20 routes 0 errors
+
+---
+
 ## 2026-04-23 16:10
 
 ### TASK-BUG-FIX-BATCH-1 Route C — FE-1/2/3/4 修复 + FE-5 根因深挖 ✅
@@ -1148,3 +1278,30 @@ Phase D — 2个高复杂度页面:
 **验收指标**:
 - 指标1: 结果 ✅/❌
 ```
+
+
+---
+
+### TASK-T5-FIXBATCH 7 条前端修复 ✅ (2026-04-27 PM 代更归档)
+
+**完成时间**: 2026-04-27 16:23 (~7 min agent 时间)
+**验收状态**: ✅ npm build 20 routes 0 errors / 7 条全部完成
+
+**完成内容**:
+- [x] UX-7 ETA monotonicity guard
+- [x] UX-9 大标题随 stage 动态
+- [x] UX-11 完成立即 redirect
+- [x] UX-2 (A1) 跨 plot 数字高亮
+- [x] UX-8 "图像"→"片段"
+- [x] UX-12 Stage 1-4/5/6 副标题分流
+- [x] UX-1 (FE) Stage C 真 portrait + silhouette fallback
+
+**关键产出**:
+| 文件 | 改动 |
+|------|------|
+| `frontend/src/components/create/StageC.tsx` | UX-7/9/11/8/12/1(FE) |
+| `frontend/src/components/create/StageB.tsx` | UX-2(A1) |
+| `frontend/src/types/create.ts` | portraitUrl + portrait_url 字段 |
+
+**待 Backend 配合**: chapter.characters_json 加 portrait_url 字段（UX-1 后端部分）
+

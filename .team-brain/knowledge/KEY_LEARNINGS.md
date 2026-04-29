@@ -237,3 +237,35 @@ NB2 + B' 方案 (官方定价校准):
 - 更快速度
 - 更好体验
 ```
+
+---
+
+## 多 Agent 协作经验
+
+### 自定义 subagent_type 启用 + frontmatter 默认值（2026-04-28 学会）
+
+**之前误判**（2026-04-25 → 2026-04-28 修正）：以为 PM 主对话只能用内置 subagent_type（general-purpose / Explore / Plan / 等），所有 spawn 都得在 prompt 里 paste 角色身份。
+
+**真根因**：CC 扫描自定义 subagent_type 依赖 cwd 下 `.claude/agents/` 可见。本项目 cwd 经常在项目根 `/AIFun/xuhuastory/`，但 agents 真目录在 `xuhua_story/.claude/agents/`，差一层导致扫描为空 → spawn 报 not found。
+
+**修复**：建 symlink `/AIFun/xuhuastory/.claude/agents → xuhua_story/.claude/agents`。验证：spawn `subagent_type: "backend"` 返回 UI 绿色高亮 + 0 tool_uses + 2.8s 完成 + 回复读到 frontmatter color。
+
+**Frontmatter 完整 schema**（官方 https://code.claude.com/docs/en/sub-agents.md L234-256）：
+- `name` / `description` / `tools` / `model` / `color` — 已知字段
+- `effort` — **5 档**：low / medium / high / xhigh / max（depends on model）
+- 其他：`disallowedTools` / `permissionMode` / `mcpServers` / `hooks` / `maxTurns` / `skills` / `initialPrompt` / `memory` / `background` / `isolation`
+
+**项目当前 frontmatter 默认**（DEC-023，2026-04-28 设定）：
+- 深度推理类（ai-ml / pm / coordinator）→ `model: opus, effort: xhigh`
+- 执行类（backend / devops / frontend / tester / resonance）→ `model: sonnet, effort: xhigh`
+- spawn 时显式传 model/effort 可覆盖默认
+
+**教训**：
+1. 碰到"X 不工作"先确认环境（cwd / 路径 / 权限），不要凭"工具不工作"下"工具有限制"结论
+2. 框架字段是否支持，先查官方文档不要猜（PM 之前用三种可能性猜 effort，官方第一行就写了支持）
+3. xhigh 可能是 Opus 4.7 专属（slash command 提示"(Opus 4.7 only)"），Sonnet 写 xhigh 实际可能跑 high — 监控验证
+
+**关联文档**：
+- `~/.claude/projects/.../memory/feedback_use_custom_subagent_type.md` — 真根因 + 修复方案 + 验证证据
+- `~/.claude/projects/.../memory/reference_subagent_symlink.md` — symlink 路径 + 重建命令
+- `.team-brain/decisions/DECISIONS.md` DEC-023 — 8 agent frontmatter 升级决策

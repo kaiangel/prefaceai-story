@@ -1,11 +1,44 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-04-23 17:10（自更新 — TASK-BUG-FIX-BATCH-1 Route D 完成，VPS 已同步最新代码）
-> **状态**: ✅ TASK-BUG-FIX-BATCH-1 Route D 完成 — 2 commits push (3fa2a73 + 6518563) + rsync + docker build api/frontend + force-recreate + 6/6 验证 PASS + 外部 HTTP 200
+> **最后更新**: 2026-04-24 13:32（自更新 — TASK-VPS-SKIP-IMAGE 完成，VPS api 容器 SKIP_IMAGE_GENERATION=True 生效）
+> **状态**: ✅ TASK-VPS-SKIP-IMAGE 完成 — .env.production 追加 SKIP_IMAGE_GENERATION=true + force-recreate api + 3/3 验证 PASS + StartedAt 2026-04-24T05:30:37Z
 
 ---
 
 ## 刚完成
+
+**TASK-VPS-SKIP-IMAGE — VPS 配置 SKIP_IMAGE_GENERATION=true [2026-04-24 13:32]**
+
+**背景**: PM 地毯式审查发现 VPS `.env.production` 未配 SKIP_IMAGE_GENERATION，Founder 要在 prefaceai.mov 做 MVP 第二轮测试，选项 A 用 R8 mock 图避免 NB2 真实调用成本（~$2/次）。
+
+**执行 4 步**:
+
+| Step | 操作 | 结果 |
+|------|------|------|
+| 1 | 幂等追加 SKIP_IMAGE_GENERATION=true → .env.production | ✅ 追加成功 |
+| 2 | 验证 .env.production 含该行 | ✅ `SKIP_IMAGE_GENERATION=true` |
+| 3 | force-recreate api 容器 | ✅ docker-api-1 Recreated + Started |
+| 4 | 容器内 3 项验证 | ✅ 全部 PASS |
+
+**3 项验证**:
+
+| 验证项 | 期望 | 结果 |
+|--------|------|------|
+| `/health` | healthy | `{"status":"healthy"}` ✅ |
+| `settings.SKIP_IMAGE_GENERATION` | True | `SKIP_IMAGE_GENERATION = True` ✅ |
+| 容器 StartedAt | 2026-04-24 | `2026-04-24T05:30:37.588742043Z` ✅ |
+
+**约束遵守**:
+- ✅ 不改代码 / 不 push / 不 commit
+- ✅ 不动共享 MySQL / frontend 容器 / redis
+- ✅ 幂等操作（grep -q 防重复追加）
+- ✅ 未改 PM 维护文档
+
+**Bash 权限**: ✅ 本次可用（一轮通过）
+
+---
+
+## 上次完成
 
 **TASK-BUG-FIX-BATCH-1 Route D — VPS 统一部署 [2026-04-23 17:10]**
 
@@ -494,6 +527,7 @@
 
 | 时间 | 更新内容 |
 |------|----------|
+| 2026-04-24 | TASK-VPS-SKIP-IMAGE: .env.production 幂等追加 SKIP_IMAGE_GENERATION=true + force-recreate api + 3/3 PASS + StartedAt 2026-04-24T05:30:37Z |
 | 2026-04-23 | TASK-BUG-FIX-BATCH-1 Route D: commit 3fa2a73+6518563 + push 928a621→6518563 + rsync app/(3)+frontend/src/(2)+docker/(1) + VPS build api+frontend + force-recreate + output_data volume 创建 + 8/8 PASS + StartedAt 2026-04-23T09:01:10Z |
 | 2026-04-23 | TASK-P0P1-DEPLOY: rebase Ben 4725e9e + commit d154ce1 + push 4725e9e→d154ce1 + rsync app/(4) + docker/(1) + VPS build+force-recreate + 6/6 PASS + StartedAt 2026-04-23T06:31:38Z |
 | 2026-04-23 | TASK-P0P1-LOGGING-FIX: docker-compose.yml api 服务加 logging (max-size=50m, max-file=5)，YAML 验证 PASS，未部署（等统一部署） |

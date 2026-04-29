@@ -3,14 +3,14 @@
 > Mitchell Hashimoto 原则：每次 agent 犯错 → 工程化一个解决方案，让它结构上不可能再犯。
 > "不要去改 prompt，去改 harness。"
 >
-> 最后更新: 2026-04-18
+> 最后更新: 2026-04-27
 
 ## 统计
 
-- 已记录错误模式: **16 个**
+- 已记录错误模式: **17 个**
 - 有工程化防护 (Sensor): **9 个** ✅
-- 仅文档记录 (Guide only): **6 个** ❌
-- **防护率**: 9/16 = **56%**
+- 仅文档记录 (Guide only): **7 个** ❌
+- **防护率**: 9/17 = **53%**
 
 ---
 
@@ -160,3 +160,33 @@
 - **修复方式**: 改用 Python `urllib.request` + `json.dumps(data, ensure_ascii=False).encode('utf-8')` 确保正确 UTF-8 编码
 - **工程化防护**: ❌ 仅文档记录。后续集成 Mureka 到 Pipeline 时，必须用 Python HTTP 调用（不用 curl）
 - **防护状态**: ❌ 需在集成代码中强制使用 Python HTTP client
+
+### EP-017: aiomysql GC `__del__` 在 event loop 关闭后报 "Event loop is closed"
+- **发现日期**: 2026-04-25 (D1 redo Phase 2 driver script 跑完观测)
+- **发现者**: @tester + @pm 联合
+- **错误描述**: driver script 用 `asyncio.run(main())` 跑完 pipeline，stderr 末尾打一条 `RuntimeError: Event loop is closed at aiomysql/connection.py __del__`
+- **根因分析**:
+  1. `asyncio.run()` 退出时关闭 event loop
+  2. Python 进程退出前 GC 跑，把残留对象清理
+  3. aiomysql 连接对象 `__del__` 析构试图调 async close
+  4. 但 event loop 已关 → RuntimeError
+- **影响范围**:
+  - ❌ 不影响 pipeline 输出（已成功返回数据）
+  - ❌ 不影响 DB 数据完整（已 commit）
+  - ❌ 不影响 ARCH-4 INSERT（已 commit）
+  - ❌ **完全不会出现于生产 FastAPI**（长生命周期 server，event loop 不关）
+  - ✅ 仅在 driver script `asyncio.run` 退出阶段打一条 stderr noise
+  - ✅ exit code 仍 0（不阻断）
+- **当前状态**: 🟡 **留着不修，cosmetic noise only**
+- **修法选项（都比较 invasive）**:
+  1. driver script 加 `await pool.close()` 显式关闭 — 改所有 driver
+  2. 用 `atexit` 注册同步 cleanup — 标准 lib，但 race condition 风险
+  3. monkey-patch aiomysql `Connection.__del__` — 改第三方库行为
+  4. 升级 SQLAlchemy 2.x async + asyncpg（不用 aiomysql）— 大动 ORM
+- **何时该修**:
+  - 等真出问题（CI 因 stderr 红字误判失败 — 现在没出）
+  - 等下次大版本升级 ORM 时顺手处理
+  - MVP 后做日志清理时一起拾掇
+- **工程化防护**: ❌ 无（设计选择不修，不需要 sensor）
+- **防护状态**: ❌ Guide only（cosmetic noise，不值得加 sensor）
+- **关联任务**: TASK-PARALLEL-M1 round 3 修了主 Bug 4（`asyncio.ensure_future` → `await`），4b 这条是修完后**残留**的不同根因

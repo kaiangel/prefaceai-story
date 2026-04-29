@@ -15,6 +15,46 @@ import io
 from typing import Optional, List
 from PIL import Image
 
+
+def _compress_for_claude(image_bytes: bytes, max_bytes: int = 4_500_000) -> tuple[bytes, str]:
+    """压缩到 < 4.5 MB（留 0.5 MB buffer 避开 Anthropic 5MB 限制）。
+
+    Returns:
+        (compressed_bytes, media_type) — media_type 可能从 image/png 变为 image/jpeg
+    """
+    if len(image_bytes) <= max_bytes:
+        return image_bytes, "image/png"
+
+    img = Image.open(io.BytesIO(image_bytes))
+    # 转 RGB（JPEG 不支持 RGBA/LA）
+    if img.mode in ("RGBA", "LA"):
+        bg = Image.new("RGB", img.size, (255, 255, 255))
+        bg.paste(img, mask=img.split()[-1])
+        img = bg
+    elif img.mode != "RGB":
+        img = img.convert("RGB")
+
+    # 先尝试不同质量
+    for quality in [85, 75, 65, 55]:
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=quality, optimize=True)
+        data = buf.getvalue()
+        if len(data) <= max_bytes:
+            return data, "image/jpeg"
+
+    # 如果质量压缩还超，降分辨率
+    w, h = img.size
+    for scale in [0.8, 0.6, 0.5]:
+        new_size = (int(w * scale), int(h * scale))
+        img2 = img.resize(new_size, Image.LANCZOS)
+        buf = io.BytesIO()
+        img2.save(buf, format="JPEG", quality=70, optimize=True)
+        data = buf.getvalue()
+        if len(data) <= max_bytes:
+            return data, "image/jpeg"
+
+    return data, "image/jpeg"  # 最坏情况返回最低分辨率版
+
 try:
     import anthropic
 except ImportError:
@@ -66,7 +106,11 @@ class ShotValidator:
             print("[ShotValidator] ❌ anthropic 模块未安装 — 所有视觉验证将被跳过（pip install anthropic）")
             return
         try:
-            self.client = anthropic.AsyncAnthropic()
+            # Bug 2 fix: 显式传入 api_key，避免 SDK 从 os.environ 找不到
+            # pydantic-settings 从 .env 加载到 settings，但不写入 os.environ
+            from app.config import settings as _settings
+            _api_key = _settings.ANTHROPIC_API_KEY or None
+            self.client = anthropic.AsyncAnthropic(api_key=_api_key)
             print("[ShotValidator] ✅ Haiku 4.5 视觉验证器已初始化")
         except Exception as e:
             print(f"[ShotValidator] ❌ Anthropic 客户端初始化失败: {e} — 所有视觉验证将被跳过")
@@ -107,10 +151,18 @@ class ShotValidator:
         print(f"[ShotValidator] 验证开始: expected_chars={expected_character_count}{props_desc}")
 
         try:
-            # PIL Image → base64
+            # PIL Image → bytes（先保存为 PNG）
             buf = io.BytesIO()
             pil_image.save(buf, format="PNG")
-            image_b64 = base64.standard_b64encode(buf.getvalue()).decode("utf-8")
+            raw_bytes = buf.getvalue()
+
+            # Bug 5 fix: 压缩到 < 4.5 MB，避免触发 Anthropic 5MB 限制
+            original_size = len(raw_bytes)
+            compressed_bytes, media_type = _compress_for_claude(raw_bytes)
+            if len(compressed_bytes) < original_size:
+                print(f"[ShotValidator] 图片压缩: {original_size // 1024}KB → {len(compressed_bytes) // 1024}KB ({media_type})")
+
+            image_b64 = base64.standard_b64encode(compressed_bytes).decode("utf-8")
 
             # T28: 构建 prompt（根据是否有 key_props 动态调整）
             prompt_text = VALIDATION_PROMPT_BASE
@@ -133,7 +185,7 @@ class ShotValidator:
                             "type": "image",
                             "source": {
                                 "type": "base64",
-                                "media_type": "image/png",
+                                "media_type": media_type,  # Bug 5 fix: 压缩后可能是 image/jpeg
                                 "data": image_b64
                             }
                         },

@@ -1,7 +1,27 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-04-23 17:10（自更新 — TASK-BUG-FIX-BATCH-1 Route D 完成，VPS 已同步 Route B + Route C + output volume）
+> **最后更新**: 2026-04-24 13:32（自更新 — TASK-VPS-SKIP-IMAGE 完成，VPS api 容器 SKIP_IMAGE_GENERATION=True 生效）
+
+---
+
+## TASK-VPS-SKIP-IMAGE 完成 (2026-04-24 13:32) — VPS api 已配置 SKIP_IMAGE_GENERATION=true
+
+**全员注意 — VPS 生产环境 Stage 5 图像生成已切换为 SKIP（R8 mock 图）模式**:
+
+- `.env.production` 追加 `SKIP_IMAGE_GENERATION=true`（幂等写入）
+- `docker compose up -d --force-recreate api` → docker-api-1 重建
+- 容器内 `settings.SKIP_IMAGE_GENERATION = True` 已验证
+- api StartedAt: `2026-04-24T05:30:37.588742043Z`
+- `/health` = `{"status":"healthy"}` ✅
+
+**影响面**（对 @backend / @frontend / @tester 说明）:
+- VPS 生产环境 pipeline Stage 5 不再调用 NB2（Gemini 3.1 Flash Image），改用 R8 数据目录的 mock 图
+- 避免每次测试 ~$2 的 NB2 图像生成成本
+- 本地 .env 已有 `SKIP_IMAGE_GENERATION=true`，两端一致
+- **不改代码、不 push、不改 DB、不动 frontend/redis**
+
+**Bash 权限**: ✅ 可用
 
 ---
 

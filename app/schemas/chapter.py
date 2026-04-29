@@ -29,31 +29,19 @@ class ChapterResponse(BaseModel):
         from_attributes = True
 
 
-class SceneInfo(BaseModel):
-    """Scene information from generated story"""
-
-    scene_id: int
-    location: str
-    time: str
-    mood: str
-    visual_description: str
-    narration: str
-    duration_hint: str | int
-
-
-class CharacterInfo(BaseModel):
-    """Character information from generated story"""
-
-    name: str
-    description: str
-    personality: str
-
-
 class ChapterStory(BaseModel):
-    """Full story content for a chapter"""
+    """Full story content for a chapter.
+
+    scenes and characters are raw dicts from the pipeline output.
+    Stage 3 ScreenplayWriter produces scenes with fields like scene_id,
+    scene_heading, time_of_day, atmosphere, etc. — not the old
+    location/time/mood/visual_description naming. Using Dict[str, Any]
+    avoids schema validation errors from field-name mismatch.
+    Frontend adapts field names directly from the raw pipeline output.
+    """
 
     title: str
     summary: str
     full_script: dict[str, Any]
-    scenes: list[SceneInfo]
-    characters: list[CharacterInfo]
+    scenes: list[dict[str, Any]]
+    characters: list[dict[str, Any]]

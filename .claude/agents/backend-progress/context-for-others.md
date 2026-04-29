@@ -1,6 +1,334 @@
 # Backend Agent - 给其他 Agent 的上下文
 
-> **最后更新**: [2026-04-23 16:15]
+> **最后更新**: 2026-04-28 17:00
+
+---
+
+## ✅ R7-3 P1 — portrait 重生静默失效 bug 修复 [2026-04-28 21:42]
+
+**@tester / @pm 关键结论**:
+
+R7-3 已修复。adjust_character API 现在会正确重生成 portrait，不再静默失败。
+
+**真因**: `app/services/character_prompt_builder.py` `_build_human_description()` 和 `build_face_description()` 对 `physical`/`clothing`/`human` 字段调 `.get()`，但 T7 项目这些字段是 str（不是 dict），触发 `'str' object has no attribute 'get'`，被 try/except 吞掉变成静默失败。
+
+**修复文件**: `app/services/character_prompt_builder.py`（仅此 1 文件，非高风险文件）
+
+**修复摘要**:
+- `_build_human_description()` L100-112: 防御性 isinstance 检查，str 类型字段直接追加文本内容
+- `build_face_description()` L217: 同样防御性处理
+
+**验证**:
+- pytest 24/24 ✅ + backend 实测 adjust API 无异常
+- backend log: `[AdjustCharacter] R7-3: char_001 肖像已重生成` ✅
+- portrait mtime 调用前后变化 ✅
+- DB `characters_json[0].portrait_url` + `updated_at` 已更新 ✅
+
+**对各 Agent 影响**:
+- **@tester**: T7 复测时 adjust API 应正常重生 portrait，portrait 文件 mtime 会变化，characters_json portrait_url + updated_at 会更新
+- **@pm**: PENDING.md R7-3 可标 ✅，可通知 Tester 复测
+- **@devops**: 部署时需包含 character_prompt_builder.py
+
+---
+
+## ✅ TASK-T6-FIXBATCH Wave 2.5 D.15 P0 — aspect_ratio 完整修复 [2026-04-28 17:00]
+
+**@pm / @tester 关键结论**:
+
+D.15 P0 aspect_ratio hardcoded 问题已完整修复。用户选 1:1 朋友圈现在真的生成 2048x2048 图像。
+
+**完整调用链路（已验证）**:
+```
+frontend POST /api/projects/{uuid}/start-generation
+→ projects.py start_generation(): project.aspect_ratio or "2:3"
+→ _run_generation_in_background(aspect_ratio=project.aspect_ratio or "2:3")
+→ run_story_generation_task(aspect_ratio=aspect_ratio)
+→ Phase2PipelineOrchestrator.run(aspect_ratio=aspect_ratio)
+→ generate_shot_image_phase2_safe(aspect_ratio=aspect_ratio)   ← 不再 hardcoded "2:3"
+→ Seedream / NB2 真生图 ← 按用户选择比例生成
+```
+
+**变更摘要**（4 文件）:
+| 文件 | 改动 |
+|------|------|
+| `app/services/seedream_generator.py` | `_ASPECT_RATIO_TO_SIZE` 补 `3:4: "1664x2218"` + `4:3: "2218x1664"`（现 7 种比例） |
+| `app/services/pipeline_orchestrator.py` | `run()` 加 `aspect_ratio: str = "2:3"` 参数；L852 `generate_shot_image_phase2_safe(aspect_ratio=aspect_ratio)`；ARCH-1 写入块 width/height/aspect_ratio 动态查 |
+| `app/services/job_manager.py` | `run_story_generation_task()` 加 `aspect_ratio` 参数；`pipeline.run()` 传值 |
+| `app/api/projects.py` | `_run_generation_in_background()` 加 `aspect_ratio` 参数；`start_generation()` 传 `project.aspect_ratio or "2:3"` |
+
+**_ASPECT_RATIO_TO_SIZE 现支持 7 种**:
+`2:3 / 3:2 / 1:1 / 3:4 / 4:3 / 9:16 / 16:9`（frontend 需要的 4 种: 2:3 / 3:4 / 1:1 / 16:9 全覆盖）
+
+**验证**: pytest 292/292 passed（非 API 集成测试）+ import check ✅
+
+**对各 Agent 影响**:
+- **@tester (T7)**: 验证时选 1:1 → 生成图应为 2048x2048（方形），而不是 2:3 竖版
+- **@pm**: PENDING.md D.15 已标 ✅，等 Founder 决定是否进 T7 前部署
+
+---
+
+## ✅ TASK-T6-FIXBATCH Wave 2 Agent D — R7-1 GET /api/projects/ 扩展字段 [2026-04-28 16:00]
+
+**@frontend Agent E 关键契约**:
+
+GET `/api/projects/` 每条 project 新增 4 字段：
+
+| 字段名 | 类型 | 示例 | 来源 |
+|--------|------|------|------|
+| `cover_image_url` | `string \| null` | `"/static/outputs/{uuid}/images/shot_01.png"` | chapter storyboard shots[0].image_url |
+| `shot_count` | `number` | `21` | storyboard shots 数组长度 |
+| `mood` | `string \| null` | `"温馨"` | confirmed_outline.user_selected_mood ?? mood ?? null |
+| `created_at` | `string` | `"2026-04-28T07:10:00Z"` | ISO 8601 UTC（已带 Z，可直接 new Date()） |
+| `updated_at` | `string` | `"2026-04-28T15:38:00Z"` | 同上 |
+
+**mapProject() 改法**:
+```typescript
+coverImageUrl: toAbsoluteUrl(project.cover_image_url) ?? "/brand/logo-48.png",
+shotCount: project.shot_count,
+createdAt: project.created_at,  // 已是 ISO Z，直接传给 new Date()
+```
+
+**修改文件**:
+- `app/schemas/project.py`（ProjectDetail 扩字段）
+- `app/api/projects.py`（helper 函数 + serialize + list endpoint）
+
+---
+
+## ✅ TASK-T6-FIXBATCH Wave 2 Agent F — ARCH-1 完成 [2026-04-28 15:50]
+
+**@pm / @tester 关键结论**:
+
+ARCH-1 chapter_scene_images 批量写入已实现。现在 pipeline 完成后，`chapter_scene_images` 表会有真实数据，单 shot 重生成 / GET /images 功能可用。
+
+**变更摘要**:
+- `Phase2PipelineOrchestrator.run()` 新增 `chapter_id: Optional[int] = None` 参数（向后兼容，默认 None）
+- Stage 5 完成后批量 DELETE + INSERT chapter_scene_images（只写 image_url 非空的成功 shots）
+- 失败兜底非阻塞（log warning）
+- `job_manager.py` 传入 chapter_id
+
+**对各 Agent 影响**:
+- **@tester (T7)**: T7 跑完后，GET `/api/projects/{uuid}/chapters/1/images` 应返回真实 shots 列表（不再空），可在验收清单加此检查点
+- **@pm**: pytest 211/211 ✅，禁改文件未碰，可安排部署
+- **@frontend**: GET /images 端点行为变化（从返空到返真实数据），但前端目前未直接调此端点（StageD 用 /storyboard 端点），无影响
+- **@devops**: 需要部署到 VPS（新代码在 pipeline_orchestrator.py + job_manager.py）
+
+---
+
+## ✅ TASK-T6-FIXBATCH Wave 1.1 Agent A — 完成 [2026-04-28]
+
+**@frontend 关键契约更新**:
+
+1. **`POST /api/projects/{project_id}/characters/{char_id}/regenerate-portrait`** 端点已就绪
+   - 返回: `{ success: bool, char_id: str, portrait_url: str, message: str }`
+   - Agent B F-2 `handleRegenerate()` 接此端点即可工作
+
+2. **`POST /api/projects/{project_id}/characters/{char_id}/adjust`** 返回新增字段
+   - 现在额外返回 `portrait_url: str | null`（成功重生时有值）
+   - `character.updated_at` 时间戳会被更新（Stage 5 freshness check 依赖此字段）
+
+3. **新 stage 名 `image_preparation` 已激活**
+   - Agent B 已在 STAGE_LABEL 加 `image_preparation: "正在准备画面"` — 现在会收到该 stage
+   - Stage 4 完成后立即 callback `image_preparation/65/分镜创建完成，正在准备画面...`
+
+4. **Stage 流程进度里程碑（新版）**:
+   | progress | stage | 含义 |
+   |---------|-------|------|
+   | 2 | character_design / story_generation | 启动 |
+   | 5 | character_design | Stage 1 完成，进角色设计 |
+   | 6 | character_design | LLM角色设计完成，开始生成画像 |
+   | 10 | character_ready | 所有 portrait 已生成，等用户确认 |
+   | 35 | storyboard | Stage 3 完成，进分镜 |
+   | 65 | image_preparation | Stage 4 完成，进 Stage 5 prep |
+   | 75 | image_generation | Stage 5 真生图开始 |
+   | 65-95 | image_generation | 每张图完成后 +delta |
+   | 92 | bgm | BGM 生成（单调 guard 防倒退） |
+   | 100 | completed | 全部完成 |
+
+5. **`GET /api/projects/{id}/chapters/{n}/status` ETA 字段已接通**（修复 round 1）
+   - `estimated_remaining_seconds` 现在是 stage-aware 实时估算（调 `estimate_remaining(current_stage, 0.5)`）
+   - 例：`image_generation` 阶段返回约 ≥300s，不再是旧 `estimated_seconds - elapsed`（1 分钟低估）
+
+**@pm**: P1-3 P1-5 P0-2 P1-1 P1-2 + 修复 round 1 全部完成，禁改文件未碰，可安排审查+部署。
+
+---
+
+## ✅ TASK-T5-FIXBATCH-R6 子任务 1 — GET /api/projects/{id} 扩展字段 [2026-04-27 17:30]
+
+**@frontend 关键契约更新**:
+
+GET `/api/projects/{project_id}` 现在额外返回:
+- `confirmed_outline: dict | null` — 用户在 Stage B 确认后的完整大纲 JSON，包含:
+  - `summary`: 200+ 字故事大纲（修 Stage E bug D）
+  - `mood`: LLM 生成的情绪基调
+  - `user_selected_mood`: 用户在 Stage B 选择的情绪（修 Stage E bug E）
+  - `music_hint`: BGM 提示
+  - `plot_points`: 情节节拍列表
+  - `title` / `title_en` / `characters_overview` 等完整 Stage 1 输出字段
+- `aspect_ratio: str | null` — 项目创建时选择的画面比例，如 "2:3"
+
+**@pm**: 修改极小（2 文件，20 行），无副作用。list 端点（GET /api/projects/）也自动带这两个字段（同用一个 serializer），属于预期行为。
+
+**修改文件**:
+- `app/schemas/project.py` — 加 `Any` import + 2 个 Optional 字段
+- `app/api/projects.py` — serialize_project_detail 加 json.loads + JSONDecodeError 兜底
+
+---
+
+---
+
+## ✅ TASK-PARALLEL-M1 Round 4 — Bug 1 + Bug 5 完成 [2026-04-27 11:35]
+
+**@pm / @tester / @devops 关键结论**:
+
+PARALLEL-M1 最后两个 bug 已修复并实证验证。部署可推进（待 Founder 决策）。
+
+**Bug 1 — project_id=None ✅ 彻底解决**:
+- `image_generator.py` dispatcher `**_kwargs_copy` 透传 1 行修复
+- 实证: 16 shots api_cost_logs 全部 project_id=12 (integer)，ARCH-4 DB cost log 真实生效
+
+**Bug 5 — ShotValidator 5MB 图压缩 ✅**:
+- `shot_validator.py` 新增 `_compress_for_claude()` 压缩函数
+- 超 4.5MB 自动 JPEG 压缩（quality 85/75/65/55 → 分辨率降级），不再 fail-open
+
+**PARALLEL-M1 全 bug 状态**:
+| Bug | 最终状态 |
+|-----|---------|
+| 1 project_id=None | ✅ 彻底修（round 4 实证 16/16 integer）|
+| 2 ShotValidator 鉴权 | ✅ 修（round 3）|
+| 3 IncompleteRead | ✅ retry 3 有效（round 3）|
+| 4 Event loop closed | ✅ ensure_future→await（round 3）|
+| 5 ShotValidator 5MB | ✅ 图压缩（round 4）|
+
+**对各 Agent 影响**:
+- @tester: 可用 run_perf_test.py driver sanity 复测（后端已重启 pid 86603 带新代码）
+- @devops: 部署条件满足（待 Founder 本地+域名测后决定）
+- @ai-ml: 无影响（prompt 逻辑不变）
+- @frontend: 无影响（API 契约不变）
+
+---
+
+## ✅ TASK-SHOT08-DIAGNOSIS — Shot 8 根因确认 [2026-04-25 13:48]
+
+**@pm / @tester / @ai-ml 关键结论**:
+
+Shot 8 Seedream 卡死根因为 **A（累积态资源耗尽）**，非代码 bug，生产环境不受影响。
+
+| 指标 | 数值 |
+|------|------|
+| outcome | success（单独跑成功）|
+| root_cause | A |
+| mem_peak_mb | 290.45 MB |
+| payload_bytes | 9.88 MB（6 refs）|
+| total_elapsed_sec | 81.6 s |
+| api_call 耗时 | 78.6 s |
+
+**对其他 Agent 的影响**:
+
+- **@pm**: 生产代码无需修改。如需修复测试脚本批量跑卡死，建议派一个微任务：在 shot 生成循环第 7/8 之间加 `await asyncio.sleep(1)` 或 `gc.collect()`（5 行改动，低优先级）
+- **@tester**: 回归测试脚本卡死的根因已确认，批量测试时注意内存积累。生产 FastAPI 路径（每请求独立调用栈）天然隔离此问题
+- **@ai-ml**: 无影响
+- **@devops**: 无需部署变更
+
+**产物路径**: `test_output/manualtest/shot8_diagnosis_2026-04-25/`
+- `diagnose.log` — 完整诊断日志（含每步 timing）
+- `result.json` — 结构化结果（JSON）
+- `shot_08.png` — 生成图片（1664x2496, 3218KB）✅
+
+---
+
+## ✅ TASK-SEEDREAM-INTEGRATION — Seedream 5.0-lite 接入完成 [2026-04-24 22:10]
+
+**对其他 Agent 的影响**
+
+**@pm**:
+- 🔴 image_generator.py 只改 7 行（dispatcher），NB2 原逻辑零变化，请审查 `git diff app/services/image_generator.py` 确认
+- 🟡 **架构澄清**: dispatcher 挂在 `generate_shot_image()` 入口（按任务文案要求），但生产 Pipeline 走的是 `generate_shot_image_phase2_safe()`。**当前状态下 `IMAGE_GEN_PROVIDER=seedream` 在生产 Pipeline 不会触发 Seedream 分支。** 详见 backend-progress/current.md 的"重要架构澄清"段。等 PM 审查后决定是否派新任务补 dispatcher 到 `_phase2_safe`（估 +8 行）
+- Sanitize 关键词表 27 条（3 级 attempt），可读
+- 本次未跑真实角色一致性回归（按任务说明 @tester 负责）
+
+**@tester**（下一步）:
+- 跑角色一致性回归测试验证 Seedream 接入
+- 故意触发 sanitize 场景（POC shot_04 prompt "elderly + worry" 组合）验证 NB2 fallback 路径能走通
+- 测试需要 `.env` 里有效 `ARK_API_KEY`（Founder 已配）+ `IMAGE_GEN_PROVIDER=seedream`
+- ⚠️ 注意: 当前 dispatcher 只挂在 `generate_shot_image()`，测试 Pipeline 端到端时不会触发 Seedream；需直接测试 `generate_shot_image()` 或等 PM 派发 dispatcher 扩展任务后再测 E2E
+- **fallback 验证法**: 用假 `ARK_API_KEY=""` 模拟 API 失败 → 应自动降级 NB2 并返回图；或故意传入含敏感词 prompt 模拟 3 次 sanitize 耗尽
+
+**@ai-ml**:
+- 本次没碰 `style_enforcer.py`（按约束）
+- Seedream 的 prompt 输入链路：POC 脚本把 `image_prompt` + `text_overlay instruction` 拼接发 API。生产 dispatcher 把 `generate_shot_image()` 的入参（shot + reference_images + aspect_ratio）完整传给 `generate_shot_image_seedream()`，函数内部复用 shot 的 text_overlay 字段构建文字指令
+- 若你计划为 Seedream 加 "2D 水彩条漫风" 硬约束，可直接改 `style_enforcer.py`（影响 prompt 头部的 MANDATORY STYLE 块），Seedream 路径会收到该 prompt — 但注意目前 Seedream 路径用的是 `shot["image_prompt"]` 原文，**并没有走** StyleEnforcer.enforce_prompt() 二次包装（走的是 Phase 1 legacy 路径的简化 prompt）。如果需要 Seedream 收到 B' / StyleEnforcer 包装后的 prompt，需要在 dispatcher 扩展到 `_phase2_safe` 时同步传入 full_prompt 参数（函数已预留 `full_prompt` 参数位）
+
+**@devops**（Phase 3）:
+- 本地 `.env` 加 `IMAGE_GEN_PROVIDER=seedream`（测试期）
+- VPS `.env.production` 同步加
+- `ARK_API_KEY` 已存在（Founder POC 阶段加的）
+- 注意: 鉴于上述架构澄清，即使 VPS 切到 `IMAGE_GEN_PROVIDER=seedream`，现阶段生产 Pipeline 不会走 Seedream 分支。等 PM 决策后再做部署
+
+**Seedream 接入的 API 技术细节**（给需要调用的 Agent 参考）:
+- Endpoint: `POST https://ark.cn-beijing.volces.com/api/v3/images/generations`
+- Model ID: `doubao-seedream-5-0-260128`（5.0-lite，已开通）
+- Auth: `Authorization: Bearer $ARK_API_KEY`
+- Size: `"1664x2496"`（2:3 2K）/ `"2048x2048"` (1:1) etc.
+- 参考图: `image` 字段传 base64 data URI（`data:image/png;base64,...`），string 或 string[]，最多 14 张
+- 响应: `response_format: "b64_json"` 返回 `data[0].b64_json`
+- Payload > 10MB 自动降采样参考图到 1024px；413/400 too large 降到 512px
+- 429/5xx 指数退避重试 2 次
+- 内容审查拦截标志: `InputTextSensitiveContentDetected` / `sensitive_content` / `content_policy` / `risk_control`
+
+**Seedream 接入代码位置**
+- 核心模块: `app/services/seedream_generator.py`（新建）
+- 配置: `app/config.py` 新增 2 字段 `IMAGE_GEN_PROVIDER` / `ARK_API_KEY`
+- `.env.example` 新增对应示例
+- Dispatcher: `image_generator.py:795-801`（`generate_shot_image()` docstring 后 7 行）
+
+---
+
+## ✅ TASK-SEEDREAM-POC Phase 3a — comparison.html 已更新 [2026-04-24 18:20]
+
+**@tester**: `comparison.html` 已加 shot_04 视觉警告，评分时注意：
+- shot_04 有 ⚠️ 红色 badge + 双 prompt 对照（原 prompt vs sanitized prompt），黄色高亮显示 2 处具体差异词
+- **shot_04 不计入 9 shots 公平对比均分**（评分说明在页面底部橙色框）
+- shot_04 的 Seedream 图本身质量仍可按 0-5 打分，但单独标注"prompt adjusted"
+- 其他 9 shots 展示不变，可正常对比评分
+
+**产物路径**: `test_output/manualtest/seedream_vs_nb2_2026-04-24/comparison.html`
+
+---
+
+## 🔴 TASK-SEEDREAM-POC — Step A-D 完成，新 blocker: 账号未开通模型 [2026-04-24 17:05]（已解决）
+
+**当前状态**: Founder 已在 `.env` 放入 `ARK_API_KEY=ark-058f...f3263`，鉴权通过（**不再是 401**），但账号 `2105093537` **尚未开通 `doubao-seedream-4-0-250828` 模型服务**，10/10 shots 返回 HTTP 404 `ModelNotOpen`。
+
+**对其他 Agent 的影响**:
+- **@pm / Founder**: 需到 https://console.volcengine.com/ark/ 「模型广场」搜 `doubao-seedream-4-0` → 点「开通」，等 ~1 分钟后重跑 `python3 scripts/test_seedream_vs_nb2.py`
+- **@tester**: Phase 3 的人工评分任务需要等模型开通后跑出 10 张 Seedream 图才能启动
+- **@ai-ml / @frontend / @devops**: 暂不涉及
+
+**脚本能力（production-grade edge case 处理）**:
+- Downsample 大 payload（>10MB → 1024px；413/400 too large → 512px）
+- 指数退避（429/5xx → 3s/5s/9s；网络异常 → 2s/4s）
+- 软节流（每 shot 间隔 1s）
+- Continue-on-error（单 shot 失败不中断整批）
+
+**产物**: `test_output/manualtest/seedream_vs_nb2_2026-04-24/`
+- `README.md` 首部有 BLOCKER 章节
+- `logs/seedream_api_logs.json` 10 条 404 记录
+- `comparison.html` 左列全 FAILED，右列 NB2 完好
+
+**_旧 blocker（Ark Key 未配置）已解决_**:
+- **@devops**: 本次不涉及部署
+- **@tester**: Phase 3 的人工评分任务需要等 Step 3 跑出 10 张 Seedream 图才能启动
+- **@ai-ml**: 本次不涉及 prompt 工程
+- **@frontend**: 本次不涉及前端
+
+**Seedream 4.0 API 调研结论（给后续接入生产 Pipeline 参考）**:
+- Endpoint: `https://ark.cn-beijing.volces.com/api/v3/images/generations`
+- Model: `doubao-seedream-4-0-250828`
+- Auth: `Authorization: Bearer $ARK_API_KEY`
+- Size: `1664x2496`（2K 2:3，DEC-010 兼容）
+- 多角色参考图: `image` 字段传 **字符串数组**（base64 data URI 或 URL），最多 14 张
+- 响应: `{data:[{b64_json, size}]}`（b64_json 模式无 URL 过期风险）
+- 火山方舟 Ark 与 VolcEngine IAM（TTS 用）是两套独立鉴权体系
 
 ---
 
@@ -294,3 +622,75 @@ Bearer token 认证一致。@Frontend 按此 API 契约开发（Step 6 已完成
 - `app/services/pipeline_schemas.py` — Pydantic 验证 characters + shots
 - Stage 2→3 + Stage 4→5 验证调用已嵌入 pipeline_orchestrator.py
 - image_prompt 中文比例检测 validator（>15% 拒绝）
+
+---
+
+## ✅ TASK-PARALLEL-M1 Phase 1 + round 2 — Stage 5 并行化完成 [2026-04-25 17:30]
+
+**@pm / @tester / @ai-ml / @devops 关键状态**:
+
+Stage 5 从串行改为并行（asyncio.Semaphore(IMAGE_MAX_CONCURRENT=3) + asyncio.gather）已完成并验证。ARCH-4 api_cost_logs INSERT/READ 路径打通。
+
+**对各 Agent 的影响**:
+
+**@tester** (Phase 2 任务):
+- 用 Seedream 跑回归（teststory6.4/6.5/6.6 + 跨题材 4 种）— Founder 主观判定（不卡死指标）
+- 8 失败分支模拟测试覆盖（PENDING.md 已列）
+- 验证 0 cost circuit breaker 真起作用
+- 验证 api_cost_logs 表真有 INSERT（ + 真实 NB2/Seedream 跑 ≥1 shot）
+- 验证 Stage 5 并行效率（20 张 4.5 min 目标）
+
+**@devops** (Phase 3 任务):
+- push GitHub + rsync VPS + /api/health 验证 + 跑 1 次完整 Seedream pipeline
+
+**@ai-ml**:
+- Stage 5 并行不影响 prompt 逻辑，无需改动
+- ARCH-4 api_cost_logs 记录每张图的模型/成本/stage，可用于 prompt 效果追踪
+
+**技术细节（关键修改文件）**:
+-  — Stage 5 并行化 + PipelineCostTracker + db_project_id 查询
+-  — 新建，异步 INSERT api_cost_logs
+-  — 新建 ORM model
+-  — log_api_cost ensure_future + Seedream dispatcher
+-  — log_api_cost ensure_future + project_id 透传（round 2）
+-  — 17 测试用例，24/24 真实 venv 通过
+-  — 已删除（round 2 修复，venv 真实依赖足够）
+
+
+---
+
+## 🆕 TASK-PARALLEL-M1 Round 3 完成 + Bug 5 + 待 Round 4 (2026-04-27)
+
+**Round 3 (04-25 16:30) 修复**:
+- pipeline_orchestrator.py: project_uuid=None 时创建 temp Project DB record（user_id=0 sentinel）
+- shot_validator.py: 显式 `api_key=settings.ANTHROPIC_API_KEY` 给 AsyncAnthropic
+- seedream_generator.py: SEEDREAM_HTTP_RETRIES 2→3 + retry log 统计
+- image_generator.py + seedream_generator.py: `asyncio.ensure_future(log_api_cost)` → `await log_api_cost(...)`
+
+**对其他 agent 的影响**:
+- @ai-ml: 无（生图 prompt 不变）
+- @frontend: 无（API 契约不变）
+- @tester: D1 redo 14/14 全过，但 Bug 1 残留 + Bug 5 新发现，等 round 4 修完再 sanity 复测
+- @devops: 部署暂缓（Founder 本地+域名测后决定）
+
+**待 Round 4 修**:
+- Bug 1 残留: image_generator.py L1392-1398 dispatcher 调 generate_shot_image_seedream 没传 **_kwargs_copy → project_id 仍 None（**1 行修**）
+- Bug 5: ShotValidator 调 Anthropic Claude 时图片超 5MB 上限触发 fail-open，需要图压缩到 < 5MB 后传
+
+**ARCH-4 状态**: INSERT 路径打通，DB cost log 真写入；READ 路径在 round 4 修 Bug 1 后才完整生效
+
+
+
+---
+
+## 🆕 TASK-T5-FIXBATCH 完成 (2026-04-27 PM 代更)
+
+**8 条后端修复完成**, 211/211 tests 通过, T5 hot-fix 已跑.
+
+**对其他 agent**:
+- **@frontend**: backend.characters_json 加了 `portrait_url` 字段（Stage 2 后），Stage C 卡片可读这字段渲染真 portrait. backend Stage 6 完成会发 progress_callback("completed", 100, "故事生成完成"), 前端 redirect 三合一触发能用.
+- **@ai-ml**: Backend 已接入 `style_music_hints.get_raw_hint()`，Stage 1 outline 有 music_hint 字段了
+- **@tester**: T6 测试时验证: shot image_url + chapter.bgm_url + outline.music_hint + chapter.characters_json.portrait_url + outline.user_selected_mood 都正确填充
+- **@devops**: 后端代码改动需要重启 backend 才生效（PM 在做）
+
+**T5 项目状态**: 已 hot-fix 补 image_url + bgm_url，Founder 刷新 Stage D 即可看图听 BGM

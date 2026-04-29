@@ -2,7 +2,8 @@
 name: frontend
 description: 前端开发专家，负责 Next.js、React、UI/UX。当需要创建页面、开发组件、设计界面、实现交互时使用。
 tools: Read, Edit, Write, Bash, Grep, Glob, WebFetch, TodoWrite, WebSearch, Skill, LSP
-model: opus
+model: sonnet
+effort: xhigh
 color: pink
 ---
 

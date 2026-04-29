@@ -18,11 +18,13 @@ import {
   Trash2,
   Film,
   ImageIcon,
+  Music,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetch, getStoredToken } from "@/lib/api";
+import { apiFetch, getStoredToken, fetchBgmInfo } from "@/lib/api";
+import { toAbsoluteUrl } from "@/lib/url";
 import { STYLE_PRESETS } from "@/types/create";
 import type { StoryDetail, Shot } from "@/types/create";
 import ShareModal from "@/components/ui/ShareModal";
@@ -30,17 +32,28 @@ import ExportModal from "@/components/ui/ExportModal";
 import VideoSynthesisModal from "@/components/ui/VideoSynthesisModal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 
+// ─── API response shapes ───────────────────────────────────────────────────────
+
 interface ProjectDetailResponse {
   id: string;
   title: string;
   original_idea: string;
   style_preset: string;
+  aspect_ratio: string | null;
   created_at: string;
+  confirmed_outline: {
+    summary?: string;
+    mood?: string;
+    user_selected_mood?: string | null;
+    music_hint?: string;
+    plot_points?: unknown[];
+    title?: string;
+  } | null;
 }
 
 interface ChapterStoryResponse {
   summary: string;
-  characters: { name: string; description: string }[];
+  characters: { name: string; description: string; portrait_url?: string | null }[];
   scenes: {
     scene_id: number;
     narration?: string;
@@ -48,7 +61,15 @@ interface ChapterStoryResponse {
   }[];
 }
 
-function buildShots(scenes: ChapterStoryResponse["scenes"]): Shot[] {
+interface StoryboardResponse {
+  storyboard: unknown;
+  chapter_number: number;
+  project_id: string;
+}
+
+// ─── Fallback: build shots from screenplay scenes (old projects) ───────────────
+
+function buildShotsFromScenes(scenes: ChapterStoryResponse["scenes"]): Shot[] {
   return scenes.map((scene, index) => ({
     shotId: index + 1,
     sceneId: scene.scene_id || index + 1,
@@ -63,11 +84,68 @@ function buildShots(scenes: ChapterStoryResponse["scenes"]): Shot[] {
   }));
 }
 
+// ─── Build shots from storyboard JSON ─────────────────────────────────────────
+
+function buildShotsFromStoryboard(storyboardData: unknown): Shot[] {
+  if (!storyboardData) return [];
+  const sb = storyboardData as Record<string, unknown>;
+  // storyboard_json can be a list of shots OR a dict with a "shots" key
+  const rawShots: unknown[] = Array.isArray(sb)
+    ? (sb as unknown[])
+    : Array.isArray(sb["shots"])
+    ? (sb["shots"] as unknown[])
+    : [];
+
+  return rawShots.map((shot, index) => {
+    const s = shot as Record<string, unknown>;
+    const rawImageUrl = (s["image_url"] as string | null | undefined) || null;
+    return {
+      shotId: (s["shot_id"] as number) || index + 1,
+      sceneId: (s["scene_id"] as number) || (s["original_scene_id"] as number) || index + 1,
+      imagePrompt: (s["image_prompt"] as string) || "",
+      narrationSegment: (s["narration_segment"] as string) || "",
+      shotType: (s["shot_type"] as string) || "medium shot",
+      cameraAngle: (s["camera_angle"] as string) || "eye level",
+      textType: "narration",
+      chineseText: [],
+      imageUrl: toAbsoluteUrl(rawImageUrl),
+      charactersInScene: (s["characters_in_scene"] as string[]) || [],
+    };
+  });
+}
+
+// ─── Inline BGM player ────────────────────────────────────────────────────────
+
+function InlineBgmPlayer({ bgmUrl }: { bgmUrl: string }) {
+  return (
+    <div className="flex items-center gap-2 p-3 rounded-lg bg-bg-secondary border border-white/5">
+      <Music className="w-4 h-4 text-brand-primary flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-text-muted mb-1.5">故事配乐</p>
+        <audio
+          src={bgmUrl}
+          controls
+          className="w-full h-8"
+          style={{ colorScheme: "dark" }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─── Main component ────────────────────────────────────────────────────────────
+
 export default function StoryDetailContent() {
   const { storyId } = useParams<{ storyId: string }>();
   const { isLoggedIn, deleteStory, loadingUser } = useAuth();
   const router = useRouter();
+
+  // Bug A: distinguish loading vs notFound vs loaded
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
   const [story, setStory] = useState<StoryDetail | null>(null);
+  const [bgmUrl, setBgmUrl] = useState<string | null>(null);
+
   const [selectedShot, setSelectedShot] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -91,14 +169,52 @@ export default function StoryDetailContent() {
 
     const load = async () => {
       try {
-        const project = await apiFetch<ProjectDetailResponse>(`/projects/${storyId}`, {}, token);
+        // Bug B+C: parallel fetch 3 endpoints
+        const [project, storyboardData, storyData] = await Promise.all([
+          apiFetch<ProjectDetailResponse>(`/projects/${storyId}`, {}, token),
+          apiFetch<StoryboardResponse>(
+            `/projects/${storyId}/chapters/1/storyboard`,
+            {},
+            token
+          ).catch(() => null),
+          apiFetch<ChapterStoryResponse>(
+            `/projects/${storyId}/chapters/1/story`,
+            {},
+            token
+          ).catch(() => null),
+        ]);
 
-        let chapterStory: ChapterStoryResponse | null = null;
-        try {
-          chapterStory = await apiFetch<ChapterStoryResponse>(`/projects/${storyId}/chapters/1/story`, {}, token);
-        } catch {
-          chapterStory = null;
-        }
+        // Bug G: also fetch BGM info (best-effort, non-blocking)
+        fetchBgmInfo(storyId, 1, token)
+          .then((info) => {
+            if (info.bgm_exists && info.bgm_url) {
+              setBgmUrl(toAbsoluteUrl(info.bgm_url));
+            }
+          })
+          .catch(() => null);
+
+        // Bug B+C: prefer storyboard shots (with image_url), fallback to screenplay scenes
+        const shots: Shot[] =
+          storyboardData?.storyboard
+            ? buildShotsFromStoryboard(storyboardData.storyboard)
+            : buildShotsFromScenes(storyData?.scenes ?? []);
+
+        // Bug D: use confirmed_outline.summary, fallback to original_idea
+        const summary =
+          project.confirmed_outline?.summary || project.original_idea || "";
+
+        // Bug E: user_selected_mood > LLM mood > placeholder
+        const mood =
+          project.confirmed_outline?.user_selected_mood ||
+          project.confirmed_outline?.mood ||
+          "—";
+
+        // Bug F: characters with portrait_url field
+        const characters = (storyData?.characters ?? []).map((c) => ({
+          name: c.name,
+          description: c.description || "",
+          portrait_url: c.portrait_url || null,
+        }));
 
         setStory({
           id: project.id,
@@ -106,19 +222,21 @@ export default function StoryDetailContent() {
           coverImageUrl: "/brand/logo-48.png",
           style: project.style_preset,
           length: "short",
-          shotCount: chapterStory?.scenes.length || 0,
+          shotCount: shots.length,
           createdAt: project.created_at,
           updatedAt: project.created_at,
           status: "draft",
           canContinue: true,
-          summary: chapterStory?.summary || project.original_idea,
-          characters: chapterStory?.characters || [],
-          shots: buildShots(chapterStory?.scenes || []),
-          mood: "待生成",
+          summary,
+          characters,
+          shots,
+          mood,
           aspectRatio: "2:3",
         });
+        setLoading(false);
       } catch {
-        setStory(null);
+        setLoading(false);
+        setNotFound(true);
       }
     };
 
@@ -139,7 +257,20 @@ export default function StoryDetailContent() {
 
   if (loadingUser) return null;
   if (!isLoggedIn) return null;
-  if (!story) {
+
+  // Bug A: show loading skeleton before fetch completes
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-brand-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-text-muted text-sm">加载中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (notFound || !story) {
     return (
       <div className="min-h-screen bg-bg-primary flex items-center justify-center">
         <div className="text-center">
@@ -166,6 +297,9 @@ export default function StoryDetailContent() {
     if (isPlaying) { setIsPlaying(false); }
     else { if (selectedShot >= story.shots.length - 1) setSelectedShot(0); setIsPlaying(true); }
   };
+
+  // Bug F: extended characters type for local use
+  const characters = story.characters as { name: string; description: string; portrait_url?: string | null }[];
 
   return (
     <div className="min-h-screen bg-bg-primary">
@@ -285,25 +419,47 @@ export default function StoryDetailContent() {
                 </div>
               </div>
 
+              {/* Bug F: Characters with portrait + silhouette fallback */}
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <Users className="w-4 h-4 text-text-muted" />
                   <span className="text-sm text-text-muted">角色</span>
                 </div>
                 <div className="space-y-2">
-                  {story.characters.map((char) => (
-                    <div key={char.name} className="p-2.5 rounded-lg bg-bg-secondary border border-white/5">
-                      <p className="text-sm font-medium text-text-primary">{char.name}</p>
-                      <p className="text-xs text-text-muted mt-0.5">{char.description}</p>
+                  {characters.map((char) => (
+                    <div key={char.name} className="flex items-center gap-2.5 p-2.5 rounded-lg bg-bg-secondary border border-white/5">
+                      {/* Portrait or silhouette */}
+                      <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden bg-bg-tertiary flex items-center justify-center">
+                        {char.portrait_url ? (
+                          <img
+                            src={toAbsoluteUrl(char.portrait_url) ?? ""}
+                            alt={char.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 text-text-muted/40">
+                            <circle cx="12" cy="7" r="4" />
+                            <path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-text-primary">{char.name}</p>
+                        <p className="text-xs text-text-muted mt-0.5 truncate">{char.description}</p>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
 
+              {/* Bug E: mood from confirmed_outline */}
               <div className="flex items-center gap-2">
                 <span className="text-xs text-text-muted">情绪基调:</span>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary">{story.mood}</span>
               </div>
+
+              {/* Bug G: BGM player */}
+              {bgmUrl && <InlineBgmPlayer bgmUrl={bgmUrl} />}
 
               {/* Delete */}
               <button onClick={() => setShowDeleteConfirm(true)} className="flex items-center gap-1.5 text-xs text-error hover:underline cursor-pointer">

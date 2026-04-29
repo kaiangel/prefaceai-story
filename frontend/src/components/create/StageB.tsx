@@ -11,6 +11,7 @@ import {
   Trash2,
   Check,
   Palette,
+  AlertCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCreate } from "@/contexts/CreateContext";
@@ -18,43 +19,91 @@ import { apiFetch, getStoredToken } from "@/lib/api";
 import { MOOD_OPTIONS } from "@/types/create";
 import type { PlotPoint } from "@/types/create";
 
+// UX-2: Extract Arabic numerals and common Chinese number words from text
+const NUMBER_REGEX = /(\d+|[零一二三四五六七八九十百千万]+(?:[零一二三四五六七八九十百千万]+)*)/g;
+
+// UX-2: Find cross-plot number conflicts. Returns list of (number, conflicting plot indices)
+function findCrossPlotNumberConflicts(
+  editedIndex: number,
+  editedText: string,
+  allPlots: PlotPoint[]
+): Array<{ num: string; conflictIndices: number[] }> {
+  const editedNums = Array.from(new Set(editedText.match(NUMBER_REGEX) || []));
+  const conflicts: Array<{ num: string; conflictIndices: number[] }> = [];
+
+  for (const num of editedNums) {
+    const re = new RegExp(`(?<![\\d\\u4e00-\\u9fa5])${num.replace(/\d/g, "\\d").replace(/[零一二三四五六七八九十百千万]/g, c => c)}(?![\\d\\u4e00-\\u9fa5])`, "g");
+    const conflictIndices: number[] = [];
+    allPlots.forEach((p, idx) => {
+      if (idx !== editedIndex && re.test(p.description)) {
+        conflictIndices.push(idx + 1); // 1-based plot number
+      }
+    });
+    if (conflictIndices.length > 0) {
+      conflicts.push({ num, conflictIndices });
+    }
+  }
+  return conflicts;
+}
+
 function PlotPointItem({
   point,
+  plotIndex,
+  allPlots,
   onDescriptionChange,
   onDelete,
 }: {
   point: PlotPoint;
+  plotIndex: number;
+  allPlots: PlotPoint[];
   onDescriptionChange: (value: string) => void;
   onDelete: () => void;
 }) {
   const controls = useDragControls();
+  // UX-2: Compute cross-plot number conflicts on every render (pure computation, no state needed)
+  const conflicts = findCrossPlotNumberConflicts(plotIndex, point.description, allPlots);
 
   return (
     <Reorder.Item
       value={point}
       dragListener={false}
       dragControls={controls}
-      className="flex items-start gap-2 bg-bg-secondary rounded-lg p-3 border border-white/5 group"
+      className="bg-bg-secondary rounded-lg border border-white/5 group"
     >
-      <div
-        onPointerDown={(e) => controls.start(e)}
-        className="touch-none mt-0.5 flex-shrink-0 cursor-grab active:cursor-grabbing"
-      >
-        <GripVertical className="w-4 h-4 text-text-muted" />
+      <div className="flex items-start gap-2 p-3">
+        <div
+          onPointerDown={(e) => controls.start(e)}
+          className="touch-none mt-0.5 flex-shrink-0 cursor-grab active:cursor-grabbing"
+        >
+          <GripVertical className="w-4 h-4 text-text-muted" />
+        </div>
+        <input
+          type="text"
+          value={point.description}
+          onChange={(e) => onDescriptionChange(e.target.value)}
+          placeholder="描述这个情节点..."
+          className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
+        />
+        <button
+          onClick={onDelete}
+          className="w-5 h-5 flex items-center justify-center text-text-muted hover:text-red-400 sm:opacity-0 sm:group-hover:opacity-100 transition-all flex-shrink-0"
+        >
+          <Trash2 className="w-3 h-3" />
+        </button>
       </div>
-      <input
-        type="text"
-        value={point.description}
-        onChange={(e) => onDescriptionChange(e.target.value)}
-        placeholder="描述这个情节点..."
-        className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
-      />
-      <button
-        onClick={onDelete}
-        className="w-5 h-5 flex items-center justify-center text-text-muted hover:text-red-400 sm:opacity-0 sm:group-hover:opacity-100 transition-all flex-shrink-0"
-      >
-        <Trash2 className="w-3 h-3" />
-      </button>
+      {/* UX-2: Cross-plot number consistency hint */}
+      {conflicts.length > 0 && (
+        <div className="px-3 pb-2 space-y-1">
+          {conflicts.map(({ num, conflictIndices }) => (
+            <div key={num} className="flex items-start gap-1.5 text-amber-400/80 text-xs">
+              <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+              <span>
+                数字 <strong className="text-amber-400">{num}</strong> 也出现在情节{conflictIndices.map(i => `第${i}点`).join("、")}，请确认是否需要同步修改。
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </Reorder.Item>
   );
 }
@@ -336,10 +385,12 @@ export default function StageB() {
               }}
               className="space-y-2"
             >
-              {outline.plotPoints.map((point) => (
+              {outline.plotPoints.map((point, plotIdx) => (
                 <PlotPointItem
                   key={point.id}
                   point={point}
+                  plotIndex={plotIdx}
+                  allPlots={outline.plotPoints}
                   onDescriptionChange={(value) => {
                     const updated = outline.plotPoints.map((p) =>
                       p.id === point.id ? { ...p, description: value } : p

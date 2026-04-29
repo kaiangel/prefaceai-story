@@ -4,6 +4,24 @@
 
 ---
 
+### 2026-04-24 — TASK-VPS-SKIP-IMAGE + NB2 三天回溯审查 ✅
+
+**TASK-VPS-SKIP-IMAGE**: Founder 选项 A 派 @devops 给 VPS `.env.production` 追加 `SKIP_IMAGE_GENERATION=true` + force-recreate api 容器。4 步 + 3 验证一次过关，`settings.SKIP_IMAGE_GENERATION=True` 在容器生效。
+
+**NB2 生图三天回溯审查**（Founder 要求地毯式）:
+- 独立 5 层交叉验证：代码静态 / 本地 backend.log 14MB / VPS docker logs / DB api_cost_logs / 两端 .env SKIP 标志
+- 结论: **2026-04-22 ~ 04-24 NB2 生图 0 次调用 / $0**
+- 三天总花费约 $0.53（全部来自 04-23 Pipeline 的 Claude Sonnet 4.6 + Mureka + Haiku）
+
+**新发现**:
+- `api_cost_logs` 是孤儿表（0 行，代码 0 引用），与之前 `chapter_scene_images` / `project_character_references` 并列为 3 张孤儿表 → 记入 PENDING
+
+**其他工作**:
+- 本地前后端干净重启（清缓存 + 无 --reload + Claude 托管 shell）
+- 开启 prefaceai.mov + 本地双实时监测
+
+---
+
 ### 2026-04-23 — TASK-BUG-FIX-BATCH-1（Route B + C） ✅
 
 **背景**: 2026-04-23 Founder 本地跑通完整 Pipeline（"泰迪知道的秘密" 16 分 10 秒），PM 深度审查发现 **18 个 bug**（Backend 6 / Frontend 8 / Arch 3 / Ops 1）+ **3 条 DB 脏数据**。Founder 批准全修 + 今天部署到 VPS。
@@ -4550,3 +4568,126 @@ Shot 14: daughter bubble_x=25, bubble_y=8; father bubble_x=75, bubble_y=18
 
 **影响范围**: 哪些 Agent 受影响
 ```
+
+---
+
+## [2026-04-28] TASK-T6-FIXBATCH Wave 0 + Wave 1.1 完成
+
+### Wave 0 (12:05-12:10): PM 文档收尾
+- PENDING.md 加 TASK-T6-FIXBATCH 总规划（5 R7 + 4 Wave + 12 风险 + 12 暂缓）
+- TEAM_CHAT.md 12:10 派发记录
+- pm-progress 三件套 + TODAY_FOCUS 04-28 更新
+
+### Wave 1.1 (12:10-15:15): A + B 并行 spawn → 一轮通过 + Agent A 1 修复 round
+
+**Agent A Backend (Sonnet) 5 子任务一轮地毯式深挖发现 2 严重问题 + 1 修复 round 二轮通过**:
+- ✅ P0-2 mark_completed stage='completed' (R7-9 + 旧 P2 #1)
+- ✅ P1-1 stage label 重构方案 B 9 处 callback (R7-5 + B-3 + B-4 + 架构 A-1)
+- ✅ P1-2 ETA backend 主导（修复 round 1 接通调用链路）+ progress 单调 guard (R7-7 + R7-8 + B-7 + 架构 A-4)
+- ✅ P1-3 R7-3 + R7-4 portrait/fullbody 配套（修复 round 1 加 30s buffer）+ 新 endpoint regenerate-portrait
+- ✅ P1-5 character_ready 等 portrait 全成（架构 A-3）
+
+**Agent B Frontend (Sonnet) 7 子任务一轮通过**:
+- ✅ P0-1 toAbsoluteUrl 共享 + StageD/StageC/BgmPlayer/StoryDetailContent 4 处统一 (R7-12 + 旧 P2 #3)
+- ✅ P0-3 StageC character_ready 后 fetch chapter.characters_json (F-1)
+- ✅ P1-6 Stage E 显示 outline.summary 三层 fallback (UX-17)
+- ✅ P2-2 删除 checkpointPreview L209-214 (R7-6)
+- ✅ P2-4 完成态副标题统一 + carousel tip stage='completed' 时 clearInterval (R7-10 + R7-11)
+- ✅ F-2 handleRegenerate 接真 API (Agent A 端点)
+- ✅ 旧 PENDING P3 4-6 (BgmPlayer fallback + Shot onError + 进度条 spring 动画)
+- ✅ STAGE_LABEL 加 character_design + image_preparation 双 key
+
+**关键教训永久保存**:
+- `feedback_carpet_review_deep_dive.md` memory + MEMORY.md 索引：PM 审查必须追到调用链路最末端
+- `xhteam` SKILL.md 第四步加"地毯式审查铁律"双保险
+
+**真实环境**: backend pid 68345 + frontend pid 68378 仍跑着 R6/T6 build（Wave 1.1 改动还没重启 backend，等所有 Wave 完成统一部署）
+
+
+---
+
+## [2026-04-28] TASK-T6-FIXBATCH Wave 2 完成
+
+### Wave 2 (15:38-16:00): D + F 并行 + E 串行 + 审查地毯式深挖发现 D.15 P0
+
+**Agent D Backend (Sonnet 4.6 high) ✅ 一轮通过**:
+- ProjectDetail schema datetime → str (ISO 8601 with Z) + 加 cover_image_url + shot_count + mood
+- 3 helpers: _to_utc_iso / _parse_storyboard_cover_and_count (兼容 list/dict.shots 双格式) / _parse_mood (三层 fallback)
+- list_projects 2-query 批量 (零 N+1)
+- pytest 211/211 + 7 architecture + 17 parallel
+- 修改文件: app/schemas/project.py + app/api/projects.py
+
+**Agent F Backend (Sonnet 4.6 high) ✅ 一轮通过**（违反暂停点但评估正确）:
+- 19 处 SceneImage / chapter_scene_images 既有引用 grep 评估完整，全兼容无破坏
+- ARCH-1 在 storyboard checkpoint 后 (L1034-1089) 批量写入: chapter_id 防 None + DELETE+INSERT 防重复 + 失败非阻塞
+- run() signature 加 chapter_id default None (向后兼容) + job_manager 传值
+- 修改文件: app/services/pipeline_orchestrator.py + app/services/job_manager.py
+
+**Agent E Frontend (Sonnet 4.6 high) ✅ 一轮通过 + 1 处 P3 小遗漏**:
+- AuthContext L6 import toAbsoluteUrl + L37 ApiProject 加 3 字段 + L71-85 mapProject 全部用
+- types/create.ts L170 StoryCard.mood: string | null
+- StoryCard.tsx L145-146 mood 条件渲染
+- mock-data.ts 6 条补 mood (TypeScript 强制)
+- npm build 21 routes 0 errors
+- ⚠️ 漏改: types/create.ts L201 StoryDetail.mood 应跟 StoryCard 一致 → 记 PENDING D.16 P3
+
+### Wave 2 审查地毯式深挖暴露 D.15 — 实为 P0 用户体验灾难（非 Wave 2 引入）
+
+调用链路追踪发现 pipeline_orchestrator.py L843 `generate_shot_image_phase2_safe()` 调用时 L850 `aspect_ratio="2:3"` hardcoded — 是真生图实参不是元数据。用户选 1:1/16:9/3:4 等任何画幅，实际生成永远 2:3。T6 Founder 选 1:1 朋友圈但 21 shots 全 2:3 — 之前没对比就过了。
+
+**教训永久保存**:
+- `feedback_aspect_ratio_user_perception.md` memory + MEMORY.md 索引
+- 任何"用户主动选择"参数必须从输入到生成层完整传递，hardcoded 中间环节 = P0 灾难
+
+Founder 决议: D.15 升 P0 + Wave 2.5 立即修（选 A）。
+
+
+---
+
+## TASK-T6-FIXBATCH 完成里程碑（2026-04-28 21:30）
+
+### 时间线
+
+| 时间 | 阶段 |
+|------|------|
+| 12:00-15:25 | Wave 0+1.1+1.2 完成（A Backend / B Frontend / C UX-16 Opus 4.7）|
+| 15:38-16:00 | Wave 2 完成（D Backend / E Frontend / F ARCH-1）|
+| 16:00-16:35 | 地毯式审查发现 D.15 P0 → Wave 2.5 立即修（aspect_ratio 调用链路 10 段）|
+| 16:53-17:09 | Coordinator 修 subagent_type symlink + memory 重写 |
+| 17:00-17:30 | PM session 暂时 fallback general-purpose（symlink 后启动的 session 才能用真彩色）|
+| 21:00-21:13 | Wave 3 Tester (subagent_type: "tester" 真彩色) T7 真生图验收 11/12 PASS |
+| 21:30 | R7-3 单点 bug 立即修（Founder 决议 选项 A，Wave 4 部署前）|
+
+### 关键产出（Wave 1-3 累计）
+
+- **Backend (8 文件)**: pipeline_orchestrator / job_manager / projects / reference_image_manager / chapters / seedream_generator (D.15 字典扩 7 比例)
+- **Frontend (8 文件)**: lib/url.ts (新) / lib/createUrl.ts (新) / app/create/[projectUuid]/[stage]/page.tsx (新) + 改 StageC/D/E/CreateContent/CreateContext/types/AuthContext/StoryCard/BgmPlayer/StoryDetailContent
+- **Memory 4 条新教训**: feedback_carpet_review_deep_dive / feedback_opus_47_and_effort_max / feedback_aspect_ratio_user_perception + reference_subagent_symlink
+
+### 验收成绩
+
+T7 真生图 (1:1 朋友圈 16 shots) — D.15 P0 PIL 实证 16/16 = 2048x2048 ✅
+11 PASS / 1 FAIL (R7-3 修复中) / 0 未触发风险路径
+
+---
+
+## 2026-04-29 15:50 Wave 3.5/3.6 + D.17 简化决议归档
+
+### Wave 3.5 R7-3 P1 修复 ✅
+- Backend agent 真因定位: `app/services/character_prompt_builder.py` `_build_human_description()` + `build_face_description()` 对 str 类型 physical/clothing/human 调 .get() 触发异常被吞
+- 修复: L102-116 + L231-233 isinstance 双路径处理（dict 走原逻辑，str 走 fallback append）
+- 自测: portrait mtime 20:37 → 21:42（+65min）+ DB updated_at 真更新 + log 无异常 + pytest 24/24
+
+### Wave 3.6 R7-3 复测 ✅
+- Tester 真彩色 subagent_type: "tester" 独立调 char_001 adjust("增加眼镜")
+- 6 证据点全 PASS: HTTP 200 / mtime +62923s / size 1524775 / DB updated_at=2026-04-29T07:10:47Z / log 无异常 / 修复代码仍在
+- PM 5 角度地毯式深挖（被 Founder 一句话点醒后做的）：tester progress mtime / DB SQL 直查 / portrait HTTP / pytest 自跑 / character_prompt_builder 后续 .get() 安全
+- 关键证据: DB description 含双 adjust 累积内容（"红色外套" Backend 自测 + "知性眼镜" Tester 复测）
+
+### D.17 CONTENT_SAFETY 脱敏策略族（Founder 决议简化）
+- Tester 复测附带触发 BUG-2026-04-29-001 char_002 七岁小孩 CONTENT_SAFETY
+- PM 脑洞 9 大维度（儿童/民俗/暴力/真人/IP/政治/医疗/性别/场景）+ 三层防御架构
+- Founder 反馈"过头了，影响故事生动性"→ 简化为只 Layer 3 末端 fallback
+- 最终方案: NB2 拒 → PromptRewriter 改写 → Seedream 试 → 占位图 + 提示
+- 9 维度作为 PromptRewriter 改写时内部参考，不前置脱敏
+- 备注: Seedream 未来可能转首发生产（待定）

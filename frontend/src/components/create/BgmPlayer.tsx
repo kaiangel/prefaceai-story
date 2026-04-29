@@ -19,6 +19,7 @@ import {
   patchBgmVolume,
   getStoredToken,
 } from "@/lib/api";
+import { toAbsoluteUrl } from "@/lib/url";
 
 // Debounce utility for volume PATCH (300ms)
 function useDebouncedCallback<T extends (...args: Parameters<T>) => void>(
@@ -323,10 +324,11 @@ export default function BgmPlayer({ projectId, chapter = 1 }: BgmPlayerProps) {
       </div>
 
       {/* Hidden HTML5 audio element */}
+      {/* P0-1: toAbsoluteUrl converts /static/... paths to absolute backend URLs */}
       {bgmPlayer.bgmUrl && (
         <audio
           ref={audioRef}
-          src={bgmPlayer.bgmUrl}
+          src={toAbsoluteUrl(bgmPlayer.bgmUrl) ?? bgmPlayer.bgmUrl}
           onEnded={() => setIsPlaying(false)}
           onLoadedMetadata={(e) => setAudioDuration((e.target as HTMLAudioElement).duration)}
           onTimeUpdate={(e) => setAudioCurrentTime((e.target as HTMLAudioElement).currentTime)}

@@ -1,8 +1,7 @@
 """Project schemas"""
 
-from datetime import datetime
 from pydantic import BaseModel, Field
-from typing import Literal
+from typing import Any, Literal
 
 
 StylePreset = Literal[
@@ -78,8 +77,14 @@ class ProjectDetail(BaseModel):
     character_count: int
     language: str
     voice_preset: str | None
-    created_at: datetime
-    updated_at: datetime
+    created_at: str   # ISO 8601 with timezone, e.g. "2026-04-28T15:38:00Z"
+    updated_at: str   # ISO 8601 with timezone, e.g. "2026-04-28T15:38:00Z"
+    confirmed_outline: dict[str, Any] | None = None  # 用户确认后的大纲（含 summary/mood/user_selected_mood/music_hint/plot_points）
+    aspect_ratio: str | None = None                   # 画面比例 "2:3" / "16:9" 等
+    # R7-1: Dashboard 列表扩展字段（Wave 2 Agent D）
+    cover_image_url: str | None = None   # storyboard shots[0].image_url（/static/... 路径，前端 toAbsoluteUrl 转绝对 URL）
+    shot_count: int = 0                  # storyboard shots 数组长度
+    mood: str | None = None              # confirmed_outline.user_selected_mood ?? confirmed_outline.mood ?? None
 
     class Config:
         from_attributes = True

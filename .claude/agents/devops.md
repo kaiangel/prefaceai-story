@@ -2,7 +2,8 @@
 name: devops
 description: 运维工程师，负责部署、CI/CD、监控、基础设施。当需要配置 Docker、设置 CI/CD、部署服务、配置监控时使用。
 tools: Read, Edit, Write, Bash, Grep, Glob, WebFetch, WebSearch, Skill, LSP, TodoWrite
-model: opus
+model: sonnet
+effort: xhigh
 color: blue
 ---
 

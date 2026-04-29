@@ -168,6 +168,7 @@ class ReferenceImageManager:
         image_generator,
         delay: float = 3.0,
         seed_image: "Image.Image | None" = None,
+        skip_portrait: bool = False,
     ) -> Dict[str, Any]:
         """
         生成角色的多张参考图（肖像+全身）- 串行生成确保一致性
@@ -182,6 +183,10 @@ class ReferenceImageManager:
             project_style: 项目风格配置
             image_generator: 图片生成器实例
             delay: 请求间隔（秒）
+            seed_image: 用户上传的 seed 图（用作 portrait 参考）
+            skip_portrait: P1-3/R7-4: 若为 True，跳过肖像生成，直接使用
+                           seed_image 作为 portrait 参考生成全身图
+                           （portrait 已在 adjust_character 后新鲜重生成时使用）
 
         Returns:
             {ref_type: generation_result}
@@ -190,29 +195,41 @@ class ReferenceImageManager:
         char_name = character.get('name', 'Unknown')
         results = {}
 
-        # 1. 先生成正面肖像特写（作为基准参考）
-        if seed_image:
-            print(f"      [1/2] 生成 {char_name} 正面肖像（使用用户上传 seed 图）...")
-        else:
-            print(f"      [1/2] 生成 {char_name} 正面肖像（基准参考）...")
-        portrait_result = await self.generate_character_reference(
-            character=character,
-            project_style=project_style,
-            image_generator=image_generator,
-            ref_type='portrait',
-            portrait_ref=seed_image  # 用户上传图作为参考（or None）
-        )
-        results['portrait'] = portrait_result
-
         portrait_image = None
-        if portrait_result.get('success'):
-            portrait_image = portrait_result.get('pil_image')
-            print(f"      ✅ {char_name} 肖像生成成功（将用于全身图参考）")
-        else:
-            print(f"      ❌ {char_name} 肖像生成失败: {portrait_result.get('error')}")
-            print(f"      ⚠️ 全身图将在没有肖像参考的情况下生成")
 
-        await asyncio.sleep(delay)
+        if skip_portrait and seed_image is not None:
+            # P1-3/R7-4: 跳过肖像生成，复用 seed_image（已是新鲜肖像）
+            print(f"      [skip] {char_name} 肖像已新鲜生成，直接复用作为全身图参考")
+            portrait_image = seed_image
+            # 将 seed_image 注册到内部 references 中（供后续 smart 选图）
+            if char_id not in self.character_references:
+                self.character_references[char_id] = {}
+            self.character_references[char_id]['portrait'] = seed_image
+            name_en = character.get('name_en', '') or character.get('name', 'Unknown')
+            self.character_names[char_id] = name_en
+        else:
+            # 1. 先生成正面肖像特写（作为基准参考）
+            if seed_image:
+                print(f"      [1/2] 生成 {char_name} 正面肖像（使用用户上传 seed 图）...")
+            else:
+                print(f"      [1/2] 生成 {char_name} 正面肖像（基准参考）...")
+            portrait_result = await self.generate_character_reference(
+                character=character,
+                project_style=project_style,
+                image_generator=image_generator,
+                ref_type='portrait',
+                portrait_ref=seed_image  # 用户上传图作为参考（or None）
+            )
+            results['portrait'] = portrait_result
+
+            if portrait_result.get('success'):
+                portrait_image = portrait_result.get('pil_image')
+                print(f"      ✅ {char_name} 肖像生成成功（将用于全身图参考）")
+            else:
+                print(f"      ❌ {char_name} 肖像生成失败: {portrait_result.get('error')}")
+                print(f"      ⚠️ 全身图将在没有肖像参考的情况下生成")
+
+            await asyncio.sleep(delay)
 
         # 2. 用肖像作为参考生成全身图（串行关键步骤）
         print(f"      [2/2] 生成 {char_name} 全身视图（使用肖像作为参考）...")

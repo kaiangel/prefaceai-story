@@ -142,6 +142,7 @@ async def run_story_generation_task(
     characters_json: str | None = None,
     confirmed_outline: dict | None = None,
     project_uuid: str | None = None,
+    aspect_ratio: str = "2:3",  # D.15 P0: 用户选择的画幅，默认 "2:3" 兼容旧调用
 ):
     """
     Background task to generate story
@@ -184,9 +185,22 @@ async def run_story_generation_task(
         )
 
         # B-1: progress_callback 使用短生命周期 session
-        async def progress_callback(stage: str, progress: int, message: str):
+        # UX-11: stage="completed" 时同步将 job.status 设为 "completed"
+        # P1-2 UX-7: progress 单调 guard — 新 progress < 当前 progress 时保留当前（避免 BGM 入口倒退）
+        _last_progress: list[int] = [0]  # 用列表包装以便闭包内修改
+
+        async def progress_callback(
+            stage: str,
+            progress: int,
+            message: str,
+            estimated_remaining_seconds: int | None = None,  # A.2: default value 不破坏现有调用
+        ):
+            # 单调 guard: 若新 progress 小于上次 progress，使用上次值
+            _guarded_progress = max(progress, _last_progress[0])
+            _last_progress[0] = _guarded_progress
+            _status = "completed" if stage == "completed" else None
             await _update_job_short_session(
-                job_id, stage=stage, progress=progress, message=message
+                job_id, status=_status, stage=stage, progress=_guarded_progress, message=message
             )
 
         # B-6: checkpoint_callback — 每个 Stage 完成后存中间结果到 chapter 表
@@ -222,6 +236,8 @@ async def run_story_generation_task(
                 generate_images=True,
                 confirmed_outline=confirmed_outline,
                 project_uuid=project_uuid,
+                chapter_id=chapter_id,  # ARCH-1: 传入 chapter_id，让 pipeline 批量写入 chapter_scene_images
+                aspect_ratio=aspect_ratio,  # D.15 P0: 传入用户选择的画幅
                 progress_callback=progress_callback,
                 checkpoint_callback=checkpoint_callback,
             )
@@ -294,12 +310,14 @@ async def run_story_generation_task(
             await short_db.commit()
 
         # Update job as completed (短 session)
+        # P0-2: stage 必须设成 'completed' 而不是 'story_generation'，
+        # 否则前端 STAGE_LABEL["story_generation"] 会让大标题倒退到"正在生成故事大纲"
         task_elapsed = time.time() - task_start
         logger.info(f"[JobManager] ✅ 生成任务完成 (总耗时 {task_elapsed:.1f}s)")
         await _update_job_short_session(
             job_id,
             status="completed",
-            stage="story_generation",
+            stage="completed",
             progress=100,
             message="故事生成完成！",
         )

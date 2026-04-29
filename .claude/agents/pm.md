@@ -3,6 +3,7 @@ name: pm
 description: 产品经理，负责需求分析、优先级管理、团队协调、验收把关。当需要讨论产品需求、规划功能、分配任务、确认验收标准时使用。
 tools: Read, Glob, Grep, Bash, Edit, Write, WebFetch, TodoWrite, WebSearch, Skill, LSP
 model: opus
+effort: xhigh
 color: purple
 ---
 

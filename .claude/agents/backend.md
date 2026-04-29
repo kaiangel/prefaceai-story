@@ -2,7 +2,8 @@
 name: backend
 description: 后端开发专家，负责 FastAPI、业务逻辑、视频合成。当需要开发 API、修改 /app/ 目录代码、实现后端服务、处理数据库逻辑时使用。
 tools: Read, Edit, Write, Bash, Grep, Glob, WebFetch, TodoWrite, WebSearch, Skill, LSP
-model: opus
+model: sonnet
+effort: xhigh
 color: green
 ---
 

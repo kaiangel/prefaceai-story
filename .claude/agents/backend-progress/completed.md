@@ -4,6 +4,153 @@
 
 ---
 
+## 2026-04-28
+
+### R7-3 P1 portrait 重生静默失效 bug 修复 ✅ [2026-04-28 21:42]
+
+**真因**: `adjust_character()` 调 Haiku 改写角色后，`updated_char` 里的 `physical`/`clothing`/`human` 字段为 **str** 类型（不是 dict，与原始 T7 数据格式一致，Haiku 忠实保留）。随后 `generate_character_reference()` → `_build_portrait_prompt()` → `character_builder._build_human_description()` 在 L100-102 对这些字段调 `.get()` 时触发 `'str' object has no attribute 'get'`，异常被 try/except 吞掉，portrait 静默失败。
+
+**修复文件**: `app/services/character_prompt_builder.py`
+
+**修复 2 处**:
+1. `_build_human_description()` L100-112: 新增防御性类型检查，`human_raw/physical_raw/clothing_raw = character.get(...)` 后判断是否为 dict，若为 str 则直接追加 str 内容到 parts（跳过细粒度 `.get()` 调用）
+2. `build_face_description()` L217: 同样防御性处理 `physical_raw`
+
+**验收证据**:
+- pytest 24/24 ✅（test_architecture + test_parallel_stage5）
+- backend log: `[AdjustCharacter] ✅ 角色 char_001 已调整` + `R7-3: char_001 肖像已重生成` — 无任何异常
+- portrait mtime: `1777379854.28` → `1777383723.85`（文件确实更新）
+- DB `characters_json[0].portrait_url` = `/static/outputs/.../char_001_portrait.png` ✅
+- DB `characters_json[0].updated_at` = `2026-04-28T13:42:03.852076Z` ✅
+
+**严禁文件**: 未碰 image_generator.py / storyboard_prompts.py / seedream_generator.py / style_enforcer.py / storyboard_service.py ✅
+**D.15 aspect_ratio 链路**: 无影响 ✅
+
+---
+
+### TASK-T6-FIXBATCH Wave 2.5 — D.15 P0 aspect_ratio 完整修复 ✅ [2026-04-28 17:00]
+
+**根因**: pipeline_orchestrator.py 真生图调用 `aspect_ratio="2:3"` hardcoded，用户选的画幅完全无效。
+
+**修复 4 文件 7 处**:
+- `seedream_generator.py`: `_ASPECT_RATIO_TO_SIZE` 补 `3:4` + `4:3`（现 7 种）
+- `pipeline_orchestrator.py`: `run()` 加 `aspect_ratio` 参数 + 3 处 hardcoded 全消除（真生图调用 + ARCH-1 width/height/aspect_ratio）
+- `job_manager.py`: `run_story_generation_task()` 加 `aspect_ratio` 参数 + pipeline.run() 传值
+- `projects.py`: `_run_generation_in_background()` + `start_generation()` 传 `project.aspect_ratio or "2:3"`
+
+**验证**: pytest 292/292 passed ✅ | import check ✅ | PENDING.md D.15 标 ✅
+
+---
+
+### TASK-T6-FIXBATCH Wave 2 Agent F — ARCH-1 chapter_scene_images 写入 ✅ [2026-04-28 15:50]
+
+**任务**: P1-7 ARCH-1 — pipeline 完成后批量写入 chapter_scene_images 表，让单 shot 重生成 / 局部编辑功能可用。
+
+**评估完成（Step 1）**: grep 全代码库 19 处引用，逐引用分析 4 个问题，结论：全部兼容，无破坏性变更。
+
+**实施方案**:
+- `pipeline_orchestrator.run()` 加 `chapter_id: Optional[int] = None`（默认值，向后兼容）
+- Stage 5 storyboard checkpoint 之后加 ARCH-1 块：DELETE 旧记录 + 批量 INSERT 成功 shots（image_url 不为空）
+- 失败兜底：`except Exception: logger.warning`（非阻塞）
+- `job_manager.py` 调用 `pipeline.run()` 时传入 `chapter_id=chapter_id`
+
+**修改文件**:
+- `app/services/pipeline_orchestrator.py` — run() 参数 + ARCH-1 批量写入块
+- `app/services/job_manager.py` — pipeline.run() 加 chapter_id 参数
+
+**验证**: pytest 211/211 ✅；import check ✅；禁改文件未碰 ✅
+
+---
+
+### TASK-T6-FIXBATCH Wave 1.1 Agent A + 修复 round 1 ✅ [2026-04-28 15:05]
+
+**任务**: 5 项后端修复（P0-2 / P1-1 / P1-2 / P1-3 / P1-5）+ PM 审查后修复 round 1（2 处严重问题）
+
+**修改文件**:
+- `app/services/job_manager.py` — P0-2 stage='completed' + P1-2 单调 guard + estimated_remaining_seconds 参数
+- `app/services/pipeline_orchestrator.py` — P1-1 stage callback 4处修正 + image_generation 入口 + STAGE_DURATIONS + estimate_remaining() + P1-3 freshness check（**30s buffer**）+ P1-5 character_design/6 分离点
+- `app/services/reference_image_manager.py` — P1-3 generate_character_multi_refs() skip_portrait 参数
+- `app/api/projects.py` — P1-3 adjust_character Step 7 (portrait重生+updated_at) + 新端点 POST /{id}/characters/{char_id}/regenerate-portrait
+- `app/api/chapters.py` — **修复 round 1**: import estimate_remaining + /status ETA 替换为 stage-aware 逻辑（L21 + L143-156）
+
+**验证**: pytest 7/7 ✅；语法验证 ✅；import check ✅；禁改文件未碰 ✅
+
+---
+
+## 2026-04-27
+
+### TASK-T5-FIXBATCH-R6 子任务 1 ✅ [2026-04-27 17:30]
+
+**任务**: 扩展 GET /api/projects/{project_id} 响应，加 `confirmed_outline` + `aspect_ratio` 字段
+
+**修改文件**:
+- `app/schemas/project.py` — 加 `from typing import Any`；ProjectDetail 新增 2 字段（带注释）
+- `app/api/projects.py` — serialize_project_detail 新增 json.loads(confirmed_outline_json) + JSONDecodeError fallback None
+
+**验证**:
+- pytest 211/211 passed (test_architecture + test_parallel_stage5 + test_style_music_hints)
+- ProjectDetail 实例化测试: confirmed_outline={'mood':'感人'} + aspect_ratio='2:3' 正确出现在 model_dump()
+
+**影响**: GET /api/projects/{id} 和 GET /api/projects/（list）都自动带新字段。list 端点性能无影响（json.loads 每项执行一次，O(n) 不可避免）。
+
+---
+
+### TASK-PARALLEL-M1 Round 4 ✅ [2026-04-27 11:35]
+
+**任务**: 修 Bug 1（dispatcher 没传 `**_kwargs_copy`） + Bug 5（ShotValidator 5MB 图片限制图压缩）
+
+**Bug 1 修复**:
+- 文件: `app/services/image_generator.py`
+- 问题: L1392 dispatcher 调用 `generate_shot_image_seedream()` 时 `_kwargs_copy` 不传入 → project_id 无法到 log_api_cost → INSERT None
+- 修复: 在调用末尾加 `**_kwargs_copy`（1行）
+- 实证: api_cost_logs id=182-197 共 16 条 project_id=12（integer），旧代码 id<=181 全 None
+
+**Bug 5 修复**:
+- 文件: `app/services/shot_validator.py`
+- 问题: Seedream PNG 超 Anthropic Claude 5MB 上限触发 fail-open
+- 修复: 新增 `_compress_for_claude()` 函数 + validate_shot() 调用点
+  - 策略: quality 85/75/65/55 → 分辨率 80%/60%/50% 渐进压缩
+  - media_type 动态（image/jpeg 压缩后 / image/png 原图）
+
+**验收**:
+- pytest: 24/24 passed ✅
+- driver 跑完: 16/16 shots project_id=integer ✅
+- 耗时: 20.3 min, success=True, 成本 ~¥3.5
+
+---
+
+
+## 2026-04-25
+
+### TASK-SHOT08-DIAGNOSIS ✅ [2026-04-25 13:48]
+
+**背景**: Shot 8 在 Phase 3/4/回归测试三次都在同一位置卡死（4 角色 + 2 场景 = 6 refs，prompt 2023 字符）。PM 要求单独诊断根因 A/B/C。
+
+**执行**: 方案 1（`bash -c` wrapper）成功，直接跑通。
+
+**结论**: 根因 A — 累积态资源耗尽。单独跑 shot_8 成功（1664x2496 生图，78.6s，3218KB），排除 B/C。
+
+**关键数据**:
+
+| 指标 | 数值 |
+|------|------|
+| outcome | success |
+| root_cause | A |
+| mem_peak_mb | 290.45 MB |
+| payload_bytes | 10,363,884 (~9.88 MB) |
+| total_elapsed_sec | 81.603 s |
+| api_call 耗时 | 78.648 s |
+| http_status | null |
+| exception_type | null |
+
+**含义**: 前 7 个 shot 跑完后内存/socket/handle 未完全释放导致卡死。生产 FastAPI 每请求独立调用栈，天然隔离，无需修复生产代码。
+
+**约束遵守**: 未碰 scripts/diagnose_shot8_seedream.py / app/services/* / 其他 agent 文件。仅写 test_output + 文档三件套。
+
+**产物**: `test_output/manualtest/shot8_diagnosis_2026-04-25/` (diagnose.log, result.json, shot_08.png)
+
+---
+
 ## 2026-04-23
 
 ### TASK-BUG-FIX-BATCH-1 Route B ✅ [2026-04-23 16:15]
@@ -2176,3 +2323,52 @@ bubble_x = max(10, min(bubble_x, width - bubble_width - 10))
 **经验教训**:
 - 学到了什么
 ```
+
+---
+
+## 2026-04-25 — round 2
+
+### TASK-PARALLEL-M1 round 2 ✅ [2026-04-25 17:30]
+
+**背景**: PM 审查 Phase 1 报告 3 隐忧，Founder 批准 Backend round 2 修复。
+
+**执行**: 真实 venv 验证所有依赖可用，无需 stub。
+
+**修复内容**:
+1. conftest.py（14.6KB）删除 — venv 真实依赖足够，无需任何 stub
+2. pipeline_orchestrator.py: PipelineCostTracker 创建前用 project_uuid 查 DB 拿 integer Project.id，传入 CostTracker + generate_shot_image_phase2_safe() 调用，ARCH-4 READ/INSERT 路径打通
+3. seedream_generator.py: 从 **_kwargs 提取 project_id，传入 log_api_cost()，Seedream INSERT 路径携带真实 project_id
+
+**验收**: pytest 24/24 passed in 0.78s（真实 venv，无 stub）
+
+**修改文件**: conftest.py 删除 / pipeline_orchestrator.py +18行 / seedream_generator.py +2行
+
+
+
+---
+
+### TASK-T5-FIXBATCH 8 条后端修复 ✅ (2026-04-27 PM 代更归档)
+
+**完成时间**: 2026-04-27 16:33 (~13 min agent 时间)
+**验收状态**: ✅ 211/211 tests pass + T5 hot-fix 已跑
+
+**完成内容**:
+- [x] BE-3 P0 image_url 写回 storyboard
+- [x] BE-4 P0 /chapters/{n}/storyboard 端点
+- [x] BE-5 P0 bgm_url HTTP URL
+- [x] BGM-1 P1 outline.music_hint
+- [x] OBS-4 P1 用户情绪持久化
+- [x] UX-10/11 P1 BGM + completed signal
+- [x] UX-1/14 P1 Stage 2 portrait 提前
+- [x] UX-2 A2 P2 outline 一致性 LLM check
+- [x] Hot-fix T5 数据补 URL 让 Founder 立刻能看
+
+**关键产出**:
+| 文件 | 改动 |
+|------|------|
+| `app/services/pipeline_orchestrator.py` | BE-3/5 + BGM-1 + UX-10/11 + UX-1/14 |
+| `app/api/chapters.py` | BE-4 |
+| `app/api/projects.py` | OBS-4 + UX-2 A2 |
+| `app/services/job_manager.py` | UX-10/11 |
+| `scripts/hotfix_t5_urls.py` (新建) | T5 数据补 URL |
+

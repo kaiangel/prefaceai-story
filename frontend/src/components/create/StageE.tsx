@@ -57,6 +57,13 @@ export default function StageE() {
         </motion.div>
 
         <h1 className="text-2xl font-bold mb-2">故事创作完成</h1>
+        {/* P1-6 (UX-17): Show outline.summary (edited outline) instead of original_idea.
+            Three-layer fallback: outline.summary → chapter.summary → original idea */}
+        {(state.outline?.summary || state.idea) && (
+          <p className="text-text-secondary text-sm mb-3 max-w-sm mx-auto line-clamp-3 leading-relaxed">
+            {state.outline?.summary || state.idea}
+          </p>
+        )}
         <p className="text-text-tertiary text-sm mb-2">
           共 {state.shots.length} 张画面
           {state.bgm && <> &middot; BGM: {state.bgm.name}</>}

@@ -56,6 +56,7 @@ export interface OutlineCharacter {
   nameEn: string;
   description: string;
   personality: string;
+  portrait_url?: string | null;  // UX-1: backend Stage 2 adds portrait after character design
 }
 
 export interface EndingOption {
@@ -166,6 +167,7 @@ export interface StoryCard {
   style: string;
   length: StoryLength;
   shotCount: number;
+  mood: string | null;
   createdAt: string;
   updatedAt: string;
   status: "draft" | "generating" | "complete";
@@ -194,7 +196,7 @@ export interface RegisterForm {
 
 export interface StoryDetail extends StoryCard {
   summary: string;
-  characters: { name: string; description: string }[];
+  characters: { name: string; description: string; portrait_url?: string | null }[];  // Bug F: portrait_url from backend Stage 2
   shots: Shot[];
   mood: string;
   aspectRatio: AspectRatio;
@@ -209,6 +211,7 @@ export interface PreviewCharacter {
   name: string;
   description: string;
   fullbodyUrl: string;
+  portraitUrl?: string | null;  // UX-1: real portrait from Stage 2 backend, null = fallback silhouette
   adjustments: string[];
 }
 
@@ -329,6 +332,8 @@ export type CreateAction =
   | { type: "SET_DELIVERY_FORMAT"; payload: DeliveryFormat }
   | { type: "SET_CONTINUATION_MODE"; payload: ContinuationMode | null }
   | { type: "SET_CONTINUATION_PROMPT"; payload: string }
+  // UX-16: Hydrate full state from backend on URL-based deep link / refresh
+  | { type: "HYDRATE_FROM_BACKEND"; payload: Partial<CreateState> & { projectId: string } }
   | { type: "RESET" };
 
 // ============ Style Presets ============
