@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   ChevronLeft,
@@ -29,6 +29,8 @@ export default function StageD() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [adjustmentText, setAdjustmentText] = useState("");
   const [adjusting, setAdjusting] = useState(false);
+  // D.17: ref for adjustment input to focus when user clicks "改一下文字"
+  const adjustInputRef = useRef<HTMLInputElement>(null);
 
   const token = getStoredToken();
   const shots = state.shots;
@@ -204,9 +206,28 @@ export default function StageD() {
                   }}
                 />
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center">
-                  <ImageIcon className="w-12 h-12 text-text-muted/30 mb-2" />
-                  <span className="text-xs text-text-muted">画面生成中...</span>
+                // D.17: show specific reason when safety_advice or error_message is present
+                <div className="w-full h-full flex flex-col items-center justify-center px-4 gap-2">
+                  <ImageIcon className="w-12 h-12 text-text-muted/30 mb-1" />
+                  {(currentShot.safetyAdvice || currentShot.errorMessage) ? (
+                    <>
+                      <span className="text-xs text-amber-400/80 text-center leading-relaxed">
+                        {currentShot.safetyAdvice || currentShot.errorMessage}
+                      </span>
+                      <button
+                        onClick={() => {
+                          // D.17: focus the "调整画面" input below and scroll to it
+                          adjustInputRef.current?.focus();
+                          adjustInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }}
+                        className="mt-1 text-xs text-brand-primary hover:underline"
+                      >
+                        改一下文字
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-xs text-text-muted">画面生成中...</span>
+                  )}
                 </div>
               )}
             </div>
@@ -300,6 +321,16 @@ export default function StageD() {
               <span>场景: {currentShot.sceneId}</span>
             </div>
 
+            {/* D.17: Safety advice / error reason — shown when image generation was blocked */}
+            {!currentShot.imageUrl && (currentShot.safetyAdvice || currentShot.errorMessage) && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-400/90 leading-relaxed">
+                  {currentShot.safetyAdvice || currentShot.errorMessage}
+                </p>
+              </div>
+            )}
+
             {/* Adjust Image */}
             <div className="bg-bg-secondary rounded-xl border border-white/5 p-3 space-y-2">
               <div className="flex items-center gap-1.5 text-xs text-text-secondary font-medium">
@@ -308,6 +339,7 @@ export default function StageD() {
               </div>
               <div className="flex gap-2">
                 <input
+                  ref={adjustInputRef}
                   type="text"
                   value={adjustmentText}
                   onChange={(e) => setAdjustmentText(e.target.value)}

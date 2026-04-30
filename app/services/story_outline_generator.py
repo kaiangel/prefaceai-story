@@ -412,6 +412,20 @@ Review all family_relationships entries together. For each person mentioned:
 - Verify that relationship labels match the generational distance
   (1 generation = parent_of, 2 generations = grandparent_of)
 
+## 故事内部一致性规则（MANDATORY — 输出前必须自检）
+
+**数字一致性**：故事中出现的所有数字（如"二十八对夫妻"、"三十二名学生"、"五年前"等统计或量化信息）必须在所有 plot_points、summary、logline 中保持完全一致。如果 plot_point 1 提到"二十八对"，plot_point 7 也必须是"二十八对"，不得自行更改。
+
+**角色名字一致性**：characters_overview 中定义的角色名字（name_suggestion）必须在 plot_points、summary、family_relationships 中统一使用，不得出现"李明"和"李小明"混用、或同一人物被称呼不同名字的情况。
+
+**时间点/地点/关键物件一致性**：故事世界观中的时间背景（如"改革开放初期"、"1990年代"）、核心地点（如"老宅"、"上海外滩"）、关键物件（如"外婆的木梳"、"父亲的围棋盒"）在所有 plot_points 中的描述必须前后一致。
+
+**输出前自检指令**：在生成最终 JSON 之前，扫描所有 plot_points + summary + logline，确认：
+1. 所有数字前后一致（特别检查 plot_point 1 vs 其他 plot_points 的数字）
+2. 所有角色名字在 characters_overview 和 plot_points 中拼写完全一致
+3. 时间/地点/物件描述无矛盾
+如发现矛盾，以 plot_point 1（inciting_incident）的版本为准，修正其他所有不一致处。
+
 ## 注意事项
 
 - visual_tone.color_palette 中的颜色名必须是**英文**（如 "warm amber", "deep navy", "muted sage green"），不要使用中文颜色名
@@ -495,14 +509,20 @@ Review all family_relationships entries together. For each person mentioned:
         if json_match:
             try:
                 return json.loads(json_match.group(1))
-            except json.JSONDecodeError:
-                pass
+            except json.JSONDecodeError as e:
+                logger.warning(
+                    f"[OutlineGenerator] JSON解析失败(code-block): {e} "
+                    f"| 位置约第{e.lineno}行col{e.colno} | 内容长度={len(content)}"
+                )
 
         # 尝试直接解析整个内容
         try:
             return json.loads(content)
-        except json.JSONDecodeError:
-            pass
+        except json.JSONDecodeError as e:
+            logger.warning(
+                f"[OutlineGenerator] JSON解析失败(direct): {e} "
+                f"| 位置约第{e.lineno}行col{e.colno} | 内容长度={len(content)}"
+            )
 
         # 尝试找到第一个{和最后一个}
         start = content.find('{')
@@ -510,8 +530,12 @@ Review all family_relationships entries together. For each person mentioned:
         if start != -1 and end != -1 and end > start:
             try:
                 return json.loads(content[start:end+1])
-            except json.JSONDecodeError:
-                pass
+            except json.JSONDecodeError as e:
+                logger.warning(
+                    f"[OutlineGenerator] JSON解析失败(brace-extract): {e} "
+                    f"| 位置约第{e.lineno}行col{e.colno} | 内容长度={len(content)} "
+                    f"| 预览前200chars: {content[start:start+200]!r}"
+                )
 
         return None
 

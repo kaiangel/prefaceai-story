@@ -539,6 +539,7 @@ class Phase2PipelineOrchestrator:
                 characters_overview=outline.get("characters_overview", []),
                 family_relationships=outline.get("family_relationships", []),
                 progress_callback=progress_callback,
+                chapter_duration_minutes=target_duration_minutes,  # O-2: 传入时长用于 shot cap
             )
             # 成本计数: Stage 4 Sonnet 调用
             cost_tracker.add_cost("sonnet", 0.05, "Stage 4")
@@ -953,7 +954,28 @@ class Phase2PipelineOrchestrator:
                         }
                     else:
                         err = (result.get("error", "Unknown error") if result else "No result returned")
+                        error_kind = result.get("error_kind", "") if result else ""
                         logger.error(f"    ❌ Shot {shot_id} 失败: {err}")
+
+                        # D.17: content_safety_failure → Haiku 智能分析，写回 shot dict
+                        safety_advice: dict | None = None
+                        if error_kind == "content_safety_failure":
+                            try:
+                                from app.services.prompt_safety_advisor import analyze_safety_failure
+                                failed_prompt = result.get("failed_prompt", "") if result else ""
+                                safety_advice = await analyze_safety_failure(
+                                    failed_prompt=failed_prompt,
+                                    reason=error_kind,
+                                )
+                                shot["error_message"] = safety_advice.get("user_message", "")
+                                shot["safety_advice"] = safety_advice
+                                shot["image_url"] = None
+                                logger.info(
+                                    f"    [SafetyAdvisor] Shot {shot_id} 安全提示已写回: "
+                                    f"{len(safety_advice.get('suspected_terms', []))} suspected terms"
+                                )
+                            except Exception as _sa_exc:
+                                logger.warning(f"    [SafetyAdvisor] Shot {shot_id} 分析失败（非阻塞）: {_sa_exc}")
 
                         async with completed_lock:
                             completed_count += 1
@@ -973,8 +995,10 @@ class Phase2PipelineOrchestrator:
                             "shot_id": shot_id,
                             "success": False,
                             "error": err,
+                            "error_kind": error_kind,
                             "image_path": None,
                             "with_text_path": None,
+                            "safety_advice": safety_advice,
                         }
 
                 logger.info(
@@ -1041,12 +1065,10 @@ class Phase2PipelineOrchestrator:
                         from app.database import async_session_maker
                         from app.models.scene_image import SceneImage
                         from sqlalchemy import delete as sa_delete
-                        # D.15 P0: 用 _ASPECT_RATIO_TO_SIZE 查真实 width/height（移到循环外，只执行一次）
-                        from app.services.seedream_generator import _ASPECT_RATIO_TO_SIZE as _AR_MAP
-                        _size_str = _AR_MAP.get(aspect_ratio, _AR_MAP["2:3"])
-                        _size_parts = _size_str.split("x")
-                        _ar_width = int(_size_parts[0])
-                        _ar_height = int(_size_parts[1])
+                        # D.18: model-aware 尺寸查询（NB2 vs Seedream 实际分辨率不同）
+                        from app.services.seedream_generator import get_size_for_model as _get_size
+                        _current_provider = getattr(settings, "IMAGE_GEN_PROVIDER", "nb2")
+                        _ar_width, _ar_height = _get_size(_current_provider, aspect_ratio)
 
                         async with async_session_maker() as arch1_db:
                             # 先 DELETE 该 chapter 下所有既有 SceneImage 记录（防止重复写入）
@@ -1074,8 +1096,8 @@ class Phase2PipelineOrchestrator:
                                     image_prompt=shot.get("image_prompt", ""),
                                     image_path=_image_path,     # 本地绝对路径
                                     image_url=_image_url,       # HTTP URL /static/outputs/...
-                                    width=_ar_width,            # D.15 P0: 真实宽度，从 aspect_ratio 参数派生
-                                    height=_ar_height,          # D.15 P0: 真实高度，从 aspect_ratio 参数派生
+                                    width=_ar_width,            # D.18: model-aware 真实宽度（NB2/Seedream 不同）
+                                    height=_ar_height,          # D.18: model-aware 真实高度
                                     aspect_ratio=aspect_ratio,  # D.15 P0: 真实比例，从 run() 参数读取
                                     is_active=True,
                                 )

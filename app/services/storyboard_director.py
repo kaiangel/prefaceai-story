@@ -348,6 +348,7 @@ class StoryboardDirector:
         characters_overview: list = None,
         family_relationships: list = None,
         progress_callback=None,
+        chapter_duration_minutes: int = 3,  # O-2: 用于计算 max_shots 上限
     ) -> dict:
         """
         生成分镜脚本（按scene分批生成，解决LLM输出不完整问题）
@@ -430,6 +431,10 @@ class StoryboardDirector:
         if remaining_scenes:
             semaphore = asyncio.Semaphore(3)  # RB-3: 降低并发避免 529 overloaded
 
+            # T-2: 共享完成计数器（Scene 1 已完成，从 1 起步）
+            _completed_scenes = [1]
+            _completed_lock = asyncio.Lock()
+
             async def _generate_with_semaphore(scene_idx: int, scene: dict) -> tuple:
                 async with semaphore:
                     scene_id = scene.get("scene_id", scene_idx + 1)
@@ -449,6 +454,22 @@ class StoryboardDirector:
                         print(f"✅ {len(shots)} shots")
                     else:
                         print(f"❌ 失败")
+
+                    # T-2: 每个 scene 完成后立即推进度回调（不等 gather 全部结束）
+                    if progress_callback:
+                        async with _completed_lock:
+                            _completed_scenes[0] += 1
+                            _done = _completed_scenes[0]
+                        _base = 35
+                        p = _base + int(_done / len(valid_scenes) * 30)
+                        try:
+                            await progress_callback(
+                                "storyboard", p,
+                                f"分镜生成中 (Scene {_done}/{len(valid_scenes)})..."
+                            )
+                        except Exception as _cb_e:
+                            logger.warning(f"[StoryboardDirector] T-2 progress_callback 失败: {_cb_e}")
+
                     return (scene_idx, shots)
 
             # 并行执行
@@ -468,17 +489,27 @@ class StoryboardDirector:
                         shot_id_counter += 1
                     all_shots.extend(shots)
 
-                # B-4: Scene 进度回调（每完成一个 scene）
-                if progress_callback:
-                    completed = i + 2  # +2 因为 Scene 1 已完成
-                    p = 35 + int(completed / len(valid_scenes) * 30)
-                    await progress_callback(
-                        "storyboard", p,
-                        f"分镜生成中 (Scene {completed}/{len(valid_scenes)})..."
-                    )
-
         if not all_shots:
             raise ValueError("无法生成任何shots")
+
+        # O-2: cap 上限 — 根据 chapter_duration_minutes 截断超出部分
+        if chapter_duration_minutes <= 3:
+            _max_shots = 18
+        elif chapter_duration_minutes <= 6:
+            _max_shots = 36
+        else:
+            _max_shots = 60
+
+        if len(all_shots) > _max_shots:
+            logger.warning(
+                f"[StoryboardDirector] O-2: LLM 生成 {len(all_shots)} shots，超出上限 {_max_shots}（"
+                f"chapter_duration={chapter_duration_minutes}min），自动截断"
+            )
+            print(f"  [O-2] ⚠️ shots 超出上限 {_max_shots}（实际 {len(all_shots)}），截断")
+            all_shots = all_shots[:_max_shots]
+            # 重新统一 shot_id 编号（截断后保持连续）
+            for idx, s in enumerate(all_shots):
+                s["shot_id"] = idx + 1
 
         total_duration = sum(s.get("estimated_duration", 5) for s in all_shots)
 

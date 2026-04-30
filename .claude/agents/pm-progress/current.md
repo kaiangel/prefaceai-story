@@ -1,7 +1,68 @@
 # PM Agent - 当前任务
 
-> **最后更新**: 2026-04-29 15:50
-> **状态**: ✅ Wave 1.1+1.2+2+2.5+3+3.5+3.6 全部 PASS（R7-3 修复 + Tester 复测 6 证据点 + PM 5 角度地毯式深挖）→ Wave 4 DevOps 部署准备 spawn
+> **最后更新**: 2026-04-29 17:35
+> **状态**: 🔄 **Wave 5.1 进行中** — Backend + Frontend + AI-ML 三真彩色 agent 并行（D.17 二次修订移除 NB2/Seedream 混合 fallback + 11 项暂缓项除导出/视频外全做）
+
+## 2026-04-29 17:25 Founder 二次修订 D.17 — 关键铁律确立
+
+**Pipeline 必须用单一生图模型，不可 NB2/Seedream 混合**（永久 memory: `feedback_pipeline_single_model_only.md`）
+
+理由: 18 张 shot 里 1 张异类风格用户细看大概率发现，破坏视觉统一性。
+
+修复:
+- ❌ 删除 `image_generator.py` L796-801 + L1389-1398 + `seedream_generator.py` L720-740 _run_fallback 全部 NB2↔Seedream 自动切换
+- ✅ 保留 PromptRewriter 改写重试（首选模型内）
+- ✅ 新建 `app/services/prompt_safety_advisor.py` Haiku 智能提示用户改 prompt（仍拒时）
+
+## 2026-04-29 17:30 Wave 5.1 spawn 3 agent 并行
+
+| Agent | subagent_type | 任务 | 工时 |
+|-------|--------------|------|------|
+| 🟦 Backend | "backend" 真彩色 | D.17 移除 fallback + 智能提示 + D.18 SIZE_BY_MODEL + O-2 cap + T-2 callback + R7-2 schema/endpoint × 6 | ~3 hr |
+| 🟩 Frontend | "frontend" 真彩色 | D.14 三 banner + D.13/D.16/T-1 + StageD onError 升级 + R7-2 frontend × 8 | ~2 hr |
+| 🟨 AI-ML | "ai-ml" 真彩色 | O-1 outline 一致性 prompt | ~15 min |
+
+## 关键产品决策（本轮 17:00-17:30）
+
+1. **R7-2 DB schema 选 B**：PM 直接派 Backend 设计 schema + Alembic 迁移（**纯增量加列/加表，不破坏 Ben 现有架构**），事后通知 Ben
+2. **R7-2 分享页内容方案 A**：部分 shot（前 3 张）+ 引流注册 CTA
+3. **R7-2 OG meta tags**：暂不加，记 PENDING
+4. **R7-2 分享过期机制**：永久（不加 expires_at）
+5. **R7-2 PV 统计**：记录到 share_pv_logs 表
+6. **D.17 二次修订**：移除 NB2/Seedream 混合 fallback（全 pipeline 单一模型铁律）
+7. **R7-2 导出 zip + 合成视频**：暂缓 MVP 后做（已记 PENDING）
+8. **ARCH-2 死表清理**：本轮做完后 Founder 人工通知 Ben 操作（DBA 边界）
+9. **测试 + 部署节奏**：A — 全部做完一次性 push + VPS 部署（避免多次 docker rebuild）
+
+## Wave 5 流程
+
+- 5.1 Backend + Frontend + AI-ML 并行 (~2-3 hr)
+- 5.2 Frontend 第二轮接 Backend R7-2 真 API
+- 5.3 DevOps push + rsync VPS + Alembic 迁移 + 通知 Ben
+- 5.4 Tester 端到端验收（本地 + 浏览器域名 2 套）
+
+---
+
+## ✅ TASK-T6-FIXBATCH 历史结案（17:00 之前）
+
+Wave 0+1.1+1.2+2+2.5+3+3.5+3.6+4 全部 PASS
+
+## 2026-04-29 16:50 Wave 4 DevOps 部署 ✅
+- DevOps 真彩色 (subagent_type: "devops") 部署
+- commit 84a2d35 (代码) + ec471a6 (文档) push GitHub main
+- rsync VPS + Docker rebuild + 容器 healthy
+- Ben 通知发了（team_ben/TEAM_CHAT.md 15:57）
+- 生产 T8 (uuid a3966a40-6d27-42c0-a7cf-109729e453e7) 4 验收 PASS：D.15 1:1 ✅ / R7-1 cover+shot ✅ / R7-3 mtime+45s ✅ / UX-16 dynamic route HTTP 200 ✅
+- T8 NB2 实际成本 ~¥12-15（NB2 单价比 Seedream 高，下次用 SKIP_IMAGE_GENERATION 节省）
+
+## 2026-04-29 17:00 D.18 P3 新发现
+- DevOps 报告 NB2 1:1=1024x1024 vs Seedream 1:1=2048x2048
+- _ASPECT_RATIO_TO_SIZE 字典是 Seedream 标准，SceneImage 元数据写 2048x2048 跟 NB2 实际不一致
+- 用户视觉感受不到（仍是 1:1），只影响 DB 元数据 + 后续单 shot 重生成参数 — P3 暂缓
+
+## 暂缓项追踪 (PENDING D.13-D.18 共 6 条 + R7-2 5 按钮 + ARCH-2 + OPS-3 + 文案小批)
+
+详见 PENDING + 用户视角故事见 TEAM_CHAT 17:00 PM 总结。
 
 ## 2026-04-29 15:50 Wave 3.5/3.6 + D.17 简化
 - Wave 3.5 R7-3 修复 (character_prompt_builder isinstance) ✅

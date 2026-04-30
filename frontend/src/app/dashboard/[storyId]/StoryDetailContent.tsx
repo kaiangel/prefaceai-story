@@ -293,6 +293,25 @@ export default function StoryDetailContent() {
     router.push("/dashboard");
   };
 
+  // R7-2: Favorite — POST /projects/{storyId}/favorite, returns { is_favorite }
+  const handleFavoriteToggle = async () => {
+    const token = getStoredToken();
+    if (!token) return;
+    // Optimistic update first
+    setIsFavorite((prev) => !prev);
+    try {
+      const r = await apiFetch<{ is_favorite: boolean }>(
+        `/projects/${storyId}/favorite`,
+        { method: "POST" },
+        token
+      );
+      setIsFavorite(r.is_favorite);
+    } catch {
+      // Revert optimistic update on failure
+      setIsFavorite((prev) => !prev);
+    }
+  };
+
   const togglePlay = () => {
     if (isPlaying) { setIsPlaying(false); }
     else { if (selectedShot >= story.shots.length - 1) setSelectedShot(0); setIsPlaying(true); }
@@ -311,7 +330,7 @@ export default function StoryDetailContent() {
             <span className="text-sm">返回</span>
           </Link>
           <div className="flex items-center gap-2">
-            <button onClick={() => setIsFavorite(!isFavorite)} className={`p-2 rounded-lg transition-colors ${isFavorite ? "text-error" : "text-text-muted hover:text-text-secondary"}`} title="收藏">
+            <button onClick={handleFavoriteToggle} className={`p-2 rounded-lg transition-colors ${isFavorite ? "text-error" : "text-text-muted hover:text-text-secondary"}`} title="收藏">
               <Heart className={`w-4 h-4 ${isFavorite ? "fill-current" : ""}`} />
             </button>
             <button onClick={() => setShowShare(true)} className="p-2 rounded-lg text-text-muted hover:text-text-secondary transition-colors" title="分享">
@@ -471,7 +490,7 @@ export default function StoryDetailContent() {
       </main>
 
       {/* Modals */}
-      <ShareModal open={showShare} storyTitle={story.title} onClose={() => setShowShare(false)} />
+      <ShareModal open={showShare} storyTitle={story.title} storyId={storyId} onClose={() => setShowShare(false)} />
       <ExportModal open={showExport} onClose={() => setShowExport(false)} onExport={() => {}} />
       <VideoSynthesisModal open={showVideo} onClose={() => setShowVideo(false)} />
       <ConfirmModal

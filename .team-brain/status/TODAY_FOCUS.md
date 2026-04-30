@@ -155,3 +155,26 @@ Wave 3.5 R7-3 修复 + 3.6 Tester 复测全 PASS。D.17 CONTENT_SAFETY 简化为
 **当前状态**: TASK-T6-FIXBATCH 17 项原始修复 + R7-3 全部完成 → Wave 4 DevOps 部署准备 spawn 真彩色 devops。
 
 **今日工作**: 详见 daily-sync/2026-04-29.md
+
+---
+
+### 17:00 跨日总结 — TASK-T6-FIXBATCH 完整结案 🎉
+
+9 Wave 全部 PASS / 16 文件代码改动 / push 到 main / VPS 部署 / Ben 通知 / 生产 T8 4 验收 PASS。
+
+**新发现 D.18 P3** — NB2/Seedream 尺寸字典不一致，用户视觉无影响（仍是 1:1），仅 DB 元数据。
+
+**下一步**: 进入下一批"产品打磨批次" — 详见 PENDING D.13-D.18 + R7-2 + ARCH-2 + OPS-3。
+
+**用户视角故事讲解**: 详见 TEAM_CHAT 17:00 PM 总结。
+
+---
+
+## 2026-04-29 17:35 Wave 5.1 启动 + 二次修订 D.17
+
+**关键铁律确立**: Pipeline 必须用单一生图模型，不可 NB2/Seedream 混合（永久 memory `feedback_pipeline_single_model_only.md`）
+
+**Wave 5.1 spawn 状态**:
+- 🟦 Backend (subagent_type "backend") D.17 移除 fallback + 5 子任务: 🔄 运行中 (~3 hr)
+- 🟩 Frontend (subagent_type "frontend") D.14 三 banner + 7 子任务: 🔄 运行中 (~2 hr)
+- 🟨 AI-ML (subagent_type "ai-ml") O-1: ✅ 17:33 完成

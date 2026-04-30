@@ -1749,12 +1749,11 @@ await progress_callback(stage, progress, message, estimated_remaining_seconds=..
 - **关联文件**: `app/services/sanitize_helper.py`（待 backend 加） + `seedream_generator.py` retry path
 - **后续路径**: OBS 数据驱动决策，可能做"中文民俗词字典"或"风格预审 LLM"
 
-### D.10 OBS-3 — outline LLM prompt 加内部一致性规则
-- **优先级**: P2
-- **暂缓原因**: UX-2 A1 前端校验 + A2 后端 LLM check 已修，OBS-3 是 outline 阶段就让 LLM 主动避免内部矛盾，跟 UX-2 是兜底关系。先看 UX-2 修复后实际效果再决定是否需要 OBS-3
-- **触发条件**: MVP 后 1-2 周观察 confirm-outline 一致性 LLM check 触发率，若仍频繁告警则启动 OBS-3
-- **关联文件**: `app/services/story_outline_generator.py` outline LLM prompt
-- **后续路径**: AI-ML 派任务，加规则"故事中提及的所有数字/角色名/时间点必须前后保持一致"
+### ✅ D.10 OBS-3 — outline LLM prompt 加内部一致性规则（Wave 5.1 AI-ML 已完成 2026-04-29 17:33）
+- **优先级**: P2 → **已修复**
+- **修复实施**: `app/services/story_outline_generator.py` L415-427 加"故事内部一致性规则（MANDATORY — 输出前必须自检）"覆盖数字/角色名/时间地点物件三类一致性 + 自检指令（以 plot_point 1 为准）。L512-538 JSON 解析三 fallback 加 logger.warning + brace-extract 附 200 字符预览。
+- **PM 地毯式审查**: 6 角度通过（mtime/规则文本/logger.warning 三处/_build_prompt 调用链路/三件套 mtime/索引标记）
+- **pytest**: 7/7 PASS 不退化
 
 ### D.11 BGM-related P3 (PENDING 早期记录)
 - **music_hint meta-prompt 层效用有限**: P3，等 MVP 用户反馈"水墨故事配 acoustic guitar 违和"再启动
@@ -1990,3 +1989,100 @@ MVP 前 P1（不带病上线，Wave 4 部署前不做，作为下批产品打磨
 - **OBS-1** Seedream 中文叙事 sanitize 触发率 → 改用 Layer 3 fallback 后 OBS-1 现象不阻塞（自动 fallback）
 - **R7-3** 修复 portrait 重生 + 但 adjust 调用 image_gen 仍可能撞 CONTENT_SAFETY → 同样走 Layer 3 fallback 处理
 - **BUG-2026-04-29-001** 七岁小孩 CONTENT_SAFETY → Layer 3 fallback 完美兜底
+
+---
+
+### D.18 SceneImage width/height 元数据跟实际生成模型尺寸不一致（2026-04-29 Wave 4 T8 部署发现）
+
+**优先级**: P3 元数据准确性
+
+**现象**: T8 生产环境用 NB2 生 1:1 朋友圈，实际尺寸 1024×1024。但 SceneImage 元数据 width/height 从 `_ASPECT_RATIO_TO_SIZE["1:1"]="2048x2048"` 派生 → DB 写的是 2048×2048（错值）。
+
+**根因**: D.15 修复时把 width/height 从 hardcoded 1664/2496 改成字典派生，但字典是 Seedream 标准（2048×2048），不是 NB2 标准（1024×1024）。
+
+**影响**: 
+- 视觉层面: 用户看到 1:1 ✅（D.15 P0 用户承诺保住）
+- DB 元数据层面: width/height 不准（影响后续单 shot 重生成或局部编辑用 SceneImage 元数据作 prompt 参数时）
+
+**修复方向**: model-aware width/height 派生
+```python
+SIZE_BY_MODEL = {
+    "nb2": {"1:1": (1024,1024), "2:3": ...},
+    "seedream": {"1:1": (2048,2048), "2:3": (1664,2496), ...},
+}
+width, height = SIZE_BY_MODEL[settings.IMAGE_GEN_PROVIDER][aspect_ratio]
+```
+
+**触发条件**: P3，与 D.15 同批未来"model 灵活配置"工作一起做（Seedream 转首发生产决议后）
+
+**关联**:
+- D.15 P0 ✅ 用户视觉承诺保住，本条仅元数据
+- D.17 Layer 3 fallback 实施时也要 model-aware
+- Seedream 首发可能性（PENDING D.17 备注）— 如果转 Seedream default，字典反而准了
+
+---
+
+### 🔴 D.17 二次修订（2026-04-29 17:25 Founder 决策最终版）
+
+**之前两版方案均作废**（D.17 P3 三层架构 / Layer 3 fallback Seedream），最终方案：
+
+**核心原则**: 全 pipeline 单一模型一致，**移除 NB2↔Seedream 自动切换**，失败用智能提示帮用户改 prompt。
+
+**理由**: NB2 vs Seedream 视觉风格差太多。pipeline 内任一张图回退另一模型会破坏 18 张统一性，用户细看大概率发现异类。
+
+**修复范围（必须删除现有混合 fallback）**:
+1. `app/services/image_generator.py` L796-801 `generate_shot_image()` dispatcher fallback_callback 删除
+2. `app/services/image_generator.py` L1389-1398 `generate_shot_image_phase2_safe()` dispatcher fallback_callback 删除
+3. `app/services/seedream_generator.py` L720-740 `_run_fallback()` 改成返 sanitize_failure error，不调 NB2
+
+**修复后流程**:
+```
+首选模型（NB2 or Seedream，看 settings.IMAGE_GEN_PROVIDER）
+  ├─ ✅ 成功 → 返回
+  └─ ❌ CONTENT_SAFETY 拒
+        ↓
+        PromptRewriter 改写 prompt（首选模型内）
+        再调首选模型
+          ├─ ✅ 成功 → 返回
+          └─ ❌ 仍拒
+                ↓
+                [新增] prompt_safety_advisor.py Haiku 分析失败 prompt
+                生成"建议改 X 为 Y"提示
+                ↓
+                占位图 + storyboard.shots[i].error_message + safety_advice
+                ↓
+                Frontend StageD 显示提示 + "改一下文字"按钮
+```
+
+**新建文件**: `app/services/prompt_safety_advisor.py`
+- 接收: 失败 prompt + 失败 reason（CONTENT_SAFETY 类）
+- 调用: Haiku 4.5 quick check
+- 返回: { "suspected_terms": [...], "suggested_changes": [...], "user_message": "你的画面文字 'XXX' 触发了 AI 安全审查，可能因 'YYY'，建议改成 'ZZZ' 后重试" }
+
+**全 pipeline 受影响环节**: portrait（Stage 2 UX-1）/ fullbody（Stage 5 prep）/ scene_anchor（Stage 5 prep）/ shots（Stage 5 真生图 18 张）— 全部走单一模型，无回退。
+
+**Wave 5.1 实施中** — Backend agent 负责。
+
+---
+
+### ✅ O-1 + OBS-3 — Wave 5.1 AI-ML 完成（2026-04-29 17:33）
+
+`app/services/story_outline_generator.py` L415-427 加内部一致性规则 + L512-538 JSON fallback OBS warning。详见 ai-ml-progress.
+
+---
+
+## ✅ Wave 5.1 完整 PASS（2026-04-29 19:30 PM 21+ 角度地毯式审查通过）
+
+主索引完成标记:
+- D.13 F-Hydrate-1 ✅
+- D.14 F-Lock-Family ✅
+- D.16 mood 类型 ✅
+- T-1 milestone 文案 ✅
+- D.17 二次修订 fallback 删除 + 智能提示 ✅
+- D.18 SIZE_BY_MODEL ✅
+- O-2 cap ✅
+- T-2 scene callback ✅
+- R7-2 点赞/分享/公开页（除导出/视频外）✅
+- O-1 outline 一致性 ✅（Wave 5.1 早完成）
+
+待: Wave 5.2 DevOps 部署（pytest + Alembic 002 upgrade head + push + rsync VPS + 通知 Ben）

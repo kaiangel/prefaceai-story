@@ -2,25 +2,55 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { X, Link2, Copy, Check } from "lucide-react";
+import { X, Link2, Copy, Check, Loader2 } from "lucide-react";
+import { apiFetch, getStoredToken } from "@/lib/api";
 
 interface ShareModalProps {
   open: boolean;
   storyTitle: string;
+  storyId: string;
   onClose: () => void;
 }
 
-export default function ShareModal({ open, storyTitle, onClose }: ShareModalProps) {
+export default function ShareModal({ open, storyTitle, storyId, onClose }: ShareModalProps) {
   const [copied, setCopied] = useState(false);
-  const mockLink = `https://prefaceai.mov/s/${Date.now().toString(36)}`;
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // R7-2: Call backend share API to generate real share link
+  const handleShare = async () => {
+    const token = getStoredToken();
+    if (!token) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await apiFetch<{ share_url: string }>(
+        `/projects/${storyId}/share`,
+        { method: "POST" },
+        token
+      );
+      setShareUrl(`${window.location.origin}${r.share_url}`);
+    } catch {
+      setError("生成分享链接失败，请重试");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCopy = () => {
-    navigator.clipboard?.writeText(mockLink);
+    if (!shareUrl) return;
+    navigator.clipboard?.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   if (!open) return null;
+
+  // Trigger share URL generation when first opening (React will re-render after state updates)
+  if (!shareUrl && !loading && !error) {
+    void handleShare();
+  }
 
   return (
     <>
@@ -40,11 +70,24 @@ export default function ShareModal({ open, storyTitle, onClose }: ShareModalProp
           {/* Link */}
           <div className="flex items-center gap-2 p-3 rounded-lg bg-bg-tertiary border border-white/10 mb-4">
             <Link2 className="w-4 h-4 text-text-muted flex-shrink-0" />
-            <span className="text-xs text-text-secondary truncate flex-1">{mockLink}</span>
-            <button onClick={handleCopy} className="text-brand-primary hover:underline text-xs flex items-center gap-1 flex-shrink-0 cursor-pointer">
-              {copied ? <><Check className="w-3 h-3" />已复制</> : <><Copy className="w-3 h-3" />复制</>}
-            </button>
+            {loading ? (
+              <span className="flex items-center gap-1.5 text-xs text-text-muted flex-1">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                正在生成链接...
+              </span>
+            ) : (
+              <span className="text-xs text-text-secondary truncate flex-1">{shareUrl || "—"}</span>
+            )}
+            {shareUrl && (
+              <button onClick={handleCopy} className="text-brand-primary hover:underline text-xs flex items-center gap-1 flex-shrink-0 cursor-pointer">
+                {copied ? <><Check className="w-3 h-3" />已复制</> : <><Copy className="w-3 h-3" />复制</>}
+              </button>
+            )}
           </div>
+
+          {error && (
+            <p className="text-xs text-error mb-3">{error}</p>
+          )}
 
           {/* QR Code mock */}
           <div className="flex justify-center mb-4">

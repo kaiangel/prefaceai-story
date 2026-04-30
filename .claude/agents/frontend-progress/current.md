@@ -99,3 +99,16 @@
 ## 历史: TASK-T5-FIXBATCH 7 条前端修复 (2026-04-27 16:23)
 
 详见 completed.md
+
+---
+
+## [2026-04-29 19:30] Wave 5.1 ✅ (PM 代更，权限 600)
+
+8 子任务全完成 + npm build 22 routes 0 errors:
+- D.14 useStageLock hook 新建 + StageB/StageC 三处 banner + 隐藏按钮
+- D.13 hydrate guard initialProgressRef
+- D.16 mood string|null
+- T-1 friendlyMessage replace 张图像→个片段
+- StageD onError D.17 配套 safetyAdvice + 改一下文字按钮
+- R7-2 favorite/share/公开页 frontend 接 backend API
+- /s/[token] Server Component 新建（OG 暂不加）

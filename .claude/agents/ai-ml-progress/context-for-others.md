@@ -119,3 +119,11 @@ enforced_prompt = StyleEnforcer.enforce_prompt_for_provider(
 
 **未碰**: style_config.py / style_enforcer.py / music_generation_service.py / meta_mixed_v3_quote_picking.md (Wave 4 + v3.2 已稳)
 
+
+---
+
+## 2026-04-29 17:33 给同事的关键信息（PM 代更）
+
+**O-1 outline 一致性 prompt** 已加到 `story_outline_generator.py` _build_prompt() L415-427。后续 outline LLM 会主动自检数字/角色名/时间地点物件一致性。如果遇到 plot 间矛盾，可优先怀疑 prompt 规则没生效（grep "故事内部一致性规则"确认）。
+
+JSON 解析 fallback 三路径都加了 logger.warning，监控 R4 启动时可统计 fallback 触发率。

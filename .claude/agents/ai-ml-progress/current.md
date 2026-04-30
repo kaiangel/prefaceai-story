@@ -181,3 +181,15 @@ Founder 否决 #3/#4/#6 风格。重写后 PM 审查 PASS。
 | 任务 | 优先级 | 状态 |
 |------|--------|------|
 | 6人场景一致性 90%->95% | P2 | 暂缓 |
+
+---
+
+## [2026-04-29 17:33] Wave 5.1 O-1 outline 一致性 prompt ✅ (PM 代更)
+
+**改动文件**: `app/services/story_outline_generator.py` (单文件，2 处改动)
+- L415-427 `_build_prompt()` 加"故事内部一致性规则（MANDATORY — 输出前必须自检）"覆盖数字/角色名/时间地点物件三类一致性 + 自检指令
+- L512-538 `_extract_json()` 三 fallback 分支各加 logger.warning + brace-extract 附 200 字符预览
+
+**pytest**: 7/7 PASS 不退化
+
+**状态**: 等 Wave 5.2 集成验证（与 Backend/Frontend 同步部署）

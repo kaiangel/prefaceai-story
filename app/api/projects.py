@@ -134,6 +134,7 @@ def serialize_project_detail(project: Project, chapter: "Chapter | None" = None)
         cover_image_url=cover_image_url,                # R7-1: storyboard shots[0].image_url
         shot_count=shot_count,                          # R7-1: storyboard shots 数组长度
         mood=mood,                                      # R7-1: user_selected_mood ?? mood ?? None
+        is_favorite=bool(project.is_favorite),          # R7-2: null 老数据视为 False
     )
 
 
@@ -1109,4 +1110,85 @@ async def regenerate_portrait(
         "char_id": char_id,
         "portrait_url": portrait_url,
         "message": "肖像已重新生成",
+    }
+
+
+# ---------------------------------------------------------------------------
+# R7-2: 点赞 endpoint
+# ---------------------------------------------------------------------------
+
+@router.post("/{project_id}/favorite")
+async def toggle_favorite(
+    project_id: str,
+    user_id: int = Depends(verify_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    R7-2: toggle is_favorite 状态。
+    - 每次调用取反（False → True → False ...）
+    - null（老数据）视为 False，toggle 后变 True
+    返回: { "success": true, "is_favorite": bool }
+    """
+    result = await db.execute(
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    # null 视为 False，toggle 取反
+    current = bool(project.is_favorite)
+    project.is_favorite = not current
+    db.add(project)
+    await db.commit()
+
+    logger.info(f"[Favorite] project={project_id} is_favorite={project.is_favorite}")
+    return {"success": True, "is_favorite": project.is_favorite}
+
+
+# ---------------------------------------------------------------------------
+# R7-2: 分享 endpoint（生成 token）
+# ---------------------------------------------------------------------------
+
+@router.post("/{project_id}/share")
+async def create_share_link(
+    project_id: str,
+    user_id: int = Depends(verify_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    R7-2: 生成分享链接 token。
+    - 同一 project 可重复调用（每次返回已有 token，不重复生成）
+    - Token 永久有效（Founder 决策 Wave 5.1）
+    返回: { "success": true, "share_url": "/s/{token}", "token": "..." }
+    """
+    from app.models.share import ShareToken
+
+    # 验证项目归属
+    result = await db.execute(
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    # 幂等：已有 token 直接返回
+    existing = await db.execute(
+        select(ShareToken).where(ShareToken.project_uuid == project_id).limit(1)
+    )
+    token_row = existing.scalar_one_or_none()
+
+    if token_row is None:
+        token_row = ShareToken(project_uuid=project_id)
+        db.add(token_row)
+        await db.commit()
+        await db.refresh(token_row)
+        logger.info(f"[Share] 新建 token project={project_id} token={token_row.token}")
+    else:
+        logger.info(f"[Share] 已有 token project={project_id} token={token_row.token}")
+
+    return {
+        "success": True,
+        "share_url": f"/s/{token_row.token}",
+        "token": token_row.token,
     }

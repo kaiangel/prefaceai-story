@@ -27,5 +27,6 @@ class Project(Base):
     character_refs_analysis_json = Column(Text, nullable=True)     # 角色参考图分析结果
     scene_refs_analysis_json = Column(Text, nullable=True)         # 场景参考图分析结果
     characters_confirmed = Column(Boolean, default=False, nullable=False)  # R4-1: 用户确认角色后设为 True
+    is_favorite = Column(Boolean, default=False, nullable=True)  # R7-2: 用户点赞（兼容老数据，null 视为 False）
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

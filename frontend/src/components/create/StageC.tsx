@@ -8,6 +8,8 @@ import { useCreate } from "@/contexts/CreateContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch, getStoredToken } from "@/lib/api";
 import { toAbsoluteUrl } from "@/lib/url";
+import { useStageLock } from "@/hooks/useStageLock";
+import { buildCreateUrl } from "@/lib/createUrl";
 import { useToast } from "@/components/ui/Toast";
 import { mockShotGenProgress, mockPreviewCharacters, mockPreviewScenes } from "@/lib/mock-data";
 import type { PreviewCharacter, PreviewScene, Shot } from "@/types/create";
@@ -216,10 +218,21 @@ export default function StageC() {
 
   useEffect(() => { return () => clearPoll(); }, [clearPoll]);
 
+  // D.13 hydrate guard: capture progress at mount time (before any polling) using a ref.
+  // We intentionally capture only the initial value to avoid re-running the text-gen effect
+  // on every progress tick.
+  const initialProgressRef = useRef(state.generationProgress);
+
   // ============ Text-gen phase ============
   useEffect(() => {
     if (state.generationSubPhase !== "text-gen") return;
-    dispatch({ type: "START_GENERATION" });
+    // D.13: If we were hydrated from backend (F5/deep-link), generationProgress > 0 already.
+    // Skip START_GENERATION (which resets progress → 0) to avoid the 1.6s flash.
+    if (initialProgressRef.current > 0) {
+      // Already hydrated — skip reset, polling below will continue from real progress
+    } else {
+      dispatch({ type: "START_GENERATION" });
+    }
 
     if (!useRealApi) {
       // Mock path
@@ -414,6 +427,8 @@ export default function StageC() {
             shotType?: string;
             cameraAngle?: string;
             sceneId?: number;
+            safety_advice?: string | null;
+            error_message?: string | null;
           }> } | null;
           totalShots: number;
         }>(`/projects/${projectId}/generation-result`, {}, token);
@@ -432,6 +447,9 @@ export default function StageC() {
             chineseText: s.textOverlay?.text ? [s.textOverlay.text] : [],
             imageUrl: s.imageUrl,
             charactersInScene: [],
+            // D.17: content safety fields
+            safetyAdvice: s.safety_advice || null,
+            errorMessage: s.error_message || null,
           }));
           dispatch({ type: "GENERATION_COMPLETE", payload: mappedShots });
         } else {
@@ -530,6 +548,7 @@ export default function StageC() {
         scenes={state.previewScenes}
         onUpdateScene={(id, userEdit) => dispatch({ type: "UPDATE_PREVIEW_SCENE", payload: { id, userEdit } })}
         onConfirm={handleConfirmScenes}
+        projectId={projectId}
       />
     );
   }
@@ -647,7 +666,8 @@ export default function StageC() {
                 .map((entry, i) => (
                 <div key={i} className="flex items-center gap-2 text-xs">
                   <CheckCircle2 className="w-3 h-3 text-green-500 flex-shrink-0" />
-                  <span className="text-text-tertiary">{entry.message}</span>
+                  {/* T-1: also apply friendlyMessage to log entries ("张图像" → "个片段") */}
+                  <span className="text-text-tertiary">{friendlyMessage(entry.message)}</span>
                 </div>
               ))}
             </div>
@@ -692,6 +712,10 @@ function CharacterPreview({
   token: string | null;
 }) {
   const { toast } = useToast();
+  const router = useRouter();
+  // D.14 F-Lock-Family: lock character preview once generation has started/completed
+  const isLocked = useStageLock();
+  const progressUrl = buildCreateUrl(projectId, "generating") || "/dashboard";
   const [countdown, setCountdown] = useState(20); // R6-4: 20s countdown
   const [paused, setPaused] = useState(false);
   const [adjustingId, setAdjustingId] = useState<string | null>(null);
@@ -807,6 +831,22 @@ function CharacterPreview({
 
   return (
     <main className="container-lg py-8 pb-24">
+      {/* D.14 F-Lock-Family: lock banner when generation already started beyond char-preview */}
+      {isLocked && (
+        <div className="mb-6 max-w-2xl mx-auto">
+          <div className="flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
+            <p className="text-amber-400 text-sm">
+              📌 角色已确认，AI 正在创作画面。如需修改请新建项目
+            </p>
+            <button
+              onClick={() => router.replace(progressUrl)}
+              className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition-colors whitespace-nowrap"
+            >
+              返回创作进度
+            </button>
+          </div>
+        </div>
+      )}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -816,7 +856,8 @@ function CharacterPreview({
             </div>
             <p className="text-text-tertiary text-sm">确认角色外观，或调整后继续</p>
           </div>
-          {!paused && (
+          {/* D.14: Hide countdown when locked */}
+          {!paused && !isLocked && (
             <div className="flex items-center gap-2">
               <div className="w-9 h-9 rounded-full border-2 border-brand-primary/50 flex items-center justify-center text-brand-primary text-sm font-bold">{countdown}</div>
               <span className="text-xs text-text-muted">秒后自动继续</span>
@@ -845,14 +886,20 @@ function CharacterPreview({
                     <span className="text-text-muted/40 text-xs">生成中</span>
                   </div>
                 )}
-                <button onClick={() => handleRegenerate(char.id)} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70 transition-colors cursor-pointer" title="重新生成">
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
+                {/* D.14: hide regenerate button when locked */}
+                {!isLocked && (
+                  <button onClick={() => handleRegenerate(char.id)} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70 transition-colors cursor-pointer" title="重新生成">
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
               <div className="p-3">
                 <p className="font-semibold text-text-primary text-sm mb-0.5">{char.name}</p>
                 <p className="text-text-muted text-xs mb-2 line-clamp-2">{char.description}</p>
-                <button onClick={() => handleAdjust(char.id)} className="flex items-center gap-1 text-xs text-brand-primary hover:underline cursor-pointer"><Pencil className="w-3 h-3" />调整</button>
+                {/* D.14: hide adjust button when locked */}
+                {!isLocked && (
+                  <button onClick={() => handleAdjust(char.id)} className="flex items-center gap-1 text-xs text-brand-primary hover:underline cursor-pointer"><Pencil className="w-3 h-3" />调整</button>
+                )}
               </div>
               <AnimatePresence>
                 {adjustingId === char.id && (
@@ -876,9 +923,12 @@ function CharacterPreview({
           ))}
         </div>
 
-        <button onClick={handleConfirmWithApi} className="btn-primary w-full flex items-center justify-center gap-2 py-3">
-          确认角色，继续<ChevronRight className="w-4 h-4" />
-        </button>
+        {/* D.14: hide confirm button when locked */}
+        {!isLocked && (
+          <button onClick={handleConfirmWithApi} className="btn-primary w-full flex items-center justify-center gap-2 py-3">
+            确认角色，继续<ChevronRight className="w-4 h-4" />
+          </button>
+        )}
       </motion.div>
     </main>
   );
@@ -890,11 +940,18 @@ function ScenePreview({
   scenes,
   onUpdateScene,
   onConfirm,
+  projectId,
 }: {
   scenes: PreviewScene[];
   onUpdateScene: (id: string, userEdit: string) => void;
   onConfirm: () => void;
+  projectId: string | null;
 }) {
+  const router = useRouter();
+  // D.14 F-Lock-Family: lock scene preview once generation has started/completed
+  const isLocked = useStageLock();
+  const progressUrl = buildCreateUrl(projectId, "generating") || "/dashboard";
+
   const [countdown, setCountdown] = useState(20); // R6-4: 20s countdown
   const [paused, setPaused] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -922,6 +979,22 @@ function ScenePreview({
 
   return (
     <main className="container-lg py-8 pb-24">
+      {/* D.14 F-Lock-Family: lock banner when generation already started beyond scene-preview */}
+      {isLocked && (
+        <div className="mb-6 max-w-2xl mx-auto">
+          <div className="flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
+            <p className="text-amber-400 text-sm">
+              📌 场景已确认，AI 正在创作画面。如需修改请新建项目
+            </p>
+            <button
+              onClick={() => router.replace(progressUrl)}
+              className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition-colors whitespace-nowrap"
+            >
+              返回创作进度
+            </button>
+          </div>
+        </div>
+      )}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -931,7 +1004,8 @@ function ScenePreview({
             </div>
             <p className="text-text-tertiary text-sm">确认场景描述，或修改后开始绘制</p>
           </div>
-          {!paused && (
+          {/* D.14: Hide countdown when locked */}
+          {!paused && !isLocked && (
             <div className="flex items-center gap-2">
               <div className="w-9 h-9 rounded-full border-2 border-brand-primary/50 flex items-center justify-center text-brand-primary text-sm font-bold">{countdown}</div>
               <span className="text-xs text-text-muted">秒后自动继续</span>
@@ -948,25 +1022,32 @@ function ScenePreview({
                     <span className="text-xs text-brand-primary font-medium">场景 {idx + 1}</span>
                     <span className="text-sm font-semibold text-text-primary">{scene.name}</span>
                   </div>
-                  {editingId === scene.id ? (
+                  {/* D.14: no textarea when locked */}
+                  {editingId === scene.id && !isLocked ? (
                     <textarea value={scene.userEdit || scene.description} onChange={(e) => onUpdateScene(scene.id, e.target.value)} placeholder="描述你想要的场景氛围" rows={3} className="w-full mt-2 px-3 py-2 rounded-lg bg-bg-tertiary border border-white/10 text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-brand-primary/50 resize-none" />
                   ) : (
                     <p className="text-text-tertiary text-sm leading-relaxed">{scene.userEdit || scene.description}</p>
                   )}
                 </div>
-                {editingId === scene.id ? (
-                  <button onClick={() => setEditingId(null)} className="text-xs text-brand-primary hover:underline mt-1 flex-shrink-0 cursor-pointer">完成</button>
-                ) : (
-                  <button onClick={() => handleEdit(scene.id)} className="flex items-center gap-1 text-xs text-text-muted hover:text-brand-primary transition-colors mt-1 flex-shrink-0 cursor-pointer"><Pencil className="w-3 h-3" />修改</button>
+                {/* D.14: hide edit/done button when locked */}
+                {!isLocked && (
+                  editingId === scene.id ? (
+                    <button onClick={() => setEditingId(null)} className="text-xs text-brand-primary hover:underline mt-1 flex-shrink-0 cursor-pointer">完成</button>
+                  ) : (
+                    <button onClick={() => handleEdit(scene.id)} className="flex items-center gap-1 text-xs text-text-muted hover:text-brand-primary transition-colors mt-1 flex-shrink-0 cursor-pointer"><Pencil className="w-3 h-3" />修改</button>
+                  )
                 )}
               </div>
             </motion.div>
           ))}
         </div>
 
-        <button onClick={onConfirm} className="btn-primary w-full flex items-center justify-center gap-2 py-3">
-          <Play className="w-4 h-4" />开始绘制
-        </button>
+        {/* D.14: hide confirm button when locked */}
+        {!isLocked && (
+          <button onClick={onConfirm} className="btn-primary w-full flex items-center justify-center gap-2 py-3">
+            <Play className="w-4 h-4" />开始绘制
+          </button>
+        )}
       </motion.div>
     </main>
   );

@@ -85,6 +85,8 @@ class ProjectDetail(BaseModel):
     cover_image_url: str | None = None   # storyboard shots[0].image_url（/static/... 路径，前端 toAbsoluteUrl 转绝对 URL）
     shot_count: int = 0                  # storyboard shots 数组长度
     mood: str | None = None              # confirmed_outline.user_selected_mood ?? confirmed_outline.mood ?? None
+    # R7-2: 点赞
+    is_favorite: bool = False            # 用户点赞状态（null 老数据视为 False）
 
     class Config:
         from_attributes = True

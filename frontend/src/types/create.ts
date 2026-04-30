@@ -97,6 +97,9 @@ export interface Shot {
   chineseText: string[];
   imageUrl: string | null;
   charactersInScene: string[];
+  // D.17: content safety fields (populated when image generation is blocked)
+  safetyAdvice?: string | null;
+  errorMessage?: string | null;
 }
 
 // ============ Stage C: Generation Log ============
@@ -198,7 +201,7 @@ export interface StoryDetail extends StoryCard {
   summary: string;
   characters: { name: string; description: string; portrait_url?: string | null }[];  // Bug F: portrait_url from backend Stage 2
   shots: Shot[];
-  mood: string;
+  mood: string | null;  // D.16: consistent with StoryCard.mood (string | null)
   aspectRatio: AspectRatio;
 }
 

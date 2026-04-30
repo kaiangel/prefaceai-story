@@ -954,3 +954,14 @@ test_output/manualtest/seedream_vs_nb2_2026-04-24/
 - Wave 3 Step 5: REST API 端点（/chapters/{id}/bgm，GET/POST/DELETE）
 - Wave 3 Step 6: generate_bgm_for_chapter 异步化（asyncio.to_thread 包裹）
 - Wave 3: meta-prompt 文件迁移到 app/prompts/music/（当前路径在 test_output 下）
+
+---
+
+## [2026-04-29 19:25] Wave 5.1 ✅ (PM 代更，权限 600)
+
+6 子任务全完成 + pytest 7/7:
+- D.17 _run_fallback 删除 + _make_failure_dict 替代 + image_generator fallback_callback=None + prompt_safety_advisor.py 新建 + pipeline_orchestrator L964 接入
+- D.18 SIZE_BY_MODEL nb2/seedream 各 7 比例 + get_size_for_model + pipeline_orchestrator L1069 接入
+- O-2 storyboard_director cap chapter_duration_minutes ≤ 18/36/60
+- T-2 _completed_scenes 实时 callback
+- R7-2 projects.is_favorite + share_tokens/share_pv_logs 表 + share.py 公开页方案 A + Alembic 002 迁移

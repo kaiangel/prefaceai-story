@@ -16,6 +16,8 @@ import {
 import { useRouter } from "next/navigation";
 import { useCreate } from "@/contexts/CreateContext";
 import { apiFetch, getStoredToken } from "@/lib/api";
+import { useStageLock } from "@/hooks/useStageLock";
+import { buildCreateUrl } from "@/lib/createUrl";
 import { MOOD_OPTIONS } from "@/types/create";
 import type { PlotPoint } from "@/types/create";
 
@@ -116,7 +118,19 @@ export default function StageB() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
+  // D.14 F-Lock-Family: lock outline editing once generation has started
+  const isLocked = useStageLock();
+
   if (!outline) return null;
+
+  // D.14: Build "返回创作进度" URL — prefer generating/characters/scenes based on current state
+  const progressStage =
+    state.generationSubPhase === "char-preview"
+      ? "characters"
+      : state.generationSubPhase === "scene-preview"
+      ? "scenes"
+      : "generating";
+  const progressUrl = buildCreateUrl(state.projectId, progressStage) || "/dashboard";
 
   const handleConfirm = async () => {
     const token = getStoredToken();
@@ -199,13 +213,30 @@ export default function StageB() {
 
   return (
     <main className="container-lg py-8 pb-24">
+      {/* D.14 F-Lock-Family: lock banner when generation is in progress or complete */}
+      {isLocked && (
+        <div className="mb-6 max-w-2xl mx-auto">
+          <div className="flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
+            <p className="text-amber-400 text-sm">
+              📌 大纲已确认，AI 正在创作画面。如需修改请新建项目
+            </p>
+            <button
+              onClick={() => router.replace(progressUrl)}
+              className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition-colors whitespace-nowrap"
+            >
+              返回创作进度
+            </button>
+          </div>
+        </div>
+      )}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
         className="max-w-2xl mx-auto"
       >
-        {/* Back button */}
+        {/* Back button — hidden when locked */}
+        {!isLocked && (
         <button
           onClick={handleBack}
           className="flex items-center gap-1 text-text-muted hover:text-text-secondary text-sm mb-6 transition-colors"
@@ -213,6 +244,7 @@ export default function StageB() {
           <ChevronLeft className="w-4 h-4" />
           返回修改创意
         </button>
+        )}
 
         {/* Title */}
         <div className="text-center mb-8">
@@ -477,7 +509,8 @@ export default function StageB() {
             <p className="text-center text-sm text-error">{submitError}</p>
           )}
 
-          {/* Confirm Button */}
+          {/* D.14: Confirm Button — hidden when locked; "返回创作进度" shown in banner above */}
+          {!isLocked && (
           <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
@@ -505,6 +538,7 @@ export default function StageB() {
               不满意？可以直接修改上方内容，也可以返回重新输入
             </p>
           </motion.div>
+          )}
         </div>
       </motion.div>
     </main>

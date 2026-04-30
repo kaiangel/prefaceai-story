@@ -7,7 +7,7 @@ MVP 发布时通过 env flag `IMAGE_GEN_PROVIDER=nb2` 切回 NB2。
 集成点:
 - image_generator.generate_shot_image() / generate_shot_image_phase2() 当
   settings.IMAGE_GEN_PROVIDER == "seedream" 时把调用派发到本模块。
-- sanitize 3 次失败后降级到 NB2 补图（保证 Pipeline 不断）。
+- D.17: sanitize 3 次失败后返回 content_safety_failure（不再降级 NB2，保证视觉统一性）。
 
 火山方舟国内版审查严（POC Phase 3/4 实测：10% shots 触发 InputTextSensitiveContentDetected）：
 已知拦截词示例: elderly + worry / furrow / suppressed / mist 的组合。
@@ -16,7 +16,7 @@ MVP 发布时通过 env flag `IMAGE_GEN_PROVIDER=nb2` 切回 NB2。
 - 参考图策略复用生产 NB2 传入的 reference_images（只传 fullbody + scene anchors），
   不重新生成参考图，不污染现有参考图管道。
 - prompt 直接复用 NB2 已构建好的 full_prompt（含 StyleEnforcer / text_overlay 指令 / 风格锁）。
-- sanitize 逐级替换（attempt 1/2/3 力度递增），3 轮失败 → fallback_callback 调 NB2 补这一张。
+- sanitize 逐级替换（attempt 1/2/3 力度递增），3 轮失败 → 返回 content_safety_failure（D.17: 不再降级 NB2）。
 - 不 import app/ 之外的东西；整个模块只依赖 app.config + stdlib + Pillow。
 """
 
@@ -49,7 +49,7 @@ SEEDREAM_ENDPOINT = "https://ark.cn-beijing.volces.com/api/v3/images/generations
 # Founder 决策 Q2：5.0-lite 先跑（账号已开通 model ID）
 SEEDREAM_MODEL = "doubao-seedream-5-0-260128"
 
-# 2:3 portrait, 2K — 匹配项目 DEC-010 抖音宽高比标准
+# D.15: aspect_ratio → size 字符串映射（Seedream 2K 分辨率）
 # aspect_ratio "2:3" → size "1664x2496"（来自 POC 实测）
 _ASPECT_RATIO_TO_SIZE = {
     "2:3": "1664x2496",
@@ -61,11 +61,43 @@ _ASPECT_RATIO_TO_SIZE = {
     "16:9": "2560x1440",
 }
 
+# D.18: model-aware size lookup（SceneImage 元数据写入时用，保证 width/height 与实际生图匹配）
+# NB2 (Gemini Image 3.1 Flash) 实测 T8：1:1 = 1024×1024，其余比例参考 Gemini API 文档
+SIZE_BY_MODEL: dict[str, dict[str, tuple[int, int]]] = {
+    "nb2": {
+        "1:1":  (1024, 1024),
+        "2:3":  (832,  1248),
+        "3:2":  (1248, 832),
+        "3:4":  (896,  1152),
+        "4:3":  (1152, 896),
+        "9:16": (768,  1344),
+        "16:9": (1344, 768),
+    },
+    "seedream": {
+        "1:1":  (2048, 2048),
+        "2:3":  (1664, 2496),
+        "3:2":  (2496, 1664),
+        "3:4":  (1664, 2218),
+        "4:3":  (2218, 1664),
+        "9:16": (1440, 2560),
+        "16:9": (2560, 1440),
+    },
+}
+
+
+def get_size_for_model(provider: str, aspect_ratio: str) -> tuple[int, int]:
+    """D.18: 根据当前 provider 和 aspect_ratio 返回实际图像尺寸 (width, height)。
+    用于 SceneImage 元数据写入，保证 width/height 与真实生图匹配。
+    provider 不认识时 fallback 到 seedream 字典。
+    """
+    model_sizes = SIZE_BY_MODEL.get(provider, SIZE_BY_MODEL["seedream"])
+    return model_sizes.get(aspect_ratio, model_sizes.get("2:3", (1664, 2496)))
+
 # Payload 阈值：超过则降采样参考图到 1024 px
 PAYLOAD_DOWNSAMPLE_THRESHOLD_BYTES = 10 * 1024 * 1024  # 10 MB
 
 MAX_REFERENCE_IMAGES = 14  # 火山方舟上限
-SEEDREAM_MAX_SANITIZE_ATTEMPTS = 3  # Founder 决策 Q3：3 次失败降级 NB2
+SEEDREAM_MAX_SANITIZE_ATTEMPTS = 3  # D.17: 3 次 sanitize 失败后返回 content_safety_failure（不再降级 NB2）
 SEEDREAM_TIMEOUT_SEC = 180
 SEEDREAM_HTTP_RETRIES = 3  # Bug 3 fix: 网络层瞬时错误（IncompleteRead/429/5xx）指数退避次数，2→3
 
@@ -558,8 +590,8 @@ async def generate_shot_image_seedream(
         aspect_ratio: 宽高比字符串（"2:3" 等）。
         full_prompt: 可选。如果调用方已构建好完整 prompt（含 StyleEnforcer + text_overlay），
             直接使用；否则自行拼接 shot['image_prompt'] + build_text_overlay_instruction。
-        fallback_callback: async callable，3 次 sanitize 仍失败时调用（通常是 NB2 原生成逻辑）。
-            返回 dict 与本函数对齐（含 success / pil_image 等）。
+        fallback_callback: D.17 废弃，保留参数签名兼容性但不使用。
+            失败时直接返回 content_safety_failure error dict（不调 NB2）。
         **_kwargs: 兼容其它调用参数（忽略）。
 
     Returns:
@@ -587,8 +619,8 @@ async def generate_shot_image_seedream(
             base_prompt = base_prompt + "\n\n" + text_instruction
 
     if not base_prompt.strip():
-        logger.error(f"    [SeedreamGenerator] Shot {shot_id} 没有可用 prompt，跳到 fallback")
-        return await _run_fallback(fallback_callback, reason="empty_prompt")
+        logger.error(f"    [SeedreamGenerator] Shot {shot_id} 没有可用 prompt，返回失败（D.17: 无 fallback）")
+        return _make_failure_dict(reason="empty_prompt", failed_prompt="")
 
     logger.info(
         f"    [SeedreamGenerator] Shot {shot_id} 开始生成 "
@@ -677,89 +709,65 @@ async def generate_shot_image_seedream(
         kind = result.get("error_kind")
         if kind == "missing_api_key":
             logger.error(
-                f"    [SeedreamGenerator] Shot {shot_id} ARK_API_KEY 缺失，直接降级 NB2"
+                f"    [SeedreamGenerator] Shot {shot_id} ARK_API_KEY 缺失，返回失败（D.17: 无 fallback）"
             )
-            return await _run_fallback(
-                fallback_callback,
+            return _make_failure_dict(
                 reason="missing_api_key",
                 sanitize_attempts=sanitize_attempts,
+                failed_prompt=current_prompt,
             )
 
         if kind == "sensitive_content":
             # 继续下一轮 sanitize
             if attempt >= SEEDREAM_MAX_SANITIZE_ATTEMPTS:
                 logger.error(
-                    f"    [SeedreamGenerator] Shot {shot_id} sanitize {SEEDREAM_MAX_SANITIZE_ATTEMPTS} 次仍拦截，降级 NB2"
+                    f"    [SeedreamGenerator] Shot {shot_id} sanitize {SEEDREAM_MAX_SANITIZE_ATTEMPTS} 次仍拦截，"
+                    f"返回 content_safety_failure（D.17: 无 NB2 fallback）"
                 )
-                return await _run_fallback(
-                    fallback_callback,
+                return _make_failure_dict(
                     reason="sanitize_exhausted",
                     sanitize_attempts=sanitize_attempts,
+                    failed_prompt=current_prompt,
+                    is_safety=True,
                 )
             continue
 
-        # 非敏感内容错误（网络/5xx/格式等）— 直接降级（不消耗 sanitize 轮次）
+        # 非敏感内容错误（网络/5xx/格式等）— 直接返回失败（D.17: 无 NB2 fallback）
         logger.error(
-            f"    [SeedreamGenerator] Shot {shot_id} 非敏感内容错误（{kind}），降级 NB2: {result.get('error','')[:200]}"
+            f"    [SeedreamGenerator] Shot {shot_id} 非敏感内容错误（{kind}），返回失败: {result.get('error','')[:200]}"
         )
-        return await _run_fallback(
-            fallback_callback,
+        return _make_failure_dict(
             reason=f"seedream_error:{kind}",
             sanitize_attempts=sanitize_attempts,
+            failed_prompt=current_prompt,
             upstream_error=result.get("error"),
         )
 
     # 理论上不会到这
-    return await _run_fallback(
-        fallback_callback,
+    return _make_failure_dict(
         reason="unexpected_exit",
         sanitize_attempts=sanitize_attempts,
+        failed_prompt=current_prompt,
     )
 
 
-async def _run_fallback(
-    fallback_callback: Optional[Callable[[], Awaitable[dict]]],
+def _make_failure_dict(
     reason: str,
     sanitize_attempts: Optional[list[dict]] = None,
+    failed_prompt: Optional[str] = None,
     upstream_error: Optional[str] = None,
+    is_safety: bool = False,
 ) -> dict:
-    """调用 fallback_callback（NB2 原逻辑），并在返回结果里记录 seedream_fallback 信息。"""
-    if fallback_callback is None:
-        logger.error(
-            f"    [SeedreamGenerator] 无 fallback_callback（reason={reason}），返回失败"
-        )
-        return {
-            "success": False,
-            "error": f"Seedream failed and no fallback available ({reason})",
-            "error_kind": "no_fallback",
-            "seedream_info": {
-                "sanitize_attempts": sanitize_attempts or [],
-                "fallback_reason": reason,
-                "upstream_error": upstream_error,
-            },
-        }
-    try:
-        fallback_result = await fallback_callback()
-    except Exception as e:
-        logger.exception(f"    [SeedreamGenerator] fallback_callback 抛异常: {e}")
-        return {
-            "success": False,
-            "error": f"Seedream fallback raised: {e}",
-            "error_kind": "fallback_exception",
-            "seedream_info": {
-                "sanitize_attempts": sanitize_attempts or [],
-                "fallback_reason": reason,
-                "upstream_error": upstream_error,
-            },
-        }
-    if isinstance(fallback_result, dict):
-        fallback_result.setdefault("seedream_info", {})
-        fallback_result["seedream_info"].update(
-            {
-                "sanitize_attempts": sanitize_attempts or [],
-                "fallback_reason": reason,
-                "upstream_error": upstream_error,
-                "used_fallback": True,
-            }
-        )
-    return fallback_result
+    """D.17: 统一失败返回结构。is_safety=True 时 error_kind='content_safety_failure'。"""
+    error_kind = "content_safety_failure" if is_safety else reason
+    return {
+        "success": False,
+        "error": upstream_error or f"Seedream generation failed ({reason})",
+        "error_kind": error_kind,
+        "failed_prompt": failed_prompt,
+        "seedream_info": {
+            "sanitize_attempts": sanitize_attempts or [],
+            "fallback_reason": reason,
+            "upstream_error": upstream_error,
+        },
+    }

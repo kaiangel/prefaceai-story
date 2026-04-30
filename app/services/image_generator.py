@@ -792,13 +792,13 @@ class ImageGenerator:
         Returns:
             生成结果字典
         """
-        # TASK-SEEDREAM-INTEGRATION dispatcher: Seedream 路径 + NB2 fallback（NB2 原逻辑零改动）
-        if settings.IMAGE_GEN_PROVIDER == "seedream" and not kwargs.pop("_seedream_fallback", False):
+        # D.17: Seedream 路径 — 单一模型，无 NB2 fallback（视觉统一性保证）
+        if settings.IMAGE_GEN_PROVIDER == "seedream":
+            kwargs.pop("_seedream_fallback", None)  # 清理旧兼容参数（无副作用）
             from app.services.seedream_generator import generate_shot_image_seedream
             return await generate_shot_image_seedream(
                 shot=shot, reference_images=reference_images, aspect_ratio=aspect_ratio,
-                fallback_callback=lambda: self.generate_shot_image(shot, reference_images,
-                    aspect_ratio, use_llm_translation, _seedream_fallback=True, **kwargs))
+                fallback_callback=None)  # D.17: 不传 fallback_callback，失败直接返失败 dict
         # 1. 获取shot的image_prompt
         image_prompt = shot.get('image_prompt', '')
 
@@ -1385,18 +1385,15 @@ class ImageGenerator:
         Returns:
             生成结果字典，额外包含 rewrite_info 如果进行了改写
         """
-        # TASK-SEEDREAM-INTEGRATION dispatcher: Seedream 路径 + NB2 fallback（NB2 原逻辑零改动）
-        if settings.IMAGE_GEN_PROVIDER == "seedream" and not kwargs.pop("_seedream_fallback", False):
-            from app.services.seedream_generator import generate_shot_image_seedream
+        # D.17: Seedream 路径 — 单一模型，无 NB2 fallback（视觉统一性保证）
+        if settings.IMAGE_GEN_PROVIDER == "seedream":
             _kwargs_copy = dict(kwargs)
+            _kwargs_copy.pop("_seedream_fallback", None)  # 清理旧兼容参数
+            from app.services.seedream_generator import generate_shot_image_seedream
             return await generate_shot_image_seedream(
                 shot=shot, reference_images=reference_images, aspect_ratio=aspect_ratio,
-                fallback_callback=lambda: self.generate_shot_image_phase2_safe(
-                    shot=shot, storyboard=storyboard, characters=characters,
-                    style_preset=style_preset, reference_images=reference_images,
-                    screenplay=screenplay, aspect_ratio=aspect_ratio, genre=genre,
-                    use_native_text=use_native_text, _seedream_fallback=True, **_kwargs_copy),
-                **_kwargs_copy)  # Bug 1 fix: 透传 project_id 等 kwargs 到 seedream_generator
+                fallback_callback=None,  # D.17: 不传 fallback_callback，失败直接返失败 dict
+                **_kwargs_copy)  # 透传 project_id 等 kwargs 到 seedream_generator
 
         shot_id = shot.get("shot_id", "?")
         logger.info(f"\n[ImageGenerator] === Shot {shot_id} 安全生成开始 ===")
