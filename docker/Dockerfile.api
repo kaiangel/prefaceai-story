@@ -2,6 +2,9 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Ensure Python output is unbuffered (logs appear immediately in docker logs)
+ENV PYTHONUNBUFFERED=1
+
 # System dependencies (Pillow build + FFmpeg + curl for healthcheck)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
