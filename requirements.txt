@@ -31,8 +31,9 @@ Pillow>=10.0.0
 # Async HTTP (for backup APIs if needed)
 aiohttp>=3.9.0
 
-# Database migrations
+# Database migrations (pymysql used as synchronous driver for alembic CLI)
 alembic>=1.13.0
+pymysql>=1.1.0
 
 # Testing
 pytest==8.3.4
