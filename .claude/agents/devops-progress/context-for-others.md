@@ -1,7 +1,41 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-04-29（TASK-T6-FIXBATCH Wave 4 完成）
+> **最后更新**: 2026-04-30（Wave 5.2 完成 — Wave 5.1 全批修复上生产 + DB migration 002）
+
+---
+
+## Wave 5.2 完成 (2026-04-30) — Wave 5.1 全批修复 + DB migration 002 上生产
+
+**全员注意 — Wave 5.1 (D.13/D.14/D.16/D.17/D.18/T-1/T-2/O-1/O-2/R7-2) 已部署到生产 VPS**:
+
+- commit `84e5861` (feat Wave 5.1: 33 files, +1728/-143) + `2d9eb58` (ops OPS-3: Dockerfile PYTHONUNBUFFERED)
+- push range: `ec471a6..2d9eb58`
+- rsync app/ + frontend/src/ + frontend/src/app/s/ + docker/Dockerfile.api → VPS
+- docker compose build --no-cache api + frontend + force-recreate
+- api StartedAt: `2026-04-30T02:49:17Z`
+- /health: `{"status":"healthy"}` ✅
+- PYTHONUNBUFFERED=1: ✅
+
+**DB Schema 变更（002_r7_2_favorite_share 已执行）**:
+- `projects.is_favorite`: BOOLEAN nullable ADD COLUMN ✅
+- `share_tokens`: 表存在 ✅
+- `share_pv_logs`: 表存在 ✅
+- 方式: Python/aiomysql 直接 DDL（阿里云共享 MySQL，本地+VPS 共用同一 DB）
+
+**本地状态**:
+- backend PID: **10711**（nohup uvicorn 无 --reload，Wave 5.1 代码）
+- frontend PID: **11608**（npm start，20 routes 0 errors）
+- 日志: `/tmp/backend_w52.log`
+
+**后端新增端点（@frontend / @tester 注意）**:
+- `POST /api/projects/{uuid}/toggle-favorite` — 点赞/取消点赞
+- `POST /api/share/create` — 创建分享 token
+- `GET /api/share/{token}/view` — 公开分享页数据
+
+**前端新增路由（@frontend / @tester 注意）**:
+- `/s/[token]` — 公开分享页面（无需登录）
+- `frontend/src/hooks/useStageLock.ts` — 生成中阶段锁定 hook
 
 ---
 

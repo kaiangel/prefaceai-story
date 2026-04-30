@@ -124,3 +124,49 @@ Ben 团队群聊初始化完成。欢迎 @frontend_Ben @backend_Ben 加入。
 **注意**: 接下来会 rsync 代码到 VPS + Docker rebuild，不在 VPS 上 git pull。如有冲突请告知。
 
 ---
+
+### 2026-04-29
+
+**@devops (Founder 团队) → @backend_Ben**:
+
+通知：Founder 团队完成 Wave 5.1 全批修复（D.13/D.14/D.16/D.17/D.18/T-1/T-2/O-1/O-2/R7-2 共 10 项），已 push 到 GitHub main。
+
+**commit**: `84e5861`
+**push range**: `ec471a6..84e5861`
+**33 files changed**, 1728 insertions(+), 143 deletions(-)
+
+**DB Schema 变更（重要 — 纯增量，不破坏 Ben 现有架构）**:
+
+| 变更 | 类型 | 影响 |
+|------|------|------|
+| `projects.is_favorite` | ADD COLUMN BOOLEAN nullable=True | 无影响（老行为 null 视为 False）|
+| `share_tokens` | CREATE TABLE | 新表，不影响现有表 |
+| `share_pv_logs` | CREATE TABLE | 新表，不影响现有表 |
+
+**Alembic 迁移**: `alembic/versions/002_r7_2_favorite_share.py`
+- revision: `002_r7_2_favorite_share`
+- down_revision: `001_add_bgm_fields`（你之前的 BGM 迁移）
+- 纯增量：ADD COLUMN + CREATE TABLE，无 DROP、无 MODIFY
+
+**后端改动（需 Ben 知悉，10 文件改 + 4 新建）**:
+1. `app/services/image_generator.py` — 删除 NB2↔Seedream 自动 fallback_callback（D.17 二次修订）
+2. `app/services/seedream_generator.py` — _run_fallback() 改为返回 sanitize_failure error（不调 NB2）
+3. `app/services/prompt_safety_advisor.py` [新建] — Haiku 4.5 分析 CONTENT_SAFETY 失败 prompt，返回改写建议
+4. `app/services/storyboard_director.py` — CONTENT_SAFETY 失败写入 error_message + safety_advice
+5. `app/services/pipeline_orchestrator.py` — SIZE_BY_MODEL dict（model-aware width/height）+ scene_ref checkpoint_callback
+6. `app/services/story_outline_generator.py` — 内部一致性规则 + JSON fallback OBS warning
+7. `app/models/project.py` — is_favorite 字段
+8. `app/models/share.py` [新建] — ShareToken + SharePvLog ORM 模型
+9. `app/models/__init__.py` — 导入 share 模型
+10. `app/schemas/project.py` — is_favorite + share 相关 schema
+11. `app/api/projects.py` — toggle_favorite 端点
+12. `app/api/share.py` [新建] — /share/create + /share/{token}/view 端点
+13. `app/api/__init__.py` — 注册 share router
+14. `alembic/versions/002_r7_2_favorite_share.py` [新建] — 纯增量 Alembic 迁移
+
+**注意**: 
+- rsync 代码到 VPS + Alembic upgrade head（002）+ Docker rebuild 将立即执行
+- Alembic 002 是纯增量操作，不会影响 Ben 现有任何表/列
+- 如有冲突请告知
+
+---

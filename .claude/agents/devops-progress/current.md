@@ -1,11 +1,117 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-04-29（自更新 — TASK-T6-FIXBATCH Wave 4 完成，VPS 部署 + 生产 T8 验证全通过）
-> **状态**: ✅ TASK-T6-FIXBATCH Wave 4 完成 — commit 84a2d35 push + Ben 通知 + rsync + Docker rebuild api+frontend + 生产 T8 UUID a3966a40 完整故事生成 16 shots PASS + D.15/R7-1/R7-3/UX-16 全部验证 PASS
+> **最后更新**: 2026-04-30（Wave 5.2 完成 — TASK-T6-FIXBATCH Wave 5.1 全批修复部署 + DB migration 002 + 本地 backend/frontend 重启）
+> **状态**: ✅ Wave 5.2 完成 — commit 84e5861 + 2d9eb58 push + rsync app+frontend+alembic + Docker rebuild api+frontend + /health 200 + DB migration 002 PASS + 本地 backend pid 10711 + frontend pid 11608
 
 ---
 
 ## 刚完成
+
+**TASK-T6-FIXBATCH Wave 5.2 — VPS 部署 Wave 5.1 全批修复 [2026-04-30]**
+
+**Step 1: pytest 验证**
+
+| 项 | 结果 |
+|----|------|
+| 295 passed | ✅ |
+| 3 failed (pre-existing: test_api_cost_log_table×2 + test_compat_with_real_data) | ✅ 全部 pre-existing |
+| 6 errors (pre-existing: test_character_consistency 等) | ✅ 全部 pre-existing |
+| Wave 5.1 无新引入退化 | ✅ 确认（git stash 对比验证）|
+
+**Step 2: commit + push**
+
+| 项 | 内容 | 结果 |
+|----|------|------|
+| commit 1 | `84e5861` feat(Wave 5.1): D.13/D.14/D.16/D.17/D.18/T-1/T-2/O-1/O-2/R7-2 全批修复（33 files, +1728/-143）| ✅ |
+| commit 2 | `2d9eb58` ops(docker): PYTHONUNBUFFERED=1 (OPS-3) | ✅ |
+| push range | `ec471a6..2d9eb58` main | ✅ |
+
+**Step 3: Ben 通知**
+
+- `.team-brain/team_ben/TEAM_CHAT.md` 追加 Wave 5.1 完整通知
+- 内容: 10 后端文件 + 4 新建 + DB schema 变更清单（Alembic 002 revision id + 3 表变更详情）
+- ✅ 已 append
+
+**Step 4: rsync VPS**
+
+| 命令 | 目标 | 结果 |
+|------|------|------|
+| `rsync app/ → /opt/xuhua-story/app/` | 10 backend 文件（含 3 新建）| ✅ trailing slash 正确 |
+| `rsync frontend/src/ → /opt/xuhua-story/frontend/src/` | 7 frontend 文件（含 1 新建 useStageLock.ts）| ✅ |
+| `rsync frontend/src/app/s/ → /opt/xuhua-story/frontend/src/app/s/` | share token page.tsx | ✅ |
+| `rsync docker/Dockerfile.api` | OPS-3 PYTHONUNBUFFERED | ✅ |
+
+关键新建文件 VPS 确认：
+- `/opt/xuhua-story/app/api/share.py` ✅
+- `/opt/xuhua-story/app/models/share.py` ✅
+- `/opt/xuhua-story/app/services/prompt_safety_advisor.py` ✅
+- `/opt/xuhua-story/frontend/src/app/s/[token]/page.tsx` ✅
+- `/opt/xuhua-story/frontend/src/hooks/useStageLock.ts` ✅
+
+**Step 5: Docker rebuild + restart**
+
+| 操作 | sha256 | 结果 |
+|------|--------|------|
+| `docker compose build --no-cache api` (Wave 5.1) | sha256:9012a05e | ✅ |
+| `docker compose build --no-cache frontend` | sha256:8d0a47ee | ✅ |
+| `docker compose up -d --force-recreate api frontend` | api+frontend Recreated | ✅ |
+| api StartedAt | `2026-04-30T02:35:14Z` | ✅ |
+| `docker compose build --no-cache api` (OPS-3 PYTHONUNBUFFERED) | sha256:e42582106ede | ✅ |
+| `docker compose up -d --force-recreate api` | Recreated | ✅ |
+| api StartedAt | `2026-04-30T02:49:17Z` | ✅ |
+
+**Step 6: DB migration 002 (Alembic 002_r7_2_favorite_share)**
+
+| 操作 | 结果 |
+|------|------|
+| `ALTER TABLE projects ADD COLUMN is_favorite BOOLEAN DEFAULT NULL` | ✅ |
+| share_tokens 表（已存在）验证 columns | id/uuid/project_uuid/token/view_count/created_at ✅ |
+| share_pv_logs 表（已存在）验证 columns | id/share_token/viewed_at/ip_hash ✅ |
+| `SHOW COLUMNS FROM projects LIKE 'is_favorite'` | tinyint(1) YES ✅ |
+| 方式 | 直接 Python/aiomysql 执行 DDL（无 alembic CLI，项目无 alembic.ini）| 共享 MySQL 一次覆盖本地+VPS |
+
+**Step 7: /health 验证**
+
+| 验证项 | 期望 | 结果 |
+|--------|------|------|
+| 容器内 `curl http://localhost:8000/health` | `{"status":"healthy"}` | ✅ |
+| PYTHONUNBUFFERED | `PYTHONUNBUFFERED=1` | ✅ |
+| 3 容器 | api(healthy) + frontend(up) + redis(healthy) | ✅ |
+
+**Step 8: OPS-3 PYTHONUNBUFFERED**
+
+- `docker/Dockerfile.api` 加 `ENV PYTHONUNBUFFERED=1` ✅
+- 单独 commit `2d9eb58` push + rsync + rebuild + force-recreate ✅
+- 容器内 `env | grep PYTHONUNBUFFERED` = `PYTHONUNBUFFERED=1` ✅
+
+**Step 9: 本地 backend 重启**
+
+| 项 | 内容 |
+|----|------|
+| 旧 PID | 27833/27834（Wave 3.5 代码，已 kill）|
+| 新 PID | **10711**（Wave 5.1 代码，nohup 无 --reload）|
+| 日志 | `/tmp/backend_w52.log` |
+| /health | `{"status":"healthy"}` ✅ |
+
+**Step 10: 本地 DB 状态**
+
+- 共享阿里云 MySQL（101.132.69.232），本地与 VPS 共用，一次 migration 覆盖两端
+- `projects.is_favorite`: BOOLEAN ✅
+- `share_tokens`: 存在 ✅
+- `share_pv_logs`: 存在 ✅
+
+**Step 11: 本地 frontend rebuild + 重启**
+
+| 项 | 内容 |
+|----|------|
+| `npm run build` | ✅ 0 errors, 20 routes（含新 /s/[token] dynamic route）|
+| 旧 frontend | next-server pkill 完成 |
+| 新 PID | **11608** |
+| HTTP 200 | `curl http://localhost:3000/` ✅ |
+
+---
+
+## 上次完成
 
 **TASK-T6-FIXBATCH Wave 4 — VPS 部署 Wave 1.1+1.2+2+2.5+3.5 全批修复 [2026-04-29]**
 

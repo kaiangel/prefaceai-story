@@ -10886,3 +10886,60 @@ logger.warning(
 ## [2026-04-30 09:30] @pm — Wave 5.2 spawn devops 真彩色启动
 
 Wave 5.1 已 PASS（21+ 角度地毯式深挖），现在启动 Wave 5.2 DevOps 部署 → Founder 本地 + 浏览器域名测试。
+
+---
+
+## [2026-04-30 11:05] @devops — Wave 5.2 部署完成报告
+
+**pytest 全套结果（Wave 5.1 不退化验证）**:
+- 295 passed ✅
+- 3 failed (pre-existing: test_api_cost_log_table×2 + test_compat_with_real_data) — 与 HEAD 完全一致，Wave 5.1 零引入退化 ✅
+- 6 errors (pre-existing: test_character_consistency 等) ✅
+- 32 skipped ✅
+
+**commit hash + push**:
+- `84e5861` feat(Wave 5.1): D.13/D.14/D.16/D.17/D.18/T-1/T-2/O-1/O-2/R7-2 全批修复（33 files, +1728/-143）
+- `2d9eb58` ops(docker): PYTHONUNBUFFERED=1 (OPS-3)
+- push range: `ec471a6..2d9eb58` → origin/main ✅
+
+**VPS docker ps + StartedAt**:
+```
+docker-api-1      Up (healthy)   StartedAt: 2026-04-30T02:49:17Z
+docker-frontend-1 Up             StartedAt: 2026-04-30T02:35:14Z
+docker-redis-1    Up (healthy)   7 weeks ago (unchanged)
+```
+
+**VPS 关键文件验证 (grep / ls)**:
+- `/opt/xuhua-story/app/api/share.py` ✅
+- `/opt/xuhua-story/app/models/share.py` ✅
+- `/opt/xuhua-story/app/services/prompt_safety_advisor.py` ✅
+- `/opt/xuhua-story/frontend/src/app/s/[token]/page.tsx` ✅
+- `/opt/xuhua-story/frontend/src/hooks/useStageLock.ts` ✅
+- `PYTHONUNBUFFERED=1` in container env ✅
+
+**DB migration 002 真实运行结果**:
+- `projects.is_favorite`: ALTER TABLE ADD COLUMN BOOLEAN 执行 ✅
+- `share_tokens`: 已存在（schema 正确：id/uuid/project_uuid/token/view_count/created_at）✅
+- `share_pv_logs`: 已存在（schema 正确：id/share_token/viewed_at/ip_hash）✅
+- 方式: Python/aiomysql 直接 DDL（无 alembic CLI — 项目无 alembic.ini 配置，与 001 迁移一致）
+- 共享阿里云 MySQL 本地+VPS 共用同一 DB，一次 DDL 两端同步
+
+**本地 backend**:
+- 旧 PID 27833/27834 (Wave 3.5 代码) → kill ✅
+- 新 PID **10711** (Wave 5.1 代码, nohup 无 --reload) ✅
+- `/health` = `{"status":"healthy"}` ✅
+- 日志: `/tmp/backend_w52.log`
+
+**本地 frontend**:
+- `npm run build` = 0 errors, 20 routes（含新 /s/[token] dynamic）✅
+- 新 PID **11608** ✅
+- `curl http://localhost:3000/` = 200 ✅
+
+**Ben 通知**: `.team-brain/team_ben/TEAM_CHAT.md` 已 append Wave 5.1 完整通知（DB schema 变更 + Alembic 002 revision id）✅
+
+**风险提示**:
+- Alembic CLI 不在容器中（无 alembic.ini），002 迁移通过 Python 直接执行 DDL — 与 001 迁移方式一致，不是新问题
+- SKIP_IMAGE_GENERATION 仍为 true（节省成本，如需真实生图 Founder 可临时 false）
+- OPS-3 PYTHONUNBUFFERED=1 已生效，docker logs 现在是实时输出（无缓冲）
+
+Founder 可以开始本地测试 (`http://localhost:3000`) 和浏览器域名测试 (`https://prefaceai.mov`)。
