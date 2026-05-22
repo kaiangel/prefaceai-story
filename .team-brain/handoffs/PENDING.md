@@ -5,9 +5,21 @@
 
 ---
 
-## 📊 真**当前剩余 task** (5/22 15:20 cleanup)
+## 📊 当前剩余 task (5/22 19:45 update)
 
-### 🔴 P0 (内测启动卡点) — **0 个** ✅ Wave 7+8 已全修
+### 🟡 内测启动卡点 — DevOps 第 2 次部署待派
+- **TASK-WAVE-9-DEPLOY** — push GitHub + rsync VPS + Docker rebuild (一次部署 Wave 9 + 9.1 + Tester)
+  - 待派 DevOps Sonnet 4.6 effort high (~30 min)
+  - 3 commits 待 push: 89bcfc7 (W9) + 1629332 (W9.1) + c570c2d (Tester)
+  - 验收: VPS /api/health 200 + 容器 healthy + Alembic head 一致
+  - 完成后: Founder 视觉 spot-check → 内测启动
+
+### ✅ 已完成 (5/22)
+- **TASK-T22-NEW-10-PORTRAIT-LAYER1-WIRE** ✅ (commit 89bcfc7, 9 files +704 -3, 7/7 + 500 baseline, PM 11 维度审查通过)
+- **TASK-T22-NEW-10-FULLBODY-LAYER1-WIRE** (DEC-049-3) ✅ (commit 1629332, 7 files +527 -17, 6/6 + 178 baseline, PM 11 维度审查通过)
+- **TASK-WAVE-9-TESTER-INDEPENDENT-BASELINE** ✅ (commit c570c2d, 6 files +1300 -5, 623/623 PASS in 0.90s, 60 矩阵 case + 12 边缘 case, 9 min wall clock, $0 API)
+- **TASK-SECRET-LEAK-REMEDIATION** ✅ Step 1-5 完成 (HEAD = f9987b0, Step 6 Founder 跳过)
+- **Wave 7+8** ✅ 6 task 全闭环
 
 ### 🟡 P2 (内测后/不阻塞)
 - **TASK-T22-NEW-1-TEST-ISOLATION-EXTENDED** — test_status_authoritative 综合跑 mock 污染 (生产 0 影响, Wave 9+ 修)

@@ -1721,3 +1721,51 @@ if not StyleEnforcer.is_bw_style(style_name):
 **fullbody 同 root cause** 待后续同批修。
 
 **关联**: TASK-T22-NEW-10 + DEC-049 + DEC-048 (Layer 1 Framework) + KEY_LEARNINGS #52 (跨 import cascade 防御)
+
+---
+
+## #58 [2026-05-22] destructive git 操作前必须 commit/stash 所有 working tree (PM 5/22 18:45 灾难)
+
+### 事件
+
+5/22 17:00-18:30 AI-ML Opus 4.7 max 完成 Wave 9 portrait Layer 1 wire (代码 + test + progress 三件套 + KEY_LEARNINGS + DECISIONS), 但**未 commit**。
+
+5/22 18:45 DevOps 第二轮 Sonnet 4.6 跑 `git filter-repo --replace-text .secret-replacements.txt --force` (清理 GitGuardian P0 secret leak), 重写整个 working tree 到 HEAD 状态。
+
+结果: AI-ML 1.5h 工作 (代码 2 文件 + progress 3 文件 + KEY_LEARNINGS #57 + DEC-049 + TEAM_CHAT 消息) **全部清除**。只有 untracked 新文件 (test_layer1_portrait_injection.py + audit doc + .gitleaks.toml) 保留 (filter-repo 不动 untracked)。
+
+同事故还连带清掉了 PM 自己之前 Edit 加的 PM completed.md Wave 7+8 块 — PM 也没及时 commit。
+
+### 根因
+
+`git filter-repo --force` 在 working repo 自动 reset working tree (这是文档警告的行为, DevOps 跑时没考虑, PM 派工 spawn prompt 没明确"先 commit / stash")。
+
+不只 filter-repo, 任何 destructive git 操作都可能丢 uncommitted: `git reset --hard`, `git clean -fdx`, `git checkout -- .`, `git restore .`, BFG repo-cleaner 等。
+
+### 修复 (Wave 9 重做)
+
+派 AI-ML Sonnet 4.6 重做 45 min (spec + test 文件已存在), self-commit 89bcfc7 保存。后续 Wave 9.1 + Tester 都强制 self-commit (1629332 + c570c2d)。
+
+### 教训 — 铁律
+
+**任何 destructive git 操作前 (PM 自己 or 派 DevOps), 必须先 `git status` 确认 working tree clean**:
+- 有 uncommitted modified → 先 commit 或 stash
+- 有 untracked files 不动 (filter-repo 默认不动 untracked)
+- 跨多 agent 工作 → PM 协调时务必 verify 所有 agent 都 self-commit 后再 destructive
+
+**Spawn prompt 必须强制**:
+- 任何代码改动的 spawn prompt 末尾必须含 "完成后立即 git add + git commit (self-commit, 防丢)"
+- 任何 destructive git 操作的 spawn prompt 必须含 "跑命令前先 `git status` verify clean, 如有 uncommitted 立即 commit 或 stash"
+
+### 后续防御
+
+- PM 派工 spawn prompt 模板加入 "self-commit 强制" 章节
+- 任何 PM 派 DevOps 跑 destructive git (filter-repo / reset --hard / clean -fdx / BFG) 必须前置 step "verify git status clean"
+- DEC-050 候选 (DevOps Opus 4.7 已写) 加入此条
+
+### 实证 (5/22 19:00-19:45)
+
+Wave 9 重做 + Wave 9.1 + Tester 全部 self-commit ✅ (89bcfc7 / 1629332 / c570c2d)
+后续 destructive git 操作 0 再丢
+
+**关联**: TASK-SECRET-LEAK-REMEDIATION + TASK-T22-NEW-10 + DEC-050 候选 (SECRET_HANDLING_PROTOCOL) + KEY_LEARNINGS #57 (跨路径 wire 一致性)

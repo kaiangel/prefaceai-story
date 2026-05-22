@@ -1,55 +1,51 @@
 # Today's Focus
 
-> **Updated**: 2026-05-22 14:30 (PM)
+> **Updated**: 2026-05-22 19:45 (PM)
 
-## 当前阶段: Wave 7 P0 修 + 内测启动倒计时
+## 当前阶段: DevOps 第 2 次部署 (内测启动倒计时)
 
 ### 今日 (5/22) 全程战果
 
 | 时段 | 内容 | 结果 |
 |---|---|---|
-| 08:30-12:35 | Layer 1 Identity Anchor Framework v1.0 全闭环 | 306 PASS (AI-ML 74 + Backend 127+365 + Tester 105) |
-| 12:35-13:25 | 干净重启 backend + frontend + 4 monitor | ✅ |
-| 13:25-13:57 | e2e test22 美人鱼 (~31.5 min Pipeline) | ✅ 21/21 shots + ⚠️ BGM 失败 |
-| 14:00-14:10 | Founder 视觉验证 + PM 真**核心发现** chars=0 | 🚨 Layer 1 P0 bug 发现 |
-| 14:10-14:23 | Explore agent audit (542 行) | ✅ |
-| 14:25 | Wave 7 派工 (Backend + Frontend 并行) | 🟢 进行中 |
+| 08:30-12:35 | Layer 1 Identity Anchor Framework v1.0 全闭环 | 306 PASS |
+| 12:35-13:57 | e2e test22 Round 1 + 5 P0 audit | chars=0 P0 暴露 |
+| 14:25-15:17 | Wave 7+8 6 task 全修 | 786+ PASS |
+| 15:30-16:08 | e2e test22 Round 2 (manga + 浪漫 + 3:4) | 85-90 分 |
+| 16:08-16:55 | DevOps VPS 部署 + VPS=local 同步 verify | 7 维度对齐 |
+| 17:01 | 🚨 GitGuardian P0 警报 | DevOps 派工 |
+| 17:05-18:50 | P0 SECRET-LEAK Step 1-5 完成 | HEAD = f9987b0 |
+| 18:45-18:50 | 🚨 副灾难: filter-repo 清除 AI-ML 1.5h Wave 9 工作 | AI-ML 重做 |
+| 19:00-19:02 | AI-ML Sonnet 4.6 Wave 9 重做 + self-commit | 89bcfc7 (7/7 + 218) |
+| 19:02-19:15 | AI-ML Sonnet 4.6 Wave 9.1 fullbody | 1629332 (6/6 + 178) |
+| 19:15-19:30 | PM 11 维度审查 Wave 9 + 9.1 (各 Ben 协议 5+1) | ✅ 通过 |
+| 19:30-19:45 | Tester 独立 baseline (Sonnet 4.6, 9 min wall clock) | c570c2d (623/623 PASS 0.90s) |
+| 19:45+ | DevOps 第 2 次部署待派 | 🟡 即将派 |
 
-## Wave 7 派工 (5/22 14:25)
+## DevOps 部署待派 (5/22 19:45)
 
 | Agent | 任务 | ETA |
 |---|---|---|
-| Backend Opus 4.7 max | T22-NEW-7 + T22-NEW-4 + T22-NEW-6 | ~5-6h |
-| Frontend Sonnet 4.6 | T22-NEW-2 SceneRefsPreview 智能展示 | ~1h |
+| DevOps | Sonnet 4.6 effort high: push GitHub (89bcfc7+1629332+c570c2d) + rsync VPS + Docker rebuild api + verify | ~30 min |
 
-## 5/22 真**新沉淀** 5 条 KEY_LEARNINGS
+## 后续流程
 
-- #50 Stage 4 LLM hint 失效
-- #51 Founder 通用故事铁律
-- #52 importlib 防 silent fail (#47 第 6 次重演)
-- #53 PM 漏沉淀 KEY_LEARNINGS 元教训
-- #54 Agent tool model 派工失效 + L1009 死代码
-- #55 AdjustCharacter/BGM 缺 fallback (3 次实证)
+1. DevOps 第 2 次部署完成
+2. Founder 视觉 spot-check (e2e test22 第 3 次 / test23 现代悬疑 / test24 古风武侠)
+3. 内测启动
 
-## 内测启动卡点
+## 重要教训今日新增
 
-- ✅ Layer 1 Identity Anchor Framework v1.0 (上午闭环)
-- 🔄 T22-NEW-7 chars=0 修 (Wave 7 修中, P0)
-- 🔄 T22-NEW-4 fallback 修 (Wave 7 修中, P0)
-- 🔄 T22-NEW-6 location wire (Wave 7 修中, P2)
-- 🔄 T22-NEW-2 SceneRefsPreview UX (Wave 7 修中, P2)
-- 🔮 e2e 重跑 test22 视觉验证 Coral hair 21/21 一致 (Wave 7 后)
-- 🔮 Founder 签字 → 内测启动 (5/22 晚 or 5/23)
+- **KEY_LEARNINGS #57**: 跨路径 wire 一致性 (shot ✅ portrait ❌ = "半吊子一致") — AI-ML 5/22
+- **KEY_LEARNINGS #58**: destructive git 前必须 commit/stash (filter-repo --force 灾难) — PM 5/22 沉淀
+- **DEC-049**: Layer 1 三路统一 (DEC-049-1 portrait + DEC-049-2 BW_STYLES + DEC-049-3 fullbody) ✅ 全实施
 
-## Wave 8 计划 (Founder 5/22 14:50 决策升级内测前必修)
+## Wave 9 + 9.1 + Tester 三批 commit 总览
 
-| Task | 优先级 | Agent | ETA |
-|---|---|---|---|
-| T22-NEW-5 frontend 砍 R4-2 | P2 升级 | Frontend Sonnet 4.6 (跑中) | ~1h |
-| T22-NEW-5 backend 砍 R4-2 wait loop + v1.5 | P2 升级 | Backend Sonnet 4.6 (Wave 7 后派) | ~1-2h |
-| T22-NEW-8 confirm-outline StageB wire | P2 升级 | Frontend Sonnet 4.6 (Wave 8 Frontend #2 完后派) | ~30 min |
-| T22-NEW-9 schema 通用 fallback 架构根治 | P2 升级长期根治 | Backend Sonnet 4.6 xhigh (Wave 7 后派) | ~2-3h |
+```
+89bcfc7  fix(Wave9):    portrait Layer 1 wire (9 files +704 -3, 7/7 + 218 baseline)
+1629332  fix(Wave9.1):  fullbody Layer 1 wire (7 files +527 -17, 6/6 + 178 baseline)
+c570c2d  test(Wave9+9.1): Tester 跨题材独立 baseline (6 files +1300 -5, 623/623 PASS in 0.90s)
+```
 
-## Wave 8 后真**剩余**
-- T22-NEW-1 test isolation (P3, 不阻塞)
-- memory project_mysql_migration (Ben 决定时机, Phase 6+)
+Layer 1 三路统一: shot path (W7) + portrait path (W9) + fullbody path (W9.1)
