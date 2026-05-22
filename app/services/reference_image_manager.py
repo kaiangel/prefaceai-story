@@ -624,6 +624,39 @@ and smaller build — NOT by switching to a cuter or more cartoon-like art style
             add_quality_suffix=True
         )
 
+        # Wave 9.1 W9.1-1 (DEC-049-3): 注入 Layer 1 identity anchor 跨 fullbody path 一致性
+        # 跟 portrait path _build_portrait_prompt() L388-419 对齐 (W9-1 完成)
+        # 跟 shot path image_generator._apply_identity_anchors() 对齐
+        # 风格条件判断: 黑白风格 skip 注入 (复用 W9-2 is_bw_style helper)
+        if not StyleEnforcer.is_bw_style(style_name):
+            try:
+                from app.services.identity_anchor_injector import inject_identity_anchors
+                enforced_prompt = inject_identity_anchors(
+                    image_prompt=enforced_prompt,
+                    characters_in_scene=[character],  # 当前 fullbody 单角色
+                    location=None,  # fullbody 无场景
+                    style_preset=style_name,
+                    props=None,
+                    time_continuity=None,
+                )
+                logger.info(
+                    f"[ReferenceImageManager] Layer 1 injected for fullbody "
+                    f"char={character.get('id', character.get('name_en', 'unknown'))} "
+                    f"style={style_name}"
+                )
+            except Exception as e:
+                # defensive: Layer 1 失败不阻塞 fullbody 生成，降级到无 Layer 1 prompt
+                logger.warning(
+                    f"[ReferenceImageManager] Layer 1 inject FAILED for fullbody, fallback to no-anchor: "
+                    f"char={character.get('id', 'unknown')} err={e}"
+                )
+        else:
+            logger.info(
+                f"[ReferenceImageManager] Layer 1 SKIPPED (bw style) "
+                f"char={character.get('id', character.get('name_en', 'unknown'))} "
+                f"style={style_name}"
+            )
+
         return enforced_prompt
 
     def _get_negative_prompt(self, char_type: str) -> str:

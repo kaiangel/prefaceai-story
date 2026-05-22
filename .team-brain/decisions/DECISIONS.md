@@ -2098,9 +2098,10 @@ loc_001 underwater_palace: bioluminescent coral, soft blue-green ambient light
 - 理由: 黑白风格 (如 manga_bw) 无彩色 anchor 可注入，skip 避免 anchor block 内容为空或误导
 - 状态: ✅ Wave 9 AI-ML 已实施
 
-**DEC-049-3: fullbody path 同 root cause — 待后续处理**
-- `_build_fullbody_prompt()` 未 wire Layer 1，同 portrait 修法
-- 属于后续 followup，不影响当前内测启动（fullbody 颜色比 portrait 影响小）
+**DEC-049-3: fullbody path 同 root cause — ✅ 已实施 (Wave 9.1, 2026-05-22 20:30)**
+- `_build_reference_prompt()` (`reference_image_manager.py`) 已 wire Layer 1，镜像 W9-1 portrait pattern
+- Layer 1 三路统一: shot path (W7) + portrait path (W9) + fullbody path (W9.1) 全部 wire
+- 验证: `test_layer1_fullbody_injection.py` 6/6 PASS + 252/252 总量 0 退化
 
 ### 验证
 

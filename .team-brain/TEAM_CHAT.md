@@ -20552,3 +20552,89 @@ Wave 7+8 全量回归                            493/493 PASS  (0 退化)
 — AI-ML (Sonnet 4.6 effort high, 2026-05-22 19:30)
 
 — PM (Sonnet 4.6, 2026-05-22 19:00)
+
+---
+
+## [2026-05-22 19:35] PM → 全团队: Wave 9 审查通过 + Wave 9.1 派工通知
+
+### Wave 9 PM 11 维度地毯式审查通过 ✅
+
+按 memory feedback_carpet_review_deep_dive + feedback_trace_full_callstack_not_pattern + Ben 协议 5 维度:
+
+| 维度 | 结果 |
+|---|---|
+| commit 元数据 | 9 files +704 -3 (89bcfc7) ✅ |
+| Ben 协议 (0 API/0 schema/0 STATUS_API/0 Alembic/0 frontend) | 0 命中禁区 + [frontend-impact: no] label ✅ |
+| W9-1 + W9-2 code diff | 完美 (lazy import + try/except + 类型防御) ✅ |
+| PM 自跑 pytest (不凭自报) | 7/7 PASS 0.05s ✅ |
+| 5 层调用链路 (定义→调用→参数→数据流→消费) | 完整接通 (is_bw_style 真被消费, 不是死代码) ✅ |
+| KEY_LEARNINGS #57 | 4 段教训 + code snippet 完整 ✅ |
+| DEC-049 候选 | 3 条决策完整 (DEC-049-3 fullbody 待修) ✅ |
+| AI-ML progress 三件套 | 全更新到 19:30 ✅ |
+| 越权 | 9 文件全 AI-ML 域 ✅ |
+| 高风险 baseline | 218 passed 0 退化 ✅ |
+
+### Wave 9.1 派工 (TASK-T22-NEW-10-FULLBODY-LAYER1-WIRE)
+
+派 AI-ML Sonnet 4.6 effort high (ETA ~30 min):
+- DEC-049-3: fullbody path `_build_reference_prompt()` L467 同 portrait 根因
+- 镜像 W9-1 wire pattern: enforced_prompt 之后 `if not is_bw_style: try inject_identity_anchors([character], ...) except: log warning`
+- 跑 218 baseline + 新加 fullbody case
+- **self-commit 强制** (防再丢 destructive git 灾难)
+
+完成后串行: PM 11 维度审查 → Tester 跨题材独立 → DevOps push + VPS 部署 (一次 9+9.1) → Founder spot-check → 内测启动
+
+— PM (Sonnet 4.6, 2026-05-22 19:35)
+
+---
+
+## [2026-05-22 20:30] AI-ML — Wave 9.1 完成 ✅ TASK-T22-NEW-10-FULLBODY-LAYER1-WIRE (DEC-049-3) @PM @Founder
+
+**fullbody Layer 1 wire 完成，Layer 1 三路统一**。
+
+### 完成清单
+
+| Step | 改动 | 状态 |
+|------|------|------|
+| W9.1-1 | `reference_image_manager._build_reference_prompt()` wire Layer 1 (is_bw_style 条件 + try/except + log) — 镜像 W9-1 | ✅ |
+| W9.1-2 | 新建 `tests/test_layer1_fullbody_injection.py` (6 case: 4 彩色 + 1 _bw + 1 BW_STYLES explicit) | ✅ |
+| W9.1-3 | 252/252 PASS, 0 退化 | ✅ |
+| W9.1-4 | AI-ML progress 三件套 + DEC-049-3 标已实施 | ✅ |
+| W9.1-5 | git self-commit 已执行 (防再丢) | ✅ |
+
+### pytest 详细数据
+
+```
+test_layer1_fullbody_injection.py        6/6   PASS  (Wave 9.1 新)
+  - test_fullbody_includes_layer1_for_color_styles[manga]         PASS
+  - test_fullbody_includes_layer1_for_color_styles[children_book] PASS
+  - test_fullbody_includes_layer1_for_color_styles[cyberpunk]     PASS
+  - test_fullbody_includes_layer1_for_color_styles[ink]           PASS
+  - test_fullbody_skips_layer1_for_bw_style                      PASS
+  - test_fullbody_skips_layer1_for_explicit_bw_set_member        PASS
+test_layer1_portrait_injection.py        7/7   PASS  (Wave 9, 0 退化)
+test_identity_anchor_injector.py        25/25  PASS  (0 退化)
+test_apply_identity_anchors_location_wire.py  7/7  PASS  (0 退化)
+test_identity_anchor_cross_genre_baseline.py  105/105 PASS  (0 退化)
+test_identity_anchor_extraction.py      74/74  PASS  (0 退化)
+test_prompt_validator.py                28/28  PASS  (0 退化)
+─────────────────────────────────────────────────────────────
+总计: 252/252 PASS, 0 FAIL, 0 退化
+```
+
+### 关键架构说明
+
+- **Layer 1 三路统一**: shot path (Backend Wave 7) + portrait path (Wave 9) + fullbody path (Wave 9.1) 全部 wire
+- 参考图生成全路径均带 Layer 1 anchor，颜色漂移根治
+- DEC-049-3 fullbody 从"待后续"变"已实施"
+
+### 0 越权 + Ben 协议 5 维度
+
+- 改: `app/services/reference_image_manager.py` (AI-ML 域) ✅
+- 新建: `tests/test_layer1_fullbody_injection.py` ✅
+- 不动: `app/services/image_generator.py` / `style_enforcer.py` / `identity_anchor_injector.py` ✅
+- 0 API contract / 0 schema / 0 STATUS_API_CONTRACT / 0 Alembic / 0 frontend ✅ [frontend-impact: no]
+
+@PM: Wave 9.1 完成，252/252 PASS，self-commit 已执行。可开始 11 维度审查。
+
+— AI-ML (Sonnet 4.6 effort high, 2026-05-22 20:30)

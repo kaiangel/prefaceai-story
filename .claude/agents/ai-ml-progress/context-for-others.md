@@ -1,7 +1,27 @@
 # AI-ML Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 AI-ML 的工作状态和 Prompt 约束
-> **最后更新**: 2026-05-22 19:30 (Wave 9 重做完成 — portrait Layer 1 wire)
+> **最后更新**: 2026-05-22 20:30 (Wave 9.1 完成 — fullbody Layer 1 wire, 三路统一)
+
+---
+
+# 🟢 [2026-05-22 20:30] Wave 9.1: fullbody path 已 wire Layer 1 (TASK-T22-NEW-10 DEC-049-3)
+
+**给 Backend / PM 注意**:
+
+- `_build_reference_prompt()` (`reference_image_manager.py`) 现在会对彩色风格自动调用 `inject_identity_anchors()`
+- 调用签名同 portrait: `inject_identity_anchors(image_prompt=..., characters_in_scene=[character], location=None, style_preset=style_name, props=None, time_continuity=None)`
+- **lazy import** (函数内 import) 避免循环依赖
+- **BW_STYLES 扩展位**: 同 portrait — `StyleEnforcer.BW_STYLES` 空 set + `_bw` 后缀触发 skip
+
+**当前 Layer 1 wire 状态 (三路全统一)**:
+| 路径 | 状态 |
+|------|------|
+| Shot path (`image_generator._apply_identity_anchors`) | ✅ Wave 7 Backend 已实施 |
+| Portrait path (`reference_image_manager._build_portrait_prompt`) | ✅ Wave 9 AI-ML 已完成 |
+| Fullbody path (`reference_image_manager._build_reference_prompt`) | ✅ Wave 9.1 AI-ML 本批完成 |
+
+**DEC-049-3**: 已实施，无待修项。
 
 ---
 
@@ -13,17 +33,6 @@
 - 调用签名: `inject_identity_anchors(image_prompt=..., characters_in_scene=[character], location=None, style_preset=style_name, props=None, time_continuity=None)`
 - **lazy import** (函数内 import) 避免循环依赖，无需修改 `__init__.py`
 - **BW_STYLES 扩展位**: `StyleEnforcer.BW_STYLES` 当前为空 set，只有 `_bw` 后缀触发 skip；未来加真黑白风格名进 set 即可
-
-**fullbody 同 root cause 待修** (portrait Layer 1 wire 下一步):
-- `_build_fullbody_prompt()` 还未 wire Layer 1 — 同 `_build_portrait_prompt()` 修法
-- portrait 修好，fullbody 可 followup 同批修
-
-**当前 Layer 1 wire 状态**:
-| 路径 | 状态 |
-|------|------|
-| Shot path (`image_generator._apply_identity_anchors`) | ✅ Wave 7 Backend 已实施 |
-| Portrait path (`reference_image_manager._build_portrait_prompt`) | ✅ Wave 9 AI-ML 本批完成 |
-| Fullbody path (`reference_image_manager._build_fullbody_prompt`) | ⬜ 同 root cause 待后续 |
 
 ---
 

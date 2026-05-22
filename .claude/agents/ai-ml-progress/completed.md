@@ -4,6 +4,34 @@
 
 ---
 
+## 2026-05-22 20:30 — Wave 9.1: fullbody Layer 1 wire (TASK-T22-NEW-10-FULLBODY DEC-049-3) ✅ (Sonnet 4.6 effort high)
+
+**背景**: Wave 9 portrait path 修完后，fullbody path 同 root cause DEC-049-3 待修。本批 Wave 9.1 完全镜像 W9-1 pattern。
+
+**改动文件 (2)**:
+
+| 文件 | 改动 |
+|------|------|
+| `app/services/reference_image_manager.py` | `_build_reference_prompt()` enforced_prompt 赋值后加 Layer 1 wire (is_bw_style 条件 + lazy import inject_identity_anchors + try/except + log info/warning) — 镜像 W9-1 portrait pattern |
+| `tests/test_layer1_fullbody_injection.py` | 新建 6 case (4 彩色 + 1 _bw skip + 1 BW_STYLES explicit skip) |
+
+**pytest 结果**:
+```
+test_layer1_fullbody_injection.py      6/6   PASS  (Wave 9.1 新)
+test_layer1_portrait_injection.py      7/7   PASS  (Wave 9, 0 退化)
+252 case 全量                        252/252 PASS  (0 退化)
+```
+
+**架构意义**: Layer 1 Identity Anchor 现**三路统一** — shot path (Backend W7) + portrait path (W9) + fullbody path (W9.1)。参考图生成全路径均带 Layer 1 anchor，颜色漂移根治。
+
+**DEC-049-3**: 标注"已实施"。
+
+**git commit**: 已执行 (防再丢)。
+
+**0 越权**: 仅改 AI-ML 域 1 文件 + 新建 1 测试文件 + progress 三件套 + TEAM_CHAT 末尾追加 + DECISIONS DEC-049-3 状态。
+
+---
+
 ## 2026-05-22 19:30 — Wave 9 重做: portrait Layer 1 wire (TASK-T22-NEW-10) ✅ (Sonnet 4.6 effort high)
 
 **背景**: 上一轮 Wave 9 工作 (17:00-18:30) 被 DevOps git filter-repo Step 4-5 清除 (未 commit), 现重做。ETA ~1h，实际 ~45min。

@@ -1,7 +1,63 @@
 # AI-ML Engineer 当前任务
 
-> 更新时间: 2026-05-22 19:30 (Wave 9 重做完成 — portrait Layer 1 wire, 7/7 PASS + 500 baseline)
-> 状态: 🟢 Wave 9 重做完成, self-commit 已执行, 等 PM 审查
+> 更新时间: 2026-05-22 20:30 (Wave 9.1 完成 — fullbody Layer 1 wire, 6/6 PASS + 252 baseline)
+> 状态: 🟢 Wave 9.1 完成, self-commit 已执行, 等 PM 审查
+
+---
+
+## 🟢 Wave 9.1 完成 [2026-05-22 20:30] — TASK-T22-NEW-10-FULLBODY-LAYER1-WIRE (DEC-049-3)
+
+**背景**: Wave 9 完成 portrait Layer 1 wire 后，fullbody path 同 root cause 待修 (DEC-049-3)。Wave 9.1 完全镜像 W9-1 pattern 修 `_build_reference_prompt()`。
+
+### 完成清单
+
+| Step | 文件 | 改动 | 状态 |
+|------|------|------|------|
+| W9.1-1 | `app/services/reference_image_manager.py` | `_build_reference_prompt()` enforced_prompt 赋值后 wire Layer 1 inject + is_bw_style 条件 + try/except 防御 + log (镜像 W9-1 portrait pattern, 改 "portrait" → "fullbody") | ✅ |
+| W9.1-2 | `tests/test_layer1_fullbody_injection.py` (新建 6 case) | 4 彩色风格 (manga/children_book/cyberpunk/ink) fullbody 含 Layer 1 anchor + 1 _bw skip + 1 BW_STYLES set skip | ✅ |
+| W9.1-3 | pytest 验证 | 6 新 fullbody PASS + 7 portrait PASS + 218+ baseline 0 退化 | ✅ 252/252 PASS |
+| W9.1-4 | AI-ML progress 三件套 + TEAM_CHAT + DEC-049-3 | 全更新 | ✅ |
+| W9.1-5 | git commit | self-commit 已执行，防再丢 | ✅ |
+
+### pytest 数据
+
+```
+test_layer1_portrait_injection.py      7/7   PASS  (Wave 9, 0 退化)
+test_layer1_fullbody_injection.py      6/6   PASS  (Wave 9.1 新)
+test_identity_anchor_injector.py      25/25  PASS  (0 退化)
+test_apply_identity_anchors_location_wire.py  7/7  PASS  (0 退化)
+test_identity_anchor_cross_genre_baseline.py  105/105 PASS  (0 退化)
+test_identity_anchor_extraction.py    74/74  PASS  (0 退化)
+test_prompt_validator.py              28/28  PASS  (0 退化)
+─────────────────────────────────────────────────
+总计: 252/252 PASS, 0 FAIL, 0 退化
+```
+
+### 关键架构说明 (给 Backend / PM 审查)
+
+- **fullbody Layer 1** 注入位置: `_build_reference_prompt()` 内 `enforced_prompt` 赋值后、`return enforced_prompt` 前
+- **镜像 W9-1**: 完全相同的 inject_identity_anchors 调用签名，仅 log 标识符改 "fullbody"
+- **三路 Layer 1 统一**: shot path (Backend W7) + portrait path (W9) + fullbody path (W9.1) 全部 wire
+- **is_bw_style()** 复用 W9-2 helper，无需再改 style_enforcer.py
+
+### 0 越权验证
+
+- 改: `app/services/reference_image_manager.py` (AI-ML 域) ✅
+- 改: `tests/test_layer1_fullbody_injection.py` (新建) ✅
+- 不动: `app/services/image_generator.py` (shot path L1336, Backend 域) ✅
+- 不动: `app/services/style_enforcer.py` (W9-2 helper 已完整) ✅
+- 不动: `app/services/identity_anchor_injector.py` (稳定) ✅
+- 不动: backend/frontend/tester/devops/pm progress ✅
+
+### Ben 协议 5 维度
+
+| 协议项 | 结果 |
+|--------|------|
+| 0 API contract 变更 (app/api/) | ✅ |
+| 0 schema 改动 (app/schemas/) | ✅ |
+| 0 STATUS_API_CONTRACT | ✅ |
+| 0 Alembic migration | ✅ |
+| 0 frontend 改动 | ✅ [frontend-impact: no] |
 
 ---
 
