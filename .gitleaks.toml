@@ -1,0 +1,82 @@
+# Gitleaks configuration for xuhua_story
+# Created: 2026-05-22 (DEC-050 candidate, P0 secret leak remediation)
+# Usage: gitleaks detect --config .gitleaks.toml --no-banner
+# Install: brew install gitleaks  (macOS)  OR  go install github.com/zricethezav/gitleaks/v8@latest
+#
+# History: 2026-05-22 GitGuardian detected leaked Google API Keys in commit e5470e8.
+# Root cause: DevOps progress markdown contained full 39-char keys.
+# Defense: pre-commit hook + this config + .gitignore updates.
+
+title = "xuhua_story gitleaks config"
+
+[extend]
+useDefault = true
+
+# ============================================
+# Custom rules for project-specific secret types
+# ============================================
+
+[[rules]]
+id = "google-api-key"
+description = "Google API Key (Gemini / Maps / Cloud)"
+regex = '''AIzaSy[A-Za-z0-9_-]{33}'''
+keywords = ["AIzaSy"]
+tags = ["key", "google", "gemini"]
+severity = "CRITICAL"
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic Claude API Key"
+regex = '''sk-ant-[a-zA-Z0-9_-]{40,}'''
+keywords = ["sk-ant"]
+tags = ["key", "anthropic", "claude"]
+severity = "CRITICAL"
+
+[[rules]]
+id = "openai-api-key"
+description = "OpenAI API Key (Whisper / GPT)"
+regex = '''sk-(?:proj-)?[a-zA-Z0-9_-]{40,}'''
+keywords = ["sk-", "sk-proj-"]
+tags = ["key", "openai"]
+severity = "CRITICAL"
+
+[[rules]]
+id = "volcengine-ak"
+description = "Volcengine Access Key (Bytedance Doubao TTS)"
+regex = '''AKLT[A-Za-z0-9+/=]{40,}'''
+keywords = ["AKLT"]
+tags = ["key", "volcengine", "tts"]
+severity = "CRITICAL"
+
+# ============================================
+# Allowlist (false positives we accept)
+# ============================================
+
+[allowlist]
+description = "Global allowlist - paths and patterns that are safe"
+
+paths = [
+  '''node_modules/''',
+  '''\.venv/''',
+  '''venv/''',
+  '''\.git/''',
+  '''test_output/''',
+  '''storage/''',
+  '''forclaudeweb/''',
+  '''still_image_storyref/''',
+  '''\.next/''',
+  '''build/''',
+  '''__pycache__/''',
+]
+
+regexTarget = "match"
+regexes = [
+  # Allow redacted placeholders in documentation
+  '''AIzaSy(CX|Bm)\*\*\*\[redacted''',
+  # Allow generic example placeholders
+  '''AIzaSyxxx''',
+  '''sk-ant-xxx''',
+  '''sk-xxx''',
+  '''AKLTxxx''',
+  '''AIzaSyA-Za-z0-9_-''',  # docstring/regex examples
+]
