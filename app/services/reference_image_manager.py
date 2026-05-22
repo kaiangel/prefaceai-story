@@ -14,12 +14,15 @@
 """
 
 import asyncio
+import logging
 from typing import Dict, Any, List, Optional
 from PIL import Image, ImageDraw, ImageFont
 
 from app.services.character_prompt_builder import CharacterPromptBuilder
 from app.services.style_enforcer import StyleEnforcer
 from app.models.style_config import ProjectStyleConfig
+
+logger = logging.getLogger(__name__)
 
 
 def _label_reference_image(image: Image.Image, label: str) -> Image.Image:
@@ -380,6 +383,38 @@ and smaller build — NOT by switching to a cuter or more cartoon-like art style
             style_name,
             add_quality_suffix=True
         )
+
+        # Wave 9 W9-1 (TASK-T22-NEW-10): 注入 Layer 1 identity anchor 跨 portrait path 一致性
+        # 跟 shot path image_generator._apply_identity_anchors() 对齐
+        # 风格条件判断: 黑白风格 skip 注入 (留 manga_bw 等扩展位)
+        if not StyleEnforcer.is_bw_style(style_name):
+            try:
+                from app.services.identity_anchor_injector import inject_identity_anchors
+                enforced_prompt = inject_identity_anchors(
+                    image_prompt=enforced_prompt,
+                    characters_in_scene=[character],  # 当前 portrait 单角色
+                    location=None,  # portrait 无场景
+                    style_preset=style_name,
+                    props=None,
+                    time_continuity=None,
+                )
+                logger.info(
+                    f"[ReferenceImageManager] Layer 1 injected for portrait "
+                    f"char={character.get('id', character.get('name_en', 'unknown'))} "
+                    f"style={style_name}"
+                )
+            except Exception as e:
+                # defensive: Layer 1 失败不阻塞 portrait 生成，降级到无 Layer 1 prompt
+                logger.warning(
+                    f"[ReferenceImageManager] Layer 1 inject FAILED for portrait, fallback to no-anchor: "
+                    f"char={character.get('id', 'unknown')} err={e}"
+                )
+        else:
+            logger.info(
+                f"[ReferenceImageManager] Layer 1 SKIPPED (bw style) "
+                f"char={character.get('id', character.get('name_en', 'unknown'))} "
+                f"style={style_name}"
+            )
 
         return enforced_prompt
 

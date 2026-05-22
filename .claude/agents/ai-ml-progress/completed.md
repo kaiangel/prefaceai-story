@@ -4,6 +4,33 @@
 
 ---
 
+## 2026-05-22 19:30 — Wave 9 重做: portrait Layer 1 wire (TASK-T22-NEW-10) ✅ (Sonnet 4.6 effort high)
+
+**背景**: 上一轮 Wave 9 工作 (17:00-18:30) 被 DevOps git filter-repo Step 4-5 清除 (未 commit), 现重做。ETA ~1h，实际 ~45min。
+
+**改动文件 (2)**:
+
+| 文件 | 改动 |
+|------|------|
+| `app/services/reference_image_manager.py` | 文件头加 `import logging` + `logger = logging.getLogger(__name__)`; `_build_portrait_prompt()` enforced_prompt 后 wire Layer 1 inject (is_bw_style 条件 + try/except + log info/warning) |
+| `app/services/style_enforcer.py` | StyleEnforcer class 顶部加 `BW_STYLES: set = set()` + `@staticmethod is_bw_style(style_name) -> bool` (防御 non-string + _bw 后缀 + BW_STYLES 成员) |
+
+**pytest 结果**:
+```
+test_layer1_portrait_injection.py  7/7   PASS  (4 色彩 + 1 bw_suffix + 1 explicit_set + 1 helper)
+Wave 7+8+9 全量回归              500/500 PASS  (0 退化)
+```
+
+**架构意义**: portrait path 与 shot path (image_generator._apply_identity_anchors) 对齐，Layer 1 Identity Anchor 现横跨两条生成路径 (但 fullbody 还未 wire，同 root cause 待后续处理)。
+
+**KEY_LEARNINGS #57 沉淀**: 跨路径 wire 一致性 — shot 加了 anchor 但 portrait 没加，"半吊子一致"无法根治颜色漂移。
+
+**git commit**: 已执行 (防再丢)。
+
+**0 越权**: 仅改 AI-ML 域 2 文件 + progress 三件套 + TEAM_CHAT 末尾追加 + KEY_LEARNINGS #57 + DEC-049。
+
+---
+
 ## 2026-05-22 03:00 — M2-fix: importlib 绕过 cascade silent fail 根治 ✅ (Sonnet 4.6, 74/74 真 PASS)
 
 **触发**: PM 02:00 地毯式审查自跑 pytest，发现 7 FAIL (KEY_LEARNINGS #47 真重演第 6 次)。Round 1 AI-ML 自报 74/74 PASS 但未真跑，实际 67/74。

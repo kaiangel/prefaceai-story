@@ -2075,3 +2075,41 @@ loc_001 underwater_palace: bioluminescent coral, soft blue-green ambient light
 **关联**: DEC-046 v3 narrative readability + DEC-047 Stage 4.5 + KEY_LEARNINGS #50/#51
 
 **影响范围**: AI-ML (Stage 4 prompts 重构) + Backend (image_generator post-process 注入 + PromptValidator) + Tester (跨题材 baseline) + 共 1-2 day 工时
+
+---
+
+## [2026-05-22 19:30] DEC-049 Layer 1 portrait path wire + BW_STYLES 扩展位 (Wave 9, TASK-T22-NEW-10)
+
+### 背景
+
+680 行 9 维度 audit (`T22_NEW_10_PORTRAIT_LAYER1_AUDIT_2026-05-22.md`) 发现: Layer 1 Identity Anchor 已 wire 到 shot path (Backend Wave 7)，但 portrait path (`_build_portrait_prompt`) 从未 wire，portrait 颜色靠 StyleEnforcer mandatory 关键词，无 anchor 约束 → portrait 颜色不稳定 → 参考图本身颜色错误 → shot 有 anchor 也无法纠正。
+
+### 决策内容
+
+**DEC-049-1: portrait path 必须 wire Layer 1 anchor**
+- 实施位置: `reference_image_manager._build_portrait_prompt()` enforced_prompt 赋值后
+- 调用: `inject_identity_anchors(characters_in_scene=[character], location=None, style_preset=..., props=None, time_continuity=None)`
+- 防御性: try/except 兜底，Layer 1 失败不阻塞 portrait 生成
+- 状态: ✅ Wave 9 AI-ML 已实施 (2026-05-22 19:30)
+
+**DEC-049-2: BW_STYLES 扩展位 + is_bw_style() helper**
+- `StyleEnforcer.BW_STYLES: set = set()` — 当前为空，未来加真黑白风格名进 set
+- `StyleEnforcer.is_bw_style(style_name) -> bool` — `_bw` 后缀 OR `BW_STYLES` 成员触发 skip
+- 理由: 黑白风格 (如 manga_bw) 无彩色 anchor 可注入，skip 避免 anchor block 内容为空或误导
+- 状态: ✅ Wave 9 AI-ML 已实施
+
+**DEC-049-3: fullbody path 同 root cause — 待后续处理**
+- `_build_fullbody_prompt()` 未 wire Layer 1，同 portrait 修法
+- 属于后续 followup，不影响当前内测启动（fullbody 颜色比 portrait 影响小）
+
+### 验证
+
+- 4 彩色风格 (manga/children_book/cyberpunk/ink) portrait prompt 含 IDENTITY_ANCHOR_MARKER ✅
+- _bw 后缀风格 portrait prompt 不含 IDENTITY_ANCHOR_MARKER ✅
+- BW_STYLES 显式注册成员同样 skip ✅
+- is_bw_style() helper 防御 non-string 返回 False ✅
+- Wave 7+8+9 全量 500/500 PASS, 0 退化 ✅
+
+### 关联
+
+DEC-048 (Layer 1 Framework) + TASK-T22-NEW-10 + KEY_LEARNINGS #57 (跨路径 wire 一致性)

@@ -1672,3 +1672,52 @@ T22-NEW-8 派工任务: StageB.tsx 真**加 POST confirm-outline 调用**. Front
 - 真**Wave 7+8 真**少 1 个 task 需要修** (T22-NEW-8 真**已完成**)
 
 **关联**: T22-NEW-7 (chars=0 根因) + T22-NEW-8 (假阳性) + KEY_LEARNINGS #48 (调用链路接通) + #50/#52 (silent fail 防御) + #53 (KEY_LEARNINGS 沉淀元教训) + Founder 多次提醒地毯式审查铁律
+
+---
+
+## #57 [2026-05-22] 跨路径 wire 一致性 — shot 加了 anchor 但 portrait 没加 = "半吊子一致"，颜色漂移无法根治 (Wave 9 TASK-T22-NEW-10)
+
+### 事件
+
+Wave 7 Backend 实施 `_apply_identity_anchors()` 修了 shot path 的 Layer 1 anchor 注入。但 portrait path (`reference_image_manager._build_portrait_prompt()`) 从未 wire Layer 1。audit 文件 `T22_NEW_10_PORTRAIT_LAYER1_AUDIT_2026-05-22.md` (680 行 9 维度) 发现这个不对称。
+
+### 根因
+
+Layer 1 Identity Anchor Framework 设计为横跨所有图像生成路径，但实施时"分批打补丁"导致：
+- Shot path: ✅ Backend Wave 7 wire
+- Portrait path: ❌ 从未 wire → portrait 生成时无 anchor 约束，发色靠 StyleEnforcer mandatory 关键词，LLM 自由发挥
+- Fullbody path: ❌ 同样未 wire
+
+Portrait 是 shot 的**参考图基础**。如果 portrait 本身颜色不稳定（比如 Coral 珊瑚粉变蓝），后续即使 shot 有 anchor 约束，也无法纠正参考图本身的颜色错误。
+
+### 教训
+
+1. **跨路径一致性原则**: 任何 identity/consistency 机制实施时，必须同时 audit 所有使用同类 prompt 的路径 (portrait / fullbody / shot / scene 等)。不能只改一条路径，让其他路径保持旧状态。
+
+2. **"半吊子一致"比没有一致更危险**: shot anchor 正确但 portrait 无 anchor → 最终图像里 portrait reference 和 shot 之间颜色矛盾，排查时更难判断根因。
+
+3. **wire 新机制必须跟全量路径 checklist**: 改 shot path → 立即问"portrait path 改了吗？fullbody path 改了吗？" 不要等到下次 e2e 实测才发现。
+
+4. **audit 比修复先**: Wave 9 由 680 行 9 维度 audit (PM 用 Explore agent) 触发，audit 发现了这个问题。跨路径检查是 audit 应有的维度。
+
+### 修复 (Wave 9)
+
+`reference_image_manager._build_portrait_prompt()`:
+```python
+if not StyleEnforcer.is_bw_style(style_name):
+    try:
+        from app.services.identity_anchor_injector import inject_identity_anchors
+        enforced_prompt = inject_identity_anchors(
+            image_prompt=enforced_prompt,
+            characters_in_scene=[character],
+            location=None, style_preset=style_name, props=None, time_continuity=None,
+        )
+    except Exception as e:
+        logger.warning(f"[ReferenceImageManager] Layer 1 inject FAILED ... err={e}")
+```
+
+`StyleEnforcer.is_bw_style()` 新增，两路 skip: `BW_STYLES set` 成员 OR `_bw` 后缀。
+
+**fullbody 同 root cause** 待后续同批修。
+
+**关联**: TASK-T22-NEW-10 + DEC-049 + DEC-048 (Layer 1 Framework) + KEY_LEARNINGS #52 (跨 import cascade 防御)

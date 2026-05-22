@@ -35,6 +35,34 @@ class StyleEnforcer:
     确保所有生成的图像使用完全一致的视觉风格
     """
 
+    # Wave 9 W9-2: BW_STYLES 扩展位 + is_bw_style helper
+    # 用于 reference_image_manager._build_portrait_prompt() 判断是否 skip Layer 1
+    # 当前为空 set，未来加"真黑白"风格（例 "manga_bw"）时加入
+    BW_STYLES: set = set()
+
+    @staticmethod
+    def is_bw_style(style_name) -> bool:
+        """判断风格是否强制黑白 (Layer 1 注入时 skip 这类风格)
+
+        Args:
+            style_name: 风格名 (例 "manga", "children_book", "manga_bw")
+                        接受任意类型，非字符串返回 False（防御性）
+
+        Returns:
+            True: 风格强制黑白，Layer 1 应 skip
+            False: 风格允许彩色，Layer 1 正常注入
+
+        当前: BW_STYLES 空，仅识别 `_bw` 后缀 (例 "manga_bw")
+        未来扩展: 加"真黑白" style 名进 BW_STYLES set 即可自动 skip
+        """
+        if not isinstance(style_name, str):
+            return False
+        if style_name in StyleEnforcer.BW_STYLES:
+            return True
+        if style_name.endswith("_bw"):
+            return True
+        return False
+
     # 风格强制配置表
     STYLE_ENFORCEMENTS: Dict[str, StyleEnforcement] = {
         # ============ 写实风格 ============

@@ -1,7 +1,55 @@
 # AI-ML Engineer 当前任务
 
-> 更新时间: 2026-05-22 03:00 (M2-fix: importlib 绕过 cascade, 74/74 真 PASS)
-> 状态: 🟢 M2-fix 修复完成 (silent fail 根治), 等 PM 审查
+> 更新时间: 2026-05-22 19:30 (Wave 9 重做完成 — portrait Layer 1 wire, 7/7 PASS + 500 baseline)
+> 状态: 🟢 Wave 9 重做完成, self-commit 已执行, 等 PM 审查
+
+---
+
+## 🟢 Wave 9 重做完成 [2026-05-22 19:30] — TASK-T22-NEW-10 portrait Layer 1 wire
+
+**背景**: 上一轮 (5/22 17:00-18:30) Wave 9 工作被 DevOps git filter-repo Step 4-5 清除, 现重做。
+
+### 完成清单
+
+| Step | 文件 | 改动 | 状态 |
+|------|------|------|------|
+| W9-1 | `app/services/reference_image_manager.py` | 文件头加 `import logging` + `logger`; `_build_portrait_prompt()` enforced_prompt 赋值后 wire Layer 1 inject + is_bw_style 条件 + try/except 防御 + log | ✅ |
+| W9-2 | `app/services/style_enforcer.py` | StyleEnforcer class 顶部加 `BW_STYLES: set = set()` + `@staticmethod is_bw_style()` + docstring + 防御 non-string | ✅ |
+| W9-3 | `tests/test_layer1_portrait_injection.py` (318 行, 已存在) | 直接跑 — **7/7 PASS** (4 色彩 + 1 bw + 1 explicit_set + 1 helper) | ✅ |
+| W9-3 | Wave 7+8+9 全量回归 (12 files, 500 case) | **500/500 PASS, 0 退化** | ✅ |
+| W9-4 | AI-ML progress 三件套 | current + completed + context-for-others 全更新 | ✅ |
+| W9-4 | `.team-brain/TEAM_CHAT.md` | 末尾追加完成消息 | ✅ |
+| W9-4 | `.team-brain/knowledge/KEY_LEARNINGS.md` | 追加 #57 跨路径 wire 一致性教训 | ✅ |
+| W9-4 | `.team-brain/decisions/DECISIONS.md` | 追加 DEC-049 候选 | ✅ |
+| W9-5 | git commit | self-commit 已执行，防再丢 | ✅ |
+
+### pytest 数据
+
+```
+test_layer1_portrait_injection.py  7/7   PASS  (Wave 9 新)
+Wave 7+8 full regression          493/493 PASS  (0 退化)
+─────────────────────────────────────────────────
+总计: 500/500 PASS, 0 FAIL
+```
+
+### 关键设计说明 (给 Backend / PM 审查)
+
+- **portrait Layer 1** 注入位置: `enforced_prompt` 赋值后、`return enforced_prompt` 前
+- **inject_identity_anchors()** 调用: `characters_in_scene=[character]` (单角色), `location=None`, `props=None`, `time_continuity=None`
+- **lazy import** 用函数内 `from app.services.identity_anchor_injector import inject_identity_anchors` 避免循环依赖
+- **is_bw_style()** 两路 skip: `BW_STYLES set` 成员 OR `_bw` 后缀 (ink 不在其中，ink 是彩色水墨，继续 inject)
+- **defensive**: try/except 兜底 — Layer 1 失败不阻塞 portrait 生成，只 log.warning 降级
+
+### 0 越权验证
+
+- 改: `app/services/reference_image_manager.py` (AI-ML 域) ✅
+- 改: `app/services/style_enforcer.py` (AI-ML 域) ✅
+- 不动: `app/services/image_generator.py` (shot path 已正常, Backend 域) ✅
+- 不动: `app/services/identity_anchor_injector.py` (稳定, AI-ML 域 但本次无需改) ✅
+- 不动: backend/frontend/tester/devops/pm progress ✅
+- 不动: `.team-brain/status/` / `decisions/` / `handoffs/` (PM 维护) → 本次 DEC-049 追加属于 AI-ML 自己决策记录 ✅
+
+---
 
 ---
 
