@@ -4,6 +4,30 @@
 
 ---
 
+## 2026-05-22 — TASK-WAVE-9-TESTER-INDEPENDENT-BASELINE ✅ (623/623 PASS)
+
+**任务**: Wave 9+9.1 Tester 跨题材独立第二意见 baseline verify
+
+**新建**: `tests/test_wave9_cross_genre_independent_baseline.py` (76 cases)
+
+**完整 pytest 结果** (16 test files):
+```
+test_wave9_cross_genre_independent_baseline.py  76/76  PASS  (Tester 独立新建)
+test_layer1_portrait_injection.py                7/7   PASS  (Wave 9)
+test_layer1_fullbody_injection.py                6/6   PASS  (Wave 9.1)
++ 13 Wave 7+8 regression files               534/534  PASS  (0 退化)
+────────────────────────────────────────────────────────────
+623/623 PASS, 0 FAIL, 0 退化, 0.90s, $0 API cost
+```
+
+**报告**: `.team-brain/analysis/WAVE_9_TESTER_INDEPENDENT_BASELINE_REPORT_2026-05-22.md`
+
+**发现**: RIM logger name 不匹配 (P3 非阻塞) / inject 异常兜底验证通过 / cross-path anchor 一致性确认
+
+**风险评估**: Wave 9+9.1 可部署 ✅
+
+---
+
 ## 2026-05-22 — Wave 7+8 综合 Regression + T22-NEW-7 ID Format Robustness ✅
 
 **任务**: Wave 7+8 全闭环 regression + 新建 test_t22_new_7_id_format_robustness.py

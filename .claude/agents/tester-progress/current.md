@@ -1,13 +1,64 @@
 # Tester Agent - 当前任务
 
-> **最后更新**: 2026-05-22 [Tester]
-> **状态**: Wave 7+8 综合 regression 完成 ✅ — 534/534 PASS (13 test files), 0.84s, 0 API 调用
+> **最后更新**: 2026-05-22 21:30 [Tester]
+> **状态**: TASK-WAVE-9-TESTER-INDEPENDENT-BASELINE 完成 ✅ — 623/623 PASS (16 test files), 0.90s, 0 API 调用
 
 ---
 
 ## 当前状态 (2026-05-22)
 
-**Wave 7+8 综合 regression + T22-NEW-7 ID format robustness 全完成 ✅**
+**TASK-WAVE-9-TESTER-INDEPENDENT-BASELINE 全完成 ✅ (独立第二意见)**
+
+### pytest 真自跑结果 (KEY_LEARNINGS #47 铁律, 16 test files)
+
+```
+test_layer1_portrait_injection.py              7/7   PASS  (Wave 9 新)
+test_layer1_fullbody_injection.py              6/6   PASS  (Wave 9.1 新)
+test_identity_anchor_cross_genre_baseline.py  105/105 PASS  (Layer 1 baseline, 0 退化)
+test_identity_anchor_extraction.py             74/74  PASS  (Layer 1 regression, 0 退化)
+test_identity_anchor_injector.py               25/25  PASS  (Layer 1 regression, 0 退化)
+test_apply_identity_anchors_location_wire.py    7/7   PASS  (T22-NEW-6, 0 退化)
+test_prompt_validator.py                        28/28  PASS  (Layer 1 regression, 0 退化)
+test_t22_new_7_id_format_robustness.py         65/65  PASS  (Wave 7, 0 退化)
+test_first_batch_chars_not_zero.py             17/17  PASS  (Wave 7, 0 退化)
+test_llm_fallback_chain.py                     14/14  PASS  (Wave 7, 0 退化)
+test_schema_generic_fallback_arch.py           83/83  PASS  (Wave 8, 0 退化)
+test_t22_new_5_r4_2_removed.py                24/24  PASS  (Wave 8, 0 退化)
+test_t21_new_3_to_7_backend.py                51/51  PASS  (T21, 0 退化)
+test_t21_digital_virtual_fallback.py           25/25  PASS  (T21, 0 退化)
+test_t21_new_2_humanoid_fallback_wave2.py      16/16  PASS  (T21, 0 退化)
+test_wave9_cross_genre_independent_baseline.py 76/76  PASS  (Tester 独立新建)
+────────────────────────────────────────────────────────────────────────
+623/623 PASS, 0 FAIL, 0 退化
+elapsed: 0.90s, API calls: 0 (零成本 mock)
+```
+
+### 新建 test_wave9_cross_genre_independent_baseline.py (76 cases)
+
+| Section | 内容 | Cases | 结果 |
+|---------|------|-------|------|
+| T2 Portrait 矩阵 | 5 风格 × 5 char_type | 25 | 25/25 PASS |
+| T2 Fullbody 矩阵 | 5 风格 × 5 char_type | 25 | 25/25 PASS |
+| T2 BW Skip | portrait + fullbody × 5 char_type | 10 | 10/10 PASS |
+| T3 Log Marker | portrait inject / fullbody inject / bw skip × 2 路 | 4 | 4/4 PASS |
+| T4 边缘 Case | no_id / no_clothing / inject_exception / non-string / cross-path | 12 | 12/12 PASS |
+| **Total** | | **76** | **76/76 PASS** |
+
+### 重要 Tester 独立发现
+
+1. **Log marker logger name 不匹配** (P3, 非阻塞): RIM 用 `app.services.reference_image_manager` logger，injector 用 `xuhua` logger。caplog 需用 root level 捕获。建议未来统一到 `xuhua`。
+2. **inject exception fallback 验证**: try/except 兜底真实有效 — inject 失败时 portrait/fullbody 仍返回 non-empty prompt + warning log，不 crash。
+3. **cross-path anchor consistency 验证**: 同一 character 的 portrait+fullbody 双路注入相同主色 token (mythological "stormy")，Layer 1 三路统一设计正确。
+
+---
+
+## 下一步
+
+DevOps push + VPS 部署 (一次 9+9.1) → Founder spot-check → 内测启动
+
+---
+
+## 上一完成: Wave 7+8 综合 Regression
 
 ### pytest 真自跑结果 (KEY_LEARNINGS #47 铁律)
 

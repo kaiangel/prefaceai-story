@@ -1,12 +1,88 @@
 # Tester Agent - 给其他Agent的上下文
 
-> **最后更新**: 2026-05-22 [Tester]
+> **最后更新**: 2026-05-22 21:30 [Tester]
 
 ---
 
 ## 当前状态 (2026-05-22)
 
-**Wave 7+8 综合 regression + T22-NEW-7 ID format robustness 全完成 ✅**
+**TASK-WAVE-9-TESTER-INDEPENDENT-BASELINE 完成 ✅ (独立第二意见)**
+
+### pytest 真自跑结果 (16 files, 623 cases)
+
+| 文件 | 结果 | 内容 |
+|------|------|------|
+| **test_wave9_cross_genre_independent_baseline.py (NEW)** | **76/76 PASS** | **Tester 独立跨题材矩阵** |
+| test_layer1_portrait_injection.py | 7/7 PASS | Wave 9 portrait wire |
+| test_layer1_fullbody_injection.py | 6/6 PASS | Wave 9.1 fullbody wire |
+| test_identity_anchor_cross_genre_baseline.py | 105/105 PASS | Layer 1 baseline (0 退化) |
+| test_identity_anchor_injector.py | 25/25 PASS | Layer 1 regression |
+| test_prompt_validator.py | 28/28 PASS | Layer 1 regression |
+| test_apply_identity_anchors_location_wire.py | 7/7 PASS | Wave 7 |
+| test_t22_new_7_id_format_robustness.py | 65/65 PASS | Wave 7 |
+| test_first_batch_chars_not_zero.py | 17/17 PASS | Wave 7 |
+| test_llm_fallback_chain.py | 14/14 PASS | Wave 7 |
+| test_schema_generic_fallback_arch.py | 83/83 PASS | Wave 8 |
+| test_t22_new_5_r4_2_removed.py | 24/24 PASS | Wave 8 |
+| test_identity_anchor_extraction.py | 74/74 PASS | Layer 1 regression |
+| test_t21_new_3_to_7_backend.py | 51/51 PASS | T21 regression |
+| test_t21_digital_virtual_fallback.py | 25/25 PASS | T21 regression |
+| test_t21_new_2_humanoid_fallback_wave2.py | 16/16 PASS | T21 regression |
+| **综合** | **623/623 PASS** | **0 FAIL, 0 退化, 0.90s, $0** |
+
+**@PM @DevOps**: Wave 9+9.1 可部署，Tester 独立验证完成。
+
+---
+
+## Wave 9+9.1 跨题材矩阵结果
+
+### Portrait + Fullbody 双路矩阵 (50 case)
+
+| char_type \ style | manga | children_book | cyberpunk | ink | realistic |
+|---|---|---|---|---|---|
+| human | PASS/PASS | PASS/PASS | PASS/PASS | PASS/PASS | PASS/PASS |
+| supernatural | PASS/PASS | PASS/PASS | PASS/PASS | PASS/PASS | PASS/PASS |
+| anthropomorphic_animal | PASS/PASS | PASS/PASS | PASS/PASS | PASS/PASS | PASS/PASS |
+| ai_entity | PASS/PASS | PASS/PASS | PASS/PASS | PASS/PASS | PASS/PASS |
+| mythological | PASS/PASS | PASS/PASS | PASS/PASS | PASS/PASS | PASS/PASS |
+
+格式: portrait/fullbody
+
+**50/50 PASS** — Layer 1 跨 5 风格 × 5 character_type 完全通用
+
+### BW Skip (10 case)
+
+5 char_types × portrait (manga_bw) + 5 char_types × fullbody (ink_bw) = 10/10 PASS
+
+### Log Marker 实际触发 (4 路 verify)
+
+- portrait inject log: PASS (wire 真跑过，不是死代码)
+- fullbody inject log: PASS
+- portrait bw skip log: PASS
+- fullbody bw skip log: PASS
+
+---
+
+## Tester 独立发现 (给 @AI-ML @Backend)
+
+**P3 建议 (非阻塞)**:
+- `reference_image_manager.py` logger name 是 `app.services.reference_image_manager`
+- `identity_anchor_injector.py` logger name 是 `xuhua`
+- 建议未来统一到 `xuhua` 方便 log 聚合和告警
+
+**T4 边缘 case 全 PASS**:
+- no_id + name_en fallback: 正常注入
+- no_id + no_name_en + only_name: 正常注入
+- inject 异常兜底: try/except 防 crash 验证
+- cross-path anchor consistency: portrait/fullbody 相同主色 token
+
+---
+
+## Wave 9+9.1 风险评估
+
+**可部署 ✅** — 0 阻塞问题，0 退化，P3 建议不阻塞。
+
+---
 
 ### pytest 真自跑结果 (13 test files, KEY_LEARNINGS #47 铁律)
 

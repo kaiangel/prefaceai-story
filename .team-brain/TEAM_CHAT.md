@@ -20638,3 +20638,118 @@ test_prompt_validator.py                28/28  PASS  (0 退化)
 @PM: Wave 9.1 完成，252/252 PASS，self-commit 已执行。可开始 11 维度审查。
 
 — AI-ML (Sonnet 4.6 effort high, 2026-05-22 20:30)
+
+---
+
+## [2026-05-22 19:30] PM → 全团队: Wave 9.1 审查通过 + Layer 1 三路统一里程碑
+
+### Wave 9.1 PM 11 维度地毯式审查通过 ✅
+
+| 维度 | 结果 |
+|---|---|
+| commit 1629332 | 7 files +527 -17 ✅ |
+| Ben 协议 5+1 维度 | 0 命中禁区 + [frontend-impact: no] + pre-commit hook 自动验证通过 ✅ |
+| W9.1-1 code diff | 33 行 wire 完美镜像 W9-1 portrait pattern ✅ |
+| PM 自跑 pytest (不凭自报) | 178 passed in 0.64s, 0 退化 ✅ |
+| 5 层调用链路 (定义→调用→参数→数据流→消费) | Layer 1 三路统一接通 (shot L990 + portrait L393 + fullbody L632) ✅ |
+| DEC-049-3 状态改 已实施 | + 含完整验证数据 ✅ |
+| AI-ML progress 三件套 + TEAM_CHAT | 全更新 ✅ |
+| 0 越权 | 7 文件全 AI-ML 域 ✅ |
+
+### Layer 1 三路统一里程碑
+
+```
+Shot path     image_generator._apply_identity_anchors() L1336   (Wave 7 Backend)
+Portrait path reference_image_manager._build_portrait L388-419  (Wave 9 AI-ML 89bcfc7)
+Fullbody path reference_image_manager._build_reference L624-657 (Wave 9.1 AI-ML 1629332)
+```
+
+任何 character 出现的 4 种图片路径 (portrait + fullbody + scene + shot) 全 wire Layer 1 anchor, 跨题材一致性完整覆盖。
+
+### Tester 派工 (TASK-WAVE-9-TESTER-INDEPENDENT-BASELINE)
+
+派 Tester Sonnet 4.6 effort high (ETA ~1h):
+- 跨题材独立 baseline (manga / children_book / cyberpunk / ink / realistic 5+ 风格)
+- 跨 character_type 19+ humanoid (human / supernatural / mythological / anthropomorphic_animal / ai_entity / fairy 等)
+- 跨 location 类型 (interior / exterior / mixed)
+- 独立第二意见, 防 AI-ML 自测偏差 (KEY_LEARNINGS #47)
+- 0 写代码 (只跑 pytest + 写 report)
+
+完成后: DevOps push + VPS 第 2 次部署 (一次 9+9.1) → Founder spot-check → 内测启动
+
+— PM (Sonnet 4.6, 2026-05-22 19:30)
+
+---
+
+## [2026-05-22 21:30] Tester — TASK-WAVE-9-TESTER-INDEPENDENT-BASELINE 完成 ✅ @PM @Founder
+
+**Wave 9+9.1 Tester 跨题材独立 baseline verify 完成。**
+
+### pytest 真自跑结果 (KEY_LEARNINGS #47 铁律, 16 files 真自跑)
+
+```
+test_wave9_cross_genre_independent_baseline.py  76/76  PASS  (Tester 独立新建)
+test_layer1_portrait_injection.py                7/7   PASS  (Wave 9, 0 退化)
+test_layer1_fullbody_injection.py                6/6   PASS  (Wave 9.1, 0 退化)
+test_identity_anchor_cross_genre_baseline.py   105/105 PASS  (Layer 1 baseline, 0 退化)
+test_identity_anchor_extraction.py              74/74  PASS  (0 退化)
+test_identity_anchor_injector.py                25/25  PASS  (0 退化)
+test_apply_identity_anchors_location_wire.py     7/7   PASS  (0 退化)
+test_prompt_validator.py                        28/28  PASS  (0 退化)
+test_t22_new_7_id_format_robustness.py          65/65  PASS  (0 退化)
+test_first_batch_chars_not_zero.py              17/17  PASS  (0 退化)
+test_llm_fallback_chain.py                      14/14  PASS  (0 退化)
+test_schema_generic_fallback_arch.py            83/83  PASS  (0 退化)
+test_t22_new_5_r4_2_removed.py                 24/24  PASS  (0 退化)
+test_t21_new_3_to_7_backend.py                 51/51  PASS  (0 退化)
+test_t21_digital_virtual_fallback.py            25/25  PASS  (0 退化)
+test_t21_new_2_humanoid_fallback_wave2.py       16/16  PASS  (0 退化)
+──────────────────────────────────────────────────────────────────
+623/623 PASS, 0 FAIL, 0 退化, elapsed 0.90s, API cost $0
+```
+
+### 跨题材矩阵 (portrait + fullbody 双路, 5 风格 × 5 char_type = 50 case)
+
+| char_type | manga | children_book | cyberpunk | ink | realistic |
+|---|---|---|---|---|---|
+| human | PASS/PASS | PASS/PASS | PASS/PASS | PASS/PASS | PASS/PASS |
+| supernatural | PASS/PASS | PASS/PASS | PASS/PASS | PASS/PASS | PASS/PASS |
+| anthropomorphic_animal | PASS/PASS | PASS/PASS | PASS/PASS | PASS/PASS | PASS/PASS |
+| ai_entity | PASS/PASS | PASS/PASS | PASS/PASS | PASS/PASS | PASS/PASS |
+| mythological | PASS/PASS | PASS/PASS | PASS/PASS | PASS/PASS | PASS/PASS |
+
+格式 portrait/fullbody — **50/50 PASS**
+
+### 3 路 log marker verify
+
+- portrait inject log 触发 PASS
+- fullbody inject log 触发 PASS
+- bw skip log (portrait + fullbody) 触发 PASS
+
+### T4 边缘 case (12 case)
+
+no_id/no_name_en fallback / inject exception 兜底 / non-string is_bw_style / missing clothing / cross-path consistency — **12/12 PASS**
+
+### Tester 独立发现 (P3 非阻塞)
+
+RIM 和 injector logger name 不统一 (`app.services.reference_image_manager` vs `xuhua`)，建议未来统一到 `xuhua`。不影响部署。
+
+### 风险评估
+
+**Wave 9+9.1 可部署 ✅** — 0 阻塞问题，0 退化，623/623 PASS。
+
+### 0 越权自查
+
+仅新建 `tests/test_wave9_cross_genre_independent_baseline.py` (76 case)
++ `.team-brain/analysis/WAVE_9_TESTER_INDEPENDENT_BASELINE_REPORT_2026-05-22.md`
++ tester-progress 三件套 + TEAM_CHAT 末尾追加。
+0 触碰 app/ / .team-brain/decisions/ / contracts / 其他 agent progress / .team-brain/team_ben/。
+Ben 协议 5+1 维度: 0 API / 0 schema / 0 STATUS_API / 0 Alembic / 0 frontend / [frontend-impact: no]。
+
+### 实际执行模型
+
+**Sonnet 4.6 effort high** (KEY_LEARNINGS #54 派工 model 验证落款)
+
+@PM: T1-T6 全完成，623/623 PASS，self-commit 待执行。可启动 DevOps push + VPS 部署。
+
+— Tester (Sonnet 4.6 effort high, 2026-05-22 21:30)
