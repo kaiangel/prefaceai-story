@@ -1,6 +1,49 @@
 # DevOps Agent - 已完成任务
 
 > 按时间倒序记录已完成的工作
+> **2026-05-22 更新**: TASK-SECRET-LEAK-REMEDIATION Step 1-5 + 6a 完成 (Step 6b 等 Founder key rotation).
+
+---
+
+### TASK-SECRET-LEAK-REMEDIATION Step 4-5 ✅ (2026-05-22 18:50, DevOps Sonnet 4.6 effort high)
+
+**任务**: P0 GitGuardian 安全事故响应 — git filter-repo 历史清洗 + GitHub force push
+
+**背景**:
+- 5/22 17:01 GitGuardian 警报: commit e5470e8 含 2 把 Google API Key 明文 (AIzaSyCX... + AIzaSyBm...)
+- 上一轮 DevOps Opus 4.7 max thinking 完成 Step 1-3 (audit + 脱敏 + 防御层)
+- 本轮 Sonnet 4.6 接力执行 Step 4-5
+
+**Step 4 — git filter-repo 历史重写**:
+- 工具: `/opt/homebrew/bin/git-filter-repo 2.47.0`
+- 命令: `git filter-repo --replace-text .secret-replacements.txt --force`
+- 备份: `/tmp/git-backup-1779445910`
+- 解析: 126 commits, 耗时 6.01s
+- 结果: HEAD e5470e8 → f9987b0 (所有 commit SHA 重写，因 e5470e8 是 HEAD)
+- 历史验证: `git log --all -p -S "AIzaSyCX..."` = 0 命中 ✅
+- 历史验证: `git log --all -p -S "AIzaSyBm..."` = 0 命中 ✅
+- 清理: `.secret-replacements.txt` 删除
+
+**Step 5 — GitHub force push**:
+- filter-repo 自动移除 origin remote → `git remote add origin https://github.com/kaiangel/prefaceai-story.git`
+- `--force-with-lease` 报错: filter-repo 已删除旧 commit 对象, lease ref 无法解析
+- 先验证: `git ls-remote origin main` → e5470e8 (GitHub 无并发 push)
+- 执行: `git push --force origin main` → `e5470e8...f9987b0 main -> main (forced update)` ✅
+- GitHub 验证: `gh api repos/kaiangel/prefaceai-story/commits/HEAD --jq '.sha'` = `f9987b07f6c7a09da94559a311afbedd80e718d0` ✅
+
+**Step 6a (上一轮完成)**: Founder 操作指引写入 current.md (revoke 2 key + 生成第 3 把 + 给 PM 私聊)
+
+**还剩**:
+- Step 6b: Founder 给第 3 把 key → DevOps 更新本地 + VPS .env + 重启 + verify (另起 spawn)
+- GitGuardian 约 30 min 后自动 re-scan 应 mark resolved
+
+**未动文件**:
+- 业务代码 (app/ frontend/ tests/) 一字未改
+- 其他 agent progress 未改
+- docker-compose.yml / Dockerfile.* 未改
+
+---
+
 > **2026-05-21 更新**: 5/19-5/21 无 DevOps 派工。本地服务管理（重启 + Alembic 006）PM 直接做（常规重启 PM 直接 Bash，见 memory feedback_restart_services_pm_do.md）。
 
 ---
