@@ -27,7 +27,27 @@ export function setStoredToken(token: string | null) {
   }
 }
 
-export async function apiFetch<T>(path: string, init: RequestInit = {}, token?: string | null): Promise<T> {
+// Options for apiFetch — extend this interface when adding new call-site options.
+export interface ApiFetchOptions {
+  // RISK-T18-G: Status codes that should NOT emit console.warn when they occur.
+  // Use this for endpoints that legitimately return 4xx during early pipeline stages
+  // (e.g. /chapters/1/story + /chapters/1/storyboard returning 404 before data exists).
+  // The ApiError is still thrown (callers must .catch()); only the console.warn is suppressed
+  // so that the client-log proxy does not record them as unexpected errors.
+  silentStatuses?: number[];
+}
+
+// B37: Full-trace fetch wrapper — logs every request start, completion (with status+ms), and error.
+// This is the single most critical logging point: ALL frontend API calls go through here.
+export async function apiFetch<T>(path: string, init: RequestInit = {}, token?: string | null, options?: ApiFetchOptions): Promise<T> {
+  const method = (init.method || "GET").toUpperCase();
+  const url = `${API_BASE}${path}`;
+  const start = Date.now();
+
+  // [API] Log #1 — request start
+  // eslint-disable-next-line no-console
+  console.log(`[API] ${method} ${path}`);
+
   const headers = new Headers(init.headers);
   if (!headers.has("Content-Type") && init.body) {
     headers.set("Content-Type", "application/json");
@@ -36,12 +56,29 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}, token?: 
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, { ...init, headers });
+  } catch (networkErr) {
+    const elapsed = Date.now() - start;
+    // [API] Log #2 — network-level error (fetch itself threw — no response at all)
+    // eslint-disable-next-line no-console
+    console.error(`[API] ${method} ${path} NETWORK_ERROR ${elapsed}ms`, networkErr);
+    throw networkErr;
+  }
+
+  const elapsed = Date.now() - start;
 
   if (!response.ok) {
+    // [API] Log #3 — HTTP error response
+    // RISK-T18-G: suppress console.warn for status codes listed in options.silentStatuses.
+    // These are by-design 4xx responses (e.g. 404 before chapter data exists) that callers
+    // handle via .catch(). Skipping warn keeps the client-log proxy clean for real errors.
+    const isSilent = options?.silentStatuses?.includes(response.status) ?? false;
+    if (!isSilent) {
+      // eslint-disable-next-line no-console
+      console.warn(`[API] ${method} ${path} HTTP_ERROR status=${response.status} ${elapsed}ms`);
+    }
     let detail = "请求失败";
     try {
       const payload = await response.json();
@@ -55,6 +92,10 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}, token?: 
     }
     throw new ApiError(detail, response.status);
   }
+
+  // [API] Log #4 — success
+  // eslint-disable-next-line no-console
+  console.log(`[API] ${method} ${path} ${response.status} ${elapsed}ms`);
 
   if (response.status === 204) {
     return null as T;
@@ -71,9 +112,12 @@ const BGM_BASE = (projectId: string, chapter: number) =>
 export async function fetchBgmInfo(
   projectId: string,
   chapter: number,
-  token: string | null
+  token: string | null,
+  options?: ApiFetchOptions
 ): Promise<BgmInfo> {
-  return apiFetch<BgmInfo>(`${BGM_BASE(projectId, chapter)}/bgm`, {}, token);
+  // RISK-T20-11.v2 (Wave 4): allow callers to pass silentStatuses so /outline phase
+  // (BGM not yet generated → 404) doesn't pollute client.log with routine warns.
+  return apiFetch<BgmInfo>(`${BGM_BASE(projectId, chapter)}/bgm`, {}, token, options);
 }
 
 export async function regenerateBgm(

@@ -680,16 +680,35 @@ FLEXIBLE ATTRIBUTES (may vary based on scene context):
         """
         构建增强的角色身份行
 
-        输出示例：
+        DEC-043 RISK-T20-10 (2026-05-19):
+        - human 走原 hardcoded "Asian man/woman + face_shape + hair" 路径
+          (Wave 6.4 至今 100% 一致性验证, 不动)
+        - 非 human (anthropomorphic_animal/animal/robot/fantasy_creature/...)
+          dispatch 到 CharacterPromptBuilder.build_character_prompt() (19 类型完整支持)
+          消除原 hardcoded "young Asian woman/man" 误描述
+
+        输出示例（human）：
         "young Asian man, short black hair with side part, rectangular silver-framed glasses,
          gray casual button-up shirt, black slim jeans, black smartwatch"
 
-        特点：
-        - 包含种族/民族
-        - 完整发型描述（不只是颜色）
-        - 关键服装（上衣+下装）
-        - 关键配饰
+        输出示例（anthropomorphic_animal）：
+        "[CHARACTER: 灰狐 (Grey Fox)] An elderly female fox with frost silver grey fur,
+         large triangular ears, deep amber gold eyes, slender fox muzzle, bushy fox tail,
+         CLOTHING: indigo-grey linen wrap-jacket. This is an ANTHROPOMORPHIC FOX..."
         """
+        # T20-10: 非 human 类型走通用 builder, 避免 hardcoded "Asian man/woman"
+        char_type = (character.get('character_type') or 'human').strip().lower()
+        if char_type and char_type != 'human':
+            try:
+                from app.services.character_prompt_builder import CharacterPromptBuilder
+                return CharacterPromptBuilder().build_character_prompt(character)
+            except Exception as exc:
+                # 兜底: builder 异常时退回 description 字段
+                desc = character.get('description', '') or character.get('extra_details', '')
+                if desc:
+                    return desc
+                return f"a {char_type} character"
+
         parts = []
 
         # 1. 年龄 + 种族 + 性别
@@ -769,6 +788,9 @@ FLEXIBLE ATTRIBUTES (may vary based on scene context):
 
         # 3. 关键配饰（眼镜等）- 放在服装前面因为更显眼
         clothing = character.get('clothing', {})
+        # B58-followup: defensive — clothing may be str if adjust_character Haiku output schema not strict
+        if isinstance(clothing, str):
+            clothing = {}
         accessories = clothing.get('accessories', [])
 
         # 优先提取眼镜
@@ -1088,6 +1110,9 @@ FLEXIBLE ATTRIBUTES (may vary based on scene context):
 
         # 2. 检查是否有眼镜（非常显眼的特征）
         clothing = character.get('clothing', {})
+        # B58-followup: defensive — clothing may be str if adjust_character Haiku output schema not strict
+        if isinstance(clothing, str):
+            clothing = {}
         accessories = clothing.get('accessories', [])
 
         has_glasses = False
@@ -1221,8 +1246,25 @@ FLEXIBLE ATTRIBUTES (may vary based on scene context):
         """
         从角色数据构建详细的外观描述（用于image prompt）
 
+        DEC-043 RISK-T20-10 (2026-05-19):
+        - human → 原 physical.hair_color / skin_tone / clothing 字段拼接路径 (不动)
+        - 非 human → dispatch CharacterPromptBuilder.build_character_prompt() (19 类型完整支持)
+
         优先从clothing和physical字段获取详细信息，确保角色一致性
         """
+        # T20-10: 非 human 类型走通用 builder, 避免 hair_color/skin_tone hardcoded 误描述
+        char_type = (character.get('character_type') or 'human').strip().lower()
+        if char_type and char_type != 'human':
+            try:
+                from app.services.character_prompt_builder import CharacterPromptBuilder
+                return CharacterPromptBuilder().build_character_prompt(character)
+            except Exception:
+                # 兜底
+                desc = character.get('description', '') or character.get('extra_details', '')
+                if desc:
+                    return desc
+                return f"a {char_type} character"
+
         desc_parts = []
 
         # 1. 物理外观 (physical)
@@ -1247,6 +1289,9 @@ FLEXIBLE ATTRIBUTES (may vary based on scene context):
 
         # 2. 服装（clothing）- 非常重要，用于区分角色
         clothing = character.get('clothing', {})
+        # B58-followup: defensive — clothing may be str if adjust_character Haiku output schema not strict
+        if isinstance(clothing, str):
+            clothing = {}
         if clothing:
             # 上衣
             top = clothing.get('top', '')

@@ -1,11 +1,346 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-04-30（Wave 5.2 完成 — TASK-T6-FIXBATCH Wave 5.1 全批修复部署 + DB migration 002 + 本地 backend/frontend 重启）
-> **状态**: ✅ Wave 5.2 完成 — commit 84e5861 + 2d9eb58 push + rsync app+frontend+alembic + Docker rebuild api+frontend + /health 200 + DB migration 002 PASS + 本地 backend pid 10711 + frontend pid 11608
+> **最后更新**: 2026-05-21 23:XX（自补 5/19-5/21 进度归档 + VPS 部署清单准备）
+> **状态**: ⏳ **等 VPS 部署派工** — 5/19 之后 PM 未派活给 DevOps，本地重启/Alembic PM 自己直接做（常规重启 PM 直接 Bash）。等 Layer 1 (T22-NEW-3 Identity Anchor Framework) 完成 + Founder 签字内测启动后，PM 派 VPS 部署任务。
 
 ---
 
-## 刚完成
+## 当前状态 (5/21 23:XX)
+
+**5/19 22:57 以来 DevOps 做了什么**: 无派工。本地服务管理（重启 + Alembic）全是 PM / Founder 自己做的，符合 memory feedback_restart_services_pm_do.md 协议。
+
+**5/20-5/21 间 PM 直接做的本地服务操作（DevOps 未参与）**：
+- Wave 1 17:20 重启 backend（Backend agent PID 68942）
+- Wave 2 17:45 重启 backend（PID 68942 → 71758）
+- Wave 2 round 2 后重启 backend（PID 71758 → 77188）
+- Wave 3 19:50 前后 backend 维持 87388（未重启，Wave 3 改完等下次重启）
+- Wave 4 21:10 前后：PM 干净重启（合并加载 T21-NEW-1 + T21-NEW-2 schema 13 type）
+- Wave 5 22:30 Backend Opus 4.7 完成 5 task（T21-NEW-3/4/5/6/7），未重启（等 PM 审查）
+- Wave II 22:50 Frontend Opus 4.7 完成 T21-NEW-7 Frontend
+- Wave III（PM 承诺自做）: alembic upgrade head + 干净重启 backend + frontend + monitors + cron
+
+**Alembic 006 执行过程（PM 操作，2026-05-21 ~20:35）**：
+- `alembic upgrade head` 第一次 fail（revision id `006_add_scene_references_t21_new7` 超长 MySQLChar 限制）
+- 第二次 fail（Duplicate column name，部分 ALTER 已 apply）
+- Backend agent 在 upgrade() 方法加幂等 try/except 兜底（`1060` / `Duplicate column` → 跳过）
+- 第三次 `alembic upgrade head` 成功 ✅（2 列已 apply + Backfill 老项目 scene_references_confirmed=TRUE）
+
+**等待 VPS 部署任务**（Layer 1 完成 + 内测启动后）：
+
+见下方"VPS 部署清单（待执行）"
+
+---
+
+## VPS 部署清单（待执行）
+
+**触发条件**: Layer 1 (T22-NEW-3 Identity Anchor Framework) 完成 + Founder 签字内测启动
+
+**部署顺序（严格执行）**：
+
+### Step 0: Push GitHub（必须先于 VPS 部署）
+
+```bash
+git status        # 确认有哪些改动
+git add <files>   # 精确 add，避免 .env 等敏感文件
+git commit -m "..."
+git push origin main
+# 验证: push 成功后再做 Step 1
+```
+
+**注意**: DevOps 部署铁律 — 先 push GitHub 再 VPS，不分批，一次完成（memory feedback_push_deploy_together.md）。
+
+### Step 1: rsync 本地代码到 VPS
+
+```bash
+# 注意 trailing slash 陷阱！（feedback_rsync_trailing_slash.md 2026-04-15 踩坑）
+# 正确：目标路径也要有 app/ 子目录
+rsync -avz -e "ssh -p 58913" app/ trader@107.148.1.199:/opt/xuhua-story/app/
+rsync -avz -e "ssh -p 58913" frontend/src/ trader@107.148.1.199:/opt/xuhua-story/frontend/src/
+
+# 如有新建文件（如 app/api/ 下新 endpoint），先 ssh 确认目标路径存在
+# 确认方式: docker exec docker-api-1 ls /app/app/api/
+```
+
+**不要在 VPS 上 git pull（Ben 强制协议，feedback_deploy_rsync_not_gitpull.md）**。
+
+### Step 2: Alembic 006 迁移（VPS 容器内）
+
+```bash
+ssh -p 58913 trader@107.148.1.199
+cd /opt/xuhua-story/docker
+docker compose exec api alembic current          # 确认当前 head
+docker compose exec api alembic upgrade head     # 应用 006_add_scene_references_t21_new7
+# 验证新列:
+docker compose exec api python3 -c "
+import asyncio, aiomysql, os
+async def check():
+    conn = await aiomysql.connect(host='101.132.69.232', port=3306,
+        user=os.getenv('MYSQL_USER'), password=os.getenv('MYSQL_PASSWORD'),
+        db='prefacestory')
+    cur = await conn.cursor()
+    await cur.execute('SHOW COLUMNS FROM projects LIKE \"scene_references_confirmed\"')
+    print('projects.scene_references_confirmed:', await cur.fetchall())
+    await cur.execute('SHOW COLUMNS FROM project_chapters LIKE \"scene_references_json\"')
+    print('project_chapters.scene_references_json:', await cur.fetchall())
+    conn.close()
+asyncio.run(check())
+"
+```
+
+**注意**: 本地 Alembic 006 已执行成功（幂等兜底），VPS 需单独跑一次。Alembic 006 升级脚本有幂等兜底，再次执行安全。
+
+### Step 3: Docker rebuild + 重启
+
+```bash
+cd /opt/xuhua-story/docker
+docker compose build --no-cache api        # 重 bake 新代码（Dockerfile COPY app/）
+docker compose build --no-cache frontend   # 如有前端改动
+docker compose up -d --force-recreate api
+docker compose up -d --force-recreate frontend
+```
+
+### Step 4: 健康检查
+
+```bash
+# 容器内健康检查（正确路径）
+docker compose exec api curl http://localhost:8000/health
+# 期望: {"status":"healthy"}
+
+# 外部 HTTPS（Cloudflare）
+curl https://prefaceai.mov/api/health
+# 注: 外部 /api/health 返回 200 是正常的（Nginx /api/ → :8000 反向代理）
+# 注: 容器内 /health 正确；外部 /api/health 返回 404 属正常（Nginx 路由，reference_health_endpoint_path.md）
+
+# 确认 StartedAt 已刷新
+docker compose ps api
+```
+
+**监控/告警是 Wave R4 long-tail，不在 Layer 1 范围**（运维风险 R4 待启动）。
+
+---
+
+## 最新完成
+
+**TASK-T20-FIXBATCH-2 T18-I — IncompleteRead 监控 Dashboard [2026-05-18]**
+
+（详见下方"上次完成"块，与 5/18 版本一致）
+
+---
+
+## 上次完成
+
+**TASK-T20-FIXBATCH-2 T18-I — IncompleteRead 监控 Dashboard [2026-05-18]**
+
+**背景**: Seedream 下载偶发 IncompleteRead 网络抖动，Pipeline 内已有 retry（不阻断），需监控频率突增。
+
+**交付 3 文件**:
+
+| 文件 | 说明 |
+|------|------|
+| `scripts/monitor_incompleteread.py` | 核心监控脚本 (Python stdlib, chmod +x) |
+| `scripts/monitor.yaml` | 告警阈值配置文件（唯一调参入口） |
+| `docs/MONITORING_INCOMPLETEREAD.md` | 完整部署 + 使用 + 阈值调整文档 |
+
+**本地验证**:
+- 解析 test18 第二轮 backend.log (50622 行)
+- 8 次 IncompleteRead，8 次 retry 成功，0 次耗尽，Retry 成功率 100.0%
+- WARN/CRITICAL/OK 退出码验证 PASS
+- HTML 报告生成 PASS (`logs/monitor_reports/incompleteread_2026-05-18.html`)
+
+**阈值（基于 test18 实测基线）**:
+- WARN: 每小时 >= 20 次（正常约 16/hr，设 20 留余量）
+- CRITICAL: 每小时 Retry 耗尽失败 >= 3 次（正常 0 次）
+
+**约束遵守**:
+- 未改 `app/` / `frontend/` / `.team-brain/team_ben/` 任何文件
+- 仅改 `scripts/` / `docs/` / `devops-progress` 三件套 / TEAM_CHAT.md
+
+---
+
+## 上次完成
+
+**TASK-WAVE9-P2-DEVOPS-FRONTEND-IMPACT-HOOK — Wave 9 DEC-030 DevOps 配套 [2026-05-13]**
+
+**背景**: test15 e2e 暴露 13 真 RISK 中 7 个 (47%) 属于前后端契约断裂。合伙人 Ben 5/13 15:42 建议纠错机制。Founder 采纳为 DEC-030 Wave 9 一部分，DevOps 负责 pre-commit hook 落地。
+
+**新建 3 个文件**:
+
+| 文件 | 类型 | 作用 |
+|------|------|------|
+| `scripts/pre-commit-frontend-impact.sh` | 核心 hook 逻辑 | 检测 staged 文件是否含契约高风险文件，有命中则要求 commit message 含 `[frontend-impact: yes/no]` |
+| `scripts/install_pre_commit_hook.sh` | 安装脚本 | 一键软链接 `.git/hooks/pre-commit → scripts/pre-commit-frontend-impact.sh` |
+| `docs/CONTRACT_HOOK.md` | 文档 | 5 段说明：为什么有 / 如何安装 / 如何使用 / 如何跳过 / 技术细节 |
+
+**监控的 6 个高风险契约文件**:
+- `app/api/projects.py`
+- `app/api/chapters.py`
+- `app/services/pipeline_orchestrator.py`
+- `app/services/job_manager.py`
+- `app/models/project.py`
+- `app/schemas/project.py`
+
+**安装结果**:
+```
+.git/hooks/pre-commit -> .../scripts/pre-commit-frontend-impact.sh  (symlink)
+```
+
+**3 种场景测试结果**:
+
+| 场景 | 描述 | 结果 |
+|------|------|------|
+| 1 | 改 `app/api/chapters.py` + commit message 无 label | BLOCKED (exit 1) ✅ 符合预期 |
+| 2 | 改 `app/api/chapters.py` + commit message 含 `[frontend-impact: yes]` | PASS (allowed) ✅ 符合预期 |
+| 3 | 改 `scripts/pre-commit-frontend-impact.sh`（不相关文件）| PASS (直接放行) ✅ 符合预期 |
+
+**约束遵守**:
+- ✅ 未改 `app/`, `frontend/`, `.team-brain/team_ben/` 任何文件
+- ✅ 未改 backend 代码或 frontend 代码
+- ✅ 仅改 `scripts/`, `docs/`, `devops-progress` 三件套
+
+---
+
+## 上次完成
+
+**TASK-DIAGNOSE-MYSQL-V2 — MySQL 二轮深度诊断 [2026-05-08]**
+
+**根因：阿里云 MySQL 101.132.69.232 服务进程异常（不是白名单/本地网络/SQLAlchemy 问题）**
+
+| 诊断项 | 结果 | 结论 |
+|--------|------|------|
+| `nc -zv 101.132.69.232 3306` | ✅ connected | TCP 3306 端口可达，SYN ACK 正常 |
+| Python socket.recv(4) MySQL greeting | 超时 0 bytes | MySQL 握手包永远不到达（本地） |
+| aiomysql 直连（绕过 SQLAlchemy） | 2:13 超时 → 2013 | 不是 SQLAlchemy 问题 |
+| macOS 防火墙 | block-all disabled，Python.app 允许 | 不是 macOS 本地防火墙 |
+| 本机公网 IP | 140.99.222.167 | 白名单嫌疑 IP |
+| VPS 容器内 socket.recv(4) | 超时 0 bytes | 不是本地 IP 白名单问题 |
+| VPS 容器内 asyncmy 直连 | `Can't connect to MySQL server` | VPS 也连不上 MySQL |
+| VPS docker-api-1 health | ✅ healthy（仅有 GET /health 200 日志）| /health 不测 DB，healthy 是假阳性 |
+| VPS 容器启动时间 | 2026-04-30T16:08（8 天前）| 8 天前启动时 MySQL 还通，8 天来没有真实 DB 请求（只有 health check） |
+
+**根因链路**：
+- 阿里云 MySQL 实例 101.132.69.232 的 TCP 3306 端口接受连接，但 MySQL 进程不发回握手包
+- 表现为：TCP connect 成功，但 `recv(4)` 永远超时（0 bytes）
+- 本地和 VPS 容器（两个不同 IP）均失败 → 排除白名单
+- 本地 macOS 防火墙正常 → 排除本地拦截
+- aiomysql 直连也失败 → 排除 SQLAlchemy/pool 配置
+
+**最可能的服务器侧原因（按概率排序）**：
+1. **MySQL 进程崩溃/挂起**（最高概率）：mysqld 进程存在但无法处理新连接，端口还在监听但不响应
+2. **阿里云 MySQL 实例被暂停/欠费**：实例暂停时 TCP 端口仍会 ACK 但不传数据
+3. **MySQL 连接数满**（max_connections 耗尽）：会拒绝新连接但通常立即发错误包，不是无响应
+
+**修复方案（需要 Ben 或 Founder 操作）**：
+
+**方案 A：登录阿里云 RDS 控制台检查 MySQL 实例状态**
+1. 阿里云控制台 → RDS → 实例列表 → 找 101.132.69.232 所在实例
+2. 检查实例状态：是否"运行中" / "已停止" / "欠费锁定"
+3. 若"已停止"：点击启动
+4. 若"运行中"但不响应：重启实例（RDS 控制台 → 重启）
+5. 若"欠费"：充值后自动恢复
+
+**方案 B（临时替代）：确认问题后如需本地继续开发**
+- 暂时无法用本地 backend（必须等 MySQL 恢复）
+- VPS 侧同理（VPS 容器的 DB 操作类请求也会失败，只有 /health 正常）
+
+**需要 Founder/Ben 介入**：DevOps 无权访问阿里云 RDS 控制台。
+- 预计恢复时间：控制台操作后 2-5 分钟
+
+---
+
+**TASK-DIAGNOSE-BACKEND-LIFESPAN-STUCK — 本地 backend lifespan 卡死诊断 [2026-05-08]**
+
+**根因**: 跨日（5-01→5-02）系统睡眠后重启，TCP 在 MySQL 握手阶段被切断（aiomysql 读 4 bytes 握手包时收到 0 bytes），进程直接 crash 退出（`Application startup failed. Exiting.`）。不是 metadata lock 死锁，不是卡死进程——进程已经不存在了（port 8000 未占用，ps 无 uvicorn）。
+
+**诊断过程**:
+1. 检查 `/tmp/backend.log` 完整内容（194 行 traceback，不是"只有 2 行"）
+2. 确认 `OperationalError (2013, Lost connection to MySQL server during query)` + `Application startup failed. Exiting.`
+3. `ps aux | grep uvicorn` 无进程，lsof 端口 8000 空闲 — 进程已退出
+4. VPS `docker-api-1 Up 7 days (healthy)` — MySQL 本身没问题，是瞬时网络问题
+
+**方案**: 方案 E（重启）— 直接重启，无需 kill 任何进程
+
+**给 PM 的重启命令**:
+```bash
+cd /Users/kaisbabybook/aifun/xuhuastory/xuhua_story
+source venv/bin/activate
+nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/backend_restart.log 2>&1 &
+# 等 20-30s，观察 /tmp/backend_restart.log 出现 "Application startup complete."
+# 再 curl http://localhost:8000/health 验证
+```
+
+**备选**: 直接用 VPS prefaceai.mov 测试 Gemini key rotation（docker-api-1 已跑新 key 7 天）
+
+---
+
+**TASK-KEY-ROTATE-GEMINI — Gemini API Key 轮换 [2026-05-01 00:09]**
+
+**背景**: Founder 已授权 — 旧 key `AIzaSyCX...` → 新 key `AIzaSyBm...`（同 Google project + 同配额）+ "必须立即 revoke 旧 key"。10 步流程全 PASS：
+
+| Step | 动作 | 验收证据 |
+|------|------|---------|
+| 1 | 备份本地 `.env` → `.env.backup-keyrotate-20260501` | ✅ 1608 bytes 0600 |
+| 2 | Edit `.env:2` GEMINI_API_KEY 旧→新 | ✅ 新 1 处 / 旧 0 处 (grep 验证) |
+| 3 | `pkill -f "uvicorn app.main"` (PID 48766) + nohup 重启不带 --reload | ✅ 新 PID **71921**，`/health` 200 |
+| 4 | 本地真测 settings 加载 + 真 Gemini API 调用 | ✅ `gemini-2.5-flash → 'OK'`，AUTH=PASS |
+| 5 | SSH VPS (trader@107.148.1.199:58913) ls /opt/xuhua-story/.env.production | ✅ 路径 `/opt/xuhua-story/.env.production` (1376 bytes 0644) |
+| 5b | grep VPS 旧 key 与本地一致性自检 | ✅ 都是 `AIzaSyCX...` |
+| 6 | VPS cp 备份 .env.production | ✅ 1376 bytes 0644 |
+| 7 | VPS sed 精确替换（仅匹配整行 `^GEMINI_API_KEY=AIzaSyCX...$`）| ✅ 新 1 处 / 旧 0 处 |
+| 8 | VPS `cd /opt/xuhua-story/docker && docker compose up -d --force-recreate api` | ✅ docker-api-1 Recreated + Started + healthy |
+| 9 | VPS 真测：容器内 settings + 真 Gemini API 调用 + HTTPS /api/health | ✅ `gemini-2.5-flash → 'OK'`，prefaceai.mov/api/health 200 |
+| 10 | 通知 PM 让 Founder 立即 Google Cloud Console revoke 旧 key | ⏳ 见 TEAM_CHAT.md + SendMessage |
+
+**未动**: 业务代码（app/、frontend/）、其他 agent progress、docker-compose.yml、Dockerfile.*、其他所有 env vars 一字未改。仅修改本地 `.env:2` + VPS `.env.production` 同一行 + 4 处文档（TEAM_CHAT.md 追加 / current.md / context-for-others.md / completed.md）。
+
+**关键风控**:
+- 备份文件 `.env.backup-keyrotate-20260501`（本地 + VPS 两端都存）保留至少 48 hr，万一新 key 异常可秒级回滚
+- VPS 替换前先 grep 自检旧 key 一致（避免 VPS 上是不同 key 导致 sed 不命中）
+- 本地 + VPS 都做了真 LLM 调用（不是只看 settings 加载），确认新 key 实际可用
+
+**等待 Founder 操作**: Google Cloud Console 撤销旧 key `AIzaSyCX***[redacted-key-Apr29-old]`（Founder 已明确授权"必须立即"）
+
+---
+
+## 上次完成
+
+**Wave 5.3 — alembic CLI 工程化补全 [2026-04-30]**
+
+**目标**: 让 schema 改动可走标准 `alembic revision --autogenerate` + `alembic upgrade head` 流程。
+
+| 步骤 | 操作 | 结果 |
+|------|------|------|
+| Step 1 | pip install alembic（1.18.4 已安装）+ requirements.txt 加 alembic>=1.13.0 + pymysql>=1.1.0 | ✅ |
+| Step 2 | 手工创建 alembic.ini（不用 alembic init，保留现有 versions/001/002）| alembic.ini 存在 ✅ |
+| Step 3 | 手工创建 alembic/env.py（同步 pymysql driver，target_metadata = Base.metadata）| env.py 存在 ✅ |
+| Step 4 | 前置验证：share_tokens ✅ + share_pv_logs ✅ + projects.is_favorite ✅ | DB = 002 ✅ |
+| Step 4b | 本地 alembic stamp 002_r7_2_favorite_share | ✅ alembic_version 表建立 |
+| Step 4c | 本地 alembic current | 002_r7_2_favorite_share (head) ✅ |
+| Step 5 | Dockerfile.api 加 COPY alembic.ini + COPY alembic/ ./alembic/ | ✅ |
+| Step 6 | git add + commit c30982f + push c30982f | ✅ |
+| Step 6b | requirements.txt 补 pymysql 显式依赖 + commit 26ff792 + push | ✅ |
+| Step 6c | rsync alembic.ini + alembic/ + requirements.txt + Dockerfile.api → VPS | ✅ trailing slash 正确 |
+| Step 6d | VPS docker compose build --no-cache api (sha256:2d06fcdd) | ✅ Step 9/10: COPY alembic.ini + COPY alembic/ |
+| Step 6e | VPS force-recreate api | docker-api-1 Recreated + Started ✅ |
+| Step 6f | VPS docker compose exec api alembic stamp 002_r7_2_favorite_share | INFO MySQLImpl + stamp 成功 ✅ |
+| Step 6g | VPS docker compose exec api alembic current | 002_r7_2_favorite_share (head) ✅ |
+| Step 6h | VPS /health | {"status":"healthy"} ✅ |
+
+**关键配置**:
+- alembic.ini: `sqlalchemy.url =` 留空，由 env.py 从 settings 读取
+- env.py: `_get_sync_url()` 把 `mysql+asyncmy://` / `mysql+aiomysql://` 替换为 `mysql+pymysql://`
+- env.py: `target_metadata = Base.metadata`，`import app.models` 注册所有 ORM 类
+- Dockerfile: `COPY alembic.ini .` + `COPY alembic/ ./alembic/`（容器内 alembic 10/10 步）
+
+**踩坑**:
+- pymysql 在本地 venv 是 aiomysql 的间接依赖，requirements.txt 没有显式 pin，容器内缺失 → 补加 pymysql>=1.1.0 + 二次 rebuild
+
+**commits**:
+- `c30982f` ops(alembic): add alembic CLI engineering — env.py + ini + Dockerfile + stamp 002
+- `26ff792` ops(alembic): add pymysql to requirements.txt for alembic sync driver in container
+
+---
+
+## 上次完成
 
 **TASK-T6-FIXBATCH Wave 5.2 — VPS 部署 Wave 5.1 全批修复 [2026-04-30]**
 

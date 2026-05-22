@@ -28,6 +28,7 @@ class CharacterPromptBuilder:
     TYPE_BUILDERS = {
         'human': '_build_human_description',
         'animal': '_build_animal_description',
+        'anthropomorphic_animal': '_build_anthropomorphic_animal_description',
         'fantasy_creature': '_build_fantasy_description',
         'robot': '_build_robot_description',
         'object': '_build_object_description',
@@ -338,6 +339,251 @@ class CharacterPromptBuilder:
 
         desc = ", ".join(parts) if parts else f"A {breed or species or 'animal'}"
         return f"{desc}. This is an ANIMAL character, NOT a human."
+
+    def _build_anthropomorphic_animal_description(self, character: Dict[str, Any]) -> str:
+        """
+        构建拟人化动物角色描述
+
+        拟人化动物 = 有意识、穿服装、两足站立的动物角色。
+        关键特征：保留物种的动物外貌（毛皮、耳朵、尾巴、口鼻），但穿着服装直立行走。
+
+        数据来源优先级（依次尝试）：
+        1. physical 字段中的动物字段 (species, fur_color, ear_style, tail_style 等)
+        2. animal 字段（兼容旧格式）
+        3. physical 字段的 hair_color 视为 fur_color（LLM 可能误用）
+        4. description 字段（最终兜底）
+
+        严禁：不使用 hair_color/skin_tone/body_type 作为"皮肤"特征，
+        这些是人类字段——拟人化动物有 fur，不是 hair 和 skin。
+        如果 LLM 误填了这些字段，本方法会将其转化为动物描述。
+        """
+        parts = []
+
+        # 读取数据源
+        physical = character.get('physical', {})
+        if not isinstance(physical, dict):
+            physical = {}
+        animal_data = character.get('animal', {})
+        if not isinstance(animal_data, dict):
+            animal_data = {}
+        clothing_raw = character.get('clothing', {})
+        clothing = clothing_raw if isinstance(clothing_raw, dict) else {}
+
+        # === 物种识别（最高优先级）===
+        # 从 physical.species 或 animal.species 获取物种
+        species = physical.get('species', '') or animal_data.get('species', '')
+        breed = physical.get('breed', '') or animal_data.get('breed', '') or species
+
+        # 如果 physical 没有 species，尝试从 description 猜测（兜底）
+        if not species:
+            desc = character.get('description', '')
+            name_en = character.get('name_en', '') or character.get('name', '')
+            # 常见拟人化动物物种关键词
+            species_hints = {
+                'fox': 'fox', 'rabbit': 'rabbit', 'bunny': 'rabbit', 'wolf': 'wolf',
+                'bear': 'bear', 'cat': 'cat', 'dog': 'dog', 'squirrel': 'squirrel',
+                'sparrow': 'sparrow', 'bird': 'bird', 'mouse': 'mouse', 'rat': 'rat',
+                'deer': 'deer', 'raccoon': 'raccoon', 'panda': 'panda', 'tiger': 'tiger',
+                'lion': 'lion', 'monkey': 'monkey', 'frog': 'frog', 'owl': 'owl',
+                'crow': 'crow', 'chicken': 'chicken', 'duck': 'duck', 'sheep': 'sheep',
+            }
+            search_text = (desc + ' ' + name_en).lower()
+            for hint, sp in species_hints.items():
+                if hint in search_text:
+                    species = sp
+                    breed = sp
+                    break
+
+        # === 基础物种声明 ===
+        # 尝试获取年龄/性别信息
+        age_appearance = character.get('age_appearance', '')
+        gender = character.get('gender', '')
+        age_gender_parts = [p for p in [age_appearance, gender, species or 'animal'] if p]
+        if age_gender_parts:
+            parts.append(f"An {' '.join(age_gender_parts)} anthropomorphic {species or 'animal'}")
+        else:
+            parts.append(f"An anthropomorphic {species or 'animal'}")
+
+        # === 毛皮/羽毛颜色（核心视觉特征）===
+        # 从 physical 的动物字段读取
+        fur_color = (
+            physical.get('fur_color', '') or
+            animal_data.get('fur_color', '') or
+            physical.get('coat_color', '')
+        )
+
+        # 防御：LLM 可能把毛色误填到 hair_color，转化为 fur_color
+        if not fur_color and physical.get('hair_color'):
+            fur_color = physical.get('hair_color', '')
+            print(f"  ⚠️ [AnthropomorphicBuilder] '{character.get('name', 'Unknown')}': "
+                  f"hair_color 字段转为 fur_color: {fur_color}")
+
+        fur_pattern = (
+            physical.get('fur_pattern', '') or
+            animal_data.get('fur_pattern', '')
+        )
+        fur_texture = (
+            physical.get('fur_texture', '') or
+            physical.get('hair_texture', '') or
+            animal_data.get('fur_texture', '')
+        )
+        fur_length = (
+            physical.get('fur_length', '') or
+            animal_data.get('fur_length', '')
+        )
+
+        if fur_color or fur_texture:
+            # 根据物种区分 fur（哺乳动物）vs feathers（鸟类）
+            bird_species = {'bird', 'sparrow', 'eagle', 'hawk', 'parrot', 'owl', 'penguin',
+                           'chicken', 'duck', 'crow', 'pigeon', 'finch', 'wren', 'robin'}
+            material = "feathers" if (species and species.lower() in bird_species) else "fur"
+
+            fur_parts = [p for p in [fur_color, fur_texture, fur_length] if p]
+            parts.append(f"with {' '.join(fur_parts)} {material}")
+
+        if fur_pattern:
+            parts.append(f"featuring {fur_pattern} pattern")
+
+        # === 面部动物特征（口鼻、耳朵）===
+        # 耳朵
+        ear_style = (
+            physical.get('ear_style', '') or
+            physical.get('ear_shape', '') or
+            animal_data.get('ear_shape', '')
+        )
+        if ear_style:
+            parts.append(f"{ear_style} animal ears")
+        else:
+            # 根据物种推断耳朵特征
+            if species:
+                sp_lower = species.lower()
+                if sp_lower in ('rabbit', 'bunny'):
+                    parts.append("long upright rabbit ears")
+                elif sp_lower == 'fox':
+                    parts.append("pointed fox ears")
+                elif sp_lower == 'wolf':
+                    parts.append("upright wolf ears")
+                elif sp_lower == 'bear':
+                    parts.append("round bear ears")
+                elif sp_lower in ('cat',):
+                    parts.append("pointed cat ears")
+
+        # 口鼻/喙
+        snout_shape = (
+            physical.get('snout_shape', '') or
+            physical.get('nose', '') or
+            animal_data.get('nose_color', '')
+        )
+        if snout_shape and 'button' not in snout_shape.lower() and 'human' not in snout_shape.lower():
+            # 检查是否是有意义的动物口鼻描述
+            parts.append(f"{snout_shape} snout/muzzle")
+
+        # 眼睛
+        eye_color = (
+            physical.get('eye_color', '') or
+            animal_data.get('eye_color', '')
+        )
+        eye_shape = physical.get('eye_shape', '') or animal_data.get('eye_shape', '')
+        if eye_color:
+            eye_desc = f"{eye_shape} {eye_color} eyes" if eye_shape else f"{eye_color} eyes"
+            parts.append(eye_desc)
+
+        # 尾巴
+        tail_style = (
+            physical.get('tail_style', '') or
+            physical.get('tail', '') or
+            animal_data.get('tail', '')
+        )
+        if tail_style:
+            parts.append(f"{tail_style} tail")
+        elif species:
+            sp_lower = species.lower()
+            if sp_lower == 'fox':
+                parts.append("bushy fox tail")
+            elif sp_lower in ('rabbit', 'bunny'):
+                parts.append("small fluffy rabbit tail")
+            elif sp_lower == 'squirrel':
+                parts.append("large bushy squirrel tail")
+            elif sp_lower == 'wolf':
+                parts.append("wolf tail")
+
+        # === 独特标记 ===
+        distinctive_marks = physical.get('distinctive_marks', []) or animal_data.get('distinctive_marks', [])
+        if distinctive_marks and isinstance(distinctive_marks, list):
+            # 过滤掉纯中文的标记（只保留英文可读的）
+            en_marks = [m for m in distinctive_marks if any(c.isascii() and c.isalpha() for c in m)]
+            if en_marks:
+                parts.append(f"Distinctive marks: {', '.join(en_marks[:3])}")
+
+        # === 服装（拟人化关键特征！）===
+        # 这是拟人化动物与普通动物的最大区别
+        clothing_parts = []
+        top = clothing.get('top', '')
+        bottom = clothing.get('bottom', '')
+        outerwear = clothing.get('outerwear', '')
+        footwear = clothing.get('footwear', '')
+        accessories = clothing.get('accessories', [])
+        style = clothing.get('style', '')
+        condition = clothing.get('condition', '')
+
+        if top:
+            clothing_parts.append(top)
+        if bottom:
+            clothing_parts.append(bottom)
+        if outerwear:
+            clothing_parts.append(outerwear)
+        if footwear and 'barefoot' not in footwear.lower() and '赤足' not in footwear:
+            clothing_parts.append(footwear)
+
+        if clothing_parts:
+            parts.append(f"CLOTHING: {', '.join(clothing_parts)}")
+
+        if accessories and isinstance(accessories, list):
+            # 过滤掉纯中文配饰
+            en_accessories = [a for a in accessories if any(c.isascii() and c.isalpha() for c in str(a))]
+            if en_accessories:
+                parts.append(f"ACCESSORIES: {', '.join(en_accessories[:3])}")
+
+        if style:
+            # 提取英文部分（style 字段有时含中文说明）
+            style_parts = style.split('—')[0].split('–')[0].strip()
+            if style_parts:
+                parts.append(f"STYLE: {style_parts}")
+
+        if condition:
+            condition_parts = condition.split('—')[0].split('–')[0].strip()
+            if condition_parts:
+                parts.append(f"CONDITION: {condition_parts}")
+
+        # === 姿态（直立行走，区分普通动物）===
+        posture = character.get('character_specific_directions', {})
+        if isinstance(posture, dict):
+            posture_desc = posture.get('posture', '')
+            if posture_desc:
+                # 提取英文部分
+                posture_en = posture_desc.split('—')[0].split('–')[0].strip()
+                if posture_en and any(c.isalpha() and c.isascii() for c in posture_en):
+                    parts.append(f"POSTURE: {posture_en}")
+
+        # === 表情 ===
+        expression = character.get('default_expression', '')
+        char_directions = character.get('character_specific_directions', {})
+        if not expression and isinstance(char_directions, dict):
+            expression = char_directions.get('default_expression', '')
+        if expression:
+            expr_en = expression.split('—')[0].split('–')[0].strip()
+            if expr_en and any(c.isalpha() and c.isascii() for c in expr_en):
+                parts.append(f"({expr_en} expression)")
+
+        desc = ", ".join(parts) if parts else f"An anthropomorphic {species or 'animal'} character"
+        species_label = species.upper() if species else "ANIMAL"
+        return (
+            f"{desc}. "
+            f"This is an ANTHROPOMORPHIC {species_label} — "
+            f"a sentient animal with animal fur/features but upright posture and clothing. "
+            f"MUST show: animal face/snout/muzzle, animal ears, animal fur/feathers, tail. "
+            f"NOT a human. NOT a plain quadruped animal."
+        )
 
     def _build_fantasy_description(self, character: Dict[str, Any]) -> str:
         """构建奇幻生物描述"""

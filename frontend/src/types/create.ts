@@ -86,6 +86,13 @@ export interface StoryOutline {
 
 // ============ Stage C-D: Generation & Preview ============
 
+// B44: structured safety advice from SafetyAdvisor (returned by backend when content_safety_failure)
+export interface SafetyAdvice {
+  suspected_terms: string[];
+  suggested_changes: { original: string; suggestion: string }[];
+  user_message: string;
+}
+
 export interface Shot {
   shotId: number;
   sceneId: number;
@@ -97,9 +104,13 @@ export interface Shot {
   chineseText: string[];
   imageUrl: string | null;
   charactersInScene: string[];
-  // D.17: content safety fields (populated when image generation is blocked)
-  safetyAdvice?: string | null;
+  // D.17 / B44: content safety fields (populated when image generation is blocked)
+  // safetyAdvice is now a structured SafetyAdvice object (not a plain string)
+  safetyAdvice?: SafetyAdvice | null;
   errorMessage?: string | null;
+  // B44: raw generation result fields
+  success?: boolean;
+  errorKind?: string | null;
 }
 
 // ============ Stage C: Generation Log ============
@@ -207,7 +218,14 @@ export interface StoryDetail extends StoryCard {
 
 // ============ Stage C: Character/Scene Preview Checkpoints ============
 
-export type GenerationSubPhase = "text-gen" | "char-preview" | "scene-preview" | "shot-gen";
+// T21-NEW-7 (2026-05-21 DEC-047 v1.4): scene-refs-preview 新 subPhase
+//   - 用户旅程 R4-3 闸门 (Stage 4.5 完成后等用户确认场景参考图)
+//   - 镜像 char-preview 的对偶设计 (60s 倒计时 + 编辑 + 重生)
+//   - URL 复用 /scenes 段 (但 hydrate 不同 endpoint: /scene-references vs /story)
+// T22-NEW-5 (2026-05-22): 砍 R4-2 scene-preview subPhase (文字层场景确认页已移除)
+//   - scene-preview 已从 GenerationSubPhase 中移除
+//   - Pipeline 真直接从 Stage 3 → Stage 4, 用户只在 R4-3 (scene-refs-preview) 视觉确认
+export type GenerationSubPhase = "text-gen" | "char-preview" | "scene-refs-preview" | "shot-gen";
 
 export interface PreviewCharacter {
   id: string;
@@ -222,7 +240,22 @@ export interface PreviewScene {
   id: string;
   name: string;
   description: string;
+  description_zh?: string;
   userEdit: string;
+  // Wave 10 / RISK-T16-4: retain full LLM payload for transparent POST to backend
+  // (prevents action_beats / narration / location_id etc. from being lost on confirm-scenes)
+  scene_id?: string | number;
+  scene_heading?: string;
+  plot_point?: string;
+  location_id?: string;
+  time_of_day?: string;
+  weather?: string;
+  lighting_condition?: string;
+  atmosphere?: string;
+  action_beats?: unknown[];
+  narration?: string;
+  characters_in_scene?: string[];
+  [key: string]: unknown;  // allow any additional LLM fields to pass through
 }
 
 // ============ Stage Navigation ============
@@ -247,6 +280,8 @@ export interface CreateState {
   customStyleAnalysis: Record<string, unknown> | null;
   characters: CharacterRef[];
   scenes: SceneRef[];
+  // B33: user selects mood at Stage A (before outline generation)
+  userSelectedMood: string | null;
 
   // Stage A → B bridge
   projectId: string | null;
@@ -308,6 +343,8 @@ export type CreateAction =
   | { type: "DELETE_PLOT_POINT"; payload: string }
   | { type: "SELECT_ENDING"; payload: string }
   | { type: "SET_MOOD"; payload: string }
+  // B33: mood selection moved to Stage A (pre-outline)
+  | { type: "SET_USER_SELECTED_MOOD"; payload: string | null }
   | { type: "SET_GENERATION_SUB_PHASE"; payload: GenerationSubPhase }
   | { type: "SET_PREVIEW_CHARACTERS"; payload: PreviewCharacter[] }
   | { type: "SET_PREVIEW_SCENES"; payload: PreviewScene[] }

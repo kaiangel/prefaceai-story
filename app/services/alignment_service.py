@@ -39,7 +39,8 @@ class AlignmentService:
         self.claude_client = None
         self.claude_model = "claude-sonnet-4-6"
         if settings.ANTHROPIC_API_KEY:
-            self.claude_client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+            # T18-J: AsyncAnthropic，避免同步阻塞 event loop
+            self.claude_client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
 
         # 备用模型: Gemini 3.1 Flash
         self.gemini_client = None
@@ -172,7 +173,8 @@ class AlignmentService:
                     })
                 claude_content.append({"type": "text", "text": prompt})
 
-                response = self.claude_client.messages.create(
+                # T18-J: await AsyncAnthropic，不阻塞 event loop
+                response = await self.claude_client.messages.create(
                     model=self.claude_model,
                     max_tokens=16384,
                     temperature=0.2,
@@ -229,7 +231,8 @@ class AlignmentService:
         # 优先使用 Claude Sonnet 4.6
         if self.claude_client:
             try:
-                response = self.claude_client.messages.create(
+                # T18-J: await AsyncAnthropic，不阻塞 event loop
+                response = await self.claude_client.messages.create(
                     model=self.claude_model,
                     max_tokens=16384,
                     temperature=0.2,

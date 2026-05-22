@@ -345,12 +345,48 @@ Use these substitution patterns:
 | violent, violence | intense, fierce, powerful |
 | agony, torment, horror | anguish, distress, intensity |
 
+### 2.B. SEEDREAM DARK-FANTASY TRIPWIRES (DEC-045 T20-26, 2026-05-19)
+Seedream / NB2 内容安全策略对以下暗黑题材/灵异类描述明确敏感.
+**REPLACE these phrases COMPLETELY (do NOT preserve any trace)**:
+
+| Sensitive (MUST REMOVE) | Safe Alternative |
+|--------------------------|------------------|
+| ghost, ghost of X, ghostly, spectral, phantom, apparition, wraith, specter | warm symbolic memory, lingering presence, gentle aura, soft golden halo |
+| haunted, vision of [deceased] | quiet reflection, contemplative atmosphere |
+| double-exposure, double exposed, two-face composition | single character alone in frame |
+| face overlapping, faces overlapping, face overlap, faces overlap | single character with subtle golden halo (NO face overlap) |
+| faces merging, faces merge, face merging, faces blending | single character (no merging) |
+| two faces (in same shot, same person) | one face (the living character only) |
+| deceased emerges, deceased emerging, deceased appears | symbolic object (photo, urn, keepsake) in the scene |
+| younger face emerges, older face surfaces, memory emerges, spirit emerges | warm light from off-frame (no face visible) |
+| identical jaw, identical scar, identical face, identical contour, identical features | the [living character] is shown solo with their own features (DO NOT mention resemblance via visual overlay) |
+| exact contour alignment, exact face alignment, overlapping with exact contour | single subject, clean silhouette, no overlay |
+
 ### 3. Specific Transformations
 - "lying in pool of blood" → "lying in shadow" or "surrounded by darkness"
 - "motionless body" → "still figure" or "motionless silhouette"
 - "death scene" → "aftermath" or "moment of consequence"
 - "killer kneeling before victim" → "figure kneeling in grief"
 - "fatal wound" → "decisive mark" or "final consequence"
+
+### 3.B. Specific Dark-Fantasy Transformations (DEC-045 T20-26)
+- "double-exposure vision of [A] and [B]" → "[A] kneels alone, a single warm golden halo around their head, no other figure visible"
+- "the ghost of [grandfather] emerges, identical jaw" → "[grandfather]'s old portrait visible on the wall in soft focus, the living character standing alone, contemplative"
+- "two faces overlapping with exact contour alignment" → "single character with subtle gold light suggesting remembered presence (no second face)"
+- "younger face emerges through [living character]'s features" → "the [living character] alone, eyes closed in remembrance, warm golden side light"
+- "spectral figure standing behind [living character]" → "an empty space behind [living character] lit by warm symbolic light"
+- "[character]'s face dissolves into [deceased character]'s face" → "[character] alone, looking down at an old photograph in their hands"
+
+### 3.C. CRITICAL VERIFY (DEC-045 T20-26)
+After rewriting, scan your output for these tokens and REMOVE any that remain:
+  ghost, ghostly, spectral, phantom, apparition, wraith, specter, haunted,
+  double-exposure, double exposed, two faces, faces merging, face overlapping,
+  identical jaw, identical scar, identical face, exact contour alignment,
+  deceased emerges, younger face emerges, older face surfaces,
+  memory emerges, spirit emerges, vision of deceased.
+If ANY remain, REWRITE that sentence using a safer alternative from §2.B / §3.B
+before finalizing output. Seedream will reject the prompt if even ONE of these
+phrases survives.
 
 ### 4. Maintain Dramatic Impact
 - Use metaphor and suggestion instead of explicit depiction

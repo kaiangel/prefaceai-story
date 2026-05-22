@@ -10,7 +10,6 @@ import {
   Plus,
   Trash2,
   Check,
-  Palette,
   AlertCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -18,7 +17,6 @@ import { useCreate } from "@/contexts/CreateContext";
 import { apiFetch, getStoredToken } from "@/lib/api";
 import { useStageLock } from "@/hooks/useStageLock";
 import { buildCreateUrl } from "@/lib/createUrl";
-import { MOOD_OPTIONS } from "@/types/create";
 import type { PlotPoint } from "@/types/create";
 
 // UX-2: Extract Arabic numerals and common Chinese number words from text
@@ -110,6 +108,13 @@ function PlotPointItem({
   );
 }
 
+// RISK-T14-13-frontend: Shape of inconsistency warnings from confirm-outline response
+interface InconsistencyWarning {
+  type: string;
+  message: string;
+  affected_field?: string;
+}
+
 export default function StageB() {
   const { state, dispatch } = useCreate();
   const router = useRouter();
@@ -117,17 +122,29 @@ export default function StageB() {
   const [editingCharId, setEditingCharId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  // RISK-T14-13-frontend: Banner shown when backend returns inconsistency_warnings
+  const [warningBanner, setWarningBanner] = useState<InconsistencyWarning[] | null>(null);
 
   // D.14 F-Lock-Family: lock outline editing once generation has started
   const isLocked = useStageLock();
 
-  if (!outline) return null;
+  if (!outline) {
+    // P0 hotfix v2: outline not yet loaded (hydration recovery in progress).
+    // Show a loading state so user sees activity instead of blank screen.
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 text-text-secondary">
+        <div className="w-8 h-8 border-2 border-brand-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm">正在加载故事大纲...</p>
+      </div>
+    );
+  }
 
   // D.14: Build "返回创作进度" URL — prefer generating/characters/scenes based on current state
+  // T22-NEW-5 (2026-05-22): "scene-preview" arm removed (R4-2 deleted); scene-refs-preview maps to "scenes"
   const progressStage =
     state.generationSubPhase === "char-preview"
       ? "characters"
-      : state.generationSubPhase === "scene-preview"
+      : state.generationSubPhase === "scene-refs-preview"
       ? "scenes"
       : "generating";
   const progressUrl = buildCreateUrl(state.projectId, progressStage) || "/dashboard";
@@ -135,21 +152,37 @@ export default function StageB() {
   const handleConfirm = async () => {
     const token = getStoredToken();
     if (!token) {
+      // [StageB] Log #1 — no token → redirect to login
+      // eslint-disable-next-line no-console
+      console.warn("[StageB] handleConfirm: no token → redirect /login");
       router.push("/login");
       return;
     }
 
     const projectId = state.projectId;
     if (!projectId) {
+      // [StageB] Log #2 — projectId missing (should never happen post-StageA)
+      // eslint-disable-next-line no-console
+      console.error("[StageB] handleConfirm: projectId is null — project was not created in StageA");
       setSubmitError("项目未创建，请返回重新输入创意");
       return;
     }
+
+    // [StageB] Log #3 — confirm-outline submission start
+    // eslint-disable-next-line no-console
+    console.log("[StageB] handleConfirm: submitting confirm-outline for projectId=", projectId,
+      "title=", outline.title,
+      "chars=", outline.characters.length,
+      "plotPoints=", outline.plotPoints.length,
+      "mood=", outline.mood,
+      "user_selected_mood=", state.userSelectedMood);
 
     setSubmitting(true);
     setSubmitError("");
     try {
       // 1. Save user edits via confirm-outline
-      await apiFetch(`/projects/${projectId}/confirm-outline`, {
+      const confirmResponse = await apiFetch<{ inconsistency_warnings?: InconsistencyWarning[] }>(
+        `/projects/${projectId}/confirm-outline`, {
         method: "POST",
         body: JSON.stringify({
           outline: {
@@ -179,20 +212,43 @@ export default function StageB() {
               }
               return sortedPoints;
             })(),
+            // B33: mood here is the LLM-inferred mood from outline; user_selected_mood comes from Stage A
             mood: outline.mood,
+            user_selected_mood: state.userSelectedMood ?? null,
           },
         }),
       }, token);
+
+      // RISK-T14-13-frontend: Show non-blocking warning banner if backend flagged inconsistencies
+      if (confirmResponse?.inconsistency_warnings && confirmResponse.inconsistency_warnings.length > 0) {
+        // eslint-disable-next-line no-console
+        console.log("[StageB] handleConfirm: confirm-outline returned", confirmResponse.inconsistency_warnings.length, "inconsistency warnings");
+        setWarningBanner(confirmResponse.inconsistency_warnings);
+        setSubmitting(false);
+        // Do NOT proceed to start-generation yet — user must acknowledge the warning first
+        return;
+      }
+
+      // [StageB] Log #4 — confirm-outline OK, triggering start-generation
+      // eslint-disable-next-line no-console
+      console.log("[StageB] handleConfirm: confirm-outline OK → calling start-generation");
 
       // 2. Trigger pipeline generation
       await apiFetch(`/projects/${projectId}/start-generation`, {
         method: "POST",
       }, token);
 
+      // [StageB] Log #5 — start-generation OK, transitioning to StageC
+      // eslint-disable-next-line no-console
+      console.log("[StageB] handleConfirm: start-generation OK → SET_STAGE generate");
+
       // 3. Transition to StageC
       dispatch({ type: "CONFIRM_OUTLINE" });
       dispatch({ type: "SET_STAGE", payload: "generate" });
     } catch (error) {
+      // [StageB] Log #6 — submission error
+      // eslint-disable-next-line no-console
+      console.error("[StageB] handleConfirm: ERROR:", error instanceof Error ? error.message : error);
       setSubmitting(false);
       setSubmitError(error instanceof Error ? error.message : "确认大纲失败");
     }
@@ -200,6 +256,29 @@ export default function StageB() {
 
   const handleBack = () => {
     dispatch({ type: "SET_STAGE", payload: "input" });
+  };
+
+  // RISK-T14-13-frontend: User acknowledges warnings → dismiss banner and proceed to start-generation
+  const handleAcknowledgeWarnings = async () => {
+    const token = getStoredToken();
+    const projectId = state.projectId;
+    if (!token || !projectId) return;
+    setWarningBanner(null);
+    setSubmitting(true);
+    try {
+      await apiFetch(`/projects/${projectId}/start-generation`, {
+        method: "POST",
+      }, token);
+      // eslint-disable-next-line no-console
+      console.log("[StageB] handleAcknowledgeWarnings: start-generation OK → SET_STAGE generate");
+      dispatch({ type: "CONFIRM_OUTLINE" });
+      dispatch({ type: "SET_STAGE", payload: "generate" });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("[StageB] handleAcknowledgeWarnings: ERROR:", error instanceof Error ? error.message : error);
+      setSubmitting(false);
+      setSubmitError(error instanceof Error ? error.message : "启动生成失败");
+    }
   };
 
   const handleAddPlotPoint = () => {
@@ -470,43 +549,46 @@ export default function StageB() {
             </div>
           </motion.section>
 
-          {/* Mood Selector */}
-          <motion.section
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <div className="flex items-center gap-2 mb-3">
-              <Palette className="w-4 h-4 text-brand-primary" />
-              <h2 className="text-sm font-medium text-text-secondary">
-                情绪基调
-                <span className="text-text-muted font-normal ml-1">（可选）</span>
-              </h2>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {MOOD_OPTIONS.map((mood) => (
-                <button
-                  key={mood}
-                  onClick={() =>
-                    dispatch({
-                      type: "SET_MOOD",
-                      payload: outline.mood === mood ? "" : mood,
-                    })
-                  }
-                  className={`px-3 py-1.5 rounded-full text-xs border transition-all ${
-                    outline.mood === mood
-                      ? "border-brand-primary/50 bg-brand-primary/10 text-brand-primary"
-                      : "border-white/10 text-text-muted hover:border-white/20"
-                  }`}
-                >
-                  {mood}
-                </button>
-              ))}
-            </div>
-          </motion.section>
-
           {submitError && (
             <p className="text-center text-sm text-error">{submitError}</p>
+          )}
+
+          {/* RISK-T14-13-frontend: Inconsistency warning banner — non-blocking */}
+          {warningBanner && warningBanner.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4"
+            >
+              <div className="flex items-start gap-3 mb-3">
+                <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-amber-300 mb-1">大纲存在以下提示</p>
+                  <ul className="space-y-1">
+                    {warningBanner.map((w, i) => (
+                      <li key={i} className="text-xs text-amber-200/80">
+                        {w.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setWarningBanner(null)}
+                  className="text-xs px-3 py-1.5 rounded-lg text-amber-300 hover:bg-amber-500/10 transition-colors"
+                >
+                  返回修改
+                </button>
+                <button
+                  onClick={handleAcknowledgeWarnings}
+                  disabled={submitting}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 transition-colors disabled:opacity-60"
+                >
+                  知悉并继续
+                </button>
+              </div>
+            </motion.div>
           )}
 
           {/* D.14: Confirm Button — hidden when locked; "返回创作进度" shown in banner above */}

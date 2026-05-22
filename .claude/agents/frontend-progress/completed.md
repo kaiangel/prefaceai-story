@@ -4,6 +4,907 @@
 
 ---
 
+## T22-NEW-8 StageB confirm-outline wire 审查 (2026-05-22)
+
+**模型**: Sonnet 4.6
+**文件改动 (0)**: 无代码修改
+
+**任务**: StageB.tsx "确认大纲" 按钮调 `POST /api/projects/{uuid}/chapters/1/confirm-outline`
+
+**审查结论**: 已实现, 无需修改
+
+- PENDING.md 引用 `chapters/1/confirm-outline` 端点在 chapters.py 中不存在 (grep 确认)
+- 正确端点 `POST /projects/{project_id}/confirm-outline` 存在于 projects.py L518
+- StageB.tsx `handleConfirm` (L152-255) 已调用此端点, 发送完整编辑大纲 state (title/summary/characters/plotPoints/mood)
+- 成功路径: → start-generation → StageC; 失败路径: setSubmitError; warning 路径: banner (RISK-T14-13-frontend)
+
+**验证**: npm run build 20 routes 0 errors
+
+---
+
+## T22-NEW-5 R4-2 scene_review 删除 (2026-05-22)
+
+**模型**: Sonnet 4.6
+**文件 (5)**: `types/create.ts`, `lib/createUrl.ts`, `app/create/CreateContent.tsx`, `components/create/StageC.tsx`, `components/create/StageB.tsx`
+
+**任务**: 删除前端 R4-2 (`scene_review` ui_phase / `scene-preview` subPhase / /scenes 文字情节确认层), 保留 R4-1 (char-preview) 和 R4-3 (scene-refs-preview).
+
+**改动要点**:
+- `GenerationSubPhase` type 删 `"scene-preview"`
+- `UI_PHASE_TO_URL` 删 `scene_review: "scenes"` mapping
+- `deriveUrlStageFromState` 删 `"scene-preview" → "scenes"` arm
+- `deriveStateFromUrl` `"scenes"` case 改为返回 `"scene-refs-preview"` (R4-3)
+- `CreateContent.tsx` 删 `uiPhaseToSubPhase.scene_review`, 删 `isSceneReview` force-route block, 删 `scenesConfirmedNow` race guard
+- `StageC.tsx` 删 `handleConfirmScenes`, 删 `handleUpdatePreviewScene`, 删 `scene-preview` render block, 更新 D.23 watcher; `ScenePreview` 函数保留+eslint-disable
+- `StageB.tsx` D.14 progressStage 三元 `"scene-preview"` arm 改为 `"scene-refs-preview"`
+
+**验证**: build 20 routes 0 errors; R4-1/R4-3//outline 全保留
+
+**部署铁律**: 必须与 Backend Wave 8 同时上线 (pipeline R4-2 wait loop 删除 + STATUS_API_CONTRACT v1.5 + chapters.py confirm-scenes 清理). 禁止 frontend 单独部署.
+
+---
+
+## T22-NEW-2 SceneRefsPreview 卡片智能展示 (2026-05-22)
+
+**模型**: Sonnet 4.6
+**文件 (1)**: `frontend/src/components/create/StageC.tsx` (SceneRefsPreview 卡片渲染逻辑重写)
+
+**任务**: T22-NEW-2 P2 — Founder 5/21-22 真 2 次实测遇到 "外景未生成"/"内景未生成" 占位视觉空洞问题
+
+**根因**: Wave II SceneRefsPreview 默认显示 2 槽位 (grid-cols-2), 无 interior_url → 显示 "内景未生成" 占位, 让用户误以为后端有问题. 实际 backend by-design (洞穴/海底 only interior, 海面/沙滩 only exterior, DEC-014/DEC-009).
+
+**修复**: 4 种 case 全 cover — 真判断 hasInterior/hasExterior:
+- 两者都有 → grid-cols-2 双图 (保留原布局) + 无额外标签
+- 只 interior → 全宽 + 灰色小字 "(室内场景，无室外画面)" + 隐藏"重生外景"按钮
+- 只 exterior → 全宽 + 灰色小字 "(室外场景，无室内画面)" + 隐藏"重生内景"按钮
+- 都无 → 统一 "场景图生成失败，请重新生成" 单行提示 + 重新生成按钮
+
+**验证**: npm run build → 20 routes 0 errors (Warnings 全 pre-existing, 0 来自 StageC.tsx)
+
+---
+
+## T21-NEW-7 Wave II Frontend — SceneRefsPreview (2026-05-21)
+
+**模型**: Opus 4.7 xhigh thinking (Founder 决: 大架构改造)
+**文件 (6)**:
+- `frontend/src/types/create.ts` (+6/-1)
+- `frontend/src/lib/createUrl.ts` (+15/-3)
+- `frontend/src/hooks/useETA.ts` (+10/-1)
+- `frontend/src/app/create/CreateContent.tsx` (+50/-3)
+- `frontend/src/components/create/StageC.tsx` (+405/-2) — 加 SceneRefsPreview 组件
+- `frontend/src/hooks/useETA.test.ts` (+170/-8) — 加 5 新 T21-NEW-7 测试
+
+**任务**: T21-NEW-7 Frontend Wave II — 镜像 characters 页面对偶设计真场景参考图视觉确认 (R4-3)
+
+### Founder DEC-047 决方案 D
+
+情节确认 (R4-2 scene-preview, 大纲已有) ≠ 场景视觉确认 (R4-3 scene-refs-preview, 真图层面). 与 characters 页面 (R4-1 角色视觉确认) 对偶设计美学.
+
+### 改动概要
+
+1. **GenerationSubPhase 加 scene-refs-preview**: 与 char-preview/scene-preview/shot-gen 平级
+2. **UI_PHASE_TO_URL 加 scene_references_review→scenes**: 复用 URL 段, StageC 内部按 subPhase 区分组件
+3. **useETA 加 9 状态机适配**: scene_image_preparation=180s baseline + scene_references_ready=0s (REVIEW_STAGES)
+4. **CreateContent.tsx Watcher 加**:
+   - ChapterStatusResp 加 ui_phase=scene_references_review + 2 新字段 (scene_references_ready/confirmed)
+   - phaseToSubPhase 加新映射 (scene_references_review → scene-refs-preview)
+   - Race guard: 本地 scene_references_confirmed=true 时 override 派生为 shot-gen
+   - isSceneRefsReview force-route 分支 (强制 /scenes + setSubPhase=scene-refs-preview)
+5. **StageC.tsx 加 SceneRefsPreview 组件 (~370 行)**:
+   - GET /scene-references hydrate + 2s poll until ready
+   - 卡片 (interior + exterior 2 图 + meta + description)
+   - 编辑模式 (textarea + 4 重生按钮)
+   - 重生 3 按钮 (interior / exterior / both) + cache-buster URL
+   - 60s 倒计时 (anti-pattern fix, paused 编辑/重生时停)
+   - 确认 CTA (router 立即跳 /generating + 后台 POST confirm-scene-references)
+6. **useETA.test.ts 加 5 新测试**:
+   - 6a scene_image_preparation budget=180s + scene_references_ready=0s
+   - 6b scene_references_ready is REVIEW_STAGES
+   - 6c phaseToSubPhase 9 状态映射完整 (含 scene-refs-preview)
+   - 6d UI_PHASE_TO_URL scene_references_review → /scenes
+   - 6e 60s countdown + double-confirm guard arithmetic
+
+### 验证
+
+- ✅ tsc 0 errors
+- ✅ lint 0 新增 warning (所有 warning pre-existing img/useCallback)
+- ✅ build 20 routes 0 errors
+- ✅ useETA test 14/14 PASS (含 5 新 T21-NEW-7)
+- ✅ 0 越权 (仅改 frontend/src/{types,lib,hooks,app/create,components/create})
+- ✅ 0 修改 .team-brain/* — paste 给 PM 代写
+
+### Ben 5/13 STATUS_API_CONTRACT v1.4 真消费
+
+- frontend 严格不算 ui_phase, 从 backend response 真读 (backend authoritative)
+- createUrl + subPhase + hydrate 全派生
+- 9 状态机完整覆盖 (8 旧 + 1 新 scene_references_review)
+- 2 新字段 (scene_references_ready/confirmed) 用于 race guard
+
+---
+
+## T20-44 Frontend ETA Fix (2026-05-20)
+
+**模型**: Sonnet 4.6 xhigh thinking
+**文件 (3)**: `frontend/src/hooks/useETA.ts`, `frontend/src/components/create/StageC.tsx`, `frontend/src/hooks/useETA.test.ts`
+
+**任务**: T20-44 Frontend 部分 — useETA.ts 真消费 estimated_remaining_seconds (Wave 2)
+
+### 根因 (test20 实证)
+
+- Backend ETA 790s (13min), frontend 显示"3 分钟" — 4x 低估
+- 真根因: `prevEtaSecRef` stale (~180s BGM budget fallback), sliding-window smoothing 把 backend 790s 上调 clamp 到 180s，`Math.ceil(180/60)=3` → "3 分钟"
+
+### 修复 (3 文件)
+
+**useETA.ts — T20-44 核心修复**:
+- 新增 `isBackendAuthoritative` flag (P1 active 时 true)
+- 当 P1 active: bypass 单调性 guard + 上调 smoothing，直接用 backend ETA
+- CONTRACT v1.3 §1.4: "Frontend 直接读 backend estimated_remaining_seconds 即可"
+- 保留 fallback 路径 (P2/P3/P4) 的 monotonicity guard + smoothing 不变
+
+**StageC.tsx — 2 处修复**:
+1. text-gen poller: `estimated_remaining_seconds > 0` → `>= 0` (与 shot-gen poller 一致, T20-44)
+2. text-gen poller: `estimated_remaining_seconds` 类型从 `number | undefined` → `number | null` (contract v1.3)
+3. shot-gen poller: BGM 阶段 log synthesis guard — `isPostImageGen` (bgm/postprocess/finalize/completed) 时跳过合成 "已生成 X/Y" 条目 (STATUS_API_CONTRACT v1.3 §1.4: shots_completed==shots_total 不代表"还在生图")
+
+**useETA.test.ts — 测试更新**:
+- test 4 从 `testT209_SmoothingStillAppliesWithBackendField` → `testT2044_BackendAuthoritativeBypassesSmoothing`
+- 验证 790s backend ETA 不被 180s prevEta clamp 到 "3 分钟"
+- 9/9 PASS
+
+### 验证
+
+- `npx tsc --noEmit` 0 errors
+- `npx next lint` 0 新增 warning
+- `npm run build` 0 errors (20 routes)
+- `npx ts-node src/hooks/useETA.test.ts` 9/9 PASS
+- dev server HTTP 200
+
+### 验收状态
+
+- ✅ grep 0 hardcoded "3 分钟"
+- ✅ useETA.ts 真用 `status.estimated_remaining_seconds` (P1 bypass smoothing)
+- ✅ BGM 阶段 log synthesis 已 guard (isPostImageGen)
+- ✅ 删除 message regex "已生成 X/Y" 解析 (Wave 17/18 已完成，本次验证未退化)
+- ✅ jest/ts-node 9 PASS, tsc 0 errors, build 0 errors
+
+---
+
+## Wave 4 (TASK-T20-FIXBATCH-5): 3 P2 UX 修复串行 (2026-05-19 22:55)
+
+**模型**: Opus 4.7 default
+**文件 (3)**: `frontend/src/components/create/StageC.tsx`, `frontend/src/app/create/CreateContent.tsx`, `frontend/src/lib/api.ts`
+
+**任务**: 3 项 P2 RISK 一 session 串行修复 (PM 22:30 派活)
+
+### T20-24 — progress bar 真接 backend progress (Stage 2 早期 0% 卡住)
+
+**真根因**: StageC text-gen poller `setInterval(async () => {...}, 2000)` 第一次 fire 在 2000ms 后, 这 2s 用户看 0%
+
+**修复**:
+- 把 text-gen poll body 抽成 `runTextGenPoll` named function
+- 同模式 shot-gen poll body 抽成 `runShotGenPoll`
+- `void runTextGenPoll(); pollRef.current = setInterval(runTextGenPoll, 2000)` 立即 fire + 持续 poll
+- 同步加 silentStatuses=[404]
+
+**实际源**: progress bar 用 `state.generationProgress` (CreateContext init=0), 由 `UPDATE_GENERATION_PROGRESS` dispatch 更新, 源头是 backend `status.progress` (T20-24 修了"何时第一次见到")
+
+### T20-25 — confirm-characters 后跳错 (/characters → /scenes 20s → /generating)
+
+**真根因 chain (5 维度追)**:
+1. `handleConfirmCharacters` 立即 push /scenes URL (subPhase=scene-preview)
+2. confirm-characters API await 在 onConfirm() 之后 (~200-500ms 延迟)
+3. 此窗口 backend 仍 ui_phase=char_review → Watcher 力拉回 /characters
+4. API 完成后 backend ui_phase=scene_review_pending → Watcher 派生 subPhase=text-gen → state→URL push /generating
+5. Stage 3 done (~90s) → ui_phase=scene_review → Watcher 派生 scene-preview → URL push /scenes
+6. 净结果: 3 次跳转 + 假加载
+
+**修复 (Wave 9 contract 对齐)**:
+- `handleConfirmCharacters` 改 push `/generating` + subPhase=text-gen (符合 contract scene_review_pending → /generating)
+- Watcher `isCharReview` URL force 加 `!charactersConfirmedNow` gate (Wave 9 path 与 legacy path 一致)
+- Watcher subPhase 派生加 `charactersConfirmedNow` / `scenesConfirmedNow` gate (防 stale ui_phase 覆盖本地操作)
+
+**新流程**: /characters → /generating (progress 涨从 ~10% → ~32%) → /scenes (Stage 3 done) → 确认 → /generating
+
+### T20-11.v2 — /outline polling 优化 (76 个 404 routine warn)
+
+**主犯**: CreateContent Watcher 5s tick `/chapters/1/status` 无 silentStatuses
+**从犯**: hydrate status + bgm 调用都无 silentStatuses
+**数学**: 4 min × 12 tick/min ≈ 48 + hydrate ~3 ≈ 51 (与 audit 76 数量级吻合)
+
+**修复**:
+- Watcher status poll → silentStatuses=[404]
+- Hydrate status poll → silentStatuses=[404]
+- `fetchBgmInfo` 加 `options?: ApiFetchOptions` 参数 + hydrate 传 silentStatuses=[404]
+- D.23 watcher (StageC L431) status poll → silentStatuses=[404] (防御性)
+
+### 验证
+
+- ✅ `npx tsc --noEmit` 0 errors
+- ✅ `npx next lint` 0 新增 error/warning
+- ✅ dev server /create + / + /dashboard HTTP 200
+- ✅ 0 越权 (仅 StageC.tsx + CreateContent.tsx + api.ts)
+- ✅ 不动 useETA.ts (Wave 1+2 保护)
+- ✅ 不动 useRealApi flag / Watcher 主逻辑 / progress bar UI
+
+### 待 Founder 实测 (Wave 5)
+
+| RISK | 验证场景 |
+|------|----------|
+| T20-24 | 跑 Pipeline, 进 /generating 立即观察 progress bar 是否从 backend 5-10% 起 (不卡 0%) |
+| T20-25 | 走 confirm-characters → 应直接 /generating 显进度 → Stage 3 done 跳 /scenes 显完整场景 |
+| T20-11.v2 | 进 /outline 停留 5 min, client.log chapters/* 404 warn 应从 ~50 → ~0 |
+
+---
+
+## Wave 18: TASK-T20-9.v3 — ETA 全局重审 Frontend (2026-05-19)
+
+**模型**: Sonnet 4.6
+**文件 (2)**: `frontend/src/hooks/useETA.ts`, `frontend/src/components/create/StageC.tsx`
+
+**任务**: T20-9.v3 P1 ETA 全局重审 Frontend 部分 (TASK-T20-FIXBATCH-4 Wave 2)
+
+**改动**:
+- `useETA.ts`: 新增 shotsTotal/shotsCompleted/shotsFailed 字段; 实现 shots-based fallback 公式; 删除 "正在收尾" UX (isReallyWrappingUp 移除); progress>=95% 仍显具体 ETA; 滑动窗口 per_shot_real (SHOT_TIMING_WINDOW=5); DEFAULT_PER_SHOT_SEC=80s 兜底
+- `StageC.tsx`: shot-gen poller type 加 3 字段; 3 个新 ref; useETA 透传; message regex 替换 shots_completed 日志合成; RF-4 接受 >=0
+
+**验证**: tsc 0 errors, lint 0 新增 error, /create HTTP 200
+
+---
+
+## Wave 17.5: TASK-T20-FIXBATCH-4 T20-12 重做 — 60s 倒计时恢复 (2026-05-19)
+
+**模型**: Sonnet 4.6
+**文件 (1)**: `frontend/src/components/create/StageC.tsx`
+
+**任务**: Wave 1 漏看 PM 16:55 TaskUpdate (方案 A), 执行了方案 C (完全删除). 本 session 重做.
+
+**改动**:
+- CharacterPreview: 恢复 countdown (60) + paused state
+- 定时器 useEffect: B36/D.14/paused gates + 纯 state update (T20-15 anti-pattern 修复模式)
+- 副作用 useEffect: countdown===0 触发 handleConfirmWithApi (与 ScenePreview 对称)
+- handleAdjust: 恢复 setPaused(true)
+- 倒计时 badge UI: 圆形边框 + 数字 + "秒后自动继续" (与 ScenePreview 一致)
+
+**验证**: tsc 0 errors, lint 0 新增 warning, /create HTTP 200
+
+---
+
+## Wave 17: TASK-T20-FIXBATCH-4 Wave 1 — T20-12 + T20-15 + T20-11 + DEC-044 UI 文案 (2026-05-19)
+
+**模型**: Opus 4.7 default
+**改动文件 (3, 0 越权)**:
+- `frontend/src/components/create/StageC.tsx` — T20-12 移除 CharacterPreview 倒计时; T20-15 ScenePreview setCountdown 反模式拆分
+- `frontend/src/app/create/CreateContent.tsx` — T20-11 hydrate effect in-session skip guard
+- `frontend/src/components/create/StageD.tsx` — DEC-044 "旁白（只读）" → "描述（只读）"
+
+**4 任务摘要**:
+
+### T20-12 P0 — 移除 /characters 自动 confirm
+- **症状**: Founder 14:45 反馈"怎么都没看到角色 一下子又到了 /scenes 加载中"
+- **真根因** (5 维度链路): CharacterPreview L1383 旧版 `setInterval(() => setCountdown(prev => { if (prev<=1) handleConfirmWithApi() ... }))` → 20s 自动触发 dispatch CONFIRM_CHARACTERS + 路由切换. 在 anthropomorphic_animal 故事 portrait 就绪需 1-2s 时, 倒计时已先跑 → 用户不点就被自动跳走
+- **修复**: 完全移除自动倒计时. 用户必须手动点击"确认角色，继续". 倒计时徽章替换为"确认后开始绘制场景"文案
+- **设计意图**: DEC-011 Stage B + Founder C 项"理想形态: 大纲 - 预览/调整角色 - 预览/调整场景 - 后续全自动"
+- **不采用 30s 倒计时 + 暂停方案**: 任何倒计时都隐含催促, 干扰决策, 违反 DEC-011 用户掌控感
+
+### T20-15 P1 — StageC setState-in-render React 反模式根治
+- **症状**: client.log L1533 "Warning: Cannot update a component (CreateProvider) while rendering a different component (CharacterPreview)"
+- **真根因**: React 在 reconciliation 期间调用 setState updater 计算下一 state. 在 updater 内调副作用 (dispatch / API / 路由) 触发警告. CharacterPreview L1383 和 ScenePreview L1645 都中招
+- **修复**:
+  - CharacterPreview: 移除整个 setInterval (T20-12 一并解决)
+  - ScenePreview: `setInterval(() => setCountdown(prev => prev<=1 ? 0 : prev-1))` (纯 state) + 新独立 useEffect 监听 countdown===0 触发 onConfirm (副作用隔离)
+
+### T20-11 P2 — /create → /outline 重复 fetch 去重
+- **症状**: Founder 14:43 反馈"大纲直接在 /create 出来了 停留 /create 地址, 10s 内跳到 /outline 显示载入中, 过了 30s 又出来"
+- **真根因** (5 维度链路): StageA `router.replace(/create/${id}/outline)` 不设 lastPushedUrlRef / hydratedFor → CreateContent hydrate effect 错过两个现有 guard → 重新跑 hydrateProjectFromBackend 30s+ (含 /chapters/1/story 404 retry) → L1126 fallback 再调 generate-outline 第二次
+- **修复**: hydrate effect 加新 guard: `if (state.projectId === urlProjectUuid && state.outline !== null) → skip + mark hydratedFor`. StageA dispatch SET_OUTLINE 后 outline 已在 state, 再 hydrate 是冗余
+- **eslint-disable**: react-hooks/exhaustive-deps 故意不加 state.outline (会导致每次 outline 变化重跑 effect, 反而破坏 guard)
+
+### DEC-044 UI 文案改
+- **改动**: StageD.tsx L446 "旁白（只读）" → "描述（只读）" + 加 DEC-044 设计意图注释
+- **内容源 (currentShot.narrationSegment) 不变**, T20-21 AI-ML 重构后 narration_segment 会变短作为画面描述/caption 使用
+- "调整画面"按钮已有, 无需新建
+
+**验证**:
+- `npx tsc --noEmit` 0 errors
+- `npx next lint` 0 新增 warning (现有 useEffect deps warning 加 eslint-disable + 完整理由)
+- dev server HMR ✓ Compiled 1688 modules
+- /create /characters /preview /outline 4 URL HTTP 200
+
+**Universal 视角**:
+- T20-12: 任何 character_type / 任何故事都受益
+- T20-15: 通用 React 反模式修复
+- T20-11: 通用 in-session create flow guard
+- DEC-044: 通用 UI 文案
+
+**边界保护**:
+- ❌ 不碰 useETA.ts (Wave 16 已交付)
+- ❌ 不碰 backend / AI-ML 文件
+- ❌ 不碰 /preview 数据展示逻辑 (只改文案)
+- ❌ 不动 ScenePreview 自动确认机制 (按任务要求保留 /scenes 端 60s 倒计时)
+
+---
+
+## Wave 16: RISK-T20-9 P0 useETA backend authoritative priority 反转 (2026-05-18)
+
+**模型**: Sonnet 4.6
+**改动文件 (3)**:
+- `frontend/src/hooks/useETA.ts` — 新增 estimatedRemainingSeconds top-priority 字段 + 优先级链重写
+- `frontend/src/components/create/StageC.tsx` — useETA 调用传 estimatedRemainingSeconds
+- `frontend/src/hooks/useETA.test.ts` — 追加 5 个 T20-9 单测 (共 9 个)
+
+**内容摘要**:
+- 根因: STAGE_BUDGET_SECONDS[image_generation]=1440 hardcoded (worst-case 29 shots)
+  19 shots 故事 ETA 偏快 ~100% (1440s vs 实际 380s)
+- 修复: UseETAInput 新增 `estimatedRemainingSeconds` (top priority, >= 0)
+  backendEtaSec 降级 legacy fallback (> 0 only)
+  STAGE_BUDGET 降级 last resort (保留兼容)
+- StageC.tsx useETA 调用传 estimatedRemainingSeconds: backendEstimatedSecondsRef.current
+- 等 Backend #1 T20-9 动态算法上线后，ETA 自动准确
+
+**验证**: npm build 0 errors / 20 routes + tsc --noEmit 0 errors / 0 越权
+
+---
+
+## Wave 15: RISK-T20-2 P1 ETA UX 复合 bug 三修 (2026-05-18)
+
+**模型**: Sonnet 4.6
+**改动文件 (2)**:
+- `frontend/src/hooks/useETA.ts` — Bug 1 sliding window + Bug 2 near-zero text + Bug 3 wrapping-up trigger
+- `frontend/src/hooks/useETA.test.ts` — 新建，4 test cases 覆盖 3 bug
+
+**内容摘要**:
+- Bug 1: `prevEtaSecRef` + MAX_STEP_PER_POLL=3s clamp → 不再硬切 ETA (12 min → 8 min 变为渐变)
+- Bug 2: rawSec<=0 → "即将完成"，rawSec<60 → "还需不到 1 分钟" (不消失)
+- Bug 3: 删除 elapsed≥30min 触发，改为 bgm/image_generation+95% 触发 (不误导)
+- backward compat: `actualElapsedSec` 保留在 UseETAInput 接口 (StageC.tsx 不需改)
+
+**验证**: npm build 0 errors / 20 routes + tsc --noEmit 0 errors / 0 越权
+
+---
+
+## Wave 12 mini: RISK-T17-7 "后台生成"按钮触发时机扩展 (2026-05-15 16:45)
+
+**模型**: Sonnet 4.6
+**改动文件 (1)**:
+- `frontend/src/components/create/StageC.tsx` — L1144-1163 按钮条件扩展
+
+**内容**: 按钮从仅 shot-gen 阶段显示，扩展为 storyboard_running + shot_generating + bgm 全程显示。
+具体条件: `(generationSubPhase === "shot-gen") || (generationSubPhase === "text-gen" && currentStage === "storyboard")`
+
+**验证**: npm build 0 errors / 20 routes / 0 越权
+
+---
+
+## Wave 11.3 收尾: StageC.tsx 集成 useETA hook (2026-05-14) [RISK-T17-5]
+
+**模型**: Sonnet 4.6, Frontend #2 接力
+**改动文件 (1)**:
+- `frontend/src/components/create/StageC.tsx`
+  - 新增 `import { useETA } from "@/hooks/useETA"` (L12)
+  - 删除旧 `estimatedMinutes` IIFE + `lastEtaSecondsRef` 声明 (原 L291-338 区域)
+  - 新增 `const { etaText } = useETA({ stage, progress, backendEtaSec })` 调用 (L291-295)
+  - ETA render 改为 `etaText !== null && <p>{etaText}</p>` (L988-993)
+
+**结果**: npm build 0 errors / 20 routes, 0 越权
+
+---
+
+## Wave 11.3 阶段 1: useETA hook 创建 + CreateContent.tsx atmosphere 修复 (2026-05-14) [RISK-T17-5]
+
+**模型**: Sonnet 4.6, Frontend #2
+**改动文件 (2)**:
+- `frontend/src/hooks/useETA.ts` — 新建 170 行 ETA hook
+- `frontend/src/app/create/CreateContent.tsx` — atmosphere 类型 normalize 修复 (pre-existing build error)
+
+**结果**: npm build 0 errors / 20 routes
+
+---
+
+## Wave 11.2: RISK-T18-G 404 storm 修复 (2026-05-14)
+
+**模型**: Sonnet 4.6, Frontend #1
+**改动文件 (3)**:
+- `frontend/src/lib/api.ts` — ApiFetchOptions + silentStatuses
+- `frontend/src/components/create/StageC.tsx` — charPreviewFetchingRef guard + silentStatuses
+- `frontend/src/app/create/CreateContent.tsx` — hydration silentStatuses
+
+**结果**: npm build 0 errors / 20 routes
+
+---
+
+## Wave 10 Phase 1B: RISK-T16-4/-7/-9/-3 frontend bug fixes (2026-05-14)
+
+**模型**: Sonnet 4.6 xhigh, ~60 min
+**改动文件 (4)**:
+- `frontend/src/types/create.ts` — PreviewScene 扩展
+- `frontend/src/components/create/StageC.tsx` — 4 处修改
+- `frontend/src/app/create/CreateContent.tsx` — 3 处修改
+- `frontend/src/components/create/StageD.tsx` — 1 处修改
+
+| RISK | P | 修复内容 |
+|------|---|---------|
+| T16-4 | P0 CRITICAL | PreviewScene 接口增加 12 字段 + index sig；handleConfirmScenes 改 full spread（含 action_beats）；CreateContent hydrate + Watcher 用完整 Stage 3 scenes |
+| T16-7 | P1 | StageD shots.length=0 时替换 return null 为完整错误 UI |
+| T16-9 | P1 | StageC 轮播提示 L52 改为"场景已生成，请确认是否符合预期" |
+| T16-3 | P1 | StageC 区分网络断线 vs 真实 pipeline 失败；online/offline 事件监听；amber 横幅代替红色错误页 |
+
+**关键决策**: userEdit 通过 `userEdit: undefined` 从 POST body 中 strip（不影响其他 LLM 字段透传）
+
+---
+
+## RISK-T15-11 window.onerror 增强 (2026-05-13 ~22:xx)
+
+**模型**: Sonnet 4.6, ~15 min
+**改动文件 (1)**: `frontend/src/app/layout.tsx` L83-175
+
+| 问题 | 根因 | 修复 |
+|------|------|------|
+| client.log uncaught stack 全空 | 媒体错误触发 window error event，e.error=null，无 JS stack | 新增 window.onerror handler 专门处理 JS 错误；listener 改为只处理媒体/resource 错误 |
+| promise-reject 显示 `{"isTrusted":true}` | MediaElement play() rejected，reason 是 Event 对象不是 Error | 增强 promise-reject handler，检测 Event 对象并提取 type/targetSrc/MediaError.code |
+
+npm run build: ✅ 0 errors, 20 routes
+
+---
+
+## RISK-T15-1 + RISK-T15-2 紧急双修 (2026-05-13 test15 现场)
+
+**模型**: Sonnet 4.6
+**耗时**: ~5 min（test15 backend stage=screenplay 期间完成，hot reload 生效）
+
+### 改动摘要
+
+| RISK | P | 文件 | 修复 |
+|------|---|------|------|
+| T15-2 | 🔴🔴 CRITICAL | `createUrl.ts` L118-131 | POST_CHAR_STAGES 移除 "screenplay"+"storyboard"，scenes checkpoint 恢复可达 |
+| T15-1a | 🔴 P0 | `StageC.tsx` L940 | "后台生成"按钮条件改为 shot-gen only |
+| T15-1b | 🔴 P0 | `StageC.tsx` L106-115 | text-gen 阶段 subtitle 改"请稍候" |
+| T15-1c | 🔴 P0 | `StageC.tsx` L120 | resolveSubtitle fallback 改"请稍候" |
+
+### grep verify
+
+- POST_CHAR_STAGES: screenplay/storyboard 0 残留 ✅
+- "可以选择后台生成": 仅 shot-gen 相关 4 行（正确） ✅
+
+---
+
+## TASK-WAVE7-FRONTEND 6 任务全闭环 (2026-05-13 16:55) — PM 代补
+
+**模型**: Sonnet 4.6 xhigh effort
+**耗时**: 25 min (vs 预估 2.5h)
+**Build**: npm run build 0 errors / 20 routes ✅
+
+### 6 任务完整列表
+
+| RISK | P | 文件 + 行号 | 修复 |
+|------|---|---|------|
+| T14-8 | 🔴 P0 | `CreateContent.tsx` L1252 | 加 `MID_PIPELINE_STAGES` watcher 监听 4 stages |
+| T14-6 | 🟡 P1 | `StageC.tsx` L704-712 | handleConfirmCharacters 后 `router.replace('/scenes')` |
+| T14-12 | 🟡 P1 | `StageC.tsx` + `DashboardContent.tsx` + `StoryGrid.tsx` + `StoryCard.tsx` | "后台生成"按钮 + Notification + 30s polling + ✨ 新故事完成角标 |
+| T14-3 | 🟢 P3 | `createUrl.ts` L118-125 | 2 set → 1 const dedup |
+| T14-2 | 🟡 P1 | 4 文件 user.X → user?.X | PM 自修 SettingsContent L27-28 |
+| T14-13 | 🟡 P1 | `StageB.tsx` | InconsistencyWarning interface + warning banner |
+
+### 验收
+
+- ✅ `npm run build` 0 errors / 20 routes
+- ✅ PM Explore-Frontend 审查通过（5/13 17:00）
+- ✅ PM 自修 SettingsContent.tsx L27-28（PM 简单跨角色补）
+- ✅ PM clean rebuild frontend 5 routes 200
+
+### 改动文件 (10)
+
+```
+frontend/src/app/create/CreateContent.tsx
+frontend/src/components/create/StageC.tsx
+frontend/src/components/create/StageB.tsx
+frontend/src/app/dashboard/DashboardContent.tsx
+frontend/src/components/dashboard/StoryGrid.tsx
+frontend/src/components/dashboard/StoryCard.tsx
+frontend/src/lib/createUrl.ts
+frontend/src/contexts/AuthContext.tsx
+frontend/src/app/settings/SettingsContent.tsx  (含 PM 自修)
+frontend/src/components/dashboard/UserMenu.tsx
+```
+
+---
+
+## TASK-T13-FRONTEND-ROUTING-FAMILY 8 任务全闭环 (2026-05-12 ~22:50)
+
+**完成时间**: 2026-05-12 ~22:50
+**模型**: Opus 4.7 + xhigh
+**验收状态**: npm run build 0 errors / 20 routes / TypeScript tsc --noEmit 无错误
+
+### 8 任务清单
+
+| # | Bug ID | P |
+|---|--------|---|
+| 1 | BUG-T13-REACT-ANTIPATTERN-STAGEC | P0 |
+| 2 | BUG-T13-CHARACTER-PAGE-NO-AUTO-JUMP | P0 |
+| 3 | BUG-T13-URL-PINGPONG-CHARACTER-READY-V2 | P0 |
+| 4 | BUG-T13-COMPLETED-NO-AUTO-JUMP | P0 |
+| 5 | BUG-T13-AUTH-FALSE-LOGOUT-ON-500 | P0 |
+| 6 | BUG-T13-PREVIEW-DIRECT-LOAD-SLOW | P0 |
+| 7 | DASHBOARD-PERF-N1 | P1 |
+| 8 | C1-frontend (project-level confirm-scenes alias) | P0 |
+
+### 改动文件 (4)
+
+**`frontend/src/contexts/AuthContext.tsx`** (BUG-T13-AUTH-FALSE-LOGOUT-ON-500):
+- 新增 state `tokenInvalid` — 仅在 401 真发生时设为 true
+- `isLoggedIn` 改为 `!!user || (!!token && !tokenInvalid)` — 5xx/网络/超时不再误判 logout
+- `useEffect` 重写为 `attemptHydrate(isRetry)` 函数，5xx 后指数退避重试 (2/4/8/16/30s)
+- 第一次失败仍 setLoadingUser(false)，避免页面永久 loading（旧逻辑）；retry 不动 loadingUser
+- login/register/logout 同步重置 tokenInvalid
+
+**`frontend/src/app/create/CreateContent.tsx`** (BUG-T13-CHARACTER/COMPLETED-AUTO-JUMP + URL-PINGPONG-V2 + PREVIEW-DIRECT-LOAD-SLOW):
+- 新增顶层 status watcher useEffect（5s 间隔，independent of StageC）
+  - status.status === 'completed' → force /preview
+  - status.stage === 'character_ready' + !charactersConfirmed → force /characters
+  - status.stage === 'scenes_ready' + !scenesConfirmed → force /scenes
+- watcher 用 4 个 ref 读最新 state（charactersConfirmed/scenesConfirmed/currentStage/generationStatus）避免 useEffect 频繁重启
+- hydrate Promise.all 增加第 4 个并行 fetch (BGM)，原本 BGM 串行在 chapter 后 — 现在 4 个并行
+
+**`frontend/src/components/create/StageC.tsx`** (REACT-ANTIPATTERN + URL-PINGPONG-V2 + C1-frontend):
+- StageC 父组件新增 useCallback `handleUpdatePreviewCharacter` / `handleUpdatePreviewScene` 替代 inline arrow（L728/740）
+- CharacterPreview render-time `console.log` (L926) 移到 `useEffect` (deps: characters.length, projectId, isLocked, paused, countdown)
+- 新增 `portraitMap`（每 render 算一次） — JSX 不再调 `resolvePortraitUrl(char)` 两次（一次条件判断一次 src）
+- 新增 `charactersConfirmedRef` — text-gen poller 的 character_ready guard 改读 ref 避免 closure 陈旧
+- handleConfirmScenes 改调 project-level alias `POST /projects/{uuid}/confirm-scenes`（C1）
+
+**`frontend/src/lib/createUrl.ts`** (URL-PINGPONG-V2):
+- reconcileBackendVsUrl 在 urlStage="characters" 分支加 `backendPastCharStage` guard
+- 仅当 `charactersConfirmed && backendPastCharStage`（backend 真过 character_ready 进 screenplay+）才 bounce 到 /generating
+- 防止 ADVANCED_STAGES heuristic 误判 charactersConfirmed=true 时把用户从 /characters 踢走
+
+### 验证结果
+
+- ✅ `npm run build` — 0 errors, 20 routes (Compiled successfully)
+- ✅ `npx tsc --noEmit` — 无 TypeScript 错误
+- ✅ 无新增 lint warning（仅 BgmPlayer.tsx:30 pre-existing useCallback 警告与本次无关）
+- ⚠️ Founder 手动 e2e (test14) 待 PM 协调
+
+### 关键决策
+
+**为什么用顶层 watcher（不靠 StageC 内部 poller）**：
+- StageC text-gen poller 在 React 错误边界 unmount / 组件未渲染 / 闭包陈旧时会失效
+- 顶层 watcher 是 belt-and-suspenders 安全网，独立于 StageC 生命周期
+- 5s 间隔（不是 2s）— StageC 仍是主，watcher 只补漏
+
+**为什么 tokenInvalid 比修 isLoggedIn 计算更好**：
+- 旧逻辑 `isLoggedIn = !!user`，5xx 后 user=null → 误踢 /login
+- 改成 `!!user || (!!token && !tokenInvalid)` 让 token 在场且未被 401 时仍是 logged in
+- 401 时 setTokenInvalid(true) — 显式信号告诉 AuthContext 真假分离
+
+**为什么 createUrl.ts 加 backendPastCharStage guard**：
+- 旧逻辑只看 charactersConfirmed flag（可能因 heuristic 误为 true）
+- 新逻辑要求 backendStage 真在 POST_CHAR_STAGES（screenplay+）才 bounce
+- 防止用户手动改 URL 被错误踢走
+
+### 待 PM 操作
+
+1. PM 代写 TEAM_CHAT 本段 + PENDING.md 标 ✅ 7 P0 + DASHBOARD-PERF-N1 + C1-frontend
+2. PM kill+restart frontend
+3. PM 通知 Founder 手动 e2e test14
+
+### 高风险文件回归测试建议
+
+- `StageC.tsx` CharacterPreview 重构 portrait 渲染逻辑（portraitMap）— 重点测 portrait 显示
+- `AuthContext.tsx` isLoggedIn 算法改 — 重点测 401/5xx/login/logout 4 路径
+
+---
+
+## TASK-T13-FRONTEND-A2-URL-FIX — Console Proxy 硬编码 localhost 修复 (2026-05-12)
+
+**完成时间**: 2026-05-12
+**验收状态**: npm run build 0 errors, 20 routes; build artifact 确认 env var 已正确内联
+
+### 根因
+
+`layout.tsx:26` 原始代码 `var ENDPOINT = 'http://localhost:8000/api/_client_log';` 硬编码，生产环境因 CORS 失败导致日志管道全量失效，违反 Founder "全量捕获不丢任何一条" 硬性要求。
+
+### 修改文件 (3)
+
+**`frontend/src/app/layout.tsx`**:
+- 新增 `const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';`（Server Component 构建时展开）
+- `CLIENT_LOG_PROXY_SCRIPT` 模板字符串内 ENDPOINT 改为 `${JSON.stringify(API_BASE)} + '/api/_client_log'`
+- 更新注释说明 NEXT_PUBLIC_API_URL 构建时展开原理 + JSON.stringify 引号转义保证
+
+**`frontend/.env.local`** (新建，gitignore):
+- `NEXT_PUBLIC_API_URL=http://localhost:8000`
+
+**`frontend/.env.production`** (新建，可入仓库):
+- `NEXT_PUBLIC_API_URL=https://prefaceai.mov`
+
+### 验证
+
+- `npm run build` 0 errors, 20 routes
+- build artifact (`.next/standalone/.next/server/app/verify-email.html`) 确认 `var ENDPOINT = "http://localhost:8000" + '/api/_client_log';` 已正确解析
+
+### 部署注意
+
+生产 Docker build 时 `next build` 自动读 `.env.production`。无需额外 build arg。VPS 重新 rsync + Docker rebuild 即生效。
+
+---
+
+## Wave 6 — BUG-SCENES-CONFIRM-MISSING (P0) + URL-PINGPONG (P1) + PROGRESS-LIST-SKIP (P2) (2026-05-11)
+
+**完成时间**: 2026-05-11
+**验收状态**: npm run build 20 routes 0 errors
+
+### 改动文件 (2)
+
+**`frontend/src/app/create/CreateContent.tsx`**:
+- `ProjectDetailResp` 新增 `scenes_confirmed?: boolean` (B58 follow-up)
+- hydrate: 旧 heuristic (`ADVANCED_STAGES.has(...)`) 替换为 `project.scenes_confirmed === true` 真读字段
+- 加 [B58] console.log 追踪
+
+**`frontend/src/components/create/StageC.tsx`**:
+- BUG-URL-PINGPONG: `character_ready` 分支加 `state.charactersConfirmed` guard（已确认时跳过 char-preview dispatch）
+- `handleConfirmScenes`: 升级 async，POST `/api/projects/{id}/chapters/1/confirm-scenes` 传 modified_scenes
+- ScenePreview 倒计时 20s → 60s（Founder 决策）
+- ScenePreview 按钮文案 "开始绘制" → "确认场景，继续"
+- BUG-PROGRESS-LIST-SKIP-SHOT: `generationLogRef` + gap-fill 逻辑合成跳号条目
+- 添加 `state.charactersConfirmed` 依赖注释
+
+---
+
+## Wave 5 — B49+B50+B48 (2026-05-11)
+
+**完成时间**: 2026-05-11 17:18（PM 代写，前端权限受限）
+**验收状态**: npm run build 20 routes 0 errors, BUILD_ID `nyVs1UIUpv8EcHThyi1I6`
+
+### 改动文件 (2)
+
+**`frontend/src/app/create/CreateContent.tsx`**:
+- B49: `ProjectDetailResp` 加 `characters_confirmed?: boolean`
+- B49: hydrate 优先读 `project.characters_confirmed === true`（旧 ADVANCED_STAGES 作 fallback）
+
+**`frontend/src/components/create/StageC.tsx`**:
+- B50: ScenePreview hasScenes=false 时倒计时不启动 + scenes 到来时重置 20s（B42+B50 双 gate）
+- B48: 右上角 RotateCcw 按钮移除，统一"调整 / 重生"入口 + placeholder 提示
+
+---
+
+## B33 frontend — 情绪基调移到 Stage A (2026-05-09)
+
+**完成时间**: 2026-05-09
+**验收状态**: npm run build 20 routes 0 errors, BUILD_ID mtime 2026-05-09 15:05
+
+### 改动文件 (4 files)
+
+**`frontend/src/types/create.ts`**
+- `CreateState` 加 `userSelectedMood: string | null` 字段
+- `CreateAction` 加 `SET_USER_SELECTED_MOOD` action type
+
+**`frontend/src/contexts/CreateContext.tsx`**
+- `initialState` 加 `userSelectedMood: null`
+- reducer 加 `SET_USER_SELECTED_MOOD` case → `{ ...state, userSelectedMood: action.payload }`
+
+**`frontend/src/app/create/CreateContent.tsx`**
+- import 加 `Palette` (lucide), `MOOD_OPTIONS` (types/create)
+- `ProjectDetailResp` 接口加 `user_selected_mood?: string | null`
+- StageA render: AspectRatioSelector 后新增情绪基调 chips 区域（8 选项，可取消选中，delay 0.225）
+- `handleSubmit` POST /projects/ body 加 `user_selected_mood: state.userSelectedMood || null`
+- `hydratePayload` 加 `userSelectedMood: project.user_selected_mood ?? null`
+
+**`frontend/src/components/create/StageB.tsx`**
+- 移除 `Palette` import (lucide)
+- 移除 `MOOD_OPTIONS` import
+- 移除"情绪基调"整个 `<motion.section>` 区域（Option A 完全删除）
+- `confirm-outline` body 加 `user_selected_mood: state.userSelectedMood ?? null`（把 Stage A 选的 mood 随大纲确认一起持久化）
+
+### 验收清单
+- Stage A 显示情绪基调选择器（8 个 chip，可单选/取消选）
+- POST /projects/ body 含 `user_selected_mood`（中文值或 null）
+- StageB outline 编辑页无情绪基调选择器
+- npm run build 0 errors (20 routes)
+- 不破坏 D.21/D.23/D.24/D.25/B26/B27/B28 修复
+
+---
+
+## P0 全维度修复: B26 portrait fallback + B27 /scenes 路由 + B28 timeout + 衍生问题 (2026-05-09)
+
+**完成时间**: 2026-05-09
+**验收状态**: npm run build 20 routes 0 errors
+
+### Bug 修复清单
+
+**B26 P1 — 角色预览页空白（portrait 不显示）**
+- 根因: `CharacterPreview` 组件没有 component-level portrait fallback；silhouette 使用 `text-text-muted/30`（dark theme 下接近不可见）
+- 修复文件: `frontend/src/components/create/StageC.tsx`
+  - L(imports): 新增 `ImageOff` import from lucide-react
+  - 新增 `portraitErrors` state: `Record<string, boolean>`
+  - 新增 `resolvePortraitUrl(char)` useCallback — 先用 `char.portraitUrl`，无则构造 `/static/outputs/{projectId}/character_refs/{char.id}_portrait.png` static fallback
+  - portrait img 渲染条件从 `char.portraitUrl && !portraitErrors[char.id]` 改为 `resolvePortraitUrl(char) && !portraitErrors[char.id]`
+  - img `src` 改为 `resolvePortraitUrl(char) as string`
+  - 新增 img `onError`: 记录 warning + 设 `portraitErrors[char.id] = true`
+  - silhouette 增强: `text-text-muted/30` → `text-text-muted/50` + `bg-bg-secondary/60` 背景 + 显示 char.name + `ImageOff` 错误图标
+
+**B27 P1 — /scenes URL 显示 spinner 而非进度条（backend 已推进到 Stage 3+）**
+- 根因: `reconcileBackendVsUrl()` 对 URL=/scenes + `scenesConfirmed=false` 的所有情况都返回 `"scenes"`，但当 backend 已经过了 `character_ready` 进入 `screenplay/storyboard` 等阶段时，scene-preview 不再可操作，应跳到 `/generating`
+- 修复文件: `frontend/src/lib/createUrl.ts`
+  - 新增 `POST_CHAR_STAGES` Set: `["screenplay", "storyboard", "image_preparation", "image_generation", "bgm", "completed"]`
+  - `/scenes` 分支加判断: `if (backendStage && POST_CHAR_STAGES.has(backendStage)) return "generating";`
+
+**B28 P1 — Stage 3 LLM 阻塞 DB 254s，触发前端 30s timeout 误报 "加载项目失败"**
+- 根因: `PROJECT_FETCH_TIMEOUT_MS = 30000`，但 Stage 3 ScreenplayWriter 实测单 LLM 调用可达 254.8s，期间 DB row-level lock 导致 GET /projects 超时
+- 修复文件: `frontend/src/app/create/CreateContent.tsx`
+  - `PROJECT_FETCH_TIMEOUT_MS`: 30000 → 120000
+  - `HYDRATE_CHAPTER_TIMEOUT_MS`: 25000 → 90000
+  - 新增 `hydrateSlowWarning` state + 15s 后显示 "AI 正在创作中，服务器响应稍慢，请耐心等待..."
+  - timeout 兜底 error message: "加载项目失败，请刷新重试" → "服务器正忙（AI 正在创作中），请稍后刷新重试"
+
+**衍生问题 1 — URL 切换触发全量 hydration（1-2 min spinner loop）**
+- 根因: active create session 的 state→URL push（`lastPushedUrlRef.current = desiredUrl`）触发 URL 变化 effect，但 `hydratedFor.current` 从未在 active session 路径设置，导致每次 subPhase 切换都重走完整 hydrateProjectFromBackend
+- 修复: 在 hydration effect 入口加 `isOurOwnPush` guard:
+  ```typescript
+  const isOurOwnPush = lastPushedUrlRef.current === currentUrl;
+  if (isOurOwnPush && state.projectId === urlProjectUuid) {
+    setHydrating(false); return;
+  }
+  ```
+
+**衍生问题 3 — ETA 在 Stage 1/2 不显示**
+- 根因: `calcEtaMinutes()` 在 `progress < 10` 时直接 return null，但 story_generation/character_design 阶段 progress 长时间 < 10%
+- 修复: 在 `progress < 10` 分支按 currentStage 给 stage-based 默认值: `story_generation` → 8 min，`character_design` → 7 min
+
+**衍生问题 2 — 进度倒退（F5 后 19% → 1%）**
+- 根因: F5 触发 hydration，hydration 完成后 `START_GENERATION` reset progress → 0，加上 `initialProgressRef.current > 0` guard 防止比当前 state.generationProgress 低的值写入
+- 不修: 该问题与 START_GENERATION reset 逻辑相关，已有 `initialProgressRef` guard 保护，完整 fix 需 StageC refactor，放下期
+
+---
+
+## D.25 — B24 TASK-BGM-BUTTON-COPY: BGM 按钮文案区分 (2026-05-08)
+
+**完成时间**: 2026-05-08
+**验收状态**: npm run build 20 routes 0 errors
+
+**问题**: 预览页 BGM 区域"换一首"+"重新生成"用户看不出区别
+
+**实际语义**:
+- 换一首 = 切换 meta_version（mixed ↔ en），换调性/语言风格，5 credits
+- 重新生成 = 同 meta_version 再调 Haiku+Mureka，同调性变奏，10 credits
+
+**修改文件 (1)**:
+
+**`frontend/src/components/create/BgmPlayer.tsx`** L392-410:
+- "换一首" → "换种风格"，新增 title tooltip "切换 BGM 风格类型（mixed 混合版 ↔ en 英文版），换不同调性和语言风格"
+- "重新生成" → "再来一首"，新增 title tooltip "保持相同风格，用同样的调性和语言再生成一首变奏版本"
+- credits 说明文字改为: "换种风格 消耗 5 credits（试不同调性） · 再来一首 消耗 10 credits（同款变奏）"，关键词加粗
+
+---
+
+## D.24 — B21 TASK-REGENERATE-FRONTEND-CACHE-BUST: regenerate 图片缓存穿透 (2026-05-08)
+
+**完成时间**: 2026-05-08
+**验收状态**: npm run build 20 routes 0 errors
+
+**问题**: 重新生成镜头后，浏览器从 disk cache 返回旧图，用户看不到新图
+
+**修改文件 (1)**:
+
+**`frontend/src/components/create/StageD.tsx`** L44-75:
+- 新增 `bustCache(url: string)` 辅助函数 — 如果 imageUrl 已含 `?v=` 参数（backend B16 新格式），直接使用；否则追加 `?v=Date.now()` 强制浏览器发起新 HTTP 请求
+- handleRegenerate: 将 result.imageUrl 过 bustCache 后再 dispatch REGENERATE_SHOT_SUCCESS
+- handleAdjust: 同样过 bustCache（调同一 regenerate endpoint）
+- toast 文案: "已重新生成"（原"重新生成完成"）
+- loading/disabled 状态已有（L376-385 regeneratingId + adjusting），本次不改
+
+**向后兼容**: Backend B16 未完成时，旧 backend 返回不带 ?v= 的 URL，前端自动加上 ?v=Date.now()，无破坏性影响
+
+---
+
+## D.23 — TASK-AUTO-ROUTE-PREVIEW: pipeline 完成后自动跳 /preview (B10 路由 bug) (2026-05-08)
+
+**完成时间**: 2026-05-08
+**验收状态**: npm run build 20 routes 0 errors
+
+**问题 (Founder test7 实测)**:
+- Pipeline 完整跑完，chapter status = 'completed'，18 张 shot + BGM 全就绪
+- Frontend URL 仍停在 `/generating` 或 `/characters`，显示 spinner
+- Founder 手动改 URL 末尾为 `/preview` 才进入预览页
+
+**Root Cause 分析 (三路径)**:
+
+1. **text-gen 路径**: text-gen 轮询检测到 `status.status === "completed"` 时，原代码进 `character_ready` 分支（`if (status.stage === "character_ready" || status.status === "completed")`），触发角色预览而非直接跳 /preview。这是主要 bug。
+
+2. **char-preview / scene-preview 路径**: 用户在角色确认/场景确认检查点时，text-gen 和 shot-gen 轮询都不运行（两者各自 guard 退出）。如果 backend 在此期间完成，前端无任何机制检测 completed 状态，用户永久卡在检查点。
+
+3. **dashboard 进入路径**: `handleContinue` 路由到 `/create`（Stage A），没有带 projectId，hydration 无法运行，reconcileBackendVsUrl 不触发，completed 项目无法自动到 /preview。
+
+**修复文件 (2)**:
+
+**`frontend/src/components/create/StageC.tsx`**:
+- L251-304: 新增 `finalizeAndGoToPreview` useCallback（从 shot-gen effect 内提升至组件级），单一 `completedRef` guard 防止双执行
+- L306-341: 新增 D.23 checkpoint watcher effect — `char-preview` / `scene-preview` 时每 5s 轮询 job status，检测到 completed → 调 finalizeAndGoToPreview
+- L430-436: text-gen 轮询 `status.status === "completed"` 判断从原来的 `character_ready || completed` 联合条件中分离，单独优先处理 completed → 直接调 finalizeAndGoToPreview，不再进角色预览
+- 两个 useEffect dependency 数组均添加 `finalizeAndGoToPreview`
+- shot-gen effect 内移除内联 finalizeAndGoToPreview 函数定义，使用组件级 callback
+
+**`frontend/src/app/dashboard/DashboardContent.tsx`**:
+- L31-33: `handleContinue` 从 `router.push("/create")` 改为 `router.push(\`/create/${storyId}/outline\`)`，触发 hydration → reconcileBackendVsUrl → 对 completed 项目自动 redirect 到 /preview
+
+**触发条件**: pipeline 完成时（chapter status='completed' / stage='completed' / progress>=100 任一），UI 在以下三个位置均自动跳 /preview：
+1. 正在 text-gen 等待时（轮询直接检测）
+2. 正在 char-preview 或 scene-preview 检查点时（新 checkpoint watcher）
+3. 从 dashboard 进入 completed 项目时（hydration reconcile）
+
+**验证**: npm run build 20 routes, 0 errors
+
+---
+
+## 2026-05-08
+
+### D.22 — TASK-FRONTEND-STALE-COPY: 副文案 stage 联动修复 (2026-05-08)
+
+**完成时间**: 2026-05-08
+**验收状态**: ✅ npm run build 20 routes 0 errors
+
+**问题**: generation 页面副文案（"先喝杯可可，接下来要确认角色"）在 Stage 4/5 阶段（剧本编写 25%、真生图 65%）仍然显示，用户走完角色确认后副文案内容已过时，体验断层。
+
+**根因**: 原实现用固定字符串 `FIXED_TIP`，条件仅为 `generationSubPhase === "text-gen"`，不感知 `currentStage` 变化，导致 screenplay/storyboard/image_generation 等阶段全显示同一条"确认角色"文案。
+
+**修复文件**: `frontend/src/components/create/StageC.tsx`
+
+**改动行号**:
+- L19-45: 删除 `const FIXED_TIP = "..."` 固定字符串，替换为 `getProgressTip(stage, subPhase)` 函数
+- L653-664: 渲染条件从 `generationSubPhase === "text-gen"` 扩展为 `text-gen || shot-gen`，内容由 `getProgressTip()` 动态决定
+
+**Stage → 副文案 mapping**:
+
+| Stage | 副文案 |
+|-------|-------|
+| null / story_generation / character_design | "稍后需要你确认角色和场景哦～可以先喝杯可可，保持页面打开就好" |
+| screenplay / storyboard | "剧本和分镜马上准备好，角色确认结束后画面就开始了～" |
+| image_preparation / image_generation | "画面正在一张一张生成中，马上就能看到精彩成果！" |
+| bgm / music | "BGM 配乐处理中，最后一步啦，再等一小会儿～" |
+| character_ready / other | null（不显示） |
+
+**验证**: npm run build 20 routes 0 errors ✅
+
+---
+
+### D.21 — P0 hydrate 家族 v3: character preview 空白 + /story 400 + spinner 卡住 三合一修复 (2026-05-08)
+
+**完成时间**: 2026-05-08
+**验收状态**: ✅ npm run build 20 routes 0 errors
+
+**Bug 现场 (xuhuastorytest7, pixar_3d x 3:4 x 3 角色)**:
+1. Stage 2 完成后切到角色预览页面完全空白（只有确认按钮 + 倒计时，无任何 portrait）
+2. /chapters/1/story 在 chapter.status="generating_story" 时返回 400，D.19 只 catch 了 404，400 被 Promise.all .catch() 吞掉但没报 warn
+3. 切换阶段时 spinner 卡 1-2 min（backend DB 连接超时导致每个 API 调用 30-52 秒）
+
+**根因**:
+- `/chapters/1/story` 在 chapter 还没有 `full_script` 时返回 400（"故事尚未开始生成"/"故事正在生成中"）
+- P0-3 fix (Wave 1.1) 在 `character_ready` handler 里 catch 了 `/story` 400，但 fallback 逻辑使用 outline 里的角色数据，而 outline 里没有 `portrait_url`（portrait 写在 chapter.characters_json）
+- 同样，`hydrateProjectFromBackend` 里 storyData=null 时，previewCharacters 全无 portraitUrl
+- Backend portrait 文件路径有规律：`/static/outputs/{uuid}/character_refs/{char_id}_portrait.png`，char_id = "char_001"/"char_002" 等（confirmed_outline._map_outline_to_response L107）
+
+**修复 (2 文件)**:
+
+1. **`frontend/src/components/create/StageC.tsx`** — `character_ready` handler L321-364:
+   - catch 里加 `console.warn` 日志（400/404 都是 routine）
+   - 新增 `buildStaticPortraitUrl(charId)` helper: `char_id` 格式合法 (`/^char_\d+/`) 时返回 static URL
+   - portraitUrl fallback chain: `portraitByName[c.id] ?? portraitByName[c.name] ?? buildStaticPortraitUrl(c.id) ?? c.portrait_url ?? null`
+
+2. **`frontend/src/app/create/CreateContent.tsx`** — `hydrateProjectFromBackend`:
+   - L471-480: 新增 `withTimeout<T>(promise, ms, fallback)` helper（D.21 超时保护）
+   - L503-527: Step 1 project fetch 加 10s timeout（超时 → load error，不永久 spinner）
+   - L532-568: Step 2 chapter fetches 加 8s timeout（超时 → 用默认值继续）
+   - L638-658: `buildStaticPortraitUrl` helper + previewCharacters portrait fallback chain
+   - L706: bgm fetch 加 4s timeout
+
+**修复原理**:
+- static URL (`/static/outputs/{uuid}/character_refs/char_001_portrait.png`) 经 `toAbsoluteUrl()` 转为 `http://127.0.0.1:8000/static/...`
+- Backend 已确认 HTTP 200 可访问（curl 测试通过）
+- 若 portrait 文件存在 → img 正常显示；若不存在 → img 404 → onError → 静默降级（浏览器处理）
+- withTimeout 让 hydrate 在 backend DB 慢时不永久 spinner，而是用默认值继续渲染
+
+**不影响范围**: D.19/D.20 outline 修复完整保留；禁改文件 lib/url.ts/lib/createUrl.ts 均未触碰
+
+---
+
 ## 2026-04-28 16:30
 
 ### TASK-T6-FIXBATCH Wave 2 Agent E — R7-1 Dashboard 列表前端读字段 ✅
@@ -1305,3 +2206,49 @@ Phase D — 2个高复杂度页面:
 
 **待 Backend 配合**: chapter.characters_json 加 portrait_url 字段（UX-1 后端部分）
 
+
+---
+
+## 2026-04-30 11:00 Wave 5.1 归档（PM 代更，权限 600）
+
+D.14 三处 banner 共享 useStageLock + D.13 hydrate guard + D.16 mood string|null + T-1 friendlyMessage + StageD onError safetyAdvice + R7-2 favorite/share/公开页 frontend + /s/[token] Server Component。详见 current.md 19:30 + Wave 5.2 已部署生产。
+
+---
+
+## D.19 — hydrateProjectFromBackend chapter 404 误判黑屏 hotfix v1 [2026-04-30 15:20]
+- 改动: frontend/src/app/create/CreateContent.tsx L484-708
+- 重构 hydrate 为两步: project 单独 try/catch (唯一 notFound 触发点) + chapter Promise.all 各自 .catch 吞 404
+- 外层 catch 改 notFound=false (generic 错误，避免 chapter 404 被误判为项目不存在)
+- 验证: npm run build 20 routes 0 errors
+
+## D.20 — StageB outline=null 黑屏 hotfix v2 [2026-04-30 17:09]
+- 改动:
+  - frontend/src/app/create/CreateContent.tsx L775-792 (outline recovery via POST generate-outline)
+  - frontend/src/components/create/StageB.tsx L130 (null guard 改 loading spinner '正在加载故事大纲...')
+- Root cause: backend ProjectDetail 不返 raw_outline_json → hydrate state.outline=null → StageB 空渲染黑屏
+- 修复: hydrate 后 outline=null && stage=outline 自动调幂等 generate-outline 恢复 outline，注入 dispatch HYDRATE_FROM_BACKEND
+- 验证: npm build 20 routes 0 errors + Founder F12 console 真见 [hydrate] outline recovered successfully
+- 配套: Backend 同期完成 raw_outline 字段+幂等 (PM 派 Option C 后置永久解法)
+- 部署踩坑: frontend pid 36674 启动 15:29 < hotfix v2 17:09 → 必须重启加载新 build (PM 17:44 发现+处理，新 pid 49226)
+
+---
+
+### 2026-05-09 16:44-17:00 — B36+B27+B28+B37 修复 (PM 代写)
+
+参考 frontend-progress/current.md 17:00 段
+
+---
+
+### 2026-05-11 10:41-10:48 — B36 v3 + B42 + B44 + B46 全闭环 ✅（PM 代写）
+
+参考 frontend-progress/current.md 10:41-10:48 段。两次 agent spawn:
+- Wave 1 (a50d2d1727de1db27): B36 v3 + B44 + B46
+- Follow-up (ae2ccec81c3cedc50): B42 scenes/endings/hasScenes
+
+PM 干净重启 frontend (PID 43584 / next-server 43604) BUILD_ID `CDKVfwbPoTu04NXtBsdFS`
+
+---
+
+### 2026-05-11 17:18 Wave 5 — B49+B50+B48 全闭环 ✅（PM 代写）
+
+参考 frontend-progress/current.md 17:18 段。BUILD_ID `nyVs1UIUpv8EcHThyi1I6`。

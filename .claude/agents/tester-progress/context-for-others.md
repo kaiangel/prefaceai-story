@@ -1,12 +1,294 @@
 # Tester Agent - 给其他Agent的上下文
 
-> **最后更新**: 2026-04-29 [Tester]
+> **最后更新**: 2026-05-22 [Tester]
 
 ---
 
-## 当前状态
+## 当前状态 (2026-05-22)
 
-Wave 3.6 R7-3 独立复测完成 — PASS。R7-3 修复确认有效，可进入 Wave 4 DevOps 部署。
+**Wave 7+8 综合 regression + T22-NEW-7 ID format robustness 全完成 ✅**
+
+### pytest 真自跑结果 (13 test files, KEY_LEARNINGS #47 铁律)
+
+| 文件 | 结果 | 内容 |
+|------|------|------|
+| test_identity_anchor_cross_genre_baseline.py | 105/105 PASS | Layer 1 baseline (0 退化) |
+| test_first_batch_chars_not_zero.py | 17/17 PASS | T22-NEW-7 Wave 7 |
+| test_llm_fallback_chain.py | 14/14 PASS | T22-NEW-4 Wave 7 |
+| test_apply_identity_anchors_location_wire.py | 7/7 PASS | T22-NEW-6 Wave 7 |
+| test_schema_generic_fallback_arch.py | 83/83 PASS | T22-NEW-9 Wave 8 |
+| test_t22_new_5_r4_2_removed.py | 24/24 PASS | T22-NEW-5 Wave 8 |
+| test_identity_anchor_injector.py | 25/25 PASS | Layer 1 regression |
+| test_prompt_validator.py | 28/28 PASS | Layer 1 regression |
+| test_identity_anchor_extraction.py | 74/74 PASS | Layer 1 regression |
+| test_t21_new_3_to_7_backend.py | 51/51 PASS | T21 regression |
+| test_t21_digital_virtual_fallback.py | 25/25 PASS | T21 regression |
+| test_t21_new_2_humanoid_fallback_wave2.py | 16/16 PASS | T21 regression |
+| **test_t22_new_7_id_format_robustness.py (NEW)** | **65/65 PASS** | T22-NEW-7 ID format |
+| **综合** | **534/534 PASS** | **0 FAIL, 0 退化** |
+
+elapsed: 0.84s, API calls: 0
+
+**PM 可安排**: 终审 → e2e test22 重跑视觉验证 → Founder 验证 → 内测启动
+
+---
+
+## T22-NEW-7 ID format mismatch — 修后真实证
+
+**T22-NEW-7 根因** (KEY_LEARNINGS #56 教训 A): Stage 4 LLM 在同一故事内不同 shot 用不同格式输出 `characters_in_scene`:
+- Shot 1-3: `['Coral']` (name_en 格式)
+- Shot 4-21: `['char_001']` (char_id 格式)
+
+旧代码只匹配 `c["id"]` → 前 3 shot chars=0 → Coral CHARACTER ANCHORS 未注入 → Seedream 弱引用 → Shot 2 蓝发人腿。
+
+**Wave 7 修复** (`resolve_characters_in_shot` 三路 fuzzy match):
+```python
+for fld in ("id", "name_en", "name"):
+    val = c.get(fld)
+    if isinstance(val, str) and val.strip():
+        match_keys.append(val.strip().lower())
+if any(k in shot_ids_norm for k in match_keys):  # 三路任一命中即匹配
+```
+
+**test_t22_new_7_id_format_robustness.py 实证** (65 cases):
+- Format A (char_id): 19/19 types PASS
+- Format B (name_en): 19/19 types PASS — T22-NEW-7 修后真实证，前 3 shot 不再 chars=0
+- Format C (mixed):   19/19 types PASS — 混合场景全 resolve
+- Boundary (8): empty/None/no-match/dedup/case-insensitive/WARNING 全覆盖
+
+---
+
+## Wave 7+8 验证总结 (给 @PM @Founder)
+
+### T22-NEW-7 (chars=0 修) — 实证 PASS
+
+resolve_characters_in_shot 三路 fuzzy match 跨 19 types × 3 ID formats 全通过。
+前 3 shot 不再 chars=0，CHARACTER ANCHORS 注入完整。
+
+### T22-NEW-4 (LLM fallback 三层) — 实证 PASS
+
+LLMFallbackChain (Haiku → Gemini → Sonnet) 14/14 PASS。
+AdjustCharacter / Shot regen / BGM Haiku 529 时自动 fallback，不再直接 500。
+
+### T22-NEW-6 (location wire) — 实证 PASS
+
+location 字段正确透传到 inject_identity_anchors()，LOCATION ANCHOR 注入完整。
+
+### T22-NEW-9 (通用 fallback 架构) — 实证 PASS
+
+pipeline_schemas.py 19→4 entries + has_humanoid_fallback() 通用函数。
+83/83 cases 全过，含 strict types (animal/vehicle_character) 正确拒绝 humanoid fallback。
+
+### T22-NEW-5 (R4-2 移除) — 实证 PASS
+
+scene_review 状态机已移除，24/24 cases。Stage 3→Stage 4 无 wait loop 阻塞。
+
+### 0 退化确认
+
+105 Layer 1 baseline + 74 AI-ML extraction + 51 T21 + 25 T21-DV + 16 T21-HFW2 全 PASS。
+Wave 7+8 改动未破坏任何现有功能。
+
+---
+
+## Layer 1 跨题材 Baseline Regression 设计方案 (准备中)
+
+### 背景 (DEC-048, Founder 5/21 22:55 决策)
+
+test22 fairytale 暴露 T22-NEW-3 P0 灾难: Stage 4 LLM 真 0 注入 character physical 字段到 image_prompt。
+- 珊瑚 char_001 schema `hair_color="deep sea-green"` → 但 Stage 4 生成的 shot 9-14 全 6 张都写 `"dark hair"`
+- 这是 CLAUDE.md "角色一致性产品生命线" 铁律的 100% miss
+- 真根因: storyboard_director.py L229 真 0 注入 char physical；storyboard_prompts.py L904 仅"建议"而非"强制"
+
+Founder 决策: 不走 Layer 2 hotfix patch，走 Layer 1 架构层治本 (Identity Anchor Framework v1.0 真实施)。
+
+### Tester 的角色
+
+等 AI-ML + Backend Layer 1 实施完成后执行验证，重点是：
+1. **grep validation**: 验证所有 shot prompt 真 100% 含 character schema 关键字
+2. **跨题材矩阵**: 19 character_types × 5 styles 覆盖
+3. **回归不退化**: 与 wave 5 前基线对比，确认 260 PASS 基线无退化
+
+### 19 character_types × 5 styles 矩阵设计
+
+**19 character_types (来自 CharacterDesigner schema)**:
+1. human
+2. animal (realistic)
+3. anthropomorphic_animal (拟人动物，如小熊、小鸟)
+4. fantasy_creature (精灵、龙等)
+5. supernatural (鬼魂、吸血鬼)
+6. undead (僵尸)
+7. mythological (神明、神仙)
+8. robot
+9. ai_entity
+10. digital_virtual
+11. hybrid (半人半兽)
+12. alien
+13. elemental (元素精灵，如火精灵)
+14. aquatic (水生生物，如美人鱼)
+15. anthropomorphic_plant (植物拟人)
+16. insect (昆虫类)
+17. object_personified (物品拟人)
+18. cosmic_entity (宇宙存在)
+19. historical_figure (历史人物)
+
+**5 styles (代表性选取)**:
+1. realistic (写实)
+2. anime (日式动画)
+3. children_book (儿童绘本/水彩)
+4. cyberpunk (赛博朋克)
+5. ink (中国水墨)
+
+### grep Validation 标准 (每个 shot prompt 必须含以下字面值之一)
+
+对于 human/anthropomorphic_animal/fantasy_creature 等有 physical 字段的类型:
+- `hair_color` 字面值 OR 实际颜色词 (e.g., "sea-green hair", "ash-blonde", "silver-white")
+- `skin_tone` 字面值 OR 实际肤色词 (e.g., "fair skin", "sun-tanned", "pale")
+- 至少 1 个 `distinctive_marks` 描述 (如果 schema 有)
+
+具体 grep pattern:
+```bash
+# 检查 shot prompt 是否含具体发色 (拒绝 generic "dark hair" / "black hair" 而 schema 是其他颜色)
+grep -c "hair" shot_prompt.txt  # 应 >= 1
+
+# 检查发色是否与 schema 匹配
+python -c "
+import json
+schema_hair = char['physical']['hair_color']  # e.g., 'deep sea-green'
+assert schema_hair.split()[0] in shot_prompt or schema_hair in shot_prompt
+"
+```
+
+### 测试用例设计
+
+**优先级 1 (test22 复现，必跑)**:
+- fairytale + children_book: char_type=aquatic, 验证 hair_color=sea-green 真注入
+- fairytale + ghibli: char_type=anthropomorphic_animal, 验证 species+fur_color 真注入
+
+**优先级 2 (跨题材扩展)**:
+- cyberpunk + anime: char_type=robot, 验证 body_material/color 真注入
+- horror + realistic: char_type=supernatural, 验证 skin_tone/distinctive_marks 真注入
+- wuxia + ink: char_type=human, 验证 physical 字段全含
+
+**优先级 3 (long-tail)**:
+- 任意题材: char_type=elemental/cosmic_entity, 验证非人类 anchor 注入
+- 验证 props signature (道具描述) 是否一致 (如 shell harmonica)
+
+### 执行方式
+
+不生成真实图片 (避免 API 成本)，只验证 Stage 4 LLM 生成的 image_prompt 文本：
+1. 对测试故事运行 Stage 1-4 (LLM)
+2. 提取生成的 `storyboard_json.shots[i].image_prompt`
+3. 对每个 shot 执行 grep validation
+4. 输出 "schema_key 真存在率" 报告 (目标: 100%)
+
+### ETA
+
+- 设计: 已完成 (本文档)
+- 执行: ~3-4h (等 Layer 1 实施完成后)
+- 需要: PM 派工通知 + AI-ML/Backend Layer 1 代码完成
+
+---
+
+## [2026-05-08] 最新回归测试基线
+
+| 测试项 | 结果 | 日期 |
+|--------|------|------|
+| pytest 全套 | 295 PASS / 3 fail (pre-existing) / 6 errors (pre-existing) | 2026-05-08 |
+| 3人场景一致性 | B16 hotfix 后 PIL 实测 shot_01.png 1664x2218 PASS | 2026-05-08 |
+| 参考图传递链 | 角色一致性高风险文件 5/8 全零改动 | 2026-05-08 |
+| Wave 3 T20 系列 | 260 PASS (后续 Wave 波加) | 2026-05-20 |
+
+**注**: Wave 1-5 期间 Backend/AI-ML 新增了大量 test 文件，基线已升至 260+ PASS。
+Tester 最后一次实跑基线: 5/08，295 PASS。Wave 3 之后 Backend 自跑测试维护。
+
+---
+
+## [2026-05-08] TASK-T8-INTEGRATION-VERIFY 给 @Backend 的信息
+
+### B16 P1 Bug — regenerate_shot 返回 500（Seedream 格式不匹配）
+
+**现象**: POST /api/projects/{uuid}/chapters/1/shots/1/regenerate → HTTP 500 "生成图像数据格式异常"
+
+**实测证据**:
+- 图像 **已真实生成**: SeedreamGenerator 日志 `✅ Shot 1 生成成功 (1664x2218, 446.27s)` ✅
+- 保存步骤 **失败**: chapters.py L1683-1696 格式检测逻辑不匹配 Seedream 返回 ❌
+- shot_01.png mtime **未变**: 1778230393 (生成前) = 1778230393 (生成后)
+
+**根因**:
+```python
+# chapters.py L1683
+image_data = result.get("image_data")  # Seedream 返回: base64 STRING, 不是 bytes 或 PIL
+
+if isinstance(image_data, bytes):     # False (str)
+    ...
+elif hasattr(image_data, "save"):     # False (str)
+    ...
+else:
+    raise HTTPException(500, "生成图像数据格式异常")  # <- 命中这里
+```
+
+**Seedream 实际返回格式**:
+```python
+{
+    "success": True,
+    "image_data": "<base64_png_string>",  # 注意: string, 不是 bytes
+    "pil_image": <PIL.Image>,              # PIL Image 对象在这里
+    ...
+}
+```
+
+**修复建议** (app/api/chapters.py L1683附近):
+```python
+# 选项 A (推荐): 优先用 pil_image
+pil_image = result.get("pil_image")
+if pil_image and hasattr(pil_image, "save"):
+    pil_image.save(shot_path)
+elif isinstance(image_data, bytes):
+    with open(shot_path, "wb") as f:
+        f.write(image_data)
+elif isinstance(image_data, str):
+    import base64
+    with open(shot_path, "wb") as f:
+        f.write(base64.b64decode(image_data))
+else:
+    raise HTTPException(500, "生成图像数据格式异常")
+```
+
+**严重度**: P1 — 用户重新生成画面功能完全不可用
+
+---
+
+### B6 failed 状态返回值分歧（小）
+
+`chapter.status == "failed"` 返回 HTTP 400，任务 spec 写 404。400 语义更准确（有内容但失败）。建议 @backend @frontend 对齐这个状态的前端处理逻辑（现有代码 400 不是 bug，只是 spec 描述模糊）。
+
+---
+
+### pytest 基线 (2026-05-08)
+
+两次运行结果一致:
+- **295 passed, 3 failed (pre-existing), 32 skipped, 6 errors (pre-existing), 596-599s**
+- 与 Wave 5.2 DevOps 基线完全一致 (`295 passed, 3 pre-existing failed`)
+- **Wave 5.1 + 5-08 4 Agent 修复批零引入新退化**
+
+---
+
+### 回归风险评估 (2026-05-08)
+
+高风险文件修改状态:
+
+| 文件 | 修改 | 角色一致性风险 |
+|------|------|--------------|
+| image_generator.py | 未动 | 无 |
+| storyboard_prompts.py | 未动 | 无 |
+| storyboard_service.py | 未动 | 无 |
+| reference_image_manager.py | 未动 | 无 |
+| chapters.py | 修改 (B6/B16) | 无(不影响参考图传递链) |
+| screenplay_writer.py | 修改 (B8/B20) | 无(只影响剧本生成逻辑) |
+
+**结论**: 角色一致性回归风险极低。image consistency 完整链路零改动。
+
+---
 
 ---
 

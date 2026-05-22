@@ -104,6 +104,7 @@ class StoryOutlineGenerator:
         character_refs_analysis: list[dict] | None = None,
         scene_refs_analysis: list[dict] | None = None,
         custom_style_name: str | None = None,
+        user_selected_mood: str | None = None,  # B33: 用户在 Stage A 选择的情绪基调
     ) -> dict:
         """
         生成故事大纲
@@ -144,14 +145,98 @@ class StoryOutlineGenerator:
             custom_style_name=custom_style_name,
         )
         if ref_context:
-            prompt = prompt.rstrip() + "\n" + ref_context + "\n\n现在开始生成故事大纲："
-        else:
-            prompt = prompt.rstrip() + "\n\n现在开始生成故事大纲："
+            prompt = prompt.rstrip() + "\n" + ref_context
+
+        # B33 + B47: 注入用户选择的情绪基调约束（最高优先级，覆盖 LLM 自由判断）
+        # B47 升级 (2026-05-11)：仿 BGM Haiku meta-prompt B40 Sub-Vibe Default Lock 模式，
+        # 加 8 mood × PREFER/AVOID sub-vibe 反偏置 + 形状>内容铁律 + 4 反例
+        # 真根因：B33 旧约束只说"mood 必须=用户选"但没说"为什么 LLM 会滑"
+        # → LLM 看到"孤独老人/凌晨3点/猫"内敛诱因关键词时自动归"治愈"，忽视用户选"幽默"
+        # 这里显式枚举每个 mood 的诱因 + PREFER/AVOID 调性，让 LLM 主动反偏置
+        if user_selected_mood:
+            # 中文 mood → 英文 overall_mood 映射（与 B19 valid_moods 枚举一致）
+            _mood_map = {
+                "温馨": "warm",
+                "治愈": "heartwarming",
+                "紧张": "tense",
+                "幽默": "comedic",
+                "感人": "melancholic",
+                "热血": "heroic",
+                "悬疑": "mysterious",
+                "浪漫": "romantic",
+            }
+            overall_mood_en = _mood_map.get(user_selected_mood, user_selected_mood)
+            mood_constraint = f"""
+
+## STORY MOOD CONSTRAINT (USER SELECTED — MANDATORY, HIGHEST PRIORITY)
+
+═══════════════════════════════════════════════════════════════
+用户在 Stage A 主动选择的情绪基调（不可被覆盖、不可被替换、不可漂移）：
+
+  ╔══════════════════════════════════════════════════════════╗
+  ║   user_selected_mood = "{user_selected_mood}"  (overall_mood = "{overall_mood_en}")  ║
+  ╚══════════════════════════════════════════════════════════╝
+═══════════════════════════════════════════════════════════════
+
+### 必须输出的字段（如违反 → JSON 视为无效）
+
+1. `mood` 字段 MUST be exactly: **"{user_selected_mood}"** （8 选项之一，禁止自造或替换为相似词）
+2. `visual_tone.overall_mood` MUST be exactly: **"{overall_mood_en}"** （英文 8 桶之一）
+3. `user_selected_mood` 字段（top-level）MUST be exactly: **"{user_selected_mood}"** （透传字段，复制用户原值）
+
+### 🔑 形状 > 内容 铁律（Sub-Vibe Default Lock —— B47 反偏置核心）
+
+⚠️ 用户选 mood 时**默认指"明亮/激昂/正面/主动" sub-vibe**，但 LLM 看故事内容（孤独/独居/凌晨3点/已故/失败/中年/30年磨砺）会自动滑向"内敛/坚守/伤逝/黑色"sub-vibe。
+
+**当用户选 mood 与故事内容内敛诱因冲突时：以用户选的 mood 形状为准，不要跟着内容滑。**
+
+按 user_selected_mood 查下表，输出的 mood / emotional_arc / plot_points / visual_tone 字段必须体现 PREFER 列形状，**禁止**让 AVOID 列偏置渗透：
+
+| user_selected_mood | PREFER sub-vibe（必须给的形状）| AVOID sub-vibe（绝不允许滑向）| 内敛诱因关键词（看到这些词要警觉，主动反偏置）|
+|---|---|---|---|
+| **温馨** | warm / cozy / familial / 家庭温情 / 朋友闲聊 / 情侣甜蜜 / 日常烟火 | mournful / longing for the lost / 怀旧伤逝 / "再也回不去" | 已故 / 旧物 / 老照片 / 多年未见 |
+| **治愈** | restorative / 温暖抚慰 / 重获力量 / 拥抱后释怀 / soft uplift | lonely / isolated / 寂寞独处 / "一个人的孤单" / 凌晨3点 | 独居 / 分手后 / 失业后 / 一个人 / 凌晨 / 孤独 |
+| **紧张** | heartbeat-like / 心跳加速 / 倒计时 / 危机感 / 即将爆发 | suffocating / 窒息 / breath held / hopeless / inevitable doom | 无力反抗 / 被压制 / 没有出路 |
+| **幽默** | bouncy / 段子反转 / 轻快搞笑 / punchline 落位 / 小恶作剧 | bitter laughter / 黑色幽默 / 自嘲式悲凉 / "含泪的笑" / 沉重底色 | 失败 / 挫折 / 走投无路 / 孤独 / 凌晨 / 独居 |
+| **感人** | heartfelt / 真情流露 / 泪点动人 / 释怀 / 拥抱后哭出来 | grief funeral / 葬礼式哀伤 / hopeless / notes that sink | 死亡 / 葬礼 / 生离死别 / 永别 |
+| **热血** | explosive / 激昂高燃 / 突破爆发 / 巅峰对决 / 30年终于爆发 | enduring / 坚守式 / hold ground / not triumph / "悲壮孤勇" | 中年 / 多年磨砺 / 长跨度 / 第二次机会 |
+| **悬疑** | minor key / 紧张未知 / 解谜推理 / 暗中观察 / 倒推真相 | shrieking / 阴森恐怖 / jumpscare / dissonant scream | 鬼魂 / 超自然 / 失踪 / 凶杀 |
+| **浪漫** | butterflies / 心动悸动 / 暧昧怦然 / 长情陪伴 / 第一次心跳 | mournful goodbye / 哀伤别离 / 错过遗憾 / "永别" | 分手 / 错过 / 异地 / 永别 / 暗恋未表白 |
+
+### 4 个必须避免的 sub-vibe slip（test11 实测教训 + B40 BGM 经验）
+
+❌ **反例 1**：user_selected_mood="幽默" + idea="孤独老人凌晨3点训练AI客服 → 猫送外卖" → **不要**把 mood 滑成"治愈"（test11 真实失败），**必须** mood="幽默" + emotional_arc 写成"comedic_chaos → mischief → playful resolution"
+
+❌ **反例 2**：user_selected_mood="热血" + idea 含"30 年磨砺/中年人坚持" → **不要**把 mood 滑成"感人"或写"doesn't triumph but endures"，**必须** mood="热血" + emotional_arc 写"30 年的等待终于爆发成行动 / breakthrough / explosive surge"
+
+❌ **反例 3**：user_selected_mood="温馨" + idea="已故妈妈的红烧肉/翻出旧物" → **不要**把 mood 滑成"感人"或"melancholic"，**必须** mood="温馨" + emotional_arc 写"warm familial cozy / 红烧肉香气仍在 / 妈妈的味道还活着"
+
+❌ **反例 4**：user_selected_mood="紧张" + idea="无力反抗的压迫" → **不要**把 mood 滑成"感人"或写"suffocating breath held"，**必须** mood="紧张" + emotional_arc 写"heartbeat racing / deadline closing in / 即将爆发"
+
+### 输出前自检（生成 JSON 之前必须扫一遍）
+
+1. ✅ 我输出的 `mood` = 用户选的 "{user_selected_mood}" 吗？（不是相似词，不是 LLM 自由判断）
+2. ✅ 我输出的 `user_selected_mood` 顶层字段 = "{user_selected_mood}" 吗？（透传，不是 null）
+3. ✅ 我输出的 `visual_tone.overall_mood` = "{overall_mood_en}" 吗？（英文 8 桶之一）
+4. ✅ 我的 emotional_arc / plot_points 描述符合上表 PREFER 列调性吗？（不是 AVOID 列偏置）
+5. ✅ 故事 idea 含内敛诱因关键词时，我有没有主动反偏置回到 PREFER 形状？
+
+**Escape Hatch（罕见情况）**：如果 idea 整体 90%+ 内容明确指向"AVOID sub-vibe"（如故事真的是葬礼挽歌、user_selected_mood 仍标"感人"），可在 emotional_arc 局部使用次要 sub-vibe 词，但 `mood` 字段顶层必须**严格输出**用户选的值，不允许漂移。
+
+═══════════════════════════════════════════════════════════════
+**记住：用户选 mood = 主基调形状的明确表达；故事内容 = idea 的具体载体。两者冲突时，给形状（用户选的 mood），不给内容（LLM 自动倾向）。**
+═══════════════════════════════════════════════════════════════
+"""
+            prompt = prompt.rstrip() + mood_constraint
+
+        prompt = prompt.rstrip() + "\n\n现在开始生成故事大纲："
 
         logger.info(f"[StoryOutlineGenerator] 生成故事大纲...")
         logger.info(f"  idea: {idea[:80]}{'...' if len(idea) > 80 else ''}")
         logger.info(f"  style: {style_preset}")
         logger.info(f"  target: {target_duration_minutes}分钟, ≥{min_shots} shots")
+        if user_selected_mood:
+            logger.info(f"  B33 user_selected_mood: {user_selected_mood} (强制注入 LLM 约束)")
 
         content = None
         provider = None
@@ -165,8 +250,11 @@ Critical rules:
 - Chinese text for: title, logline, summary, character names, display_name, description_zh, plot descriptions, mood, ending descriptions, signage_text, description, personality, emotional_journey
 - English text for: title_en, name_en, emotional_arc values, narrative_pace, visual_tone fields, color_palette, archetype, interior_description, exterior_description, key_visual_elements
 - All ending_options must have 3 distinct options with meaningful differences
+- Each ending_options entry MUST include BOTH `id` and `ending_id` fields with the same value (e.g. "ending_1", "ending_2", "ending_3") — `ending_id` is the canonical key, `id` is kept for legacy frontend compatibility (RISK-T20-8, 2026-05-18)
 - All characters_overview entries must include description (20-30 Chinese chars, appearance) and personality (10-20 Chinese chars, traits)
-- mood must be exactly one of: 感人 / 治愈 / 热血 / 悬疑 / 浪漫 / 温馨
+- mood must be exactly one of (8 enum values, NO substitution allowed): 温馨 / 治愈 / 紧张 / 幽默 / 感人 / 热血 / 悬疑 / 浪漫
+- If `user_selected_mood` constraint block is present in user prompt, `mood` field MUST equal that exact value — do NOT drift toward a similar/nearby mood based on story content
+- MANDATORY: outline JSON MUST include top-level field `user_selected_mood` (passthrough) when user constraint is provided — copy the exact user-selected Chinese value
 - MANDATORY: Every unique_locations entry MUST include description_zh (100-150 Chinese chars, literary scene description). This field is REQUIRED and must NOT be omitted."""
 
         # 优先使用 Claude Sonnet 4.6
@@ -210,8 +298,50 @@ Critical rules:
         if outline:
             # 验证必要字段
             self._validate_outline(outline, min_shots)
+
+            # B47 (2026-05-11): 透传保险 + mood 兜底 enforce
+            # 即使 LLM 漏写或写错 mood/user_selected_mood 字段，这里强制纠正
+            # 防御 prompt 不够强时的最后一道防线
+            if user_selected_mood:
+                # 强 enforce 顶层 mood 字段（必须 == 用户选）
+                old_mood = outline.get("mood")
+                if old_mood != user_selected_mood:
+                    logger.warning(
+                        f"[StoryOutlineGenerator] B47 兜底纠正 mood: "
+                        f"LLM 输出 '{old_mood}' → 强制改为用户选 '{user_selected_mood}'"
+                    )
+                    outline["mood"] = user_selected_mood
+
+                # 强 enforce 顶层 user_selected_mood 透传字段（LLM 常漏写为 null）
+                if outline.get("user_selected_mood") != user_selected_mood:
+                    outline["user_selected_mood"] = user_selected_mood
+                    logger.info(
+                        f"[StoryOutlineGenerator] B47 透传补字段 user_selected_mood='{user_selected_mood}'"
+                    )
+
+                # 强 enforce visual_tone.overall_mood（与 mood 中英对应）
+                _b47_mood_map = {
+                    "温馨": "warm", "治愈": "heartwarming", "紧张": "tense",
+                    "幽默": "comedic", "感人": "melancholic", "热血": "heroic",
+                    "悬疑": "mysterious", "浪漫": "romantic",
+                }
+                expected_overall = _b47_mood_map.get(user_selected_mood)
+                if expected_overall:
+                    tone = outline.setdefault("visual_tone", {})
+                    if tone.get("overall_mood") != expected_overall:
+                        old_overall = tone.get("overall_mood")
+                        tone["overall_mood"] = expected_overall
+                        logger.warning(
+                            f"[StoryOutlineGenerator] B47 兜底纠正 visual_tone.overall_mood: "
+                            f"LLM 输出 '{old_overall}' → 强制改为 '{expected_overall}'"
+                        )
+
             logger.info(f"[StoryOutlineGenerator] ✅ 大纲生成成功 (via {provider})")
             logger.info(f"  title: {outline.get('title', 'N/A')}")
+            logger.info(f"  mood: {outline.get('mood', 'N/A')}")
+            if user_selected_mood:
+                logger.info(f"  user_selected_mood (透传): {outline.get('user_selected_mood', 'N/A')}")
+            logger.info(f"  visual_tone.overall_mood: {outline.get('visual_tone', {}).get('overall_mood', 'N/A')}")
             logger.info(f"  characters: {len(outline.get('characters_overview', []))}个")
             logger.info(f"  plot_points: {len(outline.get('plot_points', []))}个")
             logger.info(f"  locations: {len(outline.get('unique_locations', []))}个")
@@ -272,12 +402,12 @@ Critical rules:
     "summary": "故事简介（100-200字，用2-3句话描述核心故事情节，比logline更详细但比plot_points更精炼）",
 
     "ending_options": [
-        {{"id": "ending_1", "description": "结局选项1描述（1句话）"}},
-        {{"id": "ending_2", "description": "结局选项2描述（1句话）"}},
-        {{"id": "ending_3", "description": "结局选项3描述（1句话）"}}
+        {{"id": "ending_1", "ending_id": "ending_1", "description": "结局选项1描述（1句话）"}},
+        {{"id": "ending_2", "ending_id": "ending_2", "description": "结局选项2描述（1句话）"}},
+        {{"id": "ending_3", "ending_id": "ending_3", "description": "结局选项3描述（1句话）"}}
     ],
 
-    "mood": "从以下选一个最匹配的: 感人 / 治愈 / 热血 / 悬疑 / 浪漫 / 温馨",
+    "mood": "从以下 8 个枚举值中选 1 个（必须完全匹配，禁止自造/替换）: 温馨 / 治愈 / 紧张 / 幽默 / 感人 / 热血 / 悬疑 / 浪漫",
 
     "emotional_arc": {{
         "opening": "情感起点（如: isolated_melancholy, peaceful_ordinary, excited_anticipation）",
@@ -289,7 +419,7 @@ Critical rules:
     "narrative_pace": "slow_burn / steady / fast_paced",
 
     "visual_tone": {{
-        "overall_mood": "整体情绪基调（如: melancholic_intimate, warm_nostalgic, tense_mysterious）",
+        "overall_mood": "从以下选一个最匹配的（必须完全匹配，不得自造词）: warm / heartwarming / tense / comedic / melancholic / heroic / mysterious / romantic",
         "lighting_style": "光影风格（如: low_key_dramatic, high_key_bright, natural_soft, chiaroscuro）",
         "color_palette": ["primary color in English", "secondary color in English", "accent color in English"],
         "composition_style": "构图风格（如: negative_space_isolation, dynamic_diagonal, symmetrical_formal）"
@@ -361,7 +491,7 @@ Critical rules:
 7. **招牌文字**：如果 unique_location 是店铺、餐馆、客栈等有招牌的场所，signage_text 应填写该店铺在故事世界中的真实招牌名称（如 "李记桂花糕"、"百味居"）。signage_text 是用于图像生成的店铺招牌文字，不是开发标签。如果场所没有招牌（如街道、公园、家中），signage_text 为空字符串 ""。
 8. **故事简介**：summary 要比 logline 更详细，但不是 plot_points 的罗列，是对故事核心情节的概括描述（100-200字）
 9. **结局选项**：ending_options 三个选项应有明显差异（如：温馨/开放/反转），让用户有真实的选择感
-10. **情绪基调**：mood 从6个预设值（感人/治愈/热血/悬疑/浪漫/温馨）中选最匹配的一个
+10. **情绪基调**：mood 从 **8** 个预设值中选最匹配的一个：温馨 / 治愈 / 紧张 / 幽默 / 感人 / 热血 / 悬疑 / 浪漫（严禁自造或替换为相似词，如不能把"幽默"写成"治愈"、不能把"紧张"写成"悬疑"）。如果用户提示词包含 `STORY MOOD CONSTRAINT (USER SELECTED — MANDATORY)` 块，必须**严格输出**用户指定的 mood，即使故事内容含相反诱因关键词（孤独/独居/凌晨/已故/失败/挫折等）也不允许漂移
 11. **角色简述**：description 和 personality 是给前端用户看的中文简述，不是给图像生成用的英文描述。description 聚焦外貌特征（年龄、穿着、显著特征），personality 聚焦性格特点
 12. **场景氛围描述（REQUIRED/必填）**：每个 unique_location 必须包含 description_zh 字段，这是给前端用户看的中文场景描述（100-150字），用文学性的、有画面感的语言描述场景的视觉特征、光影氛围和关键细节（如同电影场景描述），不是 interior_description/exterior_description 的翻译。description_zh 与 display_name 描述同一个场景，但更丰富。示例："夜色中的古镇老街，青石板路被细雨打湿，红灯笼的暖光倒映在石板上。木质屋檐挂着春联，远处有烟花的微光在墨色天空中绽放。" 注意：description_zh 是中文，interior_description/exterior_description 是英文，三者共存互不替代
 
@@ -433,6 +563,57 @@ Review all family_relationships entries together. For each person mentioned:
 - 所有location的key_visual_elements必须是**英文**（用于图像生成）
 - characters_overview只是概览，详细外貌在Stage 2生成
 - plot_points要足够细致，每个情节点对应故事的一个关键转折
+- **plot_points 字段完整性（MANDATORY）**：每一个 plot_point 对象都必须包含 `beat` 和 `estimated_duration_seconds` 两个字段，缺一不可。最后一个 plot_point 与其他 plot_point 遵循完全相同的规则，不得省略任何字段。
+  ❌ 错误：{{"description": "公司发现AI彩蛋事件..."}}  （缺少 beat 和 estimated_duration_seconds）
+  ✅ 正确：{{"beat": "resolution", "description": "公司发现AI彩蛋事件...", "estimated_duration_seconds": 25}}
+
+## OUTLINE OUTPUT VALIDATION RULES (T20-49 — MANDATORY 输出后自检)
+
+在生成最终 JSON 之前，按以下 4 条规则进行自检。不满足时重写对应字段直到通过。
+
+### RULE OV-1: plot_points 必须以 climax 或 resolution 结尾
+
+- plot_points 中最后一个对象的 `beat` 字段 **必须** 是 `"climax"` 或 `"resolution"`
+- 不允许以 `"midpoint"` / `"hook"` / `"inciting_incident"` / `"first_turn"` 等非结尾节拍收尾
+- 允许的 beat 枚举值: hook / inciting_incident / first_turn / midpoint / second_turn / climax / resolution
+
+  ❌ 错误: 最后一个 plot_point beat = "midpoint"
+  ✅ 正确: 最后一个 plot_point beat = "climax" 或 "resolution"
+
+### RULE OV-2: beat_tag 不允许重复，重复时加 _a / _b 后缀区分
+
+- 同一 `beat` 值在 plot_points 中只能出现一次
+- 如果故事需要多个 inciting_incident / first_turn 等相同类型的节拍，必须用后缀区分：
+  `inciting_incident_a` / `inciting_incident_b`
+
+  ❌ 错误: 两个 plot_point 都用 beat = "inciting_incident"
+  ✅ 正确: beat = "inciting_incident_a" 和 beat = "inciting_incident_b"
+
+### RULE OV-3: characters_overview 的 emotional_journey 必须与 plot_points 对应
+
+- 每个角色的 `emotional_journey` 描述必须与该角色在 plot_points 中的情绪递进一致
+- 如果角色在 plot_points 中经历 "绝望 → 觉醒 → 释然"，emotional_journey 不得描述为 "平静面对，从未动摇"
+- 检查顺序: 先看每个角色出现在哪些 plot_points → 看 plot_point 中角色的情绪描述 → 确认 emotional_journey 曲线一致
+
+  ❌ 错误: char 在 plot_points 中"愤怒爆发 → 妥协认输"，但 emotional_journey = "始终平静"
+  ✅ 正确: emotional_journey = "压抑的愤怒 → 一触即发 → 最终的无奈妥协"
+
+### RULE OV-4: 输出前在 _validation_check 字段自报 4 条规则状态
+
+在 JSON 最外层追加 `_validation_check` 字段，自报每条规则是否满足：
+
+```json
+"_validation_check": {{
+  "OV1_last_beat_is_climax_or_resolution": true,
+  "OV2_no_duplicate_beat_tags": true,
+  "OV3_emotional_journey_matches_plot": true,
+  "OV4_self_check_complete": true,
+  "issues_if_any": []
+}}
+```
+
+如果任何一条为 false，在 `issues_if_any` 列出具体问题，并在输出该 JSON 前重写违规字段。
+`_validation_check` 字段仅供调试，后端处理时会自动忽略此字段。
 """
 
     @staticmethod
@@ -498,45 +679,25 @@ Review all family_relationships entries together. For each person mentioned:
         return ''.join(result)
 
     def _extract_json(self, content: str) -> Optional[dict]:
-        """从LLM响应中提取JSON"""
+        """从LLM响应中提取JSON
+
+        B59-hotfix (2026-05-12): 先做 _fix_unescaped_quotes 预处理（outline 特有），
+        再委托给共用 helper（含未闭合 ``` 容错）。
+        """
         import re
 
         # 预处理: 修复 JSON 字符串值中未转义的 ASCII 双引号
         content = self._fix_unescaped_quotes(content)
 
-        # 尝试提取```json ... ```块
-        json_match = re.search(r'```json\s*([\s\S]*?)\s*```', content)
-        if json_match:
-            try:
-                return json.loads(json_match.group(1))
-            except json.JSONDecodeError as e:
-                logger.warning(
-                    f"[OutlineGenerator] JSON解析失败(code-block): {e} "
-                    f"| 位置约第{e.lineno}行col{e.colno} | 内容长度={len(content)}"
-                )
+        from app.services._llm_helpers import extract_json_from_llm_response
+        result = extract_json_from_llm_response(content)
+        if result is not None:
+            return result
 
-        # 尝试直接解析整个内容
-        try:
-            return json.loads(content)
-        except json.JSONDecodeError as e:
-            logger.warning(
-                f"[OutlineGenerator] JSON解析失败(direct): {e} "
-                f"| 位置约第{e.lineno}行col{e.colno} | 内容长度={len(content)}"
-            )
-
-        # 尝试找到第一个{和最后一个}
-        start = content.find('{')
-        end = content.rfind('}')
-        if start != -1 and end != -1 and end > start:
-            try:
-                return json.loads(content[start:end+1])
-            except json.JSONDecodeError as e:
-                logger.warning(
-                    f"[OutlineGenerator] JSON解析失败(brace-extract): {e} "
-                    f"| 位置约第{e.lineno}行col{e.colno} | 内容长度={len(content)} "
-                    f"| 预览前200chars: {content[start:start+200]!r}"
-                )
-
+        logger.warning(
+            f"[OutlineGenerator] JSON提取失败: 所有策略均失败 "
+            f"| 内容长度={len(content)} | 前200chars: {content[:200]!r}"
+        )
         return None
 
     def _validate_outline(self, outline: dict, min_shots: int) -> None:
@@ -564,6 +725,33 @@ Review all family_relationships entries together. For each person mentioned:
         if tone_missing:
             raise ValueError(f"visual_tone缺少字段: {tone_missing}")
 
+        # B19: 标准化 overall_mood 到枚举集合
+        valid_moods = {"warm", "heartwarming", "tense", "comedic", "melancholic", "heroic", "mysterious", "romantic"}
+        current_mood = tone.get("overall_mood", "").lower().strip()
+        if current_mood not in valid_moods:
+            # 简单映射：含关键词就归类
+            # B47 修正 (2026-05-11): 修复 B19 写反的 bug — 治愈应映射 heartwarming（不是 warm），温馨应映射 warm（不是 heartwarming）
+            mood_map = {
+                "warm": "warm", "nostalgic": "warm", "cozy": "warm", "温馨": "warm",
+                "感人": "melancholic", "heartwarming": "heartwarming", "touching": "melancholic",
+                "tense": "tense", "suspense": "tense", "紧张": "tense", "悬疑": "mysterious",
+                "comedy": "comedic", "humor": "comedic", "幽默": "comedic", "comedic": "comedic",
+                "melancholic": "melancholic", "sad": "melancholic", "治愈": "heartwarming",
+                "heroic": "heroic", "epic": "heroic", "热血": "heroic",
+                "mysterious": "mysterious", "mystery": "mysterious",
+                "romantic": "romantic", "romance": "romantic", "浪漫": "romantic",
+            }
+            fallback = "warm"
+            for keyword, mapped in mood_map.items():
+                if keyword in current_mood:
+                    fallback = mapped
+                    break
+            logger.warning(
+                f"[StoryOutlineGenerator] visual_tone.overall_mood='{tone.get('overall_mood')}' "
+                f"不在标准枚举中，fallback 为 '{fallback}'"
+            )
+            tone["overall_mood"] = fallback
+
         # 验证角色数量
         if len(outline.get("characters_overview", [])) == 0:
             raise ValueError("characters_overview不能为空")
@@ -572,6 +760,29 @@ Review all family_relationships entries together. For each person mentioned:
         if len(outline.get("unique_locations", [])) == 0:
             raise ValueError("unique_locations不能为空")
 
+        # B18: 验证并修复每个 plot_point 的必要字段（fallback defaults）
+        beat_sequence = [
+            "inciting_incident", "first_turn", "midpoint", "crisis", "climax", "resolution"
+        ]
+        plot_points = outline.get("plot_points", [])
+        for i, pp in enumerate(plot_points):
+            # 确保 beat 字段存在
+            if not pp.get("beat"):
+                # 按位置分配一个合理的 beat 值
+                fallback_beat = beat_sequence[min(i, len(beat_sequence) - 1)]
+                pp["beat"] = fallback_beat
+                logger.warning(
+                    f"[StoryOutlineGenerator] plot_point[{i}] 缺少 beat 字段，"
+                    f"fallback 设置为 '{fallback_beat}'"
+                )
+            # 确保 estimated_duration_seconds 字段存在
+            if not pp.get("estimated_duration_seconds"):
+                pp["estimated_duration_seconds"] = 30
+                logger.warning(
+                    f"[StoryOutlineGenerator] plot_point[{i}] 缺少 estimated_duration_seconds 字段，"
+                    f"fallback 设置为 30"
+                )
+
         # 设置target_metrics（如果没有）
         if "target_metrics" not in outline:
             outline["target_metrics"] = {
@@ -579,6 +790,28 @@ Review all family_relationships entries together. For each person mentioned:
                 "target_duration_seconds": min_shots * 6,  # 平均每shot 6秒
                 "max_seconds_per_shot": 8
             }
+
+        # RISK-T20-8 (2026-05-18): ending_options 字段 normalization
+        # 兜底防御: LLM 偶尔漏写 id 或 ending_id, 确保两个字段都存在 (universal — 任何故事都适用)
+        # frontend 优先用 e.id (CreateContent.tsx:833), backend UX-2 + Pipeline 可读 ending_id
+        ending_options = outline.get("ending_options", [])
+        for i, ending in enumerate(ending_options):
+            if not isinstance(ending, dict):
+                continue
+            default_id = f"ending_{i + 1}"
+            current_id = ending.get("id")
+            current_ending_id = ending.get("ending_id")
+            # 任一字段缺失 → 互补; 全缺失 → fallback 到 ending_{i+1}
+            canonical = current_id or current_ending_id or default_id
+            if not current_id:
+                ending["id"] = canonical
+            if not current_ending_id:
+                ending["ending_id"] = canonical
+            if not current_id and not current_ending_id:
+                logger.info(
+                    f"[StoryOutlineGenerator] T20-8 normalize: ending_options[{i}] "
+                    f"缺 id/ending_id, fallback '{default_id}'"
+                )
 
 
 # 便捷函数

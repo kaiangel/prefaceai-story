@@ -1,7 +1,7 @@
 """API routers"""
 
 from fastapi import APIRouter
-from app.api import auth, beta_applications, chapters, contact_us, projects, monitoring, share
+from app.api import auth, beta_applications, chapters, client_log, contact_us, projects, monitoring, share
 
 api_router = APIRouter()
 
@@ -12,6 +12,7 @@ api_router.include_router(chapters.router)
 api_router.include_router(contact_us.router)
 api_router.include_router(monitoring.router)
 api_router.include_router(share.router)  # R7-2: 公开分享页
+api_router.include_router(client_log.router)  # A2-backend: TASK-CLIENT-LOG-PIPE 浏览器控制台日志接收
 
 
 @api_router.get("/api/health")

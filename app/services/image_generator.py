@@ -23,6 +23,16 @@ from app.prompts.storyboard_prompts import (
     build_identity_line_phase2
 )
 from app.services.style_enforcer import StyleEnforcer
+# DEC-048 Layer 1 (2026-05-22): Identity Anchor strong-injection — bypass
+# Stage 4 LLM creative drift on character/style/location/props/time anchors.
+# Anchors are prepended to image_prompt at the START position (where model
+# attention is highest). See app/services/identity_anchor_injector.py and
+# app/services/prompt_validator.py for spec + implementation.
+from app.services.identity_anchor_injector import (
+    inject_identity_anchors,
+    resolve_characters_in_shot,
+)
+from app.services.prompt_validator import PromptValidator
 
 
 def _strip_speaker_for_native(text: str) -> str:
@@ -620,6 +630,55 @@ class ImageGenerator:
                 "error": "Gemini client not initialized. Check GEMINI_API_KEY."
             }
 
+        # B38/D.17: 单一模型原则 — 当 provider=seedream 时，参考图层也走 Seedream
+        # 不允许运行时 NB2/Seedream 混用（D.17 严禁）
+        if settings.IMAGE_GEN_PROVIDER == "seedream":
+            from app.services.seedream_generator import _call_seedream_sync
+            _ref_count = len(reference_images) if reference_images else 0
+            # POST_BETA-5: dispatch 日志加 ref count 详情（类型由调用方决定）
+            logger.info(
+                f"    [ImageGenerator] generate_image → Seedream dispatch (D.17 单模型) "
+                f"refs={_ref_count}"
+            )
+            full_prompt = prompt
+            if negative_prompt:
+                full_prompt += f". Avoid: {negative_prompt}"
+            loop = asyncio.get_event_loop()
+            sd_result = await loop.run_in_executor(
+                None,
+                _call_seedream_sync,
+                full_prompt,
+                reference_images or [],
+                aspect_ratio,
+                settings.ARK_API_KEY,
+            )
+            if sd_result.get("success") and sd_result.get("pil_image"):
+                pil_image = sd_result["pil_image"]
+                output_buffer = BytesIO()
+                pil_image.save(output_buffer, "PNG")
+                image_data = base64.b64encode(output_buffer.getvalue()).decode("utf-8")
+                return {
+                    "success": True,
+                    "image_data": image_data,
+                    "pil_image": pil_image,
+                    "image_format": "png",
+                    "width": pil_image.width,
+                    "height": pil_image.height,
+                    "model_used": "seedream",
+                    "generation_time_seconds": sd_result.get("latency_sec", 0.0),
+                }
+            else:
+                error_kind = sd_result.get("error_kind", "api_error")
+                error_type_val = "content_safety" if error_kind == "sensitive_content" else error_kind
+                return {
+                    "success": False,
+                    "error": sd_result.get("error", "Seedream generation failed"),
+                    "error_type": error_type_val,
+                }
+
+        # DEPRECATED 2026-05-11 (B41): 以下 NB2 路径代码保留备用（IMAGE_GEN_PROVIDER=nb2 时启用）。
+        # 当前默认走 Seedream（dispatch 在上方 L625）。
+        # 如需切回 NB2，仅需 .env IMAGE_GEN_PROVIDER=nb2。
         # T23: 所有图像生成统一使用 NB2（角色参考图+场景参考图+shot 生成）
         model = self.NB2_MODEL
 
@@ -761,6 +820,212 @@ class ImageGenerator:
             "generation_time_seconds": round(time.time() - start_time, 2)
         }
 
+    # ═════════════════════════════════════════════════════════════
+    # DEC-048 Layer 1 (2026-05-22) — Identity Anchor pre-dispatch hook
+    #
+    # Wraps inject_identity_anchors + PromptValidator.auto_correct into a
+    # single helper. Called at the top of every shot-generating method
+    # BEFORE Seedream/NB2 dispatch so the image generator sees an expanded
+    # prompt with authoritative anchors at the START.
+    #
+    # Defense-in-depth: called at L820 (generate_shot_image), L1068
+    # (generate_shot_image_phase2), L1414 (generate_shot_image_phase2_safe).
+    # The injector is idempotent (IDENTITY_ANCHOR_MARKER check), so multi-
+    # call along the same code path is a no-op.
+    # ═════════════════════════════════════════════════════════════
+
+    def _apply_identity_anchors(
+        self,
+        shot: dict,
+        storyboard: Optional[dict] = None,
+        characters: Optional[dict] = None,
+        screenplay: Optional[dict] = None,
+        style_preset: str = "realistic",
+        outline: Optional[dict] = None,
+    ) -> dict:
+        """Inject identity anchors into shot['image_prompt'] (returns shot copy).
+
+        Extracts context from storyboard/characters/screenplay/outline (best-
+        effort), calls inject_identity_anchors, then validates + auto-corrects
+        via PromptValidator. Returns a COPY of shot with mutated image_prompt
+        so the caller's dict is not modified.
+
+        Idempotent — if shot's image_prompt already contains the anchor
+        marker, the injector early-returns unchanged.
+
+        Args:
+            shot: Stage 4 shot dict — must have 'image_prompt' (string).
+            storyboard: Optional Stage 4 storyboard (provides characters list
+                + outline.unique_locations lookup as legacy fallback).
+            characters: Optional Stage 2 characters dict {'characters': [...]}.
+            screenplay: Optional Stage 3 screenplay (provides scene data for
+                time_continuity anchor + scene → location_id mapping).
+            style_preset: Active style preset (drives STYLE ANCHOR block).
+            outline: Optional Stage 1 outline (provides unique_locations dict
+                for LOCATION ANCHOR — T22-NEW-6 wire). Preferred over
+                storyboard.outline lookup since pipeline_orchestrator.py
+                Stage 5 dispatch doesn't embed outline into storyboard.
+
+        Returns:
+            shot_copy with image_prompt possibly augmented. If injection
+            fails (exception), logs error and returns shot unchanged so
+            production never breaks due to anchor injection.
+        """
+        try:
+            image_prompt = shot.get("image_prompt", "") if isinstance(shot, dict) else ""
+            if not image_prompt:
+                # Nothing to inject into — return shot as-is
+                return shot
+
+            # ════════════════════════════════════════════════════════════════
+            # 1. characters_in_scene: smart-match by id / name_en / name
+            # ════════════════════════════════════════════════════════════════
+            # T22-NEW-7 (P0 fix, 2026-05-22): Stage 4 LLM 真**输出 char id 格式不一致** —
+            # 前 3 shot 真用 name_en ("Coral"), 后 18 用 char_id ("char_001").
+            # Founder e2e test22 实测: chars=0 前 3 shot → Coral anchor 完全没注入
+            # → Seedream weak ref following → Shot 2 美人鱼变蓝头发人腿 (CLAUDE.md
+            # "产品生命线" P0 违反). 修复: 三路智能匹配 (id / name_en / name).
+            # 实现见 identity_anchor_injector.resolve_characters_in_shot() —
+            # 同时输出防御性 WARNING (KEY_LEARNINGS #50/#52 silent-fail prevention).
+            # ════════════════════════════════════════════════════════════════
+            characters_list: List[dict] = []
+            if characters and isinstance(characters, dict):
+                characters_list = characters.get("characters") or []
+            if not isinstance(characters_list, list):
+                characters_list = []
+            shot_char_ids = shot.get("characters_in_scene") or []
+            chars_in_shot: List[dict] = resolve_characters_in_shot(
+                shot_char_ids=shot_char_ids,
+                characters_list=characters_list,
+                shot_id=shot.get("shot_id", "?"),
+            )
+
+            # ════════════════════════════════════════════════════════════════
+            # 2. location: lookup by scene_id → location_id → outline.unique_locations
+            # ════════════════════════════════════════════════════════════════
+            # T22-NEW-6 (P2 wire, 2026-05-22): 真 Stage 5 dispatch 真**没传** outline
+            # → 旧 storyboard.outline lookup 真**没用** → location=N (e2e 21/21).
+            # 修复: 接受 outline 参数, 优先用 outline.unique_locations 真查 location.
+            # 真**调用链路**:
+            #   shot.scene_id (e.g. 1) →
+            #   screenplay.scenes 找 scene_id=1 → 得 location_id ("stormy_sea") →
+            #   outline.unique_locations 找 location_id="stormy_sea" → 得 location dict
+            location_dict: Optional[dict] = None
+
+            # Step 2a: resolve location_id from multiple sources
+            location_id = None
+            if isinstance(shot, dict):
+                location_id = (
+                    shot.get("location_id")
+                    or shot.get("location_ref")
+                    or (shot.get("scene") or {}).get("location_id")
+                )
+
+            # Step 2b: if shot has scene_id, look up location via screenplay.scenes
+            if not location_id:
+                scene_id_for_loc = shot.get("scene_id") or shot.get("original_scene_id")
+                if scene_id_for_loc and screenplay and isinstance(screenplay, dict):
+                    scenes = screenplay.get("scenes") or []
+                    if isinstance(scenes, list):
+                        for sc in scenes:
+                            if not isinstance(sc, dict):
+                                continue
+                            sc_id = sc.get("scene_id") or sc.get("id")
+                            if sc_id == scene_id_for_loc:
+                                location_id = (
+                                    sc.get("location_id")
+                                    or sc.get("location_ref")
+                                )
+                                break
+
+            # Step 2c: look up location dict from outline.unique_locations
+            # Preferred path: explicit outline kwarg (T22-NEW-6 wire)
+            # Legacy fallback: storyboard.outline (preserved for back-compat)
+            if location_id:
+                outline_candidates = []
+                if outline and isinstance(outline, dict):
+                    outline_candidates.append(outline)
+                if storyboard and isinstance(storyboard, dict):
+                    legacy_outline = storyboard.get("outline")
+                    if isinstance(legacy_outline, dict):
+                        outline_candidates.append(legacy_outline)
+                for ol in outline_candidates:
+                    unique_locations = ol.get("unique_locations") or []
+                    if not isinstance(unique_locations, list):
+                        continue
+                    for loc in unique_locations:
+                        if not isinstance(loc, dict):
+                            continue
+                        if (loc.get("location_id") == location_id or
+                                loc.get("id") == location_id):
+                            location_dict = loc
+                            break
+                    if location_dict:
+                        break
+
+            # 3. props: from shot.props_in_scene or shot.key_props
+            props_list: List[dict] = []
+            raw_props = shot.get("props_in_scene") or shot.get("key_props") or []
+            if isinstance(raw_props, list):
+                for p in raw_props:
+                    if isinstance(p, dict):
+                        props_list.append(p)
+                    # strings are not anchorable (no signature_visual)
+
+            # 4. time_continuity: from screenplay.scenes[scene_id]
+            time_continuity_dict: Optional[dict] = None
+            scene_id = shot.get("original_scene_id") or shot.get("scene_id")
+            if scene_id and screenplay and isinstance(screenplay, dict):
+                scenes = screenplay.get("scenes") or []
+                if isinstance(scenes, list):
+                    for sc in scenes:
+                        if not isinstance(sc, dict):
+                            continue
+                        sc_id = sc.get("scene_id") or sc.get("id")
+                        if sc_id == scene_id:
+                            time_continuity_dict = sc
+                            break
+
+            # 5. Inject (idempotent — marker check inside)
+            new_prompt = inject_identity_anchors(
+                image_prompt=image_prompt,
+                characters_in_scene=chars_in_shot,
+                location=location_dict,
+                style_preset=style_preset,
+                props=props_list,
+                time_continuity=time_continuity_dict,
+            )
+
+            # 6. Validate + auto-correct (idempotent — won't double-inject)
+            validator = PromptValidator()
+            result = validator.validate_prompt_vs_schema(new_prompt, chars_in_shot)
+            if not result.passed:
+                new_prompt = validator.auto_correct(
+                    image_prompt=new_prompt,
+                    validation_result=result,
+                    characters_in_scene=chars_in_shot,
+                    location=location_dict,
+                    style_preset=style_preset,
+                    props=props_list,
+                    time_continuity=time_continuity_dict,
+                )
+
+            # 7. Return shot COPY with updated image_prompt (don't mutate caller)
+            if new_prompt == image_prompt:
+                return shot
+            shot_copy = dict(shot)
+            shot_copy["image_prompt"] = new_prompt
+            return shot_copy
+        except Exception as exc:
+            # Production safety: never break image generation due to anchor
+            # injection. Log and proceed with original shot.
+            logger.error(
+                "[ImageGenerator] DEC-048 Layer 1 _apply_identity_anchors "
+                "exception (%s: %s) — proceeding with unmodified shot",
+                type(exc).__name__, exc,
+            )
+            return shot
+
     async def generate_shot_image(
         self,
         shot: dict,
@@ -792,13 +1057,37 @@ class ImageGenerator:
         Returns:
             生成结果字典
         """
+        # DEC-048 Layer 1: identity anchor strong-injection (idempotent; no
+        # storyboard/characters context available at this entry point, so
+        # only style anchor + any minimal shot-level data flows through —
+        # main shot context paths use generate_shot_image_phase2_safe).
+        # T22-NEW-6 (2026-05-22): outline kwarg → location anchor wire.
+        shot = self._apply_identity_anchors(
+            shot=shot,
+            storyboard=kwargs.get("storyboard"),
+            characters=kwargs.get("characters"),
+            screenplay=kwargs.get("screenplay"),
+            style_preset=kwargs.get("style_preset", "realistic"),
+            outline=kwargs.get("outline"),
+        )
+
         # D.17: Seedream 路径 — 单一模型，无 NB2 fallback（视觉统一性保证）
         if settings.IMAGE_GEN_PROVIDER == "seedream":
             kwargs.pop("_seedream_fallback", None)  # 清理旧兼容参数（无副作用）
             from app.services.seedream_generator import generate_shot_image_seedream
+            # POST_BETA-5: dispatch 日志加 ref count 详情（角色参考图推断）
+            _total_refs = len(reference_images) if reference_images else 0
+            _char_count = len(shot.get("characters_in_scene", []))
+            _scene_ref_count = max(0, _total_refs - _char_count)
+            logger.info(
+                f"    [ImageGenerator] generate_shot_image → Seedream dispatch (D.17 单模型) "
+                f"refs={_total_refs} ({_char_count} portrait + {_scene_ref_count} scene_ref)"
+            )
             return await generate_shot_image_seedream(
                 shot=shot, reference_images=reference_images, aspect_ratio=aspect_ratio,
                 fallback_callback=None)  # D.17: 不传 fallback_callback，失败直接返失败 dict
+        # DEPRECATED 2026-05-11 (B41): 以下 NB2 shot 生成路径保留备用（IMAGE_GEN_PROVIDER=nb2 时启用）。
+        # 当前默认走 Seedream（dispatch 在上方）。
         # 1. 获取shot的image_prompt
         image_prompt = shot.get('image_prompt', '')
 
@@ -1037,6 +1326,21 @@ class ImageGenerator:
                 "success": False,
                 "error": "Gemini client not initialized. Check GEMINI_API_KEY."
             }
+
+        # DEC-048 Layer 1: identity anchor strong-injection BEFORE prompt
+        # assembly. Both b_prime + legacy paths read shot['image_prompt'],
+        # so mutating shot upfront ensures both paths see the augmented
+        # prompt. Idempotent — safe if generate_shot_image_phase2_safe
+        # already ran injection at its outer layer.
+        # T22-NEW-6 (2026-05-22): outline kwarg → location anchor wire.
+        shot = self._apply_identity_anchors(
+            shot=shot,
+            storyboard=storyboard,
+            characters=characters,
+            screenplay=screenplay,
+            style_preset=style_preset,
+            outline=kwargs.get("outline"),
+        )
 
         # Determine prompt format: parameter > env var > default "b_prime"
         active_format = prompt_format or settings.PROMPT_FORMAT or "b_prime"
@@ -1385,16 +1689,47 @@ class ImageGenerator:
         Returns:
             生成结果字典，额外包含 rewrite_info 如果进行了改写
         """
+        # DEC-048 Layer 1 (2026-05-22): identity anchor strong-injection —
+        # PRIMARY production inject point. All shot generation flows
+        # through here (pipeline_orchestrator.py L1589). Inject anchors
+        # BEFORE Seedream dispatch / NB2 fallback so both paths see the
+        # augmented prompt at shot['image_prompt']. Idempotent — safe to
+        # re-call from nested generate_shot_image_phase2.
+        #
+        # T22-NEW-6 (2026-05-22): outline kwarg → location anchor wire.
+        # pipeline_orchestrator.py Stage 5 dispatch passes outline through
+        # kwargs so we can look up unique_locations by scene → location_id.
+        shot = self._apply_identity_anchors(
+            shot=shot,
+            storyboard=storyboard,
+            characters=characters,
+            screenplay=screenplay,
+            style_preset=style_preset,
+            outline=kwargs.get("outline"),
+        )
+
         # D.17: Seedream 路径 — 单一模型，无 NB2 fallback（视觉统一性保证）
         if settings.IMAGE_GEN_PROVIDER == "seedream":
             _kwargs_copy = dict(kwargs)
             _kwargs_copy.pop("_seedream_fallback", None)  # 清理旧兼容参数
+            # outline 是 _apply_identity_anchors 用的, 不应传给 seedream_generator
+            _kwargs_copy.pop("outline", None)
             from app.services.seedream_generator import generate_shot_image_seedream
+            # POST_BETA-5: dispatch 日志加 ref count 详情（角色参考图推断）
+            _total_refs_p2 = len(reference_images) if reference_images else 0
+            _char_count_p2 = len(shot.get("characters_in_scene", []))
+            _scene_ref_count_p2 = max(0, _total_refs_p2 - _char_count_p2)
+            logger.info(
+                f"    [ImageGenerator] generate_shot_image_phase2_safe → Seedream dispatch (D.17 单模型) "
+                f"refs={_total_refs_p2} ({_char_count_p2} portrait + {_scene_ref_count_p2} scene_ref)"
+            )
             return await generate_shot_image_seedream(
                 shot=shot, reference_images=reference_images, aspect_ratio=aspect_ratio,
                 fallback_callback=None,  # D.17: 不传 fallback_callback，失败直接返失败 dict
                 **_kwargs_copy)  # 透传 project_id 等 kwargs 到 seedream_generator
 
+        # DEPRECATED 2026-05-11 (B41): 以下 NB2 phase2_safe 路径保留备用（IMAGE_GEN_PROVIDER=nb2 时启用）。
+        # 当前默认走 Seedream（dispatch 在上方）。
         shot_id = shot.get("shot_id", "?")
         logger.info(f"\n[ImageGenerator] === Shot {shot_id} 安全生成开始 ===")
 

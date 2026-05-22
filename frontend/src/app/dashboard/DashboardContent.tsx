@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { Plus, Layers, Clock, CheckCircle, Coins, Loader2 } from "lucide-react";
 import Image from "next/image";
@@ -11,14 +11,67 @@ import UserMenu from "@/components/dashboard/UserMenu";
 import StoryGrid from "@/components/dashboard/StoryGrid";
 
 export default function DashboardContent() {
-  const { user, isLoggedIn, stories, deleteStory, loadingUser } = useAuth();
+  const { user, isLoggedIn, stories, deleteStory, loadingUser, refreshStories } = useAuth();
   const router = useRouter();
+
+  // RISK-T14-12: Track newly-completed story IDs (transitioned from non-complete to complete
+  // during this dashboard session). Cleared on page unmount or manual dismiss.
+  const [newlyCompletedIds, setNewlyCompletedIds] = useState<Set<string>>(new Set());
+  // Track prev shot_count per story so we can detect completion transitions
+  const prevShotCountRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     if (!loadingUser && !isLoggedIn) {
       router.replace("/login");
     }
   }, [isLoggedIn, loadingUser, router]);
+
+  // RISK-T14-12: Poll every 30s to detect newly completed stories while user is on dashboard.
+  // Also triggers Browser Notification if permission was previously granted.
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const POLL_INTERVAL_MS = 30000;
+
+    const poll = async () => {
+      await refreshStories();
+    };
+
+    const timerId = setInterval(poll, POLL_INTERVAL_MS);
+    return () => clearInterval(timerId);
+  }, [isLoggedIn, refreshStories]);
+
+  // Detect completion transitions after stories update
+  useEffect(() => {
+    const prevCounts = prevShotCountRef.current;
+    const newlyDone: string[] = [];
+    for (const story of stories) {
+      const prev = prevCounts[story.id] ?? null;
+      if (prev !== null && prev === 0 && story.shotCount > 0) {
+        // Story went from in-progress to complete during this session
+        newlyDone.push(story.id);
+      }
+      prevCounts[story.id] = story.shotCount;
+    }
+    if (newlyDone.length > 0) {
+      setNewlyCompletedIds((prev) => {
+        const next = new Set(prev);
+        for (const id of newlyDone) next.add(id);
+        return next;
+      });
+      // Send browser Notification for each newly completed story (if permission granted)
+      if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+        for (const id of newlyDone) {
+          const story = stories.find((s) => s.id === id);
+          if (story) {
+            new Notification("序话Story", {
+              body: `《${story.title}》生成完成 — 点击查看`,
+              icon: "/brand/logo-40.png",
+            });
+          }
+        }
+      }
+    }
+  }, [stories]);
 
   if (loadingUser) return null;
   if (!isLoggedIn || !user) return null;
@@ -27,9 +80,11 @@ export default function DashboardContent() {
   const totalShots = stories.reduce((sum, s) => sum + s.shotCount, 0);
   const generatingStory = stories.find((s) => s.status === "generating");
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleContinue = (_storyId: string) => {
-    router.push("/create");
+  // D.23: Route to the dynamic create URL so hydration can reconcile to /preview
+  // for completed projects, or /generating for in-progress projects, etc.
+  // Previously just went to /create (Stage A), ignoring project state entirely.
+  const handleContinue = (storyId: string) => {
+    router.push(`/create/${storyId}/outline`);
   };
 
   return (
@@ -82,7 +137,7 @@ export default function DashboardContent() {
           className="mb-8"
         >
           <h1 className="text-2xl font-bold mb-1">
-            {getGreeting()}，{user.name}
+            {getGreeting()}，{user?.name}
           </h1>
           <p className="text-text-tertiary text-sm">管理你的故事创作</p>
         </motion.div>
@@ -121,7 +176,7 @@ export default function DashboardContent() {
                 <Coins className="w-4 h-4 text-accent-gold" />
                 <span className="text-xs text-text-muted">Credits</span>
               </div>
-              <p className="text-2xl font-bold text-text-primary">{user.credits ?? 0}</p>
+              <p className="text-2xl font-bold text-text-primary">{user?.credits ?? 0}</p>
             </div>
           </motion.div>
         )}
@@ -136,6 +191,7 @@ export default function DashboardContent() {
             stories={stories}
             onDelete={deleteStory}
             onContinue={handleContinue}
+            newlyCompletedIds={newlyCompletedIds}
           />
         </motion.div>
       </main>

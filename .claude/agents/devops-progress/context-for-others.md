@@ -1,7 +1,169 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
-> 其他 Agent 查看此文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-04-30（Wave 5.2 完成 — Wave 5.1 全批修复上生产 + DB migration 002）
+> 其他 Agent 查看其文件了解 DevOps 的工作状态和部署要求
+> **最后更新**: 2026-05-21 23:XX（自补 5/19-5/21 进度 + VPS 部署清单准备）
+
+---
+
+## 当前状态速览（5/21 23:XX）
+
+**DevOps 状态**: ⏳ 等 VPS 部署派工（Layer 1 完成 + 内测启动后）
+
+**5/19 之后发生了什么（PM 直接操作，DevOps 未派工）**：
+- 5/20-5/21 多波次 backend 重启（Wave 1/2/3/4/5 后台 agent 完成后）
+- 5/21 Alembic 006 (`006_add_scene_references_t21_new7`) — PM 直接跑 `alembic upgrade head`，2 次 error 后加幂等兜底成功。本地 DB 新增 2 列: `projects.scene_references_confirmed` + `project_chapters.scene_references_json`
+- Backend stuck PID 34613 历史 kill -9（PM 操作，DevOps 未参与）
+- Wave 5 Backend Opus 4.7 完成 T21-NEW-3/4/5/6/7（含 Stage 4.5 大架构改造），未重启
+- Wave II Frontend Opus 4.7 完成 T21-NEW-7 Frontend（SceneRefsPreview 对偶组件）
+- Wave III（PM 承诺自做）：alembic + 干净重启 + monitors
+
+**Layer 1 (T22-NEW-3 Identity Anchor Framework) 是当前主线**，完成后 PM 会派 VPS 部署任务给 DevOps。
+
+---
+
+## VPS 部署清单（Layer 1 完成后执行）
+
+**执行顺序**:
+
+1. **Push GitHub 先于 VPS**（铁律，不分批）
+   ```bash
+   git push origin main   # 必须先完成
+   ```
+
+2. **rsync 本地代码 → VPS**（Ben 协议，不 git pull）
+   ```bash
+   rsync -avz -e "ssh -p 58913" app/ trader@107.148.1.199:/opt/xuhua-story/app/
+   rsync -avz -e "ssh -p 58913" frontend/src/ trader@107.148.1.199:/opt/xuhua-story/frontend/src/
+   ```
+   **trailing slash 陷阱**: `rsync app/` 目标也要 `/opt/xuhua-story/app/`（含子目录 `app/`），否则平铺到根（2026-04-15 踩坑）
+
+3. **Alembic 006 迁移（VPS 容器内）**
+   ```bash
+   docker compose exec api alembic upgrade head
+   # 期望: 006_add_scene_references_t21_new7 applied
+   # 验证: SHOW COLUMNS FROM projects LIKE 'scene_references_confirmed'
+   ```
+   本地已执行成功。Alembic 006 有幂等兜底（1060 Duplicate column → skip），VPS 重跑安全。
+
+4. **Docker rebuild + force-recreate**
+   ```bash
+   docker compose build --no-cache api       # Dockerfile.api COPY app/ 是 bake-in，必须 rebuild
+   docker compose build --no-cache frontend  # 如有前端改动
+   docker compose up -d --force-recreate api frontend
+   ```
+
+5. **健康检查**
+   ```bash
+   docker compose exec api curl http://localhost:8000/health   # 容器内正确路径
+   # 外部 /api/health 200 正常（Nginx 反向代理）
+   # 外部 /health 直接访问可能 404（正常，Nginx 路由）
+   ```
+
+**监控/告警（R4）**: Wave R4 long-tail，不在 Layer 1 范围。
+
+---
+
+## 5-02 MySQL 连接中断故障全记录 (2026-05-02) — 关键基础设施知识
+
+**全员注意 — 阿里云 ECS 安全组 SAS 自管机制 + 修复模式**
+
+### 故障概要
+
+5-01 → 5-02 跨日后本地 backend 启动失败，`OperationalError (2013, Lost connection to MySQL server during query)`。DevOps 经过 V1+V2 两轮诊断，均未锁定真根因（V1 认为瞬时网络问题；V2 认为 server 端 mysqld 故障）。最终由 PM（借助 ttsrecap 项目 agent 的 server 端自查）+ Founder 截图证实真根因：**阿里云 ECS 安全组 SAS 自管**。
+
+### 真根因
+
+ECS 绑定了 SAS（安全管家）自动创建的安全组 `Sas_Malicious_Ip_Security_Group` (sg-uf668b0d3r5ohyphxywo)，该安全组限定 MySQL(3306) source 仅允许 self-IP `101.132.69.232/32`（ECS 本机自连）。
+
+- 外部 IP（包括本地 Astrill 出口 `140.99.222.167`、VPS `107.148.1.199`）全部被 **silent drop**
+- 表现：`nc -zv 3306` ✅（TCP SYN-ACK 内核层通过）但 `recv(4) 0 bytes`（MySQL 握手包被安全组吞掉）
+- 这是**应用层过滤**，不是 mysqld 崩溃，不是网络层不通
+
+### 修复模式（重要！下次再遇到不要走弯路）
+
+**正确做法**：ECS 安全组新增 allow 规则，**不要编辑 SAS 自管的已有规则**（SAS 会定期覆盖）
+1. 阿里云控制台 → ECS → 安全组 → 找到 `Sas_Malicious_Ip_Security_Group`
+2. 入方向 → 添加安全组规则
+3. 协议: TCP，端口: 3306，授权对象: 需要访问的 IP/32，优先级: 1（高于 SAS 默认规则）
+4. 提交后立即生效（秒通）
+
+**本次修复**：Founder 加白 `140.99.222.167/32`（Astrill 出口 IP）→ MySQL(3306) 优先级 1。提交后秒通。
+
+### 对所有 Agent 的影响
+
+- **MySQL 现在可用** (2026-05-02 15:30 后)：本地 backend 已恢复正常，`/health` 200，aiomysql 真连接 + 15 tables
+- **VPS docker-api-1**：同样不受影响（VPS IP 107.148.1.199 不在白名单，但 VPS 容器的 DB 操作是通过 ECS 内网地址还是公网地址待确认）
+- **如果未来再遇到 `nc 3306 ✅` 但 `mysql -h 连不上 ❌`**：优先排查 ECS 安全组，不是 mysqld 故障
+
+### DevOps V1+V2 诊断质量反思（给 PM 参考）
+
+**V1 失误**：认为"VPS docker-api-1 健康 = MySQL 本身没问题，是瞬时网络，重试通常 OK"。实际上 /health 是假阳性（硬编码不测 DB）。V1 方向基本正确（重启），但对持续失败的可能性估计不足。
+
+**V2 失误**：看到"两个不同 IP（本地 + VPS）都失败"就排除了白名单，推断为 server 端 mysqld 故障。这个推断跳步了——SAS 安全组 source 是 self-IP，本地和 VPS 都不是 self-IP，所以都被拦截，"两个 IP 都失败"恰恰是白名单问题的特征，不是排除。
+
+**改进：标准客户端 4 步自查（DevOps 未来诊断 DB 连接问题前必做）**：
+
+| 步骤 | 命令 | 判断 |
+|------|------|------|
+| 1 | `ping 101.132.69.232` | ICMP — 网络层可达性 |
+| 2 | `nc -zv 101.132.69.232 3306` | TCP — 端口层可达性 |
+| 3 | `mysql -u xxx -p -h 101.132.69.232` | 应用层 — MySQL 握手是否到达 |
+| 4 | `traceroute 101.132.69.232` | 路径追踪 — drop 发生在哪一跳 |
+
+**信号解读**：
+- `nc ✅` + `mysql ❌` = 应用层 filter（安全组/防火墙），不是 mysqld 崩溃
+- `nc ✅` + `recv(4) 0 bytes` = 中性（可能是 mysqld 崩溃，也可能是 silent drop）— 需要 server 端自连验证才能区分
+- 如果 `server 端 mysql 自连 ✅` + `外部 recv(4) 0 bytes` = 100% 安全组/防火墙 silent drop，不是 mysqld 问题
+
+---
+
+## TASK-KEY-ROTATE-GEMINI 完成 (2026-05-01 00:09) — Gemini API Key 轮换
+
+**全员注意 — 旧 Gemini API key 即将被 Founder 在 Google Cloud Console 撤销**:
+
+- 旧 key `AIzaSyCX***[redacted-key-Apr29-old]` → 新 key `AIzaSyBm***[redacted-key-Apr29-new]`
+- 本地 `.env:2`：✅ 新 key 1 处 / 旧 key 0 处
+- VPS `/opt/xuhua-story/.env.production`：✅ 新 key 1 处 / 旧 key 0 处
+- 本地 backend PID **71921**（重启时间 2026-05-01 00:08，无 --reload）/ VPS `docker-api-1` Recreated
+- 真 LLM 验证：本地 + VPS 都用 `gemini-2.5-flash` 调通，AUTH=PASS，无 401/403
+- HTTPS prefaceai.mov/api/health：200 ✅
+
+**给 @backend / @ai-ml / @tester**:
+- 新 key 已在本地 + VPS 全链路生效，可继续日常开发/测试
+- 如有任何 Gemini 调用 401/403/quota 异常，**立即** SendMessage 报 PM
+- 备份 `.env.backup-keyrotate-20260501`（本地 + VPS 两端）保留至少 48 hr 后再清理
+
+**给 @pm**:
+- 已 SendMessage 提醒：Founder 必须立即去 Google Cloud Console 撤销旧 key（Founder 已明确授权"立即 revoke 不需要观察期"）
+- 任何环境变量变更（包括 ANTHROPIC_API_KEY / OPENAI_API_KEY 等其他 key 未来轮换）都按本次 10 步流程：备份 → 替换 → 重启 → 真 LLM 验证 → 通知 Founder revoke 旧 key
+
+---
+
+## Wave 5.3 完成 (2026-04-30) — alembic CLI 工程化
+
+**全员注意 — alembic 正式工程化，以后 schema 改动可走标准流程**:
+
+- `alembic.ini` 已建（项目根），`sqlalchemy.url` 留空由 env.py 读取
+- `alembic/env.py` 已建，同步 pymysql driver，`target_metadata = Base.metadata`
+- `requirements.txt` 加 `alembic>=1.13.0` + `pymysql>=1.1.0`
+- `docker/Dockerfile.api` 加 `COPY alembic.ini` + `COPY alembic/`
+- 本地 `alembic current` = `002_r7_2_favorite_share (head)` ✅
+- VPS 容器 `alembic current` = `002_r7_2_favorite_share (head)` ✅
+- commits: `c30982f` + `26ff792` push main
+
+**以后 schema 变更标准流程（@backend 注意）**:
+```bash
+# 1. 修改 app/models/*.py
+# 2. 生成迁移文件
+alembic revision --autogenerate -m "describe_change"
+# 3. 检查生成的 versions/xxx.py
+# 4. 本地执行
+alembic upgrade head
+# 5. VPS（DevOps 负责）
+docker compose exec api alembic upgrade head
+```
+
+**不再需要手写 Python/aiomysql DDL 脚本来迁移**。
 
 ---
 
@@ -261,12 +423,49 @@
 
 ---
 
-## 当前状态速览
+## 历史状态（5/18 快照）
 
-状态: ✅ **TASK-BUG-FIX-BATCH-1 Route D 完成** (2026-04-23 17:10, DevOps 自执行)
-最新 commit: `6518563` (fix(docker): add output_data volume mount, 1 file)
-前一 commit: `3fa2a73` (fix: Pipeline UX/BGM/SKIP bugs + FE StrictMode, 20 files)
-历史 commit: `d154ce1` (fix(logging): P0P1 exception logging + docker log rotate, 2026-04-23)
+状态: ✅ **TASK-T20-FIXBATCH-2 T18-I IncompleteRead 监控 Dashboard 完成** (2026-05-18)
+
+### T18-I 新增 DevOps 工具（2026-05-18）
+
+**IncompleteRead 监控脚本**:
+- `scripts/monitor_incompleteread.py` — 解析 backend.log，统计 Seedream 下载 IncompleteRead 频率
+- `scripts/monitor.yaml` — 告警阈值配置（4 个参数，唯一调参入口）
+- `docs/MONITORING_INCOMPLETEREAD.md` — 完整部署 + 使用 + VPS cron 部署方案
+
+**基线数据**（test18, 2026-05-18）:
+- 每故事约 8 次 IncompleteRead，全部 1 次 retry 成功，成功率 100%
+- WARN 阈值: 每小时 >= 20 次；CRITICAL 阈值: 每小时 Retry 耗尽 >= 3 次
+
+**如何使用**:
+```bash
+# 立即查看当前状态
+python3 scripts/monitor_incompleteread.py --log logs/backend.log
+# 调阈值只需改 scripts/monitor.yaml
+```
+
+---
+
+## 上次状态速览
+
+状态: ✅ **TASK-WAVE9-P2-DEVOPS-FRONTEND-IMPACT-HOOK 完成** (2026-05-13, Wave 9 Phase 2)
+
+### Wave 9 新增 DevOps 工具
+
+**pre-commit hook (DEC-030 Ben 方案 B)**:
+- `scripts/pre-commit-frontend-impact.sh` — 核心 hook，检测 6 个契约高风险文件
+- `scripts/install_pre_commit_hook.sh` — 一键安装脚本
+- `docs/CONTRACT_HOOK.md` — 使用文档
+- `.git/hooks/pre-commit` — symlink 已安装
+
+**对 @backend / @ai-ml 的影响**:
+- 改以下文件 commit 时，必须在 commit message 加 `[frontend-impact: yes/no]` label
+- 受影响文件: `app/api/projects.py`, `app/api/chapters.py`, `app/services/pipeline_orchestrator.py`, `app/services/job_manager.py`, `app/models/project.py`, `app/schemas/project.py`
+- 安装 hook: `bash scripts/install_pre_commit_hook.sh`
+- 临时跳过: `git commit --no-verify`（强烈不建议）
+
+最新 commit（Wave 9 前）: `6518563` (fix(docker): add output_data volume mount, 1 file)
 域名: `https://prefaceai.mov` 已上线（前端 + API + Harness V2 监控端点）
 服务器: 107.148.1.199 (8C/16GB/200GB, Ubuntu 20.04)
 容器: 3 个运行中 — api (healthy) + frontend (up) + redis (healthy)

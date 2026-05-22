@@ -60,15 +60,37 @@ export default function BgmPlayer({ projectId, chapter = 1 }: BgmPlayerProps) {
 
   // ── On mount: fetch BGM info from backend ──────────────────────────────────
   useEffect(() => {
-    if (!projectId || !token) return;
-    if (bgmPlayer.status !== "idle") return; // already fetched
+    if (!projectId || !token) {
+      // [BgmPlayer] Log #1 — skip fetch: no projectId or token
+      // eslint-disable-next-line no-console
+      console.log("[BgmPlayer] useEffect: skip fetch (no projectId or token)", { projectId, hasToken: !!token });
+      return;
+    }
+    if (bgmPlayer.status !== "idle") {
+      // [BgmPlayer] Log #2 — skip fetch: already fetched
+      // eslint-disable-next-line no-console
+      console.log("[BgmPlayer] useEffect: skip fetch (status already:", bgmPlayer.status, "bgmUrl:", bgmPlayer.bgmUrl?.slice(0, 60) ?? "null", ")");
+      return;
+    }
 
+    // [BgmPlayer] Log #3 — starting BGM info fetch
+    // eslint-disable-next-line no-console
+    console.log("[BgmPlayer] useEffect: fetching BGM info for projectId=", projectId, "chapter=", chapter);
     dispatch({ type: "BGM_LOADING" });
     fetchBgmInfo(projectId, chapter, token)
       .then((info) => {
+        // [BgmPlayer] Log #4 — BGM info response
+        // eslint-disable-next-line no-console
+        console.log("[BgmPlayer] fetchBgmInfo response: bgm_exists=", info.bgm_exists, "bgm_url=", info.bgm_url?.slice(0, 80) ?? "null", "meta_version=", info.meta_version, "credits_used=", info.credits_used);
         if (!info.bgm_exists || !info.bgm_url) {
+          // [BgmPlayer] Log #5 — no BGM available
+          // eslint-disable-next-line no-console
+          console.log("[BgmPlayer] BGM not available (bgm_exists=false or bgm_url null) → BGM_NO_BGM");
           dispatch({ type: "BGM_NO_BGM" });
         } else {
+          // [BgmPlayer] Log #6 — BGM ready
+          // eslint-disable-next-line no-console
+          console.log("[BgmPlayer] BGM ready → BGM_READY url=", info.bgm_url?.slice(0, 80));
           dispatch({
             type: "BGM_READY",
             payload: {
@@ -80,7 +102,10 @@ export default function BgmPlayer({ projectId, chapter = 1 }: BgmPlayerProps) {
           });
         }
       })
-      .catch(() => {
+      .catch((e) => {
+        // [BgmPlayer] Log #7 — fetch error → treat as no BGM
+        // eslint-disable-next-line no-console
+        console.warn("[BgmPlayer] fetchBgmInfo ERROR (→ BGM_NO_BGM):", e instanceof Error ? e.message : e);
         dispatch({ type: "BGM_NO_BGM" });
       });
   }, [projectId, chapter, token]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -136,10 +161,16 @@ export default function BgmPlayer({ projectId, chapter = 1 }: BgmPlayerProps) {
   // ── Regenerate BGM ──────────────────────────────────────────────────────────
   const handleRegenerate = async () => {
     if (!projectId || !token) return;
+    // [BgmPlayer] Log #8 — regenerate BGM start (用户点"再来一首")
+    // eslint-disable-next-line no-console
+    console.log("[BgmPlayer] handleRegenerate: regenerating BGM for projectId=", projectId, "chapter=", chapter);
     dispatch({ type: "BGM_GENERATING" });
     setIsPlaying(false);
     try {
       const res = await regenerateBgm(projectId, chapter, token);
+      // [BgmPlayer] Log #9 — regenerate success
+      // eslint-disable-next-line no-console
+      console.log("[BgmPlayer] handleRegenerate: SUCCESS new_bgm_url=", res.bgm_url?.slice(0, 80) ?? "null", "meta_version=", res.meta_version, "credits=", res.total_credits_used);
       dispatch({
         type: "BGM_READY",
         payload: {
@@ -149,7 +180,10 @@ export default function BgmPlayer({ projectId, chapter = 1 }: BgmPlayerProps) {
           creditsUsed: res.total_credits_used,
         },
       });
-    } catch {
+    } catch (e) {
+      // [BgmPlayer] Log #10 — regenerate error
+      // eslint-disable-next-line no-console
+      console.error("[BgmPlayer] handleRegenerate: ERROR:", e instanceof Error ? e.message : e);
       dispatch({ type: "BGM_ERROR", payload: "重新生成失败，请稍后重试" });
     }
   };
@@ -157,10 +191,16 @@ export default function BgmPlayer({ projectId, chapter = 1 }: BgmPlayerProps) {
   // ── Change Meta (换一首) ─────────────────────────────────────────────────────
   const handleChangeMeta = async () => {
     if (!projectId || !token) return;
+    // [BgmPlayer] Log #11 — change meta start (用户点"换种风格")
+    // eslint-disable-next-line no-console
+    console.log("[BgmPlayer] handleChangeMeta: changing BGM style for projectId=", projectId, "chapter=", chapter);
     dispatch({ type: "BGM_GENERATING" });
     setIsPlaying(false);
     try {
       const res = await changeMetaBgm(projectId, chapter, token);
+      // [BgmPlayer] Log #12 — change meta success
+      // eslint-disable-next-line no-console
+      console.log("[BgmPlayer] handleChangeMeta: SUCCESS new_bgm_url=", res.bgm_url?.slice(0, 80) ?? "null", "meta_version=", res.meta_version, "credits=", res.total_credits_used);
       dispatch({
         type: "BGM_READY",
         payload: {
@@ -170,7 +210,10 @@ export default function BgmPlayer({ projectId, chapter = 1 }: BgmPlayerProps) {
           creditsUsed: res.total_credits_used,
         },
       });
-    } catch {
+    } catch (e) {
+      // [BgmPlayer] Log #13 — change meta error
+      // eslint-disable-next-line no-console
+      console.error("[BgmPlayer] handleChangeMeta: ERROR:", e instanceof Error ? e.message : e);
       dispatch({ type: "BGM_ERROR", payload: "换一首失败，请稍后重试" });
     }
   };
@@ -388,25 +431,28 @@ export default function BgmPlayer({ projectId, chapter = 1 }: BgmPlayerProps) {
         </span>
       </div>
 
-      {/* Action buttons */}
+      {/* Action buttons — B24: distinct labels so users instantly understand the difference */}
       <div className="flex gap-2">
         <button
           onClick={handleChangeMeta}
+          title="切换 BGM 风格类型（mixed 混合版 ↔ en 英文版），换不同调性和语言风格"
           className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-white/10 text-text-muted hover:text-text-secondary hover:border-white/20 text-xs transition-colors"
         >
           <Shuffle className="w-3 h-3" />
-          换一首
+          换种风格
         </button>
         <button
           onClick={handleRegenerate}
+          title="保持相同风格，用同样的调性和语言再生成一首变奏版本"
           className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-white/10 text-text-muted hover:text-text-secondary hover:border-white/20 text-xs transition-colors"
         >
           <RefreshCw className="w-3 h-3" />
-          重新生成
+          再来一首
         </button>
       </div>
       <p className="text-[10px] text-text-muted/60 text-center mt-2">
-        换一首消耗 5 credits，重新生成消耗 10 credits
+        <span className="font-medium text-text-muted/80">换种风格</span> 消耗 5 credits（试不同调性）&nbsp;·&nbsp;
+        <span className="font-medium text-text-muted/80">再来一首</span> 消耗 10 credits（同款变奏）
       </p>
     </div>
   );

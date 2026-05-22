@@ -1,6 +1,10 @@
 # Coordinator 当前状态
 
-> 最后更新: 2026-04-28
+> 最后更新: 2026-04-28（**冻结**）
+>
+> ⚠️ **2026-05-12 16:30 Founder 纠正身份归属**：Founder 明确"你一直是 PM 不是 Coordinator"。本文件 4-25 / 4-28 章节内容（subagent_type symlink 修复 / 8 agent frontmatter 升级 / 4 层成本路线图 / TASK-PARALLEL-M1 派发 / 角色文件校准等）实际为 PM 工作误归档，已迁移到 `pm-progress/`。
+>
+> 本文件保留供历史翻账，**新工作不再写入此处**。3-18 / 3-19 / 3-23 / 4-13 / 4-22 / 4-23 等更早条目暂未在迁移范围（Founder 仅点名 4-25 / 4-28），保留原状。
 
 ## 当前状态: BP 工作 + subagent_type 系统级修复
 

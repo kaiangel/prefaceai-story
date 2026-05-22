@@ -4,6 +4,1339 @@
 
 ---
 
+## 2026-05-22
+
+### Wave 8 第 3 批 — T22-NEW-5 R4-2 砍掉 (scene_review 移除) ✅ [2026-05-22 ~19:00 — Sonnet 4.6 xhigh, ~2h]
+
+**任务**: TASK-T22-NEW-5 — R4-2 文字层场景确认移除, Stage 3→4 直连
+
+**核心改动**:
+- `app/services/pipeline_orchestrator.py`: R4-2 wait loop 完整移除 (~90 行 → 7 行 T22-NEW-5 标记)
+- `app/api/chapters.py`: `_derive_ui_phase` 移除 scene_review, `_build_hydrate_hints` 移除 scene_review 分支, 新增 `confirm_scenes_noop` endpoint
+- `.team-brain/contracts/STATUS_API_CONTRACT.md`: 升级 v1.4 → v1.5 (8 状态机, scene_review 移除)
+- `tests/test_t22_new_5_r4_2_removed.py`: 新建 24 case
+
+**pytest**: 24/24 新 + 172/172 回归 = 196/196 PASS, 0 退化
+**Ben 5/13 协议**: 0 schema / 0 Alembic / 0 frontend / 0 越权
+**部署**: Frontend Wave 8 #2 + Backend T22-NEW-5 必须同时部署
+
+---
+
+### Wave 8 — Generic Fallback Architecture (pipeline_schemas.py 重构) ✅ [2026-05-22 ~17:00 — Sonnet 4.6 xhigh, ~1.5h]
+
+**任务**: TASK-T22-NEW-9 — 将 Wave 4+4.5 hotfix (17 type 手动 humanoid fallback) 重构为通用方案 B
+
+**核心改动**:
+- `app/services/pipeline_schemas.py`: `_TYPE_REQUIRED_GROUPS` 19 entry → 4 + `has_humanoid_fallback()` 通用函数
+- `tests/test_schema_generic_fallback_arch.py`: 新建 83 case (8 section)
+- `tests/test_t21_digital_virtual_fallback.py`: 1 test 更新 (warning not raise)
+
+**pytest**: 229/229 PASS (25+16+83+105), 0 退化, 0 越权
+
+---
+
+### Wave 7 P0 — Layer 1 first-batch chars=0 + LLM Fallback Chain + Location Wire ✅ [2026-05-22 ~15:30 — Sonnet 4.6 xhigh, ~3h]
+
+**任务范围**: 3 P0/P1/P2 任务一波修齐 (Founder e2e test22 14:09 视觉验证 + 13:30/13:56 fallback 实证)
+
+**真根因诊断 (T22-NEW-7)**: test22 4_storyboard.json 实证 — Stage 4 LLM 输出 `characters_in_scene` 真**格式不一致** (前 3 shot 用 name_en "Coral", 后 18 shot 用 char_id "char_001"). 旧 `_apply_identity_anchors` 只比对 `c["id"]` → 前 3 完全 mismatch → chars=0 → Coral CHARACTER ANCHORS 完全没注入 → Seedream weak ref → Shot 2 美人鱼变蓝头发人腿. **真不是** race/batch/scope — **纯 ID format mismatch**.
+
+**改动文件 (6 改 + 3 新单测, 0 Ben 协议越界)**:
+
+| 文件 | 改动 |
+|------|------|
+| `app/services/identity_anchor_injector.py` | + 新增 `resolve_characters_in_shot()` standalone helper (三路 id/name_en/name smart match, case-insensitive, dedup, 防御 WARNING) |
+| `app/services/image_generator.py` | `_apply_identity_anchors` + outline kwarg (T22-NEW-6), char resolution 改 delegate 到 helper |
+| `app/services/pipeline_orchestrator.py` | Stage 5 dispatch 传 `outline=outline` kwarg (T22-NEW-6 wire) |
+| `app/services/llm_fallback_chain.py` (**新建 404 行**) | Haiku → Gemini 3.1 Flash → Sonnet 4.6 三层 (跨 provider 优先, KEY_LEARNINGS #55) + FallbackResult dataclass + LLMFallbackAllFailedError + friendly_error_message |
+| `app/api/projects.py` | AdjustCharacter 接入 fallback chain |
+| `app/api/chapters.py` | Shot regenerate adjustment 接入 fallback |
+| `app/services/music_generation_service.py` | `_call_haiku_with_retry()` 重写用 fallback chain (3 caller 自动 benefit) |
+| `tests/test_first_batch_chars_not_zero.py` | **新建** 17 case |
+| `tests/test_llm_fallback_chain.py` | **新建** 14 case |
+| `tests/test_apply_identity_anchors_location_wire.py` | **新建** 7 case |
+
+**pytest 真自跑**: 321/321 PASS (38 新 + 283 旧 regression, 0 退化, 8 文件分别跑)
+
+**Ben 5/13 协议**: 0 改 schemas / alembic / STATUS_API_CONTRACT / frontend / AI-ML 文件 / prompt_validator.py
+
+**RegeneratePortrait 未接入 fallback (note)**: PENDING.md 列入但实测**不调任何 LLM**, 真无 LLM fallback 必要. 已标注给 PM/Founder.
+
+---
+
+### DEC-048 Layer 1 — Identity Anchor Backend 实施 ✅ [2026-05-22 ~12:00 — Sonnet 4.6 xhigh, ~3h]
+
+**任务范围**: AI-ML M1 spec C/D 节真精确实施, 解决 LLM 创意层与一致性的根本张力 (test22 fairytale 20/20 shot Coral hair 全失重演 7 次的真根因)
+
+**核心改动** (5 文件, 0 Ben 协议越界):
+
+| 文件 | 改动 |
+|------|------|
+| `app/services/identity_anchor_injector.py` | **新建** 400 行 — `inject_identity_anchors()` + 5 个 `_render_*_block` helper. 6 edge case 真兜底 (0 char / 0 props / 0 location / 已注入 / 多角色 / anthropomorphic 调度). Idempotent (marker check). |
+| `app/services/prompt_validator.py` | **新建** 260 行 — `PromptValidator` 类 + `ValidationResult` dataclass. `validate_prompt_vs_schema()` (severity 三级: critical/warning/info) + `auto_correct()` (idempotent re-inject). |
+| `app/services/image_generator.py` | **改** ~190 行 — + Layer 1 import (L25-32) + `_apply_identity_anchors()` 私有 helper (L820-970, 从 storyboard/screenplay 真提取 location/scene_id/props 的 5 维度 context) + 3 dispatch wire (L1009 generate_shot_image / L1278 generate_shot_image_phase2 / L1639 generate_shot_image_phase2_safe **生产 primary**) |
+| `tests/test_identity_anchor_injector.py` | **新建** 25 case |
+| `tests/test_prompt_validator.py` | **新建** 28 case |
+
+**pytest 真自跑结果** (KEY_LEARNINGS #47 第 7 次防御, PM 必跑铁律):
+
+- 新单测 injector: **25/25 PASS** (0.05s)
+- 新单测 validator: **28/28 PASS** (0.03s)
+- AI-ML extraction 真**0 退化**: **74/74 PASS** (0.03s, 与 round 2 完全一致)
+- Layer 1 全套合跑: **127/127 PASS** (0.06s)
+- Wider 回归 (10 file 含 T20-21/T20-26/T20-27/T20-28/T20-43/T20-22 + t21_new_2): **365/365 PASS** (0.23s)
+- 我之前 backend (t21_new_3_to_7): **51/51 PASS** (0.06s)
+
+**真**调用链路接通** (KEY_LEARNINGS #48 防死代码):
+
+```
+import L31-32 → 真 in
+_apply_identity_anchors L834 → 定义
+  ├── inject_identity_anchors L935 → 内部真调
+  ├── PromptValidator() L945 → 真实例化
+  ├── validate_prompt_vs_schema L946 → 真校验
+  └── auto_correct L947 → 真自纠
+3 dispatch 调用:
+  ├── L1009 generate_shot_image → 真调
+  ├── L1278 generate_shot_image_phase2 → 真调
+  └── L1639 generate_shot_image_phase2_safe → 真调 (生产 PRIMARY, pipeline_orchestrator L1589 唯一入口)
+```
+
+**Ben 5/13 协议 0 变更** (全面 grep self-check):
+- ✅ chapters.py / projects.py / schemas / STATUS_API_CONTRACT / alembic 本 session 0 diff
+- ✅ storyboard_prompts.py / storyboard_director.py / identity_anchor_prompts.py (AI-ML 职责) 0 越权
+- ✅ frontend 0 影响 (Layer 1 真对前端透明)
+
+**关键设计决策**:
+- 注入位置: image_prompt 真起始 (LLM 注意力衰减原理)
+- 注入器层 idempotent (marker) + 验证器层 idempotent (marker check 不重注 防 LLM tail 漂移导致 anchor block 重复)
+- 异常防护: `_apply_identity_anchors()` try/except 兜底 — 任何异常都 fallback 原 shot, 不抛出 (production safety > validation strictness, 与 KEY_LEARNINGS #47/#48/#50 一致)
+- mutate shot **COPY** 不动 caller dict
+- 跨 19 character_types 通用 (dispatch 已在 AI-ML extract_identity_anchors 真做)
+- 跨 80+ styles 通用 (extract_style_anchors 真从 StyleEnforcer 真读)
+
+**风险提示给 Tester / Founder**:
+1. Tester baseline 矩阵 (95 case) 真用 `inject_identity_anchors()` mock fixture 跑 grep 验证, 不调真 API (零成本)
+2. Founder e2e 重跑 test22 真验证 prompt 含 sea-green (现在通过 inject path 真保证 100%)
+3. anchor block 真**~600-1500 chars** for 1-3 角色 — Seedream context budget 真**充裕** (Seedream 真允许 ~4000 chars)
+
+---
+
+## 2026-05-21
+
+### Wave 5 — TASK-T21-NEW-3/4/5/6/7 ✅ [2026-05-21 22:30 — Opus 4.7 thinking xhigh, ~3h]
+
+**任务范围** (5 task 串行, 真大架构改造):
+
+| Task | 优先级 | 改动核心 | 单测 |
+|------|--------|---------|------|
+| T21-NEW-3 | P1 | restart-from-failed-stage 真重算 progress/ETA (传 actual_shot_count/unique_location_count/max_concurrent 真值 + 友好 stage_message) | 5/5 |
+| T21-NEW-4 | P1 | AdjustCharacter + RegeneratePortrait portrait_url + fullbody_url 加 `?v={epoch}` cache-buster | 4/4 |
+| T21-NEW-5 | P2 | Stage 5 stage_message "角色参考图" → "全身参考图" 明确语义 (KEY_LEARNINGS #46 同源思想) | 2/2 |
+| T21-NEW-7 | P0 | **大架构**: Stage 4.5 scene_image_preparation + R4-3 闸门 + 3 endpoint + STATUS_API_CONTRACT v1.4 + DEC-047 + Alembic 006 + 2 DB 列 + 9 ui_phase 状态机 | 24/24 |
+| T21-NEW-6 | P1 | image_preparation 多 sub-step stage_message 细化 (≥5 sub-step) + SceneReferenceManager sub_progress_callback 参数 | 6/6 |
+
+**改动文件** (9 个 + 2 文档):
+- `app/models/project.py` (+ scene_references_confirmed)
+- `app/models/chapter.py` (+ scene_references_json LONGTEXT)
+- `app/schemas/chapter.py` (+ 2 字段, 9 状态机注释)
+- `app/services/pipeline_orchestrator.py` (+ Stage 4.5 大块 ~180 行 + R4-3 wait loop + Stage 5 5a.5 复用+兜底 + STAGE_DURATIONS 9 stage + sub-stage messages + T21-NEW-5 文案)
+- `app/services/scene_reference_manager.py` (+ sub_progress_callback 4 参数 + _emit_sub_progress helper)
+- `app/services/job_manager.py` (+ _ETA_STAGE_BASELINES/_ETA_STAGE_PROGRESS_BOUNDS 9 stage)
+- `app/api/chapters.py` (+ T21-NEW-3 真重算 + _derive_ui_phase 新 stage + _build_hydrate_hints + status return 新字段 + 3 endpoint)
+- `app/api/projects.py` (+ T21-NEW-4 cache-buster + start_generation 重置)
+- `alembic/versions/006_add_scene_references_t21_new7.py` (新 migration + backfill)
+- `.team-brain/contracts/STATUS_API_CONTRACT.md` (v1.3 → v1.4)
+- `.team-brain/decisions/DECISIONS.md` (+ DEC-047)
+
+**pytest 真结果** (PM 自跑 KEY_LEARNINGS #47):
+- 新 51/51 PASS (test_t21_new_3_to_7_backend.py)
+- 综合回归 234/234 PASS (T21-NEW-1/2/T20-43/T20-50/T20-44/T20-47/T20-48/T20-46/T20-27/T20-13/T20-53/shot_regenerate/T20-50b)
+- 综合 (新 + status_authoritative) 95/95 PASS
+
+**架构关键设计**:
+- 9 状态机 (新 scene_references_review): input → outline → char_review_pending → char_review → scene_review_pending → scene_review → storyboard_running (Stage 4 + Stage 4.5 复用) → **scene_references_review (R4-3)** → shot_generating → completed
+- Pipeline Stage 4 完成 → Stage 4.5 真生成 scene anchors + 写 chapter.scene_references_json → R4-3 wait loop → 用户在 frontend /scenes 页面真预览+编辑+重生+60s 倒计时 → POST /confirm-scene-references → Stage 5 fullbody+shots
+- "情节确认" (R4-2 文字) ≠ "场景视觉确认" (R4-3 视觉), 都给用户停留点
+- 镜像 characters 页面对偶设计 (R4-1 角色视觉 ↔ R4-3 场景视觉)
+- DEC-014/DEC-009 一致性保留 (regenerate exterior 用 interior 作参考)
+
+**约束遵守**:
+- 0 越权改 TEAM_CHAT/PENDING (paste 给 PM 代写)
+- Edit STATUS_API_CONTRACT v1.4 + DECISIONS DEC-047 (PM 派工明确授权)
+- 不重启 Backend (等 PM 审查后重启)
+- 镜像 AdjustCharacter / 60s 倒计时模式
+- 0 退化 (除 pre-existing T20-52 isolation bug, 不阻塞)
+
+---
+
+### TASK-T21-NEW-2 — Wave 4.5 5 type humanoid fallback 补充 ✅ [2026-05-21 ~21:45 — Sonnet 4.6 xhigh]
+
+**背景**: PM 19 type 地毯式分析发现 5 type (aquatic/anthropomorphic_animal/object/plant/insect) 可能呈人形但无人外貌字段 fallback
+
+**修复** (`app/services/pipeline_schemas.py` 注释 + _TYPE_REQUIRED_GROUPS):
+- P0: `aquatic` → 加 hair_color/skin_tone/face_shape (美人鱼公主)
+- P0: `anthropomorphic_animal` → 保留 2 group AND, group 2 加人外貌 (狼人/猫娘, species 仍必须)
+- P1: `object` → 加 hair_color/skin_tone/face_shape (钟先生/Olaf)
+- P2: `plant` → 加 hair_color/skin_tone/face_shape (树精/花仙女)
+- P2: `insect` → 加 hair_color/skin_tone/face_shape (蝴蝶仙子)
+- 保留不改: `animal` (纯动物) + `vehicle_character` (Transformers 罕见)
+
+**新建测试** (`tests/test_t21_new_2_humanoid_fallback_wave2.py`):
+- 16 单测: 5 type × 人外貌 PASS + type-specific PASS + anthropomorphic_animal 2 FAIL + 3 regression
+- **16/16 PASS**
+
+**更新** (`tests/test_t21_digital_virtual_fallback.py`):
+- 1 过时测试 (T21-NEW-1 时 insect 未在修复列表, 预期 FAIL) 更新为 T21-NEW-2 后正确 PASS
+- T21-NEW-1 仍 **25/25 PASS**
+
+**pytest 汇总**:
+- 新测试 16/16 PASS
+- T21-NEW-1 25/25 PASS (0 退化)
+- T20-43 26/26 PASS (0 退化)
+
+**约束**: 不重启 backend, 等 PM 审查后重启
+
+---
+
+## 2026-05-20
+
+### TASK-T21-NEW-1 — digital_virtual + 7 non-human humanoid schema fallback ✅ [2026-05-20 ~21:30 — Sonnet 4.6 xhigh]
+
+**背景**: test21 Stage 2 失败 (char_001 小爱 digital_virtual, 15 人类外貌字段被 schema 拒绝)
+
+**修复** (`app/services/pipeline_schemas.py` L220-245):
+- 更新注释 + _TYPE_REQUIRED_GROUPS 8 个 type 加人类外貌字段 OR fallback
+- P0: digital_virtual → `[('digital_type', 'base_form', 'hair_color', 'skin_tone', 'face_shape')]`
+- P1: robot, hybrid, alien (各加 hair_color/skin_tone/face_shape)
+- P2: elemental, concept_personified, giant, miniature (各加 hair_color/skin_tone/face_shape)
+
+**新建测试** (`tests/test_t21_digital_virtual_fallback.py`):
+- 25 单测: 8 type × 2 PASS (human fallback + type-specific) + 1 FAIL (无字段) + regression
+- 25/25 PASS
+
+**pytest 汇总**:
+- 新测试 25/25 PASS
+- T20-43 26/26 PASS (0 退化)
+- Wave 3 核心 6 文件综合 101/101 PASS
+- 全量 tests/ 1685 PASS (pre-existing 9 fail 与本次改动无关)
+
+**约束**: 不重启 backend, 等 PM 审查后重启
+
+---
+
+### Wave 3 — T20-51 + T20-52 + T20-53 (3 P3 long-tail fixes) ✅ [2026-05-20 ~21:00 — Sonnet 4.6 xhigh]
+
+**T20-51 BGM meta-prompt 迁出 test_output**:
+- `app/services/music_generation_service.py` META_PROMPT_DIR: `test_output/...` → `app/prompts/bgm`
+- `app/prompts/bgm/meta_mixed_v3_quote_picking.md` (新建, 100% 与旧文件一致)
+- `app/prompts/bgm/meta_en_v2.md` (新建, 100% 与旧文件一致)
+- `tests/test_t20_51_bgm_meta_prompt_path.py` (新建, 9 PASS)
+
+**T20-52 T20-47 测试 isolation 修复**:
+- `tests/test_t20_47_shot_validator_fallback.py` — 新增 `_load_shot_validator_fresh()` autouse fixture
+- `tests/test_t20_50_fix_round3.py` — 同样的 isolation fixture
+- 根因: test_t20_43 注入 app/app.services stub (无 __path__) 污染 sys.modules
+- 修复: 每 test 前清除 stub, 用 importlib.util.spec_from_file_location 直接加载 shot_validator.py
+- 综合跑验收: 140→162 PASS, 0 fail (修复前 22 fail)
+
+**T20-53 SQLAlchemy pool 优化**:
+- `app/database.py` 新增 `pool_timeout=30`
+- `tests/test_t20_53_db_pool_config.py` (新建, 13 PASS)
+- 其余 pool 参数 (pool_pre_ping/pool_recycle/pool_size/max_overflow) 在 Wave 4 BUG-T13 已配置
+
+**pytest 汇总**: 综合 T20-43~T20-53 162 PASS, 0 fail (3 新 test 文件共 31 新单测)
+
+---
+
+### Wave 2 round 3 — T20-47-fix (SONNET_MODEL) + T20-50-fix-2 (save_all_references) ✅ [2026-05-20 ~20:00 — Sonnet 4.6 xhigh]
+
+**改动**:
+- `app/services/shot_validator.py` L184: `SONNET_MODEL` 改为 `"claude-sonnet-4-6"`（去掉不存在的 -20251101 后缀）
+- `app/services/reference_image_manager.py` L791-811: `save_all_references` 加 `os.path.exists` 判断，文件已存在 skip save
+- `tests/test_t20_47_shot_validator_fallback.py` L77-89: 更新 `test_sonnet_model_constant` 期望值
+
+**新建测试**: `tests/test_t20_50_fix_round3.py` — 9 case 全 PASS:
+- 3 case: SONNET_MODEL 常量验证
+- 2 case: mock Anthropic API 调用 (model ID 真发到 API)
+- 4 case: save_all_references 不覆盖已存在文件（含 T20-50 重生场景）
+
+**注意**: 代码改完未重启 backend (PID=79233 正跑 Founder test20 Pipeline)，等 Pipeline 完成后 PM 重启生效
+
+---
+
+### Wave 2 — T20-50b + T20-47 + T20-48 ✅ [2026-05-20 18:15 — Sonnet 4.6 xhigh]
+
+**改动**: `app/services/shot_validator.py` + `app/services/pipeline_orchestrator.py` (代码改动) + `app/api/projects.py` (审查确认)
+
+**新建测试**: 3 文件 58 新单测全 PASS:
+- `tests/test_t20_50b_adjust_character_regen.py` — 16 case (adjust_character 总是重生 portrait+fullbody)
+- `tests/test_t20_47_shot_validator_fallback.py` — 20 case (Sonnet 4.6 主 + Haiku 降级 + 30%告警)
+- `tests/test_t20_48_anatomy_auto_regen.py` — 22 case (anatomy 2次重试 + partial_failure)
+
+**Backend**: PID=75990, `/health` 200
+
+---
+
+### Wave 1 补遗 — T20-46 wire + STATUS_API_CONTRACT v1.3 + character_consistency 说明 ✅ [2026-05-20 17:45 — Sonnet 4.6 xhigh]
+
+**任务 1 - T20-46 Backend Wire**:
+- `app/services/pipeline_orchestrator.py` L561-564: `character_designer.design(outline)` → 传 `style_preset=style_preset`
+- 新建 `tests/test_t20_46_backend_wire.py` 11 单测 PASS
+- 回归: `tests/test_t20_46_character_style_infusion.py` 47/47 PASS
+
+**任务 2 - STATUS_API_CONTRACT v1.3**:
+- `.team-brain/contracts/STATUS_API_CONTRACT.md` 升级 v1.2→v1.3
+- shots_completed §1.2 注释升级 (8 stage 行为说明)
+- 新增 §1.4 跨阶段值表
+- 新增 §8 v1.3 历史条目
+- 补救 KEY_LEARNINGS #36 (Backend agent 漏改 STATUS_API_CONTRACT.md 铁律)
+
+**任务 3 - character_consistency e2e 说明**:
+- 更新 context-for-others.md: T20-50 修改逻辑正确性已 unit test 验证，e2e 一致性需 Founder 手动跑 test20/test21
+
+---
+
+### T20-50 P0 freshness check 算法完全移除 ✅ [2026-05-20 17:15 — Sonnet 4.6 xhigh]
+
+**触发**: test20 陈婶重生事故 — 用户在 /characters 页重生 portrait (gothic) → Pipeline 覆盖重生为 realistic (freshness check 算法 bug)
+
+**真根因**: `pipeline_orchestrator.py:L1071` `_portrait_fresh = _portrait_mtime > (_char_ts + 30)` — RegeneratePortrait 端点 T₀ 同时写文件(mtime=T₀) + 更新 DB(updated_at=T₀)，所以 T₀ > T₀+30 = False → 算"陈旧" → Pipeline 重新生成覆盖
+
+**修复 (Founder 方案 A — 信任用户操作 KEY_LEARNINGS #46)**:
+- 完全删除 freshness check 算法 (~20 行: `_portrait_mtime / _char_updated_at_str / _portrait_fresh / _char_ts + 30`)
+- 改为: `if file exists → skip=True` (信任 character_refs/ 目录里现有文件)
+- 加 `logger.info(f"[Pipeline] {char_name} portrait 已存在, 信任用户操作 (no regen, T20-50 KEY_LEARNINGS #46)")`
+
+**改动 1 文件**: `app/services/pipeline_orchestrator.py` L1054-1080
+
+**新增测试**: `tests/test_t20_50_freshness_removed.py` 5 个 case (含 case 4 旧 bug 重现对比)
+
+**验收**: 5/5 pytest PASS，回归 137/137 PASS，Backend 重启 PID=68942 /health 200
+
+---
+
+### T20-44 P1 shots_completed BGM 阶段重置 bug 修复 ✅ [2026-05-20 17:15 — Sonnet 4.6 xhigh]
+
+**触发**: test20 BGM 阶段 status API 返回 shots_completed=0 (应保留 27)
+
+**真根因**: `chapters.py` shots_completed 计算逻辑: stage="bgm" 走 `else` 分支 → `_shots_completed = 0` (重置)
+
+**修复**: 加 `_POST_IMAGE_GEN_STAGES = {"bgm", "postprocess", "finalize", "completed"}` 集合，这些 stage 下返回 `shots_total` (不重置)
+
+**改动 1 文件**: `app/api/chapters.py` — shots_completed 计算逻辑区分 post-image-gen stages
+
+**新增测试**: `tests/test_t20_44_shots_completed_timing.py` 21 个 case
+
+**验收**: 21/21 pytest PASS，Backend PID=68942 /health 200
+
+**Frontend 配合**: 待 Wave 2 (Frontend 读 shots_completed 渲染 ETA)
+
+---
+
+### DEC-043 RISK-T20-?? supernatural humanoid hotfix ✅ [2026-05-20 15:35 — Sonnet 4.6]
+
+**触发**: test20 horror 镜中人 char_002 (supernatural + 人类外貌字段) Stage 2 Schema 验证崩溃
+
+**改动**: `app/services/pipeline_schemas.py` `_TYPE_REQUIRED_GROUPS` — supernatural/undead/mythological/fantasy_creature 4 个 type 各自 group 内加入 `hair_color/skin_tone/face_shape`（OR 关系 fallback）
+
+**新增**: `tests/test_supernatural_humanoid_hotfix.py` 7 个 case，全 PASS
+
+**验收**: 51/51 pytest PASS（7 新 + 44 回归），Backend 重启 PID=55021 health OK
+
+---
+
+### T20-29 v3 输出端 wire — Schema extra='allow' + KPI 真接通 + narrative_cluster fallback ✅ [2026-05-20 11:30 — Sonnet 4.6]
+
+**任务**: PM v3 wire 审查发现 KEY_LEARNINGS #29 教训重演 — AI-ML v3 prompt 写好了、Backend 注入 prompt 也对了，但 LLM 输出端没接住：schema 默认丢 v3 字段 + validate_scene_self_evaluation 死代码。
+
+**改动 2 文件**:
+
+| 文件 | 改动 | 行数 |
+|------|------|------|
+| `app/services/pipeline_schemas.py` | SceneSchema + ScreenplaySchema 各加 `model_config = ConfigDict(extra='allow')` | +6 行净增 |
+| `app/services/screenplay_writer.py` | import 3 个 v3 函数 + 3 处 KPI 软警告调用 + P2 narrative_cluster fallback | +22 行净增 |
+
+**验收全 PASS**:
+- ✅ py_compile 两文件 PASS
+- ✅ SceneSchema(**v3_dict) 实测: narrative_cluster + scene_self_evaluation 字段全保留 ✅
+- ✅ grep validate_scene_self_evaluation app/services/ → 3 处调用 (修前 0) ✅
+- ✅ 538/538 pytest (test_t20_* 519 + test_pipeline_* 19) 全 PASS
+
+---
+
+### TASK-T20-FIXBATCH-6 Wave 5 v3 wire — DEC-046 Stage 3 + Stage 4 注入 ✅ [2026-05-20 10:45 — Sonnet 4.6]
+
+**任务**: AI-ML Wave 5 完成 T20-28 v3 prompt 重构 (15 原则 + 8 cluster + 85% KPI), Backend wire 到 services 层让 v3 生效.
+
+**改动 2 文件**:
+
+| 文件 | 改动 | 行数 |
+|------|------|------|
+| `app/services/screenplay_writer.py` | import 2 个 v3 常量 + 4 处 f-string 注入 (batch + single 各 2) | +8 行净增 |
+| `app/services/storyboard_director.py` | import 1 个 v3 常量 + 2 处 f-string 注入 (scene + prompt) | +4 行净增 |
+
+**验收全 PASS**:
+- ✅ py_compile 两文件 PASS
+- ✅ Stage 3 dry-run: CLUSTER DISPATCHER / SELF-EVALUATION 85% / narrative_cluster / scene_self_evaluation 全在 prompt ✅
+- ✅ Stage 4 dry-run: IMAGE-TEXT COMPLEMENT / MINIMAL DIALOGUE / TIMELINE JUMP MARKER / METAPHOR & SYMBOL 全在 prompt ✅
+- ✅ 217/217 pytest PASS (test_t20_21 60 + test_t20_17 33 + test_t20_26 23 + test_t20_27 33 + test_t20_28 68)
+
+---
+
+## 2026-05-19
+
+### TASK-T20-FIXBATCH-5 Wave 4 T20-26 P0 — regenerate flow replace 策略 ✅ [2026-05-19 22:55 — Opus 4.7 default]
+
+**任务**: 改 `regenerate_shot` endpoint 为 replace 策略 (不再 append) + Backend 双层兜底 (KEY_LEARNINGS #37/#38, DEC-045)
+
+**根因 (test19 Founder 5 次 Shot 15 重生失败)**:
+- 旧 `build_adjustment_user_prompt()` Rule 1+4+8 强制 Haiku 保留原 prompt 全部元素 → ghost / double-exposure / overlap 段落原封不动 → Seedream content_safety 100% 拒
+- 实测: 原 prompt 814 chars → Haiku 改写后 2203 chars (追加 1389 chars 不删原敏感词)
+
+**修复路径** (双团队协调):
+- **AI-ML** (并行 Wave 4): 升级 `SHOT_ADJUSTMENT_SYSTEM_PROMPT` 为 Two-Mode (Mode A surgical / Mode B replace) + 新 `build_adjustment_user_prompt(mode="auto")` + `SEEDREAM_TRIPWIRE_KEYWORDS` + `detect_seedream_tripwire()`
+- **Backend** (本任务): 接通 AI-ML 升级的 `mode="auto"` builder + Haiku 返回后**强制 check_replace_effective** + **兜底 strip_known_dark_terms**
+
+**改动 3 文件**:
+
+| 文件 | 改动 | 行数 |
+|------|------|------|
+| `app/services/shot_prompt_rewriter.py` | 新建 — Backend 兜底层模块 | 568 |
+| `app/api/chapters.py` `regenerate_shot` | 改 user prompt 构造 + Haiku 后 check + 兜底 strip + 完整 [T20-26] 日志 | L2056-2168 (改 ~100 行) |
+| `tests/test_t20_26_regenerate_replace_flow.py` | 新建 60 单测 8 sections | 568 |
+
+**真实链路**:
+```
+Founder 点 "调整画面" (中文 intent)
+  ↓ POST /chapters/1/shots/{id}/regenerate
+  ↓ detect_seedream_tripwire(orig) → mode A/B
+  ↓ build_adjustment_user_prompt(orig, intent, mode="auto")  ← AI-ML
+  ↓ Haiku 4.5 (max_tokens=3000) + SHOT_ADJUSTMENT_SYSTEM_PROMPT
+  ↓ check_replace_effective(orig, rewritten)  ← Backend 强制校验
+  ↓ effective=False? → strip_known_dark_terms()  ← 机械兜底
+  ↓ 写回 storyboard_json (image_prompt)
+  ↓ SeedreamGenerator 真生图
+```
+
+**Backend 兜底层 (`shot_prompt_rewriter.py`)**:
+- `KNOWN_DARK_TERMS` 5 类 ~40 词 (灵异/双重曝光/已故角色/身体重叠/vision overlay)
+- `find_known_dark_terms(text)` — 词边界匹配 (单词) + 子串匹配 (短语), 大小写不敏感, 去重
+- `strip_known_dark_terms(text)` — **长短语优先**替换 (防 "two faces merging" 替换后留 "faces merging" 二次拼接) + safe alternatives map ("warm light" / "split composition" / "in fond memory")
+- `check_replace_effective(orig, rewritten)` — 2 维度: 仍含敏感词 + length ratio > 2.0x = suspicious append
+- `build_replace_user_prompt()` + `gather_scene_context_for_replace()` + `gather_character_context_for_replace()` — 保留为 helper (当前 endpoint 不用, 未来如需 Backend 完全自主构造 prompt 可启用)
+
+**Mode A/B 自动判定** (AI-ML 设计, Backend 接通):
+- 无触发词 → Mode A (SURGICAL EDIT, 旧行为)
+- 含 ghost/double-exposure/etc → Mode B (REPLACE-AND-CLEAN, 完全重写 + 自检 verify)
+
+**验证**:
+- ✅ 60/60 test_t20_26_regenerate_replace_flow PASS (Backend 新单测)
+- ✅ 55/55 test_t20_26_prompt_rewriter_replace + test_t20_26_seedream_safety_avoidance PASS (AI-ML 写)
+- ✅ 9/9 test_shot_regenerate_persistence PASS (主流程不退化)
+- ✅ 15/15 test_async_anthropic_t18_j PASS (T18-J 不退化)
+- ✅ 139/139 status_authoritative + t20_13 + t20_9_v3 + t20_19 + t20_21 + t20_10 综合 PASS
+- ✅ 400/400 Wave 1-4 + T20 系列综合 PASS
+- ✅ 1218 全 suite PASS, 4 fail + 6 error 全 pre-existing (audit 确认与本次无关)
+- ✅ py_compile chapters.py + shot_prompt_rewriter.py PASS
+
+**Ben 契约**:
+- regenerate-shot endpoint **不在** STATUS_API_CONTRACT 监控的 13 字段范围内 (Wave 9 字段)
+- 响应 schema **无新字段**
+- **`[frontend-impact: no]`** — STATUS_API_CONTRACT.md 不需要改, 无需升 v1.3
+
+**0 越权**: 仅改 app/services + app/api + tests/ (Backend 白名单), 未改 AI-ML 任何文件, 未改 frontend, 未重启 backend (PM 决定时机)
+
+**给 Tester 验收 metrics** (Founder 手动 test20 时 grep backend log):
+- `[T20-26][Shot Regenerate] strategy=mode_X_...` (期望 mode_B_ok 为主, 偶尔 mode_B_with_mech_strip_fallback)
+- `tripwire_hits=[...]` (Mode B 应 ≥1)
+- `ratio=...x` (应 0.4-1.5x, > 2.0x 标 warning)
+
+---
+
+### T20-17 Backend Wire — Stage 4 Species Fidelity ✅ [2026-05-19 20:00 — Sonnet 4.6]
+
+**任务**: Wire AI-ML 的 `build_stage4_character_data_block` + `SPECIES_FIDELITY_RULES` 到 `storyboard_director.py`
+
+**根因**: `_build_scene_prompt()` 旧逻辑只传 `{id, name, clothing_summary}` → LLM 对非 human 角色物种零信息 → hallucinate "hedgehog-like" (Milly 是 rabbit)
+
+**改动** (仅 `app/services/storyboard_director.py`):
+- import 加 `SPECIES_FIDELITY_RULES` + `build_stage4_character_data_block`
+- `_build_scene_prompt()` L1534-1558: 旧 chars_simplified loop → `characters_block = build_stage4_character_data_block(characters)`
+- prompt 模板: `{characters_json}` → `{characters_block}` (含 "Character data:" prefix, 去掉重复 header)
+- prompt 模板 HAIR_COLOR 后注入 `{SPECIES_FIDELITY_RULES}`
+- `_build_prompt()` dead code: Option A 同步改动
+
+**验证**: 33/33 test_t20_17 + 13/13 storyboard_schema + 79/79 t20_10+t20_21 PASS, dry-run fox/rabbit/sparrow 全传 LLM
+
+---
+
+### TASK-T20-FIXBATCH-4 Wave 2 — T20-21 wire + T20-9.v3 ETA 全局重审 ✅ [2026-05-19 19:00 — Opus 4.7 default]
+
+**任务**: Wave 1 完成后串行 2 项 (PM 派活 5/19 17:45):
+- T20-21 P0 Backend wire — Stage 3 ScreenplayWriter 接通 AI-ML Wave 1 已实现的 DEC-044 prompts
+- T20-9.v3 P1 ETA 全局重审 — Founder 5/19 16:08 反馈 4 项核心问题 (基于 Wave 1 T20-13 新加的 shots_total/completed/failed 真字段)
+
+#### T20-21 Backend wire (~30 min)
+
+**改动** (`app/services/screenplay_writer.py`):
+- 顶部 import: `DEC044_SCREENPLAY_RULES` + `DEC044_SCREENPLAY_OUTPUT_EXAMPLE` + `get_dec044_narration_max_chars`
+- `_build_batch_prompt()` 2 处注入: DEC-044 rules block (在 CHARACTER CONSISTENCY 后) + OUTPUT_EXAMPLE (替换旧 prose JSON template)
+- `_build_single_scene_prompt()` 2 处注入: 同上
+- `target_narration_words` 公式改: `max(80, int(duration * 4))` (80-400) → `min(120, int(duration * 1.5))` (≤120 hard cap, DEC-044)
+- 删旧"【字数硬性要求：必须≥X字】" prose-mode 硬要求文本
+- 删旧"这是TTS朗读的旁白" 描述
+- `_expand_narration_if_needed()` v1 disable (return scene unchanged) — 详注释为何 DEC-044 narration 不再需要扩写
+
+**Stage 4 自动受益**: storyboard_director.py 已 import COMIC_MODE_NARRATIVE_RULES (AI-ML Wave 1 已升级, Backend 无需改动)
+
+**验证**:
+- py_compile screenplay_writer.py PASS
+- 新单测 tests/test_t20_21_wire.py 18 PASS (6 测试类: rules injection / output example injection / 旧文本删除 / target words 公式 / expand disabled / universal generic story / module structure)
+- 回归 111 PASS (b51_fallback 50 + t20_21_narration_to_shot_content 42 + t20_10_universal_character_schema 19)
+
+#### T20-9.v3 ETA 全局重审 (~60 min)
+
+**改动** (`app/api/chapters.py`):
+- 新加 4 常量: `_V3_PER_SHOT_SECONDS=80` / `_V3_BGM_BASELINE_SECONDS=120` / `_V3_POSTPROCESS_BASELINE_SECONDS=30` / `_V3_TERMINAL_PHASE_MIN_ETA=5`
+- 新 helper `_compute_v3_eta(job, shots_total, shots_completed, max_concurrent, legacy_eta) -> int | None`:
+  - completed → 0
+  - image_generation: `(shots_total - shots_completed) * 80 / max_concurrent + 120 (bgm) + 30 (postprocess)`
+  - bgm: bgm baseline 按 progress (92-100) 内折扣 + postprocess
+  - image_preparation: 保底 full image_gen + bgm + postprocess (避免低估), legacy 更大时信 legacy
+  - 早期 stage (shots_total=None) → 返 None 走 legacy chain
+  - **v3 真实数据完全接管, 不被 legacy_eta 上限约束** (Founder 反馈核心修复)
+- status endpoint 在 `_shots_total/_shots_completed` 计算后调 v3, 接管 estimated_remaining (try/except 兜底)
+
+**改动** (`.team-brain/contracts/STATUS_API_CONTRACT.md`):
+- 升 v1.1 → v1.2 — schema 字段不变, 仅 estimated_remaining_seconds 算法升级
+- §8 添加完整 v1.2 changelog (Founder 4 核心问题 + v3 算法 + 测试结果 + 向后兼容声明)
+
+**Founder 4 P0 问题修复对照**:
+
+| Founder 反馈 | v3 修复 |
+|------|---------|
+| #1 progress=84% 但 Shot 14/20 才开始 | 用真实 shots_completed (=14) 替代 progress 反推, 算剩 6 shot |
+| #2 前端"自说自话" | backend 优先返 v3 真实 ETA, frontend 直接显示 (不再需自己 fallback) |
+| #3 progress >= 95% 显"即将完成"无数字 | v3 保底 ≥5s 具体数值 (`_V3_TERMINAL_PHASE_MIN_ETA`) |
+| #4 跨 stage 累积 | image_generation ETA 含 bgm(120) + postprocess(30) |
+
+**验证**:
+- py_compile chapters.py PASS
+- 新单测 tests/test_t20_9_v3_eta.py 32 PASS (11 测试类: completed / 早期 stage 不接管 / image_gen 真实数据 / v3 接管 legacy / bgm / image_prep / universal / 跨 stage / 终态保底 / edge cases / Founder 实测场景)
+- 回归 102 PASS (status_authoritative 44 + t20_13_shots_count 34 + t20_9_estimated_remaining 17 + d2_eta_parallel 7)
+- 全 suite (~30 min 跑中, 后台)
+
+**API 契约变化** (STATUS_API_CONTRACT.md v1.2):
+- `estimated_remaining_seconds`: schema 不变, 算法升级
+- Frontend useETA.ts Wave 2 行动建议: **优先用 backend 这个字段** (现更准, 不需前端 fallback 算 ETA)
+- shots_total/completed/failed (Wave 1 T20-13 已加) — v3 算法直接消费, frontend 也可直接读
+
+**Frontend Wave 2 useETA.ts 建议**:
+- 删除任何 hardcoded `STAGE_BUDGET_SECONDS` fallback (backend v3 算法已准, 无需前端补)
+- 直接显示 `status.estimated_remaining_seconds` (image_generation/bgm/completed/image_preparation 阶段都准了)
+- progress >= 95% 也显示具体数字 (不再"即将完成")
+- 如要本地校验, 可用 `shots_total - shots_completed` 显示 "已生成 X/Y 张" (T20-13 字段)
+
+**改动文件列表** (3 修改 + 2 新建):
+
+修改:
+1. `app/services/screenplay_writer.py` — DEC-044 wire (import + 2 inject + 2 narration target + expand disable)
+2. `app/api/chapters.py` — v3 ETA helper + status endpoint 接管
+3. `.team-brain/contracts/STATUS_API_CONTRACT.md` — v1.1 → v1.2
+
+新建:
+4. `tests/test_t20_21_wire.py` — 18 case
+5. `tests/test_t20_9_v3_eta.py` — 32 case
+
+**Commit label** (Ben 规则 3 pre-commit hook):
+- 修改了 6 监控文件之一 (`app/api/chapters.py`)
+- commit message 必须含 `[frontend-impact: yes]`
+  - 理由: estimated_remaining_seconds 算法升级, Frontend Wave 2 useETA.ts 应改用 backend 值不再 fallback
+
+**0 越权**: 严格在 PM 派活白名单内 (app/services/screenplay_writer.py / app/api/chapters.py / .team-brain/contracts/ / tests/)
+
+**Backend PID 82102 未重启** (PM 任务约束明确说不重启 — 待 PM 决定时机)
+
+### TASK-T20-FIXBATCH-4 Wave 1 — T20-13 P0 + T20-14 P0 + T20-19 P1 ✅ [2026-05-19 17:20 — Opus 4.7 default]
+
+**任务**: test17 v2 端到端实测后 Founder 拍板 12 项内测前必修, Wave 1 Backend 3 项串行做 (PM 派活 5/19 16:30):
+- T20-13 P0 status API 加 shot 级真实计数字段 (frontend 不再 regex 解析 message)
+- T20-14 P0 ShotValidator Anthropic 429/529 退避重试 (test17 v2 18/18 fail-open → B51 fallback 形同虚设)
+- T20-19 P1 pipeline 单 shot wall-clock timeout 720s (Shot 14 hang 12.5 min / Shot 16 hang 14.2 min)
+
+#### 改动文件 (4 修改 + 3 新建)
+
+修改:
+1. `app/schemas/chapter.py` — ChapterStatus +3 字段 (shots_total/completed/failed, 默认 None)
+2. `app/api/chapters.py` — import re + ~50 行 status endpoint shots_total/completed/failed 派生 (regex/progress 反推/stage 派生)
+3. `app/services/shot_validator.py` — 2 helper (_is_retryable + _call_anthropic_with_retry) + validate_shot 用 helper + except 路径区分 reason
+4. `app/services/pipeline_orchestrator.py` — SHOT_WALL_CLOCK_TIMEOUT_SEC=720 常量 + asyncio.wait_for 包裹 _generate_one_shot
+
+新建:
+5. `tests/test_t20_13_shots_count_fields.py` — 34 case (6 schema + 6 regex + 6 progress + 6 stage + 5 真实场景 + 5 源码验证)
+6. `tests/test_t20_14_anthropic_retry.py` — 24 case (8 retryable 判定 + 4 常量 + 6 helper 行为 + 2 集成 + 4 源码)
+7. `tests/test_t20_19_shot_wall_clock_timeout.py` — 14 case (3 常量 + 5 源码 + 3 wait_for 行为 + 1 result shape + 2 既有路径)
+
+#### 验证
+
+- ✅ **新单测 72/72 PASS** (34 + 24 + 14)
+- ✅ **293 regression PASS** (T20-8/9/10 + status_authoritative + shot_validator_compression + shot_validator_universal_skip + parallel_stage5 + pipeline_failure_status + pipeline_restart + b51_fallback)
+- ✅ **全 suite 1002 PASS / 32 skipped** (跑全 tests/, 14:32 总耗时)
+- ✅ 4 fail + 6 error 是 **pre-existing 与本次改动无关** (SQLite LONGTEXT dialect 兼容 / e2e 需 backend / 需登录 fixture, 跟 audit 报告"4 已有 fail 与本次无关"完全吻合)
+- ✅ py_compile 所有改动文件 PASS
+- ✅ Backend PID 82102 **未重启** (等 PM 决定何时重启)
+- ✅ 0 越权 (严格在 PM 派活白名单内)
+
+#### T20-13: status API 真实 shot 计数字段
+
+**3 字段派生规则** (universal, 不破坏向后兼容):
+- `shots_total`: chapter.storyboard_json 解析 shots count
+- `shots_failed`: job.failed_shot_count (DB 直读)
+- `shots_completed`: stage="completed" → shots_total; stage="image_generation" → 优先 regex "已生成 X/Y", 兜底 progress 反推 (75+20*X/Y); 其他 stage → 0; 早期 stage 全 null
+
+**Frontend 收益** (Wave 2):
+- 删除 message regex 解析 "已生成 X/Y" — 直接读 shots_completed
+- ETA 算法可用 `(shots_total - shots_completed) * 80 / max_concurrent` 更准
+- shots_in_flight 可派生
+
+#### T20-14: ShotValidator Anthropic 退避重试
+
+**核心常量**:
+- `SHOT_VALIDATOR_RETRY_DELAYS_SEC = (2, 8, 30)` (类似 Seedream)
+- `SHOT_VALIDATOR_RETRY_JITTER_RATIO = 0.30` (防 retry storm)
+- `SHOT_VALIDATOR_RETRYABLE_STATUS_CODES = (429, 529, 503)`
+
+**逻辑**:
+- 仅对 429/529/503 + 文本兜底 "overloaded"/"rate limit" 退避
+- 其他错误 (401/400/超大图) 立即 fail-open
+- 总尝试 4 次 (1 原 + 3 重试), 仍失败才走 fail-open
+- ERROR 级日志 `OVERLOAD_RETRY_EXHAUSTED_{code}` (退避耗尽), WARNING 级 `API_ERROR_SKIPPED` (其他)
+- shot_id 从 shot dict 拿 (兜底 "?"), 便于日志追踪
+
+**影响**: test17 v2 实测 18/18 Anthropic 调用 529 全 fail-open. 修后 529 应被重试覆盖大部分, ShotValidator 真验证率显著提升, B51 fallback 不再"形同虚设".
+
+#### T20-19: Pipeline 单 Shot wall-clock timeout
+
+**为什么 720s**:
+- SeedreamGenerator 理论最坏: 4 attempts × 210s + 退避 (2+8+30+60s) = ~940s ≈ 15.7 min
+- 720s = 12 min: SeedreamGenerator 自愈窗口 + 安全余量
+- 略小于理论最坏, 但合理 cap, 不让单个假死 shot 拖死整批 Semaphore 槽位
+
+**逻辑**:
+- `asyncio.wait_for(generate_shot_image_phase2_safe, timeout=SHOT_WALL_CLOCK_TIMEOUT_SEC)` 包裹
+- TimeoutError → 构造失败 result (success=False, error_kind="wall_clock_timeout") + ERROR 级日志
+- 不 retry (已等 12 min, 再来无意义) → break 跳出 retry 循环
+- partial_failure (T15-9) + Frontend "查看并重生" 可救
+
+#### Ben 5 维度链路验证 (T20-13)
+
+1. **函数定义** — ChapterStatus schema 加 3 字段 (Optional[int] 默认 None) ✅
+2. **调用点** — chapters.py get_chapter_status (L298+) 唯一构造 ChapterStatus 处 ✅
+3. **参数传递** — _shots_total/_shots_completed/_shots_failed 在 endpoint 内构造, 来自 chapter.storyboard_json + job.stage_message + job.failed_shot_count ✅
+4. **数据流向** — regex 解析 message → progress 反推 → stage 派生 (3 层兜底) ✅
+5. **消费点** — Frontend Wave 2 useETA.ts 可消费 (PM 已知, 等 W2 派活) ✅
+
+---
+
+## 2026-05-18
+
+### TASK-T20-FIXBATCH-2 Backend #1 — T20-9 P0 + T20-8 P3 ✅ [2026-05-18 20:50 — Opus 4.7 max]
+
+**任务**: T20-9 P0 ETA 数字偏快 (test18 second run Founder 反复反馈"4 分钟太快了, 实际剩 6 min") + T20-8 P3 UX-2 false positive + ending_id 字段
+
+#### T20-9 P0 真根因 (5 维度调研)
+1. backend `estimated_remaining_seconds` 字段已存在 (chapters.py:366), schema 已定义 — 不是 audit 说的"加新字段"
+2. frontend useETA.ts L187 已 prefer backend value — STAGE_BUDGET_SECONDS fallback 仅 backend null 时触发
+3. **真问题**: backend ETA 本身**算偏快**
+   - chapters.py:344 fallback hardcoded `stage_progress=0.5` → 永远以"stage 半成"算
+   - `per_shot_seconds = 60s` 过乐观 (实测 image_generation 含 retry + 长尾 ~80s/shot)
+4. test18 second run 验证: 19 shots × 60 / 3 = 380s, 实测 540s, **低估 42%**
+5. 修复后: 19 × 80 / 3 = 506s, 实测 540s, **低估 6%** (符合用户预期)
+
+#### T20-8 P3
+- UX-2 false positive: LLM 不知道 R6-2 设计 (用户选的 ending 已追加到 plot_points 末尾, 不在 selected_ending 字段)
+- ending_id: PM 任务要求加，避免 LLM 偶尔漏写时 frontend `e.id` 拿不到值
+
+#### 修改文件
+1. `app/services/pipeline_orchestrator.py` — `build_stage_durations` per_shot 60 → 80 (含完整设计取舍注释)
+2. `app/services/job_manager.py` — `calculate_eta_remaining_sec` per_shot 60 → 80 (双源 baseline 同步)
+3. `app/api/chapters.py` — 1) import `_calculate_eta_with_progress` 2) fallback 用真实 global progress 3) status response 加 `actual_shot_count` + `max_concurrent` 透传字段
+4. `app/api/projects.py` — confirm_outline UX-2 prompt 加 R6-2 设计说明 (plot_points[-1] 检查替代 selected_ending 字段检查)
+5. `app/services/story_outline_generator.py` — 1) system_prompt 强制 ending_options 双字段 2) JSON 示例增加 ending_id 3) `_validate_outline` 兜底 normalization (LLM 漏写时补 ending_{i+1})
+6. `app/schemas/chapter.py` — `ChapterStatus` 加 `actual_shot_count` + `max_concurrent` (Optional int)
+7. `tests/test_t20_9_estimated_remaining.py` — **新建 17 case** (5 per_shot calibration + 3 concurrent scaling + 4 stage+progress + 1 helper sync + 4 robustness)
+8. `tests/test_t20_8_outline_structure.py` — **新建 9 case** (6 ending normalization + 2 UX-2 prompt + 1 universal 跨故事)
+9. `tests/test_d2_eta_parallel.py` — 旧 3 个 RISK-T14-4 测试更新 baseline 60→80 (硬编码假设必须同步)
+
+#### Universal 视角
+- T20-9: 5/19/29/50 shots × 1/3/6 concurrent × 任何 stage progress → universal 准确, 0 hardcode test18
+- T20-8: 3/5 endings × 浪漫/悬疑/幽默 mood → universal 适配 R6-2 设计, 0 hardcode 特定故事
+
+#### 验证
+- ✅ py_compile 全部 6 文件 PASS
+- ✅ 新单测 **26/26 PASS** (1.8s)
+- ✅ Regression **132/132 PASS** (eta_calculation + d2_eta_parallel + status_authoritative + confirm_outline_wire)
+- ✅ Backend HTTP 200, OpenAPI schema 含 `actual_shot_count` + `max_concurrent` + `estimated_remaining_seconds`
+- ✅ 0 越权 (改动全在白名单 app/services/ + app/api/ + app/schemas/ + tests/)
+
+#### API 契约通知 Frontend
+**新字段**: ChapterStatus.actual_shot_count + max_concurrent (Optional int)
+**Frontend 行动**: useETA.ts fallback 用 `actual_shot_count * 80 / max_concurrent` 替代 hardcoded 1440 (universal)
+
+---
+
+### TASK-T20-FIXBATCH-2 Backend #2 — T17-1 + T18-J + T19-9 + POST_BETA-5 ✅ [2026-05-18 21:00 — Sonnet 4.6]
+
+**任务**: 4 个 RISK 串行修（2个P2 + 1个P3 + 1个POST_BETA）
+
+**修改文件**:
+1. `app/services/prompt_safety_advisor.py` — T17-1: extract_json_from_llm_response 替换旧 markdown 剥离
+2. `app/services/alignment_service.py` — T18-J: Anthropic() → AsyncAnthropic() + 2 处 await
+3. `app/api/chapters.py` — T18-J: Anthropic() → AsyncAnthropic() + await (Shot 调整端点)
+4. `app/services/story_music_extractor.py` — T19-9: emotional_arc isinstance 防御
+5. `app/services/image_generator.py` — POST_BETA-5: 3 dispatch 块加 refs=N (M portrait + K scene_ref)
+6. `app/services/seedream_generator.py` — POST_BETA-5: 开始生成 log 加 ref 类型详情
+
+**新测试文件**: 4 个，共 64 case，全 PASS
+
+**验证**: py_compile PASS + 服务 PID 61003 HTTP 200
+
+---
+
+### TASK-T20-FIXBATCH T20-6 wiring — pipeline_orchestrator 1 行修复 ✅ [2026-05-18 17:15 — Sonnet 4.6]
+
+**任务**: AI-ML 在 shot_validator.py 加了 `validate_shot(..., shot: Optional[dict] = None)` 参数实现 universal skip，但 pipeline_orchestrator.py 调用处没传 `shot=shot` → skip 完全无效。
+
+**修复 (1 行)**:
+
+`app/services/pipeline_orchestrator.py` L1285-1290，在 `validate_shot(...)` 调用末尾加：
+```python
+shot=shot,  # T20-6 v2: 传入完整 shot dict，让 universal skip 真正生效
+```
+
+**Ben 教训 5 维度链路验证**:
+- 函数定义: `shot_validator.py:399` `validate_shot(..., shot: Optional[dict] = None)` ✅
+- 调用点: `pipeline_orchestrator.py:L1285` — 唯一调用处（grep 确认）✅
+- 参数传递: `shot` 变量在作用域内（L1233/L1275 已用到），加 `shot=shot` 后正确传入 ✅
+- 数据流向: `should_skip_character_count_check(shot)` 现在真正被调用 ✅
+- 消费点: `_is_fallback=True` / wide shot / no-char prompt → early return `valid=True` → 不再误报"角色数量不匹配" ✅
+
+**验证**:
+- py_compile PASS
+- 30/30 ShotValidator universal skip 测试 PASS（`tests/test_shot_validator_universal_skip.py`）
+- 4 维度内联验证 PASS (helper truthy/falsy + no-client path valid=True + grep wiring 存在)
+- 服务重启: kill PID 53186 → 新 PID 53809 + curl /health → HTTP 200 `{"status":"healthy"}`
+- 0 越权 (只改 `app/services/pipeline_orchestrator.py` 1 行)
+
+**修改文件**: `app/services/pipeline_orchestrator.py` L1289 (加 `shot=shot,`)
+
+---
+
+### TASK-T20-FIXBATCH T20-3 — P0 招牌污染修复 (方案 A) ✅ [2026-05-18 16:15 — Sonnet 4.6]
+
+**RISK-T20-3 (P0) test18 实证: 3 张 shot (5/8/13) 因招牌污染渲染出完整 location 描述**
+
+**真根因**: `scene_reference_manager.py` `_detect_signage_name` L746-757 keyword fallback 不信任 Stage 1 LLM 决策:
+- "陈默租住楼的雨夜楼道口" 含 "楼" → 命中 `_SIGNAGE_KEYWORDS_ZH` → 整段当招牌 → scene_ref.png 污染 → Shot 5/8/13 继承
+
+**修复 (方案 A — Founder 决策)**: 删除 L746-757 整段 keyword fallback，只保留:
+```python
+if signage_text:
+    return signage_text
+return None
+```
+
+**验证**:
+- py_compile PASS
+- 5/5 universal 测试用例 PASS (signage_text 有值返回 / 办公楼无招牌 / 教学楼无招牌 / 陈默租住楼无招牌 / 出租屋无招牌)
+- 693 pytest PASS (--ignore test_api_cost_log_table 已知 SQLite LONGTEXT 问题) + 0 新增 fail
+- 服务重启 (新 PID 48774) + curl /health → HTTP 200 {"status":"healthy"}
+- 0 越权 (只改 app/services/scene_reference_manager.py 1 个文件)
+
+**修改文件**: `app/services/scene_reference_manager.py` L739-758 (_detect_signage_name 函数)
+
+---
+
+## 2026-05-15
+
+### TASK-WAVE14-RISK-T19-7 — IMAGE_TOO_LARGE 真压缩 ✅ [2026-05-15 19:30 — Sonnet 4.6]
+
+**RISK-T19-7 (P1) Wave 14 Backend #3**
+
+**真根因**: Wave 11.4 target 4.5 MB binary × base64 膨胀 1.33 = ~6 MB base64，仍超 Anthropic 5 MB 限制。
+
+**修复**:
+- `app/services/shot_validator.py`: `_compress_for_claude` target 4.5 MB → 3.5 MB，resize 优先策略（8 级压缩 + 2 级极端 fallback），增强 logging（binary ratio + b64 estimate）
+- `tests/test_image_compression_safety.py`: 新建 9 case（5.7/7/10/20 MB 真实场景 + base64 < 5 MB 验证 + resize 策略验证 + 安全余量理论）
+- 9/9 新单测 PASS + 9/9 Wave 11.4 regression PASS（test_shot_validator_compression.py）
+
+### TASK-WAVE14-RISK-T19-8 — B51 fallback 中文化补漏真根因 ✅ [2026-05-15 ~19:00 — Sonnet 4.6]
+
+**RISK-T19-8 (P0) Wave 14 Backend #1**
+
+**真根因**: LLM 主路径 3 次失败（B51 fallback 触发）的根因是 `_build_scene_prompt()` 传给 LLM 的 input 含多处中文来源，导致 LLM 在 image_prompt 中输出中文，触发 pipeline_schemas.py 中文比例 >5% 校验失败。
+
+**LLM input 中文来源完整清单**:
+1. `characters_json.name` — 中文角色名（"灰狐", "米莉" 等）→ Wave 14: 改用 name_en
+2. `characters_json.clothing_summary` — top/bottom 全中文 → Wave 14: `_extract_english_from_field()` 提取英文
+3. `scene_json.scene_heading` — 含中文（"白桦树下"）→ Wave 14: `_contains_chinese` 检测替换占位
+4. `scene_json.atmosphere` — 含中文子字段 → Wave 14: `_atmosphere_to_str()` 过滤后传字符串
+5. `scene_json.action_beats[].action` — 全中文（保留，LLM 需理解）→ prompt 开头加铁律规则
+6. `scene_json.narration`/`dialogue_beats` — 全中文（保留，TTS用）→ 同上
+
+**修复**:
+- 文件: `app/services/storyboard_director.py`
+  - 新增 `_extract_english_from_field()` helper
+  - `_build_scene_prompt()` characters_json 英文化（name → name_en, clothing → 英文提取）
+  - `_build_scene_prompt()` scene_json 中文防御（scene_heading 替换, atmosphere 过滤）
+  - `_build_scene_prompt()` prompt 开头加 "CRITICAL: IMAGE_PROMPT MUST BE WRITTEN ENTIRELY IN ENGLISH" 铁律
+- 新建: `tests/test_b51_fallback_no_chinese.py` — 20/20 PASS
+- Wave 12+13 regression: 50/50 PASS（atmosphere + scene_heading + dict_compat 全过）
+- py_compile: PASS | 0 越权
+
+---
+
+### TASK-WAVE14-RISK-T19-5 — BGM dict/str 双修 ✅ [2026-05-15 17:55 — Sonnet 4.6]
+
+**RISK-T19-5 (P1) Wave 14 Backend #2**
+
+- 文件 1: `app/services/story_music_extractor.py` — L416-432 visual_tone isinstance 防御 (dict/str/else 三分支) + L488-511 atmosphere isinstance 防御 (dict/str/else 三分支，跟 Wave 12 _atmosphere_to_str 同模式)
+- 新建: `tests/test_bgm_dict_str_defense.py` — 15 case (6 visual_tone + 6 atmosphere + 2 混合 + 1 真实 test19 数据回归)
+- 验证: py_compile PASS + 15/15 新单测 PASS + 152/152 regression PASS (Wave 10-13 全覆盖) + 0 越权
+- Bonus 发现: `emotional_arc` L444 同样模式但风险较低，已记录给 PM
+
+---
+
+### TASK-WAVE13-RISK-T19-4 — scene_heading 中文防御双修 ✅ [2026-05-15 17:15 — Sonnet 4.6]
+
+**RISK-T19-4 (P0) Wave 13 Backend**
+
+- 文件 1: `app/services/screenplay_writer.py` — Batch + 逐 scene 两处 CRITICAL 约束块扩展为 "ENGLISH ONLY RULES"，新增 Rule 1 scene_heading 英文约束 + 对比示例；JSON 示例中 scene_heading 占位改为 "ENGLISH ONLY — e.g. 'EXT. Birch grove...'"
+- 文件 2: `app/services/storyboard_director.py` — L682-692 新增 scene_heading 中文检测防御 (复用 Wave 12 `_contains_chinese()`)，含中文时替换为 `f"Scene {scene_id}"` + WARN 日志
+- 新建: `tests/test_scene_heading_chinese_defense.py` — 18 case (5 含中文防御 + 3 英文通过 + 5 _contains_chinese 边界 + 5 Wave 12 atmosphere regression)
+- 验证: py_compile 2 文件 PASS + 18/18 新单测 PASS + Wave 12 regression 39/39 PASS + Wave 10/11 regression 155/155 PASS + 0 越权
+- 其他中文来源排查: B51 fallback 路径 scene_heading/atmosphere_str 全封堵，narration_segment (TTS用，允许中文)，chars_in_scene (英文 ID)
+
+---
+
+### TASK-WAVE12-RISK-T17-8 — Pipeline 失败原地重启从 Stage 4 ✅ [2026-05-15 16:30 — Sonnet 4.6]
+
+**RISK-T17-8 (P0) Wave 12 Backend #2**
+
+- 文件 1: `app/services/pipeline_orchestrator.py` — `run()` 新增 `start_from_stage: int = 1` 参数 + disk 加载块 + Stage 1-3 skip guards + R4-1/R4-2 skip guards
+- 文件 2: `app/api/chapters.py` — 新增 `_parse_failed_stage_number()` + `POST /{chapter_number}/restart-from-failed-stage` endpoint + `_run_restart_pipeline_task()` 后台任务
+- 新建: `tests/test_pipeline_restart.py` — 14 case (5 parse + 4 disk loading + 2 utility + 3 R4 skip flags)
+- 验证: py_compile 2 文件 PASS + 14/14 新单测 PASS (1.02s, 0 hang) + Wave 11.x 保护行验证 PASS + 0 越权
+
+---
+
+### TASK-WAVE12-RISK-T19-1 — atmosphere 中文防御双修 ✅ [2026-05-15 15:55 — Sonnet 4.6 xhigh]
+
+**RISK-T19-1 (P0) Wave 12 Backend #1**
+
+- 文件 1: `app/services/screenplay_writer.py` — Batch + 逐 scene 两处 prompt 模板强制 atmosphere 全英文 (CRITICAL 约束块 + ❌/✅ 示例)
+- 文件 2: `app/services/storyboard_director.py` — L323-365 新增 `_contains_chinese()` + 增强 `_atmosphere_to_str()` 防御中文 (str/dict 两个分支均处理，含中文跳过 + WARN 日志)
+- 新建: `tests/test_atmosphere_chinese_defense.py` — 22 case (5 _contains_chinese + 8 中文防御 + 9 Wave10.1 regression)
+- 验证: py_compile 2 文件 PASS + 22/22 新单测 + 10/10 Wave10.1 回归 + 7/7 b58 回归 + 0 越权
+
+---
+
+## 2026-05-14
+
+### TASK-RISK-NEW-2-CONFIG-UNIFY — IMAGE_GENERATION_TIMEOUT 配置统一 ✅ [2026-05-14 23:40 — Sonnet 4.6]
+
+- 文件 1: `app/config.py` L33 — `IMAGE_GENERATION_TIMEOUT: int = 120` → `int = 210` + Wave 11.4 注释
+- 文件 2: `app/services/seedream_generator.py` L103 — `SEEDREAM_TIMEOUT_SEC = 210` → `= settings.IMAGE_GENERATION_TIMEOUT` (从 settings 读)
+- NB2 路径: 未动 (image_generator.py 不消费 IMAGE_GENERATION_TIMEOUT, grep 全项目确认)
+- 验证: py_compile 2 文件 PASS + 56/56 regression PASS + 0 越权
+
+### TASK-WAVE11.4-TIMEOUT-210 — SEEDREAM_TIMEOUT_SEC 180→210 ✅ [2026-05-14 22:40 — Sonnet 4.6]
+
+- 文件: `app/services/seedream_generator.py` L103
+- 改前: `SEEDREAM_TIMEOUT_SEC = 180`
+- 改后: `SEEDREAM_TIMEOUT_SEC = 210  # Wave 11.4 调研: 防 177s long-tail 偶发超时, +30s buffer`
+- 验证: py_compile PASS + 56/56 regression PASS + grep 0 匹配 180 + 0 越权
+
+---
+
+### TASK-WAVE11.2-T18G-T18E — Wave 11.2 404 风暴 + preview API 修复 ✅ [2026-05-14 19:30 — Sonnet 4.6 xhigh]
+
+**修复 2 个 RISK（0 文件冲突，0 越权）**
+
+| RISK | 文件 | 行号 | 改动 |
+|------|------|------|------|
+| T18-G (P1) | `app/api/chapters.py` | L415-446 (story) + L568-574 (storyboard) | 无数据时 200+empty (取代 404) |
+| T18-E (P1) | `app/api/projects.py` | L1556-1660 | 新增 `GET /{project_id}/preview` 聚合端点 |
+| 回归更新 | `tests/test_status_authoritative.py` | L317-326 | test name → `test_truly_no_data_returns_empty` |
+| 新单测 | `tests/test_wave11_2_backend_fixes.py` | 新建 259 行 | 22 单测 (12 T18-G + 7 T18-E + 3 not-found 不变) |
+
+**验证**: py_compile 3 文件 PASS + **22/22 单测 PASS** + **134/134 regression PASS** + ⚠️ L1878-1890 未动 ✅
+
+---
+
+### TASK-WAVE11.3-T17-5-ETA — Wave 11.3 ETA 算法全面深挖修复 ✅ [2026-05-14 ~19:00 — Sonnet 4.6 xhigh]
+
+**修复 RISK-T17-5: ETA 算法根因 + stage-switch reset + 单测覆盖**
+
+| 改动 | 文件 | 行号 |
+|------|------|------|
+| 新增 `calculate_eta_remaining_sec()` helper | `app/services/job_manager.py` | L18-148 |
+| stage-switch ETA 单调 guard reset (`_last_stage` + reset on switch) | `app/services/job_manager.py` | L375-395 |
+| progress_callback 用新 helper 替换内联逻辑 | `app/services/job_manager.py` | L411-428 |
+| 新建 `tests/test_eta_calculation.py` | `tests/test_eta_calculation.py` | 全文 |
+
+**验证**: py_compile PASS + **50/50 unit test PASS** + regression 7/7 PASS + 0 越权
+
+**chapters.py 集成 snippet**: 见 PM 群聊消息（Wave 11.3 完成通知）
+
+---
+
+### TASK-WAVE11.1-T18F-T17-9 — Wave 11.1 P0 角色一致性双修 ✅ [2026-05-14 17:30 — Sonnet 4.6]
+
+**修 2 个 P0 角色一致性 RISK**:
+
+| RISK | 文件 | 改动 |
+|------|------|------|
+| T18-F (P0) | `app/api/chapters.py` L1878-1890 | regenerate_shot: 每角色传 portrait + fullbody 两张（之前只传 1 张）|
+| T17-9 (P0) | `app/api/projects.py` L1288-1309 | adjust_character: 传 existing portrait 作 portrait_ref 给 generate_character_reference（之前 4 参数无 portrait_ref）|
+
+**验证**: py_compile 2 文件 PASS + 82/82 regression PASS (含 test_shot_regenerate_persistence/test_architecture/test_status_authoritative 等) + 0 越权
+
+---
+
+### TASK-WAVE11.1-T18H-SHOTVALIDATOR-COMPRESSION — Wave 11.1 P1 ShotValidator 5MB 压缩修复 ✅ [2026-05-14 17:10 — Sonnet 4.6 xhigh]
+
+**修 1 个 RISK (T18-H)**:
+- **图片压缩**: `_compress_for_claude()` 在 base64 编码前压缩 PNG 至 < 4.5MB（PIL JPEG 多级 quality + 降分辨率兜底）
+- **日志格式修复**: Exception 时 reason 改为 `"API_ERROR_SKIPPED"` 或 `"IMAGE_TOO_LARGE_SKIPPED"`（不再粘贴完整 error stack），WARNING level logger
+- **metric 跟踪**: `validator_skipped_count` 模块级计数器，每次 fail-open 跳过时递增
+
+**改动**:
+- `app/services/shot_validator.py`: 新增 import logging + logger + validator_skipped_count + Exception handler 改写
+- `tests/test_shot_validator_compression.py`: 新建，9 case
+
+**验证**: py_compile PASS + 9/9 单测 PASS + 42/42 regression PASS + 0 越权
+
+---
+
+### TASK-WAVE10-P1A-BACKEND-FIXES — Wave 10 Phase 1A 4 RISK 双修 ✅ [2026-05-14 — Sonnet 4.6 xhigh]
+
+**修 4 个 RISK**:
+- T16-4 (P0 CRITICAL): B58 ConfirmScenes merge 而非 replace，保留 action_beats
+- T16-6 (P0): Pipeline 失败时 chapter.status 写 "failed" 不 "completed"（job_manager L373 修复）
+- T16-8 (P2): _strip_markdown_json_fence() 新增 + UX-2 解析前显式调用
+- T16-10 (P1): 顺解（GET /story 已返完整 scenes，根因是 T16-4 使 DB 简化）
+
+**新单测 21/21 PASS + 60 regression PASS**
+
+---
+
+## 2026-05-13 21:50
+
+### TASK-WAVE9-P2-BACKEND-STATUS-AUTHORITATIVE — DEC-030 Wave 9 Phase 2 主任务 ✅ [2026-05-13 21:50 — Opus 4.7 xhigh]
+
+**DEC-030 (Ben 方案 A) 落地: backend status endpoint 成为 frontend state 的 single source of truth。顺解 4 RISK (T15-3 + T15-7 + T15-8 + T15-9)。**
+
+**改动 5 个文件**:
+
+| 文件 | 位置 | 改动 |
+|------|------|------|
+| `app/schemas/chapter.py` | L1-50 | 新增 `HydrateHints` class（endpoint / display_field / expected_data_shape）+ `ChapterStatus` 加 6 字段（ui_phase / hydrate_hints / characters_confirmed / scenes_confirmed / storyboard_ready / outline_ready）|
+| `app/api/chapters.py` | L19 import + L27-156 helpers + L264-279 no-job 路径 + L336-356 with-job 路径 + L407-426 /story 顺序调整 | (1) 新增 `_derive_ui_phase()` 8-phase 状态机 (2) 新增 `_build_hydrate_hints()` 4 endpoint 映射 (3) status endpoint 两个返回路径都填 6 新字段 (4) GET /story 优先检查 scenes_json，顺解 T15-3 |
+| `app/services/job_manager.py` | L139-189 helper + L371 wiring | 新增 `increment_failed_shot_count(job_id)` async helper（短 session + 非阻塞 + max(0,..)防负数）；run_story_generation_task 调 pipeline.run 加 `job_id=job_id` |
+| `app/services/pipeline_orchestrator.py` | L317 signature + L1276-1287 single fail + L1359-1372 gather exception | `pipeline.run()` 加 `job_id: Optional[int] = None`；Stage 5 单 shot 失败 + gather exception 两 path 都立即 await `increment_failed_shot_count(job_id)` |
+| `tests/test_status_authoritative.py` (新建, 535 行) | — | 5 大类 44 单测：ui_phase 派生 (18) / hydrate_hints (9) / GET /story scenes_review (5) / mid-stage failed_count async mock (4) / schema 退化检测 (8) |
+
+**验证 (按 feedback_carpet_review_deep_dive 8 维度全 PASS)**:
+
+- ✅ py_compile 4 文件 PASS
+- ✅ test_status_authoritative.py 44/44 PASS
+- ✅ test_shot_regenerate_persistence.py 9/9 PASS（PR-A regression 不退化）
+- ✅ test_architecture.py 7/7 PASS（不退化）
+- ✅ test_wave6_full_regression.py 32/32 PASS（不退化）
+- ✅ test_d2_eta_parallel.py 7/7 PASS（不退化）
+- ✅ 总计 **99/99 PASS** (44 new + 16 regression core + 39 wave6/d2)
+- ✅ 调用链路 9 层 verify: pipeline.run(job_id) → _generate_one_shot fail path → increment_failed_shot_count → DB commit
+- ✅ 0 越权: frontend / storyboard_director.py / storyboard_prompts.py / `.team-brain/team_ben/` 未碰
+
+**关键设计决策**:
+
+1. **`ui_phase` 8 phase 状态机** — 完整覆盖 input → outline_review → char_review[_pending] → scene_review[_pending] → storyboard_running → shot_generating → completed
+2. **`hydrate_hints` 4 endpoint 映射** — char_review → /characters / scene_review → **/story（顺解 T15-3，不是 /storyboard）** / shot_generating+completed → /storyboard / 其他 → None
+3. **GET /story 顺序调整** — 原 chapter.status='generating_story' 直接 404 → 改为先检查 chapter.scenes_json 非空（Stage 3 已完成）。R4-2 阶段 frontend hydrate /story 立刻拿到 scenes 数据，永久治本 T15-3
+4. **mid-stage failed_count 通过 job_id 透传** — 不污染 progress_callback 语义，单一封闭传递路径；pipeline.run(job_id=N) → Stage 5 失败 → increment_failed_shot_count(N) → DB 实时更新；T15-9 mid-stage 实时反映
+
+**顺解 RISK 状态**:
+- ✅ T15-3 P0 CRITICAL: GET /story 在 scenes_ready 阶段真返 scenes
+- ✅ T15-7 P1: backend ETA 计算正确（frontend Wave 9 P2 自己改 stage 切换重置 ref，backend 不变）
+- ✅ T15-8 P0 UX: backend 提供 ui_phase + characters/scenes_confirmed，frontend Wave 9 P2 改 subPhase 派生
+- ✅ T15-9 P2: mid-stage failed_shot_count 实时累加 + partial_failure 即时反映
+
+**API 契约变更**:
+- `GET /chapters/{n}/status` response 加 6 字段（向后兼容 — 老 frontend 不读这 6 字段也能工作）
+- `GET /chapters/{n}/story` 在 scenes_ready 阶段返 200 + scenes（之前 404）
+- `pipeline.run()` 加 `job_id: Optional[int] = None` 参数（job_manager 已 wiring）
+
+**待 PM**:
+1. 重启 backend 让改动生效（Python 模块缓存）
+2. 追加 TEAM_CHAT 完成段（PM 代写，见 backend-progress/current.md 底部 paste）
+3. PENDING.md 标 T15-3 + T15-9 ✅
+4. Spawn Wave 9 Phase 2 Frontend agent（Opus xhigh ~3h）— Frontend 用 ui_phase + hydrate_hints 改造 state 派生
+
+---
+
+## 2026-05-13 21:30
+
+### TASK-WAVE9-P3-BACKEND-STORYBOARD-SCHEMA-FIX — RISK-T15-14 ✅ [2026-05-13 21:30 — Sonnet 4.6 xhigh]
+
+**test15 实测暴露：Shot 21/22 的 characters_in_scene=None, shot_type=None 字段空（LLM 偶尔遗漏顶层字段）。**
+
+**改动 1 文件，新建 1 单元测试**:
+
+| 文件 | 位置 | 改动 |
+|------|------|------|
+| `app/services/storyboard_director.py` | `_build_scene_prompt` JSON 示例 | 加 `shot_type` / `camera_angle` / `characters_in_scene` 字段 + REQUIRED 说明块 |
+| `app/services/storyboard_director.py` | `_build_prompt` JSON 示例 | 同步加三个字段到全剧本模式 JSON 示例 |
+| `app/services/storyboard_director.py` | `_validate_storyboard` post-process | 三字段 fallback 逻辑（从 camera.shot_size/camera.angle/characters_visible 派生）|
+| `tests/test_storyboard_director_schema_fix.py` | 新建 | 13 个单元测试（RISK-T15-14 回归 + Shot 21/22 场景）|
+
+**验证**:
+- ✅ py_compile storyboard_director.py PASS
+- ✅ `pytest tests/test_storyboard_director_schema_fix.py` 13/13 PASS
+- ✅ 0 越权（不改 chapters.py / pipeline_orchestrator.py / frontend）
+
+**根因**:
+- `_build_scene_prompt` 和 `_build_prompt` 的 JSON 示例中，顶层 `shot_type`/`camera_angle`/`characters_in_scene` 字段缺失 → LLM 不知道要输出 → 偶尔漏填
+- 下游消费方（统计/frontend 显示）读 storyboard.shots[].characters_in_scene 时拿到 None
+
+**修复策略**:
+1. Prompt 强化：JSON 示例加三字段 + 在 REQUIRED FIELDS 段落明确说明不得省略
+2. Post-process 补救：`_validate_storyboard` 检测 None 时从 camera.shot_size / camera.angle / character_direction.characters_visible 派生填充
+
+---
+
+## 2026-05-13 21:00
+
+### TASK-WAVE9-P1-PRA-REGENERATE-FIX — RISK-T15-12 + T15-13 双修 ✅ [2026-05-13 21:00 — Sonnet 4.6 xhigh]
+
+**test15 实测暴露：Shot 22 重生成功后 status 仍显 22/23、5_image_results.json 仍失败、ApiCost project_id=None。一次 PR 双修 3 个问题。**
+
+**改动 1 文件，新建 1 单元测试**:
+
+| 文件 | 行号 | 改动 |
+|------|------|------|
+| `app/api/chapters.py` | L1771 | `generate_shot_image_phase2_safe` 调用加 `project_id=project.id` 参数（RISK-T15-13b）|
+| `app/api/chapters.py` | L1829-1860 | 成功后回写 `5_image_results.json`：找 shot_id 条目 → success=True, error=None, image_path/url/generation_time 更新（RISK-T15-13a）|
+| `app/api/chapters.py` | L1862-1880 | 成功后查最新 GenerationJob → `failed_shot_count = max(0, count-1)` + `partial_failure = (count > 0)` + commit（RISK-T15-12）|
+| `tests/test_shot_regenerate_persistence.py` | 新建 | 9 个单元测试覆盖 3 个修复点的 happy path + 边界 case |
+
+**验证**:
+- ✅ py_compile chapters.py PASS
+- ✅ `pytest tests/test_shot_regenerate_persistence.py` 9/9 PASS
+- ✅ `pytest tests/test_architecture.py` 7/7 PASS（无退化）
+- ✅ 0 越权（不改 pipeline_orchestrator.py / frontend / team_ben）
+
+**根因**:
+- RISK-T15-12: chapters.py regenerate endpoint 成功 path 缺少 DB job 更新（成功后没扣 failed_shot_count）
+- RISK-T15-13a: regenerate endpoint 成功后没读写 5_image_results.json
+- RISK-T15-13b: `generate_shot_image_phase2_safe()` 调用未传 `project_id` → seedream_generator `_kwargs.get("project_id")` = None → ApiCostLogger 记 None
+
+---
+
+## 2026-05-13
+
+### TASK-WAVE7-ROUND2 ETA 调用点修复 ✅ [2026-05-13 — Sonnet 4.6 xhigh]
+
+**PM Explore 审查发现 Task 3 ETA 动态算法是死代码：signature 加了新参数，但调用方 0 传参 = 用 default 值 = 跟静态 ETA 一样。Round 2 彻底修复 3 个调用点。**
+
+**改动 3 文件**:
+
+| 文件 | 改动 | 说明 |
+|------|------|------|
+| `app/api/chapters.py` L143-195 | fallback 路径真传 3 个新参数 | 从 `chapter.storyboard_json` 解析 actual_shot_count（兜底 18），从 `project.confirmed_outline_json/raw_outline_json` 解析 unique_location_count（兜底 2），从 `settings.IMAGE_MAX_CONCURRENT` 拿 max_concurrent（兜底 3）|
+| `app/services/job_manager.py` L207-256 | progress_callback 闭包新增 3 个 mutable state 变量 + 新可选参数 | `_dyn_shot_count[18]` + `_dyn_location_count[2]` + `_dyn_max_concurrent[3]`，callback 收到新参数时更新，`_est()` 调用时真传值 |
+| `app/services/pipeline_orchestrator.py` L854 + L1327 | image_preparation 和 image_generation 两处 progress_callback 传入 actual_shot_count / unique_location_count / max_concurrent | Stage 4 完成后立即传 shot_count + outline.unique_locations count + settings.IMAGE_MAX_CONCURRENT |
+
+**单元测试** `tests/test_d2_eta_parallel.py` 新增 3 个 Round 2 case（合计 7/7 PASS）:
+
+| Test | 入参 | 期望 image_gen ETA | 验证目的 |
+|------|------|--------------------|---------|
+| `test_estimate_remaining_dynamic_shot_count_18` | 18 shots, concurrent=3 | 360s | dynamic 与静态基线一致 |
+| `test_estimate_remaining_dynamic_shot_count_26` | 26 shots, concurrent=3 | 520s | 26 > 18，dynamic 真生效 |
+| `test_estimate_remaining_dynamic_max_concurrent_1` | 18 shots, concurrent=1 | 1080s | serial vs parallel ETA 不同 |
+
+**测试加载方式**: 从 pipeline_orchestrator.py 源码 exec() 提取 3 个纯 Python 函数，绕过 pydantic_settings/google-genai 等 SDK 依赖（与 wave6 regression 静态分析方式互补）。
+
+**验证**: py_compile 4 文件全通过 + pytest test_d2_eta_parallel.py 7/7 PASS + pytest test_architecture.py 7/7 PASS（无退化）
+
+### TASK-WAVE7-BACKEND ✅ [2026-05-13 — Sonnet 4.6 xhigh]
+
+**5 任务完成（RISK-T14 波次修复）**
+
+| 任务 | 优先级 | 文件 | 改动 |
+|------|--------|------|------|
+| **Task 1** RISK-T14-7 GET /chapters/1/story 条件修复 | 🔴 P0 | `app/api/chapters.py` | Stage 3 完成（scenes_json 非空）即返 200 + scenes，不再等 full_script |
+| **Task 2** RISK-T14-5-v2 Pipeline mid-stage update | 🟡 P1 | `app/services/pipeline_orchestrator.py` | Stage 2/3 启动时立即 update jobs；R4-1/R4-2 每 30s update；角色参考图每张完成后 update |
+| **Task 3** RISK-T14-4 ETA 算法重写 | 🟡 P1 | `app/services/pipeline_orchestrator.py` | 新增 `build_stage_durations(actual_shot_count, unique_location_count, max_concurrent)` 动态计算；`estimate_remaining()` 改用动态字典；character_ready/scenes_ready 设为 0（不含 R4 等待时间） |
+| **Task 4** RISK-T14-9 移除 O-2 截断（DEC-028） | 🟡 P1 | `app/services/storyboard_director.py` | 移除 18/36/60 shots 截断逻辑，LLM 生成多少跑多少 |
+| **Task 5** RISK-T14-13-backend confirm-outline warnings | 🟡 P1 | `app/api/projects.py` | 返回 `inconsistency_warnings: [{type, message, affected_field}]` + 保留旧 `warnings` 字段兼容 |
+
+**验收**: ✅ py_compile 4 文件 PASS + pytest test_architecture 7/7 PASS + test_d2_eta_parallel 4/4 PASS + 0 越权
+
+---
+
+## 2026-05-12
+
+### TASK-T13-BACKEND-FIRSTBATCH ✅ [2026-05-12 17:30 — Sonnet 4.6 xhigh，PM 代写]
+
+**5 任务一次性完成**（PM 16:30 派 → 17:30 完成 = 1h）
+
+| 任务 | 优先级 | 文件 | 改动 |
+|------|--------|------|------|
+| **A1** DB pool 配置根治 BUG-T13-MYSQL-STALE + DB-POOL-EXHAUSTION | 🔴 P0 | `app/database.py` | 加 `pool_size=10, max_overflow=20`（原有 `pool_pre_ping=True, pool_recycle=1800` 已存在）|
+| **A2-backend** POST /api/_client_log endpoint | 🔴 P0 | `app/api/client_log.py` (新建) + `app/api/__init__.py` | prefix=`/api`，无 auth，写 `logs/client.log` 追加每行一条 JSON |
+| **D1** UX-2 LLM JSON 解析修复 | 🟡 P2 | `app/api/projects.py` confirm_outline | 替换 3 行自定义 ` ``` ` split 为 `_llm_helpers.extract_json_from_llm_response`（4 策略容错） |
+| **D2** ETA 并行加速修复 | 🟡 P2 | `app/services/pipeline_orchestrator.py` | `STAGE_DURATIONS["image_generation"]` 420→360（18×60/3，注释解释 max_concurrent=3） |
+| **C1-backend** confirm-scenes alias | 🔴 P0 | `app/api/projects.py` | 新增 project-level alias `POST /{project_id}/confirm-scenes` 转发 chapter_number=1，原 chapter-level 兼容 |
+
+**新建测试**: `tests/test_d2_eta_parallel.py`（4 断言）
+
+**验收**: ✅ py_compile 全 6 文件 + pytest 4/4 PASS + 0 越权 + 共享文档完整无冲突
+
+**PENDING.md 已标 ✅**: 5 个 bug + TASK-CLIENT-LOG-PIPE backend 部分（17:30 backend agent 自己 Edit）
+
+详见 TEAM_CHAT.md [2026-05-12 17:30] @backend → @pm 段。
+
+---
+
+### B59-hotfix — BUG-LLM-JSON-PARSE-MARKDOWN-UNCLOSED ✅ [2026-05-12]
+
+**根因**: LLM 长输出（13443字符）被 max_tokens 截断，结尾 ``` 缺失，正则匹配失败 → Stage 2 crash
+**新建**: `app/services/_llm_helpers.py` — 通用 `extract_json_from_llm_response()`，4 策略容错（未闭合 ``` 优先）
+**修改**: 4 个 LLM 服务 `_extract_json` 全部委托给 helper
+**验收**: py_compile 5/5 + pytest 7/7 + 32/32 + mock 6/6
+
+### B58-followup HOTFIX — BUG-CLOTHING-SCHEMA-HAIKU-STR ✅ [2026-05-12]
+
+**根因**: Haiku adjust prompt 缺 clothing schema 约束 → str 输出 → Stage 3 crash
+**修改**: screenplay_writer.py (×2) + storyboard_service.py (×3) + projects.py Haiku prompt + schema 验证
+**验收**: py_compile 3/3 + pytest 7/7 + 32/32 + manual test
+
+---
+
+## 2026-05-11
+
+### Wave 6 — 5 bug 一次性闭环 ✅ [2026-05-11 19:00-20:30]
+
+**任务来源**: PM 派活（Founder 4 决策：场景确认要倒计时 / Shot 重试 P2 修 / 一次性 7 bug 全修 / Backend 用 Opus 4.7 xhigh）
+
+**5 bug 全完成**:
+
+| Bug | 优先级 | 状态 |
+|-----|--------|------|
+| BUG-B52-CASCADE-V2-INCOMPLETE | 🔴 P0 | ✅ |
+| BUG-SCENES-CONFIRM-MISSING | 🔴 P0 | ✅ |
+| BUG-MUREKA-BLOCK-EVENT-LOOP | 🟡 P1 | ✅ |
+| BUG-ETA-DISAPPEAR-AT-STAGE-EDGE | 🟡 P1 | ✅ |
+| BUG-SHOT-RETRY-NETWORK-FRAGILE | 🟢 P2 | ✅ |
+
+**变更文件（9 个）**:
+
+1. `alembic/versions/005_add_scenes_confirmed_to_projects.py` (新建)
+2. `app/models/project.py` (加 `scenes_confirmed` 列)
+3. `app/schemas/project.py` (加 `scenes_confirmed` 字段)
+4. `app/api/projects.py` (serialize 暴露 + `ConfirmScenesRequest` schema + `POST /confirm-scenes` 端点 + `start_generation` 重置)
+5. `app/services/pipeline_orchestrator.py` (B52-fix v3 reload + R4-2 wait loop + STAGE_DURATIONS 完善 + estimate_remaining 兜底)
+6. `app/services/job_manager.py` (progress_callback 计算 ETA + 单调 guard + 写 job.estimated_seconds)
+7. `app/api/chapters.py` (status 端点优先用 job.estimated_seconds)
+8. `app/services/music_generation_service.py` (aiohttp async 改造 — Mureka 不阻塞 event loop)
+9. `app/services/seedream_generator.py` (IncompleteRead 退避 2/8/30/60s + jitter)
+
+**验证**:
+- ✅ py_compile 全 9 文件
+- ✅ pytest tests/test_architecture.py → 7/7
+- ✅ smoke import 全通过（含 scenes_confirmed 字段 / STAGE_DURATIONS 完整 / _call_mureka 真 async / Seedream retry delays 正确 / ConfirmScenesRequest 正常）
+- ✅ grep 真接通所有改动 — 详 current.md "验证清单"段
+
+**关键决策**:
+- B52 reload 只在 `confirmed=True` 时触发（超时不 reload，因为超时意味着用户没 adjust）
+- 整体替换 in-memory characters（不做字段级合并）— chapter.characters_json 是 adjust 完整快照，未被 adjust 的角色保留原值，Shot 7 王阿姨黑发不会被误改
+- R4-2 wait loop 与 R4-1 完全对称（2s 轮询 + 1800s 超时 + 每 30s 日志 + 超时自动继续 + reload scenes_json）
+- Mureka 用 aiohttp（已是依赖）不用 to_thread（避免 SSL/certifi 上下文丢失）
+- ETA 三处兜底协同：STAGE_DURATIONS 完整化 / estimate_remaining 不抛 KeyError / progress_callback 真计算 ETA + 写 job.estimated_seconds / chapters.py 优先读 job 字段
+- Seedream 退避只改网络层 except，HTTP 5xx 退避保留（瞬时通常 2s 够）
+
+**风险点**:
+1. Alembic 005 必须先跑（PM 部署职责），否则 confirm-scenes 报 SQLAlchemy Column 错误
+2. Backend 需要 kill+restart 让代码生效
+3. R4-2 1800s 超时与 Frontend 60s 倒计时设计协同 — frontend 内自动 confirm，1800 是兜底
+4. Frontend hydrate 应改读 `project.scenes_confirmed` 真字段（不再 heuristic）— @frontend 任务
+
+**派活上下文**: PENDING.md 7 bug 完整证据 + spawn 派活信息
+
+**Founder 4 决策**:
+1. 场景确认页要倒计时（推荐 60s）→ Frontend 实现
+2. Shot 重试 P2 修（顺手做）→ Backend 已修
+3. 一次性 7 bug 全修，Tester 分轮验证
+4. Backend 用 Opus 4.7 + xhigh thinking → 已按 Founder 要求执行
+
+**Tester 等 3 agent 完成后 spawn**：详 PENDING.md 各 BUG-* 验收清单
+
+---
+
+### Wave 5 — 5 件 P0/P1 修复（历史欠账补完） ✅ [2026-05-11 16:30-18:01]
+
+**任务来源**: PM Wave 5 派活（test11 实测发现 cascade 问题 + URL 不回弹）
+
+**5 修复点**:
+
+| Bug | 文件 | 行号 |
+|-----|------|------|
+| B52+B56 Haiku prompt 强化 | app/api/projects.py | L956-982 |
+| B57 adjust 后重生 fullbody | app/api/projects.py | L1092-1126 |
+| B52 cascade confirm_outline | app/api/projects.py | L571-600 |
+| B57 regenerate_portrait 后重生 fullbody | app/api/projects.py | L1249-1298 |
+| B49 characters_confirmed 暴露 | app/api/projects.py L204 + app/schemas/project.py L99 |  |
+| B56 CharacterDesigner description 字段 | app/services/character_designer.py | L213 |
+| B56 _validate_characters fallback | app/services/character_designer.py | L313-324 |
+| B52 cascade Stage 4 physical_summary | app/services/storyboard_director.py | L1194-1199 |
+| B51 v2 3 次重试 + fallback shot | app/services/storyboard_director.py | L549-671 |
+
+**B52 真因链全修**（红发 cascade）:
+```
+Founder 改"红发"
+→ /adjust Haiku prompt 改 description + physical [B52+B56 修 L956-982]
+→ fullbody 同步重生 → 亚麻青 fullbody 参考图 [B57 adjust 修 L1092-1126]
+→ Stage 4 physical_summary 优先读 description [B52 cascade Stage4 修]
+→ Stage 5 Seedream 生新发色 shot
+```
+
+另两个同类入口也已修:
+- `/regenerate-portrait` 后 fullbody 不重生 → B57 修 L1249-1298
+- `confirm_outline` 时 description 不同步到 chapter.characters_json → B52 修 L571-600
+
+**Wave 5 漏修点**：Pipeline in-memory `characters` 变量不 reload — 详见 Wave 6 B52-fix v3 (L5) 修复。
+
+---
+
+## 2026-05-09
+
+### B33 user_selected_mood Stage A + B34 LLM 事务外 ✅ [2026-05-09 15:00-15:22]
+
+**任务来源**: PM xhteam 派 B33 + B34
+
+**B33 — user_selected_mood 移到 Stage A（项目创建时）**
+
+9 个文件变更：
+
+| 文件 | 行范围 | 变更摘要 |
+|------|--------|---------|
+| `alembic/versions/003_add_user_selected_mood_to_projects.py` | 新文件 | migration 003：`projects` 表加 `user_selected_mood VARCHAR(32) DEFAULT NULL` |
+| `app/models/project.py` | 新增列 | `user_selected_mood: Mapped[Optional[str]]` DB 列定义 |
+| `app/schemas/project.py` | ProjectCreate / ProjectDetail | `user_selected_mood: Optional[str] = None` 新增字段 |
+| `app/api/projects.py` (create_project) | create 逻辑 | `project.user_selected_mood = data.user_selected_mood` 持久化到 DB |
+| `app/api/projects.py` (generate_outline) | outline 注入 | 将 `user_selected_mood` 传给 `StoryOutlineGenerator.generate()` |
+| `app/services/story_outline_generator.py` | generate() 签名 | 接收 `user_selected_mood` 参数，若有值注入 MANDATORY 约束块强制 LLM 设置 mood/visual_tone.overall_mood |
+| `app/services/story_music_extractor.py` | extract_story_for_music | `overall_mood` 优先级链：user_selected_mood > confirmed_outline.user_selected_mood > visual_tone.overall_mood |
+| `app/services/music_generation_service.py` | generate_bgm_for_chapter | 接收并透传 `user_selected_mood` 参数 |
+| `app/api/projects.py` (start_generation) + `job_manager.py` + `pipeline_orchestrator.py` | pipeline 调用链 | `user_selected_mood` 全链透传：start_generation → _run_generation_in_background → run_story_generation_task → pipeline.run → generate_bgm_for_chapter |
+
+**B33 调用链（完整）**:
+```
+POST /api/projects/ (ProjectCreate.user_selected_mood)
+  → Project.user_selected_mood (DB 列)
+    → generate_outline → story_outline_generator.generate(user_selected_mood)
+       → LLM MANDATORY 约束注入 → outline.mood / visual_tone.overall_mood
+    → start_generation → _run_generation_in_background(user_selected_mood)
+       → run_story_generation_task(user_selected_mood)
+          → pipeline.run(user_selected_mood)
+             → generate_bgm_for_chapter(user_selected_mood)
+                → extract_story_for_music(user_selected_mood)
+                   → overall_mood 优先级链: user_selected_mood > confirmed_outline.user_selected_mood > visual_tone.overall_mood
+```
+
+**B34 — LLM 调用移出 DB 事务（generate_outline 端点）**
+
+- 旧行为：`Depends(get_db)` session 在 MySQL autobegin 后持锁，LLM 调用 254s 期间 row-level lock 不释放，阻塞其他并发请求（B28 症状）
+- 新行为：从 project 提取所有数据 → `await db.commit()` 释放 MySQL row-level lock → LLM 调用（无锁，254s） → 新短生命周期 session 写入 `raw_outline_json`
+- 文件：`app/api/projects.py`（generate_outline 函数）
+
+**验证结果**:
+- 9 个文件全部通过 Python AST 语法检查
+- `tests/test_architecture.py` 7 passed, 0 failed
+- 无高风险文件（image_generator / storyboard_service / storyboard_prompts）被修改，无需跑角色一致性回归测试
+
+**@PM 后续操作（PM 已全部完成）**:
+- [x] `alembic upgrade head` 运行迁移 003（VPS 已升至 head=003）
+- [x] kill + restart backend（PID 59918 已重启）
+- [x] 通知 frontend 接入新 API 字段（frontend PID 60089 已重启）
+
+---
+
+### B31 BGM 切尾 4 秒 + B32 Haiku prompt 持久化 + 任务 3 mock 跑 ✅ [2026-05-09]
+
+**B31** `app/services/ffmpeg_post_processor.py` — process_bgm 签名改 `target_duration_sec: Optional[float] = None`，不再裁到 target，只切末尾 4s 水印。input < 8s 跳过水印保护。新增返回字段 `input_duration_sec` / `watermark_trimmed_sec`。
+
+**B32** `app/services/music_generation_service.py` — Step 5 调 Haiku 后，写 `bgm_prompt_chapter{N}.txt` 到 output_dir，同时 INFO 级别 log 打印完整 prompt 文本。
+
+**任务 3** `test_output/manualtest/test8_bgm_haiku_dump/bgm_prompt_dump.txt` — test8 "行李箱里的她" 真调 Haiku 4.5 dump 完成（776 chars），悬疑桶调性词分析：必备词 2/7 精确命中（minor key / ambient drone），非精确命中还有 sparse/silence/muffled/no resolution/pulse，禁用词 0/6 无污染，结论良好。
+
+---
+
+## 2026-05-08
+
+### B16 P1 Hotfix — regenerate_shot 保存失败 ✅ [2026-05-08]
+
+**根因**: `regenerate_shot` 保存逻辑只检查 `image_data`（bytes/PIL），未检查 `pil_image` 字段。Seedream 实际返回 `{"pil_image": <PIL.Image>, "image_data": "<base64_str>", ...}`，走到 else 分支抛 500。
+
+**修复**: `app/api/chapters.py` L1682-1710，新增三路判断：
+1. `pil_image` 有 `.save` 方法 → 直接 PIL save（Seedream 主路径）
+2. `image_data` 是 bytes → 直接写文件
+3. `image_data` 是 str → base64 解码后写文件
+4. else → 错误信息细化含 `type(pil_image)` + `type(image_data)` 便于调试
+
+---
+
+### P0+P1 批次 6 任务 ✅ [2026-05-08]
+
+**B16** regenerate_shot 实现：char_refs + scene_refs + `generate_shot_image_phase2_safe()` + `?v={ts}` cache bust。`app/api/chapters.py`
+
+**B8** _fix_inner_quotes 提取为模块级 `_fix_inner_quotes_shared()`，`_extract_json` 加 R4-4 修复，`_build_single_scene_prompt` 加 「」 约束。`app/services/screenplay_writer.py`
+
+**B6** `GET /story` pending/generating_story/full_script=None 从 400 改为 404。`app/api/chapters.py`
+
+**B18** `_validate_outline` 加 plot_point fallback（beat 按位置分配，duration 默认 30）；prompt 加 MANDATORY 字段完整性要求。`app/services/story_outline_generator.py`
+
+**B19** `overall_mood` 改为强制枚举（8 值）；`_validate_outline` 加 fallback 映射。`app/services/story_outline_generator.py`
+
+**B20** `_build_single_scene_prompt` 注入 `mood_sound_constraint` 块（8 情绪对应音效风格 + MANDATORY）。`app/services/screenplay_writer.py`
+
+pytest: 7 passed, 10 skipped (pre-existing LONGTEXT/SQLite infra failure 不受影响)
+
+---
+
+### TASK-SCREENPLAY-SCENE-FAIL-RCA — Stage 3 Scene 11/14/16 失败根因分析 ✅ [2026-05-08]
+
+**任务**: xuhuastorytest7 Stage 3 ScreenplayWriter 16 场戏中 3 场失败 (Scene 11/14/16) 的根因深挖。
+
+**结论**: 根因是 `_extract_json()` 缺少 R4-4 内部引号修复逻辑（`_fix_inner_quotes`），导致 Claude 在 narration 字段内嵌入未转义双引号时 JSON.loads() 全部失败。
+
+**证据链**:
+1. Log 确认 3 次 API 调用均 HTTP 200 且有真实 chars 输出（2929/2747/2974 for S11，3556/2947/3207 for S14，4793/3730/3847 for S16）
+2. Log 无 `(字数:X/Y)` 打印 → JSON parse 失败（非字数不足触发的重试路径）
+3. Log 无 `(error:` 打印 → `_call_llm_with_retry` 成功，异常在 `_extract_json` 内部静默 swallow
+4. `_extract_batch_json` 有 R4-4 `_fix_inner_quotes` (L574-615)，`_extract_json` 没有 — 功能不对等
+5. 失败场景（PP11/14）描述本身含大量对话文字（'饿不饿？红烧肉'等），Claude 写 narration 时引用这些对话会用双引号，与 JSON 外部引号冲突
+
+**文件**: `app/services/screenplay_writer.py`
+- `_extract_json()` L1076-1103 — 缺少内部引号修复
+- `_extract_batch_json()` L528-661 — 有完整修复逻辑（R4-4）
+
+**推荐修复方案（已报 PM）**: 将 `_fix_inner_quotes` 逻辑提取为 `_shared_json_fix` 辅助方法，`_extract_json` 和 `_extract_batch_json` 共用。
+
+---
+
 ## 2026-04-28
 
 ### R7-3 P1 portrait 重生静默失效 bug 修复 ✅ [2026-04-28 21:42]
@@ -2372,3 +3705,70 @@ bubble_x = max(10, min(bubble_x, width - bubble_width - 10))
 | `app/services/job_manager.py` | UX-10/11 |
 | `scripts/hotfix_t5_urls.py` (新建) | T5 数据补 URL |
 
+
+---
+
+## 2026-04-30 11:00 Wave 5.1 归档（PM 代更，权限 600）
+
+D.17 移除 fallback + prompt_safety_advisor.py + D.18 SIZE_BY_MODEL + O-2 cap + T-2 callback + R7-2 schema/endpoint + Alembic 002。详见 current.md 19:25 + Wave 5.2 已部署生产。
+
+---
+
+## D.19 + D.20 — P0 黑屏双重修复（Option C 永久解法）[2026-04-30 17:09-17:40]
+
+**任务**: Founder T7 测试黑屏 root cause 止损（Frontend D.19/D.20 hotfix 配套永久解法）
+
+### 修复 1: generate_outline 幂等保护
+
+`POST /api/projects/{uuid}/generate-outline` 现在幂等:
+- `raw_outline_json` 已存 → 直接返缓存，**不调 LLM**（省 ~¥0.3-0.5 + 30-60s/调用）
+- 增加 `?force_regenerate=true` query param 供用户主动重生
+- Log: `[GenerateOutline] 幂等: project {id} 已有 raw_outline，直接返已存数据（不调 LLM）`
+
+**改动**: `app/api/projects.py`
+- L382 签名加 `force_regenerate: bool = Query(default=False)` query param
+- L393-409 幂等检查块（cached return path）
+- L407 + L451 都调 `_map_outline_to_response` helper
+
+### 修复 2: ProjectDetail.raw_outline 字段暴露
+
+`GET /api/projects/{uuid}` 返回新字段:
+- `raw_outline`: Stage 1 LLM 原始输出（pre-confirm 状态，供前端 hydrate 用）
+- `confirmed_outline` 优先（用户 confirm）→ `raw_outline` 兜底（Stage 1 完成未 confirm）→ 都 null（等 Stage 1）
+
+**改动**:
+- `app/schemas/project.py` L83 — `raw_outline: dict[str, Any] | None = None` 字段定义
+- `app/api/projects.py` L98-151 — `_map_outline_to_response()` helper extract（DRY 重构，幂等+正常路径共用）
+- `app/api/projects.py` L163-176 — `serialize_project_detail()` 加 raw_outline_json 解析
+- `app/api/projects.py` L198 — ProjectDetail 构建传 raw_outline
+
+### 验收
+- pytest 292 passed (1 pre-existing 与本任务无关)
+- PM 11 角度地毯式 audit 全 PASS（含真 DB 测试 project_id=22 raw_outline 真返 title="纸条里的父亲", 8 keys）
+- Backend pid 17:41 重启加载新代码 + frontend recovery 链路实测真跑通
+
+### 给 frontend 的影响
+- frontend D.20 hotfix v2 outline recovery 现在调幂等 generate-outline → 走 raw_outline_json 缓存 → 0 LLM 成本
+- 也可改用 `project.raw_outline` 字段直接（snake_case，需 frontend 做 camelCase 映射）
+
+### 部署
+- 本地 backend pid 48766 (17:41 启动) — 已加载新代码
+- VPS 部署: 等 DevOps Wave 5.x push + rsync (如未部署)
+
+---
+
+### 2026-05-09 17:00-17:30 — B35+B38+B39+B37+B41 修复 (PM 代写)
+
+参考 backend-progress/current.md 17:00 段
+
+---
+
+### 2026-05-11 10:43 — B43+B44+B46+B41 修复批 ✅（PM 代写）
+
+参考 backend-progress/current.md 10:43 段。AsyncAnthropic + alembic 004 + ChapterStatus 加 2 字段 + safety_advice 暴露 + CLAUDE.md DEPRECATED 标注。
+
+---
+
+### 2026-05-11 17:18 Wave 5 — B52+B56+B57+B51v2+B49 全闭环 ✅（PM 代写）
+
+详见 backend-progress/current.md 17:18 段。5 文件 9 fix points，AST + pytest 全过。

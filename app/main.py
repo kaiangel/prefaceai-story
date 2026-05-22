@@ -2,8 +2,9 @@
 
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from app.database import init_db, close_db
 from app.api import api_router
@@ -36,20 +37,27 @@ logging.basicConfig(
 logging.getLogger("uvicorn.access").addHandler(_file_handler)
 logging.getLogger("uvicorn.error").addHandler(_file_handler)
 
+logger = logging.getLogger("xuhua")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
+    logger.info("[Main] Application startup: initializing database...")
     await init_db()
+    logger.info("[Main] Database initialized successfully")
 
     # 确保图像和音频存储目录存在
     os.makedirs(settings.IMAGE_STORAGE_PATH, exist_ok=True)
     os.makedirs(settings.AUDIO_STORAGE_PATH, exist_ok=True)
+    logger.info(f"[Main] Storage dirs ready: {settings.IMAGE_STORAGE_PATH}, {settings.AUDIO_STORAGE_PATH}")
 
     yield
     # Shutdown
+    logger.info("[Main] Application shutdown: closing database...")
     await close_db()
+    logger.info("[Main] Database closed")
 
 
 app = FastAPI(
@@ -83,6 +91,25 @@ app.include_router(api_router)
 app.include_router(images_router)
 app.include_router(audio_router)
 app.include_router(utils_router)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """
+    B37: 全局 500 异常捕获 — 记录 stack trace + 返回结构化错误
+    所有未被路由层 try/except 捕获的异常都会到这里
+    """
+    logger.exception(
+        f"[Global] Unhandled exception: {request.method} {request.url} — {exc}"
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "path": str(request.url.path),
+            "method": request.method,
+        },
+    )
 
 
 @app.get("/")

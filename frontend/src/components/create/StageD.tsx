@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   ChevronLeft,
@@ -12,7 +12,11 @@ import {
   Sparkles,
   Loader2,
   Wand2,
+  AlertTriangle,
+  XCircle,
+  RotateCcw,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCreate } from "@/contexts/CreateContext";
 import { apiFetch, getStoredToken } from "@/lib/api";
 import { toAbsoluteUrl } from "@/lib/url";
@@ -22,6 +26,7 @@ import { useToast } from "@/components/ui/Toast";
 export default function StageD() {
   const { state, dispatch } = useCreate();
   const { toast } = useToast();
+  const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [editingShotId, setEditingShotId] = useState<number | null>(null);
   const [regeneratingId, setRegeneratingId] = useState<number | null>(null);
@@ -29,6 +34,8 @@ export default function StageD() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [adjustmentText, setAdjustmentText] = useState("");
   const [adjusting, setAdjusting] = useState(false);
+  // B44: whether safety_advice detail panel is expanded for current shot
+  const [expandedSafety, setExpandedSafety] = useState<Record<number, boolean>>({});
   // D.17: ref for adjustment input to focus when user clicks "改一下文字"
   const adjustInputRef = useRef<HTMLInputElement>(null);
 
@@ -36,13 +43,91 @@ export default function StageD() {
   const shots = state.shots;
   const currentShot = shots[currentIndex];
 
-  if (!currentShot) return null;
+  // B46: compute failed shots (image_url === null and success !== true)
+  const failedShotIndices: number[] = shots
+    .map((s, i) => (s.imageUrl === null ? i : -1))
+    .filter((i) => i !== -1);
+  const failedShotCount = failedShotIndices.length;
+
+  // B46: jump to the first failed shot
+  const jumpToFirstFailedShot = useCallback(() => {
+    if (failedShotIndices.length > 0) {
+      setCurrentIndex(failedShotIndices[0]);
+      // eslint-disable-next-line no-console
+      console.log("[B46] jumping to first failed shot index=", failedShotIndices[0], "shotId=", shots[failedShotIndices[0]]?.shotId);
+    }
+  }, [failedShotIndices, shots]);
+
+  // [StageD] Log #1 — render: how many shots, current index, projectId
+  // eslint-disable-next-line no-console
+  console.log("[StageD] render: projectId=", state.projectId, "shots.length=", shots.length, "failedShotCount=", failedShotCount, "currentIndex=", currentIndex, "currentShot.shotId=", currentShot?.shotId ?? "none", "bgmPlayer.status=", state.bgmPlayer.status, "bgmUrl=", state.bgmPlayer.bgmUrl?.slice(0, 60) ?? "null");
+
+  if (!currentShot) {
+    // [StageD] Log #2 — no shots at all (empty state) — possibly loading or pipeline failed
+    // eslint-disable-next-line no-console
+    console.warn("[StageD] currentShot is null — shots.length=", shots.length, "— likely empty generation result or hydration not complete");
+
+    // RISK-T16-7: Show failed state UI instead of blank screen.
+    // This happens when: (a) pipeline failed and storyboard_json is empty {},
+    // or (b) status=completed but shots array is empty.
+    const errorMessage = state.generationMessage
+      ? state.generationMessage
+      : "故事生成遇到了问题，画面数据为空。请返回重新创建。";
+
+    return (
+      <main className="container-lg py-16 pb-24">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-lg mx-auto text-center"
+        >
+          <div className="mb-8">
+            <XCircle className="w-16 h-16 text-red-400 mx-auto" />
+          </div>
+          <h1 className="text-2xl font-bold mb-3 text-text-primary">
+            故事生成遇到问题
+          </h1>
+          <p className="text-text-tertiary text-sm mb-6 leading-relaxed">
+            {errorMessage}
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button
+              onClick={() => router.push("/create")}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-primary text-white font-medium hover:bg-brand-primary/90 transition-colors"
+            >
+              <RotateCcw className="w-4 h-4" />
+              重新创建故事
+            </button>
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-bg-secondary border border-white/10 text-text-secondary font-medium hover:bg-bg-tertiary transition-colors"
+            >
+              返回工作台
+            </button>
+          </div>
+          <p className="text-text-muted text-xs mt-6">
+            如果问题持续出现，请联系我们的支持团队
+          </p>
+        </motion.div>
+      </main>
+    );
+  }
 
   const handlePrev = () => setCurrentIndex((i) => Math.max(0, i - 1));
   const handleNext = () => setCurrentIndex((i) => Math.min(shots.length - 1, i + 1));
 
+  // B21: Ensure imageUrl bypasses browser disk cache after regeneration.
+  // If backend already appended ?v=<timestamp> we use it as-is; otherwise we add one.
+  const bustCache = (url: string): string => {
+    if (!url) return url;
+    return url.includes("?v=") ? url : `${url}?v=${Date.now()}`;
+  };
+
   // KI-001: Regenerate shot — call POST API then update imageUrl
   const handleRegenerate = async (shotId: number) => {
+    // [StageD] Log #3 — regenerate shot start
+    // eslint-disable-next-line no-console
+    console.log("[StageD] handleRegenerate: shotId=", shotId, "projectId=", state.projectId);
     setRegeneratingId(shotId);
     dispatch({ type: "REGENERATE_SHOT", payload: shotId });
     try {
@@ -55,12 +140,21 @@ export default function StageD() {
         { method: "POST" },
         token
       );
+      // B21: apply cache-bust so the browser fetches the new image instead of
+      // serving the old one from disk cache.
+      const freshUrl = bustCache(result.imageUrl);
+      // [StageD] Log #4 — regenerate success
+      // eslint-disable-next-line no-console
+      console.log("[StageD] handleRegenerate: SUCCESS shotId=", shotId, "newImageUrl=", freshUrl?.slice(0, 80) ?? "null");
       dispatch({
         type: "REGENERATE_SHOT_SUCCESS",
-        payload: { shotId, imageUrl: result.imageUrl },
+        payload: { shotId, imageUrl: freshUrl },
       });
-      toast("success", "重新生成完成");
-    } catch {
+      toast("success", "已重新生成");
+    } catch (e) {
+      // [StageD] Log #5 — regenerate error
+      // eslint-disable-next-line no-console
+      console.error("[StageD] handleRegenerate: ERROR shotId=", shotId, e instanceof Error ? e.message : e);
       toast("error", "重新生成失败，请重试");
     } finally {
       setRegeneratingId(null);
@@ -70,6 +164,9 @@ export default function StageD() {
   // Adjust shot image — user provides Chinese intent, backend uses Haiku to modify image_prompt then regenerate
   const handleAdjust = async () => {
     if (!adjustmentText.trim()) return;
+    // [StageD] Log #6 — adjust shot start
+    // eslint-disable-next-line no-console
+    console.log("[StageD] handleAdjust: shotId=", currentShot.shotId, "intent=", adjustmentText.trim().slice(0, 60));
     setAdjusting(true);
     dispatch({ type: "REGENERATE_SHOT", payload: currentShot.shotId });
     try {
@@ -86,13 +183,21 @@ export default function StageD() {
         },
         token
       );
+      // B21: same cache-bust applied for adjustment-driven regeneration
+      const freshUrl = bustCache(result.imageUrl);
+      // [StageD] Log #7 — adjust success
+      // eslint-disable-next-line no-console
+      console.log("[StageD] handleAdjust: SUCCESS shotId=", currentShot.shotId, "prompt_modified=", result.prompt_modified, "newUrl=", freshUrl?.slice(0, 80) ?? "null");
       dispatch({
         type: "REGENERATE_SHOT_SUCCESS",
-        payload: { shotId: currentShot.shotId, imageUrl: result.imageUrl },
+        payload: { shotId: currentShot.shotId, imageUrl: freshUrl },
       });
       toast("success", "画面已调整");
       setAdjustmentText("");
-    } catch {
+    } catch (e) {
+      // [StageD] Log #8 — adjust error
+      // eslint-disable-next-line no-console
+      console.error("[StageD] handleAdjust: ERROR shotId=", currentShot.shotId, e instanceof Error ? e.message : e);
       toast("error", "调整失败，请重试");
     } finally {
       setAdjusting(false);
@@ -167,10 +272,31 @@ export default function StageD() {
           </p>
         </div>
 
+        {/* B46: Partial failure banner — shown when some shots failed to generate */}
+        {failedShotCount > 0 && (
+          <div className="mb-4 flex items-center justify-between gap-3 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+              <p className="text-red-300 text-sm">
+                {shots.length - failedShotCount}/{shots.length} 张生成成功，{failedShotCount} 张未生成
+              </p>
+            </div>
+            <button
+              onClick={jumpToFirstFailedShot}
+              className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors whitespace-nowrap"
+            >
+              查看并重生
+            </button>
+          </div>
+        )}
+
         {/* Shot Navigator */}
         <div className="flex items-center justify-between mb-4">
           <span className="text-sm text-text-muted">
             第 {currentIndex + 1} / {shots.length} 张
+            {failedShotCount > 0 && (
+              <span className="ml-2 text-red-400/80 text-xs">({failedShotCount} 张失败)</span>
+            )}
           </span>
         </div>
 
@@ -206,27 +332,37 @@ export default function StageD() {
                   }}
                 />
               ) : (
-                // D.17: show specific reason when safety_advice or error_message is present
+                // B44: show structured safety advice when image generation failed
                 <div className="w-full h-full flex flex-col items-center justify-center px-4 gap-2">
-                  <ImageIcon className="w-12 h-12 text-text-muted/30 mb-1" />
-                  {(currentShot.safetyAdvice || currentShot.errorMessage) ? (
+                  {currentShot.safetyAdvice ? (
+                    // B44: structured safety advice from SafetyAdvisor
                     <>
-                      <span className="text-xs text-amber-400/80 text-center leading-relaxed">
-                        {currentShot.safetyAdvice || currentShot.errorMessage}
-                      </span>
+                      <AlertTriangle className="w-10 h-10 text-amber-400/70 mb-1" />
+                      <p className="text-xs font-medium text-amber-300 text-center">图生成失败</p>
+                      <p className="text-[11px] text-amber-400/80 text-center leading-relaxed max-w-[200px]">
+                        {currentShot.safetyAdvice.user_message}
+                      </p>
                       <button
                         onClick={() => {
-                          // D.17: focus the "调整画面" input below and scroll to it
-                          adjustInputRef.current?.focus();
-                          adjustInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                          setExpandedSafety((prev) => ({ ...prev, [currentShot.shotId]: !prev[currentShot.shotId] }));
                         }}
-                        className="mt-1 text-xs text-brand-primary hover:underline"
+                        className="mt-1 text-[10px] text-brand-primary/70 hover:text-brand-primary hover:underline"
                       >
-                        改一下文字
+                        {expandedSafety[currentShot.shotId] ? "收起详情" : "查看可疑词"}
                       </button>
                     </>
+                  ) : currentShot.errorMessage ? (
+                    <>
+                      <ImageIcon className="w-12 h-12 text-text-muted/30 mb-1" />
+                      <span className="text-xs text-amber-400/80 text-center leading-relaxed">
+                        {currentShot.errorMessage}
+                      </span>
+                    </>
                   ) : (
-                    <span className="text-xs text-text-muted">画面生成中...</span>
+                    <>
+                      <ImageIcon className="w-12 h-12 text-text-muted/30 mb-1" />
+                      <span className="text-xs text-text-muted">画面生成中...</span>
+                    </>
                   )}
                 </div>
               )}
@@ -304,10 +440,12 @@ export default function StageD() {
               </div>
             )}
 
-            {/* Narration (read-only) */}
+            {/* DEC-044 (2026-05-19): narration_segment 不再朗读为旁白, 仅作为画面描述使用.
+                T20-21 重构后 narration_segment 会变短, 作为 caption / 画面描述 (read-only)
+                展示给用户. 用户可通过上方"调整画面"按钮触发画面级编辑. */}
             {currentShot.narrationSegment && (
               <div>
-                <label className="text-xs text-text-muted mb-1 block">旁白（只读）</label>
+                <label className="text-xs text-text-muted mb-1 block">描述（只读）</label>
                 <p className="text-sm text-text-secondary/70 leading-relaxed">
                   {currentShot.narrationSegment}
                 </p>
@@ -321,12 +459,80 @@ export default function StageD() {
               <span>场景: {currentShot.sceneId}</span>
             </div>
 
-            {/* D.17: Safety advice / error reason — shown when image generation was blocked */}
-            {!currentShot.imageUrl && (currentShot.safetyAdvice || currentShot.errorMessage) && (
+            {/* B44: Safety advice panel — shown when image was blocked by content safety */}
+            {!currentShot.imageUrl && currentShot.safetyAdvice && (
+              <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 overflow-hidden">
+                {/* Summary row — always visible */}
+                <div className="flex items-start gap-2 p-3">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-amber-400/90 leading-relaxed">
+                      {currentShot.safetyAdvice.user_message}
+                    </p>
+                    <button
+                      onClick={() => setExpandedSafety((prev) => ({ ...prev, [currentShot.shotId]: !prev[currentShot.shotId] }))}
+                      className="mt-1 text-[10px] text-amber-300/70 hover:text-amber-300 underline"
+                    >
+                      {expandedSafety[currentShot.shotId] ? "收起" : "查看可疑词和修改建议"}
+                    </button>
+                  </div>
+                </div>
+                {/* Expanded detail — suspected terms + suggested changes */}
+                {expandedSafety[currentShot.shotId] && (
+                  <div className="border-t border-amber-500/20 px-3 pb-3 pt-2 space-y-2">
+                    {currentShot.safetyAdvice.suspected_terms.length > 0 && (
+                      <div>
+                        <p className="text-[10px] text-amber-400/60 mb-1 font-medium">可疑词</p>
+                        <div className="flex flex-wrap gap-1">
+                          {currentShot.safetyAdvice.suspected_terms.map((term, i) => (
+                            <span key={i} className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px]">
+                              {term}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {currentShot.safetyAdvice.suggested_changes.length > 0 && (
+                      <div>
+                        <p className="text-[10px] text-amber-400/60 mb-1 font-medium">建议替换</p>
+                        <div className="space-y-0.5">
+                          {currentShot.safetyAdvice.suggested_changes.map((change, i) => (
+                            <p key={i} className="text-[10px] text-amber-300/80">
+                              <span className="line-through text-amber-400/50">{change.original}</span>
+                              <span className="mx-1 text-amber-400/40">→</span>
+                              <span>{change.suggestion}</span>
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (currentShot.safetyAdvice) {
+                          // Pre-fill adjustment input with suggested changes summary
+                          const suggestions = currentShot.safetyAdvice.suggested_changes
+                            .map((c) => `将"${c.original}"改为"${c.suggestion}"`)
+                            .join("，");
+                          setAdjustmentText(suggestions);
+                          adjustInputRef.current?.focus();
+                          adjustInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }
+                      }}
+                      className="w-full mt-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[10px] hover:bg-amber-500/30 transition-colors"
+                    >
+                      <Wand2 className="w-3 h-3" />
+                      应用建议并重生成
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            {/* D.17 fallback: plain error message when no structured safety advice */}
+            {!currentShot.imageUrl && !currentShot.safetyAdvice && currentShot.errorMessage && (
               <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
                 <Sparkles className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-amber-400/90 leading-relaxed">
-                  {currentShot.safetyAdvice || currentShot.errorMessage}
+                  {currentShot.errorMessage}
                 </p>
               </div>
             )}
@@ -403,21 +609,34 @@ export default function StageD() {
           </div>
         </div>
 
-        {/* Shot Thumbnails */}
+        {/* Shot Thumbnails — B46: red border on failed shots */}
         <div className="flex gap-1.5 overflow-x-auto pb-2 mb-6 scrollbar-hide">
-          {shots.map((shot, i) => (
-            <button
-              key={shot.shotId}
-              onClick={() => setCurrentIndex(i)}
-              className={`w-10 h-10 rounded-md flex-shrink-0 border-2 flex items-center justify-center text-[10px] transition-all ${
-                i === currentIndex
-                  ? "border-brand-primary bg-brand-primary/20 text-brand-primary"
-                  : "border-white/10 bg-bg-secondary text-text-muted hover:border-white/20"
-              }`}
-            >
-              {shot.shotId}
-            </button>
-          ))}
+          {shots.map((shot, i) => {
+            const isFailed = shot.imageUrl === null;
+            return (
+              <button
+                key={shot.shotId}
+                onClick={() => setCurrentIndex(i)}
+                title={isFailed ? "图生成失败，点击查看详情" : undefined}
+                className={`w-10 h-10 rounded-md flex-shrink-0 border-2 flex items-center justify-center text-[10px] transition-all relative ${
+                  i === currentIndex
+                    ? isFailed
+                      ? "border-red-500 bg-red-500/20 text-red-400"
+                      : "border-brand-primary bg-brand-primary/20 text-brand-primary"
+                    : isFailed
+                    ? "border-red-500/50 bg-red-500/10 text-red-400/70 hover:border-red-500/80"
+                    : "border-white/10 bg-bg-secondary text-text-muted hover:border-white/20"
+                }`}
+              >
+                {shot.shotId}
+                {isFailed && (
+                  <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-red-500 flex items-center justify-center">
+                    <span className="text-white text-[7px] font-bold">!</span>
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* BGM Player */}

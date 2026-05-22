@@ -87,17 +87,12 @@ Rules:
 
         content = message.content[0].text.strip()
 
-        # Parse JSON response
-        import json
-
-        # Strip markdown code fences if present
-        if content.startswith("```"):
-            lines = content.split("\n")
-            content = "\n".join(
-                l for l in lines if not l.startswith("```")
-            ).strip()
-
-        advice = json.loads(content)
+        # Parse JSON response — RISK-T17-1: 使用 extract_json_from_llm_response 处理 markdown JSON
+        from app.services._llm_helpers import extract_json_from_llm_response
+        advice = extract_json_from_llm_response(content)
+        if advice is None:
+            logger.warning(f"[SafetyAdvisor] JSON 解析失败，content[:200]={content[:200]!r}")
+            return _generic_advice(failed_prompt)
 
         # Validate structure
         if not isinstance(advice.get("suspected_terms"), list):

@@ -1,0 +1,26 @@
+# IncompleteRead 监控告警阈值配置
+# 用途: 被 scripts/monitor_incompleteread.py 读取
+# 修改后直接生效，无需重启任何服务
+#
+# 背景: Seedream 下载偶发 IncompleteRead 网络抖动，Pipeline 内已有 retry 机制不阻断。
+# 监控目标: 频率突增时及时知道（阈值调整时只改这个文件）
+#
+# test18 实测基线 (2026-05-18): 8 次 IncompleteRead / 故事（约 30min），全部 1 次 retry 成功
+
+# 每小时 IncompleteRead 触发次数 → WARN
+# 基线: ~16次/hr（2 个并发故事生成，每故事 ~8次/30min）
+# 设 20 留一倍余量，突破说明有异常（网络质量差 or 请求量骤增）
+warn_hourly_count: 20
+
+# 每小时 retry 耗尽仍失败次数 → CRITICAL
+# 正常应为 0（当前全部 1 次 retry 即成功）
+# 设 3 允许极少数瞬时双次失败，超过就说明 Seedream 服务有问题
+critical_hourly_exhausted: 3
+
+# 单故事 IncompleteRead 次数 → WARN（辅助参考，不产生告警）
+# 基线: ~8次，超过 15 说明该次生成网络条件特别差
+warn_per_story: 15
+
+# 分析窗口（小时数，0 = 全量日志）
+# 默认 24 小时，定期 cron 可设为 1（只看最近 1 小时）
+analysis_window_hours: 24

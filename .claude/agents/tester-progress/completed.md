@@ -4,6 +4,117 @@
 
 ---
 
+## 2026-05-22 — Wave 7+8 综合 Regression + T22-NEW-7 ID Format Robustness ✅
+
+**任务**: Wave 7+8 全闭环 regression + 新建 test_t22_new_7_id_format_robustness.py
+
+**pytest 真自跑结果** (KEY_LEARNINGS #47 铁律, 13 test files 综合):
+
+```
+tests/test_identity_anchor_cross_genre_baseline.py   105/105 PASS  (Layer 1 baseline, 0 退化)
+tests/test_first_batch_chars_not_zero.py              17/17  PASS  (T22-NEW-7 Wave 7)
+tests/test_llm_fallback_chain.py                      14/14  PASS  (T22-NEW-4 Wave 7)
+tests/test_apply_identity_anchors_location_wire.py     7/7   PASS  (T22-NEW-6 Wave 7)
+tests/test_schema_generic_fallback_arch.py            83/83  PASS  (T22-NEW-9 Wave 8)
+tests/test_t22_new_5_r4_2_removed.py                 24/24  PASS  (T22-NEW-5 Wave 8)
+tests/test_identity_anchor_injector.py                25/25  PASS  (Layer 1 regression)
+tests/test_prompt_validator.py                        28/28  PASS  (Layer 1 regression)
+tests/test_identity_anchor_extraction.py              74/74  PASS  (Layer 1 regression)
+tests/test_t21_new_3_to_7_backend.py                 51/51  PASS  (T21 regression)
+tests/test_t21_digital_virtual_fallback.py            25/25  PASS  (T21 regression)
+tests/test_t21_new_2_humanoid_fallback_wave2.py       16/16  PASS  (T21 regression)
+tests/test_t22_new_7_id_format_robustness.py (NEW)    65/65  PASS  (T22-NEW-7 ID format)
+─────────────────────────────────────────────────────────────────────────────
+534/534 PASS, 0 FAIL, 0 退化
+elapsed: 0.84s
+API calls: 0 (零成本 mock)
+```
+
+**新建 test_t22_new_7_id_format_robustness.py (65 cases)**:
+
+| Section | 内容 | Cases |
+|---------|------|-------|
+| Section 1: Format A | char_id format ('char_001') × 19 types | 19 |
+| Section 2: Format B | name_en format ('Coral') × 19 types — T22-NEW-7 根因 | 19 |
+| Section 3: Format C | mixed (name_en + char_id) × 19 types | 19 |
+| Section 4: Boundary | empty/None/no-match/dedup/case-insensitive/WARNING | 8 |
+| **Total** | | **65** |
+
+**T22-NEW-7 ID format mismatch 修后真实证**:
+- Format B (name_en): 19/19 types 全成功匹配 — 修前 Shot 1-3 chars=0 → 修后全 resolve
+- Format C (mixed): 19/19 types 全 2 chars 成功匹配 (含 dedup 验证)
+- 边界: `log_mismatch=True` 时 `WARNING` 真发出 (silent fail 防御已确认)
+
+**越权检查**: 仅新建 `tests/test_t22_new_7_id_format_robustness.py` + tester-progress 三件套 + TEAM_CHAT 末尾追加. 0 触碰 app/ 代码 / .team-brain/decisions/ / 其他 agent progress.
+
+---
+
+## 2026-05-22 — DEC-048 Layer 1 跨题材 95 Baseline Regression ✅
+
+**任务**: TASK-T22-NEW-3 / DEC-048 Layer 1 Tester 跨题材 baseline regression
+
+**文件**: `tests/test_identity_anchor_cross_genre_baseline.py` (新建, ~430 行)
+
+**pytest 真自跑结果** (KEY_LEARNINGS #47 铁律, 自己跑不自报):
+```
+105/105 PASS, 0 FAIL, 0 SKIP
+elapsed: 0.49s
+API calls: 0 (零成本 mock)
+```
+
+**覆盖矩阵**:
+- 95 parametrized: 19 character_types × 5 styles (realistic/anime/children_book/cyberpunk/ink)
+- 10 structural: 空 char 注入/6角色独立块/style anchor/location/time/幂等性/边界值
+
+**验证逻辑 (per shot, 18 shots each)**:
+- 100% primary_color tokens 在 injected prompt
+- 100% skin_tone tokens 在 injected prompt (humanoid)
+- 幂等性: 二次注入 == 首次注入
+- 原始 prompt 保留 (prepend not replace)
+
+**KEY_LEARNINGS #52 铁律**: import 用 `importlib.util.spec_from_file_location`，镜像 Backend test_identity_anchor_injector.py pattern，0 google.genai cascade。
+
+**越权检查**: 仅改 tests/ 和 tester-progress/，0 触碰 app/ 或 team-brain/decisions/
+
+---
+
+## 2026-05-19 22:57 - 2026-05-21: 等派工期间 (无派工任务)
+
+**时间段**: 2026-05-19 22:57 (B16 Hotfix 重测完成) → 2026-05-21 23:30 (本次更新)
+**状态**: 无派工任务，诚实记录
+
+**背景**:
+- Wave 1/2/3/4/4.5/5 期间，PM 选择"Tester 跳过，Founder 手动测"策略
+- 5/19 22:30 PM 消息: "Wave 4 Tester 跳过，Founder 手动跑 test20 验证"
+- 5/20 09:30 PM 消息: "Wave 5 Tester 跳过，Founder 手动测 2-3 跨题材样本"
+- Backend/AI-ML 自行跑单元测试（260+ PASS 基线），无需 Tester 介入
+- Tester 无任何 test 脚本执行记录
+
+**期间观察 (阅读 TEAM_CHAT 学习到)**:
+- Wave 1: T20-50 freshness check P0 修复 ✅
+- Wave 2: T20-47 SONNET_MODEL 修复 + T20-50-fix-2 save_all_references ✅
+- Wave 3: T20-51 BGM meta-prompt + T20-52 test isolation + T20-53 pool_timeout ✅
+- Wave 4: AI-ML T20-26/26/21v2/27 prompt 层 + Backend wire ✅
+- Wave 5: AI-ML DEC-046 v3 通用叙事原则 15 原则 8 cluster ✅
+- test22 fairytale: T22-NEW-3 P0 character schema 0% 注入 发现 → DEC-048 Layer 1 决策
+
+**下一个任务**: Layer 1 跨题材 baseline regression (等 AI-ML + Backend 实施完成后 PM 派工)
+
+---
+
+## 2026-05-08 20:33: B16 P1 Hotfix 重测 PASS
+
+**任务**: 验证 Backend B16 修复 (chapters.py L1682-1710 三路判断 pil_image 优先)
+**项目**: test7 UUID `edd4e938-68f6-4ffe-84f5-503442034dca`
+
+**结果**: 全 PASS
+- HTTP 200 响应 ✅
+- Seedream 真重新生图 (1664x2218, 147.36s) ✅
+- shot_01.png mtime 真变 ✅
+- storyboard_json 写回 DB ✅
+
+---
+
 ## 2026-04-29: Wave 3.6 — R7-3 P1 portrait 重生 Bug 独立复测
 
 **任务**: 独立验证 Wave 3.5 Backend 对 R7-3 的修复（character_prompt_builder.py isinstance 防御）
@@ -1836,4 +1947,39 @@ PM独立审查发现V1版本有32+个问题（AI气泡20+、留白10+、乱码5+
 **实际成本**: ¥34.3 / 预算 ¥48
 **残留 bug**: 1 (project_id=None dispatcher) + 4 partial (event loop aiomysql) + 5 (ShotValidator 5MB)
 **Founder 反馈**: 可用，比 NB2 稍逊
+
+---
+
+### TASK-T8-INTEGRATION-VERIFY — 5-08 4 Agent 修复批集成验证 (2026-05-08)
+
+**完成时间**: 2026-05-08 19:50 - 21:00 (约 70 分钟)
+**验收状态**: 6/7 通过，发现 1 个 P1 Bug (B16)
+
+**测试项目**: test7 UUID `edd4e938-68f6-4ffe-84f5-503442034dca` (《我妈骂的AI客服是我训练的》)
+**Backend PID 26925 / Frontend PID 26957**
+
+**完成内容**:
+
+| 验证项 | 状态 | 核心证据 |
+|--------|------|----------|
+| V2 B8 _extract_json inner quote fix | PASS | 直接调用 _fix_inner_quotes_shared + _extract_json，未转义内部引号解析成功 |
+| V3 B6 /story 404 状态码行为 | PASS(有保留) | pending→404, generating_story→404, failed→400（与 spec 分歧，见说明） |
+| V4 B11 BGM 6 桶 meta-prompt | PASS | 6 桶调性词全验证：bouncy/syncopated/driving/minor key/brass stab/contemplative |
+| V5 B17 ShotValidator anatomy | PASS 3/3 | severe→valid=False, mild→valid=True, UPPERCASE+string→valid=False |
+| V6 D.24 cache bust + D.25 BGM 文案 | PASS | bustCache 逻辑确认；"换种风格"+"再来一首"+tooltip 代码确认 |
+| pytest 全套回归 | PASS | 295 passed / 3 failed / 32 skipped / 6 errors，与 Wave 5.2 基线完全一致，零退化 |
+| 架构测试 11/11 | PASS | test_architecture.py + test_quality_gates.py 全通过 |
+| V1 B16 regenerate_shot 真生图 | **FAIL P1** | 图像生成成功(1664x2218, 446s)，但 save 步骤 HTTP 500 |
+
+**关键发现 - B16 P1 Bug**:
+- **位置**: `app/api/chapters.py` L1683
+- **根因**: `result.get("image_data")` 返回 base64 string，`isinstance(bytes)` + `hasattr("save")` 均 False，fall through 到 `else: raise HTTPException(500, "生成图像数据格式异常")`
+- **修复方向**: 先检查 `result.get("pil_image")` — PIL Image 在 Seedream 返回值里存在但代码未检查
+- **派给**: @backend 修复 `app/api/chapters.py` L1683-1696
+
+**B6 状态分歧**:
+- spec 说 failed→404，代码实际返回 400（有完整错误信息），语义上更准确
+- 建议 @backend 与 @frontend 对齐处理，不阻塞其他修复
+
+**角色一致性回归**: 静态分析 — 5-08 修改文件均非高风险文件（image_generator.py / storyboard_prompts.py / storyboard_service.py / reference_image_manager.py 零触碰），预期 PASS。后台进程 PID 32983 仍在运行中（LLM 生成阶段，约 15-20 分钟）。
 

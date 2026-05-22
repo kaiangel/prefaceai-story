@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 import hashlib
 import hmac
+import logging
 import os
 from uuid import uuid4
 
@@ -17,6 +18,8 @@ from app.database import get_db
 from app.models.invite_code import InviteCode
 from app.models.invite_relationship import InviteRelationship
 from app.models.user import User
+
+logger = logging.getLogger("xuhua")
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -127,6 +130,7 @@ def _serialize_user(user: User) -> UserProfile:
 
 @router.post("/register", response_model=AuthResponse)
 async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db)):
+    logger.info(f"[Auth] register attempt: email={request.email} invite_code={request.invite_code.strip().upper()}")
     invite_code_value = request.invite_code.strip().upper()
 
     invite_code_result = await db.execute(
@@ -134,16 +138,21 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
     )
     invite_code = invite_code_result.scalar_one_or_none()
     if not invite_code:
+        logger.warning(f"[Auth] register failed: invite_code={invite_code_value} not found")
         raise HTTPException(status_code=400, detail="邀请码无效")
     if invite_code.status != "active":
+        logger.warning(f"[Auth] register failed: invite_code={invite_code_value} status={invite_code.status}")
         raise HTTPException(status_code=400, detail="邀请码不可用")
     if invite_code.expires_at and invite_code.expires_at <= user_now():
+        logger.warning(f"[Auth] register failed: invite_code={invite_code_value} expired at {invite_code.expires_at}")
         raise HTTPException(status_code=400, detail="邀请码已过期")
     if invite_code.used_count >= invite_code.max_uses:
+        logger.warning(f"[Auth] register failed: invite_code={invite_code_value} used_count={invite_code.used_count}/{invite_code.max_uses}")
         raise HTTPException(status_code=400, detail="邀请码已用完")
 
     existing = await db.execute(select(User).where(User.email == request.email.lower()))
     if existing.scalar_one_or_none():
+        logger.warning(f"[Auth] register failed: email={request.email} already exists")
         raise HTTPException(status_code=409, detail="邮箱已注册")
 
     user = User(
@@ -170,16 +179,23 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
         )
     )
 
+    logger.info(f"[Auth] register success: email={request.email} uuid={user.uuid}")
     return AuthResponse(success=True, token=user.uuid or str(user.id), user=_serialize_user(user))
 
 
 @router.post("/login", response_model=AuthResponse)
 async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
+    logger.info(f"[Auth] login attempt: email={request.email}")
     result = await db.execute(select(User).where(User.email == request.email.lower()))
     user = result.scalar_one_or_none()
-    if not user or not _verify_password(request.password, user.password_hash):
+    if not user:
+        logger.warning(f"[Auth] login failed: email={request.email} not found")
+        raise HTTPException(status_code=401, detail="邮箱或密码错误")
+    if not _verify_password(request.password, user.password_hash):
+        logger.warning(f"[Auth] login failed: email={request.email} wrong password")
         raise HTTPException(status_code=401, detail="邮箱或密码错误")
 
+    logger.info(f"[Auth] login success: email={request.email} uuid={user.uuid}")
     return AuthResponse(success=True, token=user.uuid or str(user.id), user=_serialize_user(user))
 
 

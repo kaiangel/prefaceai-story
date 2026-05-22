@@ -24,8 +24,8 @@ export default function SettingsContent() {
 
   useEffect(() => {
     if (user) {
-      setNickname(user.name);
-      setAvatarPreview(user.avatarUrl);
+      setNickname(user?.name ?? "");
+      setAvatarPreview(user?.avatarUrl ?? null);
     }
   }, [user]);
 
@@ -41,7 +41,7 @@ export default function SettingsContent() {
   };
 
   const handleSave = async () => {
-    const ok = await updateUser({ name: nickname.trim() || user.name, avatarUrl: avatarPreview });
+    const ok = await updateUser({ name: nickname.trim() || (user?.name ?? ""), avatarUrl: avatarPreview });
     if (!ok) return;
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -49,9 +49,9 @@ export default function SettingsContent() {
 
   // Mock data
   const membershipData = {
-    level: (user.plan || "pro").toUpperCase(),
+    level: (user?.plan || "pro").toUpperCase(),
     expiresAt: "2026-12-31",
-    credits: user.credits ?? 0,
+    credits: user?.credits ?? 0,
     history: [
       { id: "1", title: "雨夜公交站", credits: 5, date: "2026-03-20" },
       { id: "2", title: "深夜便利店", credits: 3, date: "2026-03-18" },
@@ -59,7 +59,7 @@ export default function SettingsContent() {
     ],
   };
 
-  const initials = user.name
+  const initials = (user?.name ?? "")
     .split(/[\s_-]/)
     .map((w) => w[0])
     .join("")
@@ -120,7 +120,7 @@ export default function SettingsContent() {
           <div className="mb-4">
             <p className="text-xs text-text-muted mb-1">邮箱</p>
             <p className="px-3 py-2 rounded-lg bg-bg-tertiary/50 text-text-tertiary text-sm">
-              {user.email}
+              {user?.email}
             </p>
           </div>
 

@@ -6,6 +6,47 @@
 
 ---
 
+## 🚨 主力生图模型决策（2026-05-09 Founder 决定）
+
+**当前主力：Seedream**（`doubao-seedream-5-0-260128`）— 全栈使用 Seedream
+- 参考图（portrait + fullbody）：Seedream
+- 场景参考图（interior + exterior anchor）：Seedream
+- Shot 生成（18+ 张）：Seedream
+- **铁律**: 整个 Pipeline 必须**单一模型**，严禁 NB2/Seedream 运行时混用（D.17 + memory feedback_pipeline_single_model_only.md）
+
+**配置**：
+- `.env` `IMAGE_GEN_PROVIDER=seedream` ← 默认主力
+- `app/config.py:63` `IMAGE_GEN_PROVIDER: str = "seedream"`（2026-05-09 改）
+- 切换路径：image_generator.py L620/L837/L1430 三个 dispatch 点统一从 settings 读取
+- 当 IMAGE_GEN_PROVIDER=seedream → 早 return 走 SeedreamGenerator（保留所有 prompt 工程层 + 参考图传递链）
+
+**NB2 路径状态**：保留备用（Premium 储备 / 回滚预案），但当前**不走默认**。
+- 如果未来切回 NB2，仅需改 `.env IMAGE_GEN_PROVIDER=nb2`
+- NB2 dispatch 之后的代码完全保留（T23 NB2 路径 + StyleEnforcer + reference_images 14 张限制 + 预处理）
+
+**画幅决策**: 按用户在 Stage A 选的 aspect_ratio 真生效（D.15 + B39 修复 2026-05-09），不再"统一 2:3"
+- Seedream 1:1 = 2048×2048
+- Seedream 16:9 = 2048×1152 / 9:16 = 1152×2048 等
+- 参考图 + Shot 全部按用户选画幅
+
+**成本（Seedream，2026-05-09 实测）**：
+- 每张 ~$0.030（vs NB2 $0.067，**降 55%**）
+- 短篇（3 角色，~26 张图）= **~$0.78/故事**（旧 NB2 ~$1.74）
+- 中长篇（6 角色，~53 张）= **~$1.59/故事**（旧 NB2 ~$3.55）
+
+**注意 — 以下旧文档章节内容已过时**（已由 B41 于 2026-05-11 标注，保留供历史参考）：
+以下章节描述的是旧 NB2 时代的架构，当前主力已切换为 Seedream（见顶部决策块）。
+章节内容保留不删，但阅读时以本文件顶部"主力生图模型决策"块为准：
+- L175-177（"统一 NB2 模型架构"叙述）
+- L191-193（NB2 成本对比）
+- L206 / L373 / L375 / L389（Shot 默认 NB2 叙述）
+- L405-406（"NB2 主力生图模型"）
+- L533（关键铁律 use_pro_model=False）
+- L737-753（NB2 vs Pro 代码示例）
+- L956（NANO_BANANA_2_RESEARCH.md 引用）
+
+---
+
 ## 当前项目状态（2026-02-24）
 
 | Phase | 状态 | 说明 |
@@ -172,9 +213,11 @@ Ben 是项目的人类合伙人兼技术联合创始人（CTO 级别）。使用
 
 **🎉 突破性解决方案（teststory6.4-6.6验证通过）**：
 
-采用**统一 NB2 模型架构**彻底解决角色一致性问题（2026-04-15 更新）：
-- **参考图生成**：NB2（gemini-3.1-flash-image-preview，速度快、成本低）
-- **Shot生成**：NB2（gemini-3.1-flash-image-preview，默认）/ Gemini 3 Pro Image（未来 Premium 储备，当前不启用）
+> ⚠️ DEPRECATED 2026-05-11 — 以下 NB2 架构叙述已过时，当前主力为 Seedream（见顶部决策块）。保留供历史参考。
+
+采用**统一 Seedream 模型架构**彻底解决角色一致性问题（2026-05-09 切换）：
+- **参考图生成**：Seedream（`doubao-seedream-5-0-260128`）
+- **Shot生成**：Seedream（默认）/ NB2（保留备用，当 IMAGE_GEN_PROVIDER=nb2 时启用）
 
 **验证结果（2025-12-23）**：
 | 场景类型 | 一致性 | 测试用例 |
@@ -187,12 +230,11 @@ Ben 是项目的人类合伙人兼技术联合创始人（CTO 级别）。使用
 Pro模型不只是"看到"参考图，而是**理解**每个角色的身份边界，不会混淆角色特征。
 Flash模型仅用于参考图生成（无多角色混淆风险），成本仅为Pro的1/3。
 
-**成本对比（官方定价，2026-04-15 更新）**：
-- 短篇（3 角色, 21 shots）：**~$3.40/故事**（NB2 + B' 格式 + Sonnet 4.6）
-- 中长篇满配（6 角色, 45 shots）：**~$6.82/故事**
-- 费用大头：NB2 图像输出 $0.067/张（1K 分辨率），占总成本 70%+
-- 详细计算见 `docs/API_COST_CALCULATION.md`
-- 旧数据（已过时）：Pro 方案 $9.35/60shots、Flash 方案 $3.11/60shots
+**成本（Seedream，官方定价，2026-05-09 更新）**：
+- 短篇（3 角色, ~26 张图）：**~$0.78/故事**（Seedream $0.030/张）
+- 中长篇满配（6 角色, ~53 张）：**~$1.59/故事**
+- 详细计算见顶部"主力生图模型决策"块 + `docs/API_COST_CALCULATION.md`
+- 旧 NB2 数据（已过时）：短篇 ~$3.40、中长篇 ~$6.82（NB2 $0.067/张）
 
 **技术实现要点**：
 - 串行生成参考图：先肖像 → 用肖像作为参考生成全身图
@@ -203,7 +245,8 @@ Flash模型仅用于参考图生成（无多角色混淆风险），成本仅为
 - StyleEnforcer强制风格锁定，防止写实风格漂移成卡通
 
 **开发时必须遵守**：
-- **Shot生成默认使用 Nano Banana 2（`use_pro_model=False`）**，角色一致性 ~95% 与 Pro 持平，速度快 3-5x，成本降 50%。Pro 模型仅作为未来 Premium 用户储备
+- **Shot生成默认使用 Seedream（IMAGE_GEN_PROVIDER=seedream）**，全流水线统一模型（D.17 铁律）
+- NB2 路径保留备用（`.env IMAGE_GEN_PROVIDER=nb2` 切回），不走默认
 - 每个shot的prompt必须包含完整的角色外观描述
 - 场景图生成必须传入所有出场角色的参考图
 - 新增角色类型时，必须在CharacterPromptBuilder中实现对应的描述构建方法
@@ -360,7 +403,7 @@ idea (用户输入)
 │ Stage 5: ShotImageGenerator                             │
 │ ├── ReferenceImageManager → 角色参考图 (portrait+fullbody)
 │ ├── SceneReferenceManager → 场景参考图 (interior+exterior)
-│ └── ImageGenerator (Pro) → shot图片                     │
+│ └── SeedreamGenerator → shot图片（IMAGE_GEN_PROVIDER=seedream）│
 └─────────────────────────────────────────────────────────┘
     ↓
 视频合成 (TTS + Whisper对齐 + 图片序列)
@@ -370,9 +413,10 @@ final.mp4
 
 **关键设计决策**：
 - Stage 1-4 使用 Claude Sonnet 4.6（DEC-012 升级，备用 Gemini 3 Pro）
-- Stage 5 Shot生成默认使用 Nano Banana 2（角色一致性 ~95%，速度快 3-5x，成本降 50%）
+- Stage 5 Shot生成默认使用 Seedream（`IMAGE_GEN_PROVIDER=seedream`，2026-05-09 切换，D.17 单一模型铁律）
+- NB2 路径保留备用，`.env IMAGE_GEN_PROVIDER=nb2` 可切回
 - 环境连续性由场景参考图 (interior/exterior) + 文字 prompt 保障（DEC-014: previous_shot_image 已移除）
-- **Nano Banana 2 已确认为主力**：`gemini-3.1-flash-image-preview`（2026-02-26 发布），角色一致性 ~95% 与 Pro 持平，速度快 3-5x，成本降 50%。Founder 决策 NB2 为默认，Pro 仅作未来 Premium 用户储备。详见 `docs/NANO_BANANA_2_RESEARCH.md`
+- > ⚠️ DEPRECATED 2026-05-11: NB2 主力叙述已过时，详见 `docs/NANO_BANANA_2_RESEARCH.md`（历史参考）
 
 ---
 
@@ -386,24 +430,25 @@ final.mp4
 | Stage 2 | CharacterDesigner | 角色外貌设计 | **Claude Sonnet 4.6**（备用 Gemini 3 Pro） |
 | Stage 3 | ScreenplayWriter | 分场剧本生成 | **Claude Sonnet 4.6**（备用 Gemini 3 Pro） |
 | Stage 4 | StoryboardDirector | 分镜脚本生成 | **Claude Sonnet 4.6**（备用 Gemini 3 Pro） |
-| Stage 5 | ImageGenerator | Shot图片生成 | **Nano Banana 2**（默认）/ Gemini 3 Pro Image（Premium 储备） |
+| Stage 5 | SeedreamGenerator | Shot图片生成 | **Seedream**（默认，IMAGE_GEN_PROVIDER=seedream）/ NB2（备用） |
 
 ### 支撑服务
 
 | 服务 | 职责 | 外部依赖 |
 |------|------|----------|
 | Phase2PromptBuilder | 构建Shot生成的完整Prompt | - |
-| ReferenceImageManager | 角色参考图生成与管理 | ImageGenerator (Flash) |
-| SceneReferenceManager | 场景参考图生成与管理（内外景关联） | ImageGenerator (Flash) |
+| ReferenceImageManager | 角色参考图生成与管理 | SeedreamGenerator（默认）/ ImageGenerator NB2（备用） |
+| SceneReferenceManager | 场景参考图生成与管理（内外景关联） | SeedreamGenerator（默认）/ ImageGenerator NB2（备用） |
 | StyleEnforcer | 风格强制锁定 | - |
 | **TextOverlayServiceV2** | 条漫文字后处理叠加（旁白、气泡、情感强调） | PIL/Pillow |
 | TTSService | 文字转语音 | 火山引擎 Doubao |
 | WhisperService | 语音转文字+时间戳 | OpenAI Whisper |
 | AlignmentService | 音画时间对齐 | - |
 
-**🚨 模型配置说明**：
-- `FAST_MODEL` — 已废弃（注释掉），参考图现统一用 NB2_MODEL
-- `NB2_MODEL = "gemini-3.1-flash-image-preview"` - Nano Banana 2，主力生图模型（角色一致性 ~95%）
+**🚨 模型配置说明**（2026-05-11 更新）：
+- `IMAGE_GEN_PROVIDER=seedream` → 走 `SeedreamGenerator`（当前默认，全栈统一）
+- `IMAGE_GEN_PROVIDER=nb2` → 走 `ImageGenerator` NB2 路径（备用，保留 Premium 储备）
+- > ⚠️ DEPRECATED 2026-05-11: `NB2_MODEL = "gemini-3.1-flash-image-preview"` 不再是主力
 
 ---
 
@@ -530,7 +575,7 @@ final.mp4
 ### 角色一致性是产品的生命线
 
 1. **任何代码修改都不能破坏现有的角色一致性能力**
-2. **Shot生成默认使用 Nano Banana 2**（`use_pro_model=False`），角色一致性 ~95%，速度和成本优势显著。Pro 模型（`use_pro_model=True`）仅作为未来 Premium 用户储备，当前不启用
+2. **Shot生成默认使用 Seedream**（`IMAGE_GEN_PROVIDER=seedream`），全流水线统一模型，严禁 NB2/Seedream 运行时混用（D.17 铁律）。NB2 路径保留备用
 3. **参考图传递链必须完整**：character_refs + scene_refs → generate_shot_image()
 4. **修改storyboard_service.py或image_generator.py时，必须先跑角色一致性回归测试**
 
@@ -596,13 +641,14 @@ python tests/test_character_consistency_regression.py
 11. **不要硬编码角色类型**：支持19种角色类型，新类型走CharacterPromptBuilder
 12. **不要硬编码风格**：支持80+风格，走StyleEnforcer
 
-### 宽高比标准（TASK-ASPECT-2x3，2026-02-14）
-14. **所有图像统一 2:3 宽高比**（抖音适配）：
-    - 角色参考图（portrait + fullbody）：`"2:3"`
-    - 场景参考图（interior + exterior）：`"2:3"`（DEC-010 修复）
-    - Shot 生成图：`"2:3"`
-    - 相关文件：reference_image_manager.py, scene_reference_manager.py, storyboard_director.py, image_generator.py, consistent_image_generator.py, pipeline_orchestrator.py
-    - **禁止硬编码其他宽高比**，除非有明确的产品需求变更
+### 宽高比标准（D.15 + B39 更新，2026-05-09）
+14. **所有图像按用户在 Stage A 选择的 aspect_ratio 生成**（D.15 P0 决策，B39 修复）：
+    - 角色参考图（portrait + fullbody）：从 `project.aspect_ratio` 透传
+    - 场景参考图（interior + exterior）：同上
+    - Shot 生成图：同上
+    - 相关文件：reference_image_manager.py, scene_reference_manager.py, pipeline_orchestrator.py
+    - > ⚠️ DEPRECATED 2026-05-11: 原"统一 2:3"规则已被 D.15 P0 废止，不再"统一 2:3"
+    - **禁止硬编码 `aspect_ratio="2:3"`**，必须透传 `project.aspect_ratio`
 
 ### 代码质量原则
 15. **No backward compatibility（不写兼容性代码）**：
@@ -734,23 +780,29 @@ ref_manager = ReferenceImageManager(image_generator, output_dir)
 await ref_manager.generate_character_multi_refs(characters, style_config)
 ```
 
-### 生成场景图（默认 NB2，Pro 仅 Premium 储备）
+### 生成场景图（默认 Seedream，IMAGE_GEN_PROVIDER=seedream）
+
+> ⚠️ DEPRECATED 2026-05-11: 以下 NB2 代码示例已过时，当前走 SeedreamGenerator 路径（image_generator.py dispatch → seedream_generator.py）
+
 ```python
+# 当前实际路径：image_generator.generate_shot_image_phase2_safe()
+# → dispatch: if settings.IMAGE_GEN_PROVIDER == "seedream" → early return SeedreamGenerator
 char_refs = ref_manager.get_references_for_scene(chars_in_scene)
 scene_refs = scene_ref_manager.get_references_for_location(location_id)
-result = await image_gen.generate_shot_image(
+result = await image_gen.generate_shot_image_phase2_safe(
     shot=shot,
+    storyboard=storyboard,
+    characters=characters,
+    style_preset=style_preset,
     reference_images=char_refs + scene_refs,
-    style_enforcer=style_enforcer,
-    use_pro_model=False  # 默认 NB2（Nano Banana 2），角色一致性 ~95%
-    # use_pro_model=True 仅用于未来 Premium 用户
+    aspect_ratio=aspect_ratio,
 )
 ```
 
-**NB2 vs Pro 对比**：
-- NB2（默认）：角色一致性 ~95%，37.2s/shot，成本降 50%
-- Pro（Premium 储备）：角色一致性 ~98%，70-90s/shot，成本高 2x
-- Founder 决策：NB2 为默认主力，Pro 不做 3+ 角色场景自动切换
+**Seedream vs NB2 对比（2026-05-09 实测）**：
+- Seedream（默认）：角色一致性稳定，23.5s/张，$0.030/张（成本降 55%）
+- NB2（备用）：$0.067/张，IMAGE_GEN_PROVIDER=nb2 时启用
+- D.17 铁律：全 Pipeline 必须单一模型，严禁运行时混用
 
 ### 音画对齐
 ```python

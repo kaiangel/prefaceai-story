@@ -18,6 +18,8 @@ const initialState: CreateState = {
   customStyleAnalysis: null,
   characters: [],
   scenes: [],
+  // B33: mood selection moved to Stage A
+  userSelectedMood: null,
   // Stage A → B bridge
   projectId: null,
   // Stage B
@@ -52,7 +54,37 @@ const initialState: CreateState = {
   previousStoryId: null,
 };
 
+// B37: Reducer logger — logs every action type + key payload info.
+// Grouped by category so DevTools Console stays readable. Never logs token/password values.
 function createReducer(state: CreateState, action: CreateAction): CreateState {
+  // [Reducer] Log — action type + key payload excerpt (no sensitive data)
+  // eslint-disable-next-line no-console
+  console.log("[Reducer] action:", action.type, (() => {
+    switch (action.type) {
+      case "SET_STAGE": return "payload=" + action.payload;
+      case "SET_GENERATION_SUB_PHASE": return "payload=" + action.payload;
+      case "SET_USER_SELECTED_MOOD": return "payload=" + action.payload;
+      case "UPDATE_GENERATION_PROGRESS": return "progress=" + action.payload.progress + " msg=" + (action.payload.message?.slice(0, 40) ?? "");
+      case "GENERATION_COMPLETE": return "shots=" + action.payload.length;
+      case "GENERATION_ERROR": return "msg=" + (action.payload?.slice(0, 60) ?? "");
+      case "SET_PREVIEW_CHARACTERS": return "count=" + action.payload.length + " firstId=" + (action.payload[0]?.id ?? "none");
+      case "SET_PREVIEW_SCENES": return "count=" + action.payload.length;
+      case "HYDRATE_FROM_BACKEND": return "currentStage=" + action.payload.currentStage + " subPhase=" + action.payload.generationSubPhase + " previewChars=" + (action.payload.previewCharacters?.length ?? 0) + " shots=" + (action.payload.shots?.length ?? 0);
+      case "CONFIRM_CHARACTERS": return "(no payload)";
+      case "CONFIRM_SCENES": return "(no payload)";
+      case "START_GENERATION": return "(no payload)";
+      case "CONTINUE_GENERATION": return "(no payload)";
+      case "SET_PROJECT_ID": return "projectId=" + action.payload;
+      case "SET_OUTLINE": return "title=" + (action.payload?.title ?? "null");
+      case "CONFIRM_OUTLINE": return "(no payload)";
+      case "BGM_READY": return "url=" + (action.payload.bgmUrl?.slice(0, 60) ?? "null");
+      case "BGM_NO_BGM": return "(no bgm)";
+      case "BGM_ERROR": return "msg=" + (action.payload?.slice(0, 60) ?? "");
+      case "REGENERATE_SHOT_SUCCESS": return "shotId=" + action.payload.shotId;
+      default: return "";
+    }
+  })());
+
   switch (action.type) {
     case "SET_STAGE":
       return { ...state, currentStage: action.payload };
@@ -187,6 +219,10 @@ function createReducer(state: CreateState, action: CreateAction): CreateState {
     case "SET_MOOD":
       if (!state.outline) return state;
       return { ...state, outline: { ...state.outline, mood: action.payload } };
+
+    // B33: mood selection moved to Stage A (pre-outline)
+    case "SET_USER_SELECTED_MOOD":
+      return { ...state, userSelectedMood: action.payload };
 
     case "SET_GENERATION_SUB_PHASE":
       return { ...state, generationSubPhase: action.payload };

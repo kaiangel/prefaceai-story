@@ -11,12 +11,13 @@ interface StoryGridProps {
   stories: StoryCardType[];
   onDelete?: (id: string) => void;
   onContinue?: (id: string) => void;
+  newlyCompletedIds?: Set<string>;
 }
 
 type SortBy = "updatedAt" | "createdAt" | "title";
 type FilterStatus = "all" | "complete" | "generating" | "draft";
 
-export default function StoryGrid({ stories, onDelete, onContinue }: StoryGridProps) {
+export default function StoryGrid({ stories, onDelete, onContinue, newlyCompletedIds }: StoryGridProps) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("updatedAt");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
@@ -132,6 +133,7 @@ export default function StoryGrid({ stories, onDelete, onContinue }: StoryGridPr
               index={i}
               onDelete={onDelete}
               onContinue={onContinue}
+              isNewlyCompleted={newlyCompletedIds?.has(story.id) ?? false}
             />
           ))}
         </div>

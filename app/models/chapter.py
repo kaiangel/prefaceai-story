@@ -20,6 +20,10 @@ class Chapter(Base):
     characters_json = Column(LONGTEXT, nullable=True)
     scenes_json = Column(LONGTEXT, nullable=True)
     storyboard_json = Column(LONGTEXT, nullable=True)
+    # T21-NEW-7 (2026-05-21 DEC-047): Stage 4.5 scene_image_preparation 输出
+    # JSON 结构: [{location_id, location_zh, interior_url, exterior_url, description_zh, atmosphere, time_of_day, lighting_condition}]
+    # 前端 /scenes 页面真预览 + 重生 + 60s 倒计时 (镜像 characters 页面对偶设计)
+    scene_references_json = Column(LONGTEXT, nullable=True)
     video_url = Column(String(500), nullable=True)
     error_message = Column(LONGTEXT, nullable=True)
 

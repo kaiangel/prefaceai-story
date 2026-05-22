@@ -1,6 +1,10 @@
 # Coordinator — 其他 Agent 需要知道的
 
-> 最后更新: 2026-04-28
+> 最后更新: 2026-04-28（**冻结**）
+>
+> ⚠️ **2026-05-12 16:30 Founder 纠正身份归属**：本文件中关于 subagent_type symlink / 8 agent frontmatter 升级等工作流变化的描述实际为 PM 工作误归档。**最新状态请看 `pm-progress/context-for-others.md`**。
+>
+> 本文件保留供历史翻账。
 
 ## 项目总体状态
 

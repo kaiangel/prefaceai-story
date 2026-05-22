@@ -2,6 +2,14 @@
 
 ---
 
+> ⚠️ **2026-05-12 16:30 Founder 纠正身份归属**：以下 4-25 / 4-28 两个条目（8 Agent frontmatter 升级 + subagent_type symlink 修复 + 4 层成本路线图 + 角色文件校准）实际为 PM 工作误归档，**已迁移到 `pm-progress/completed.md`**。
+>
+> 本文件保留 4-25 / 4-28 条目供历史翻账。3-18 / 3-19 / 3-23 / 4-13 / 4-22 / 4-23 等更早条目暂未在迁移范围（Founder 仅点名 4-25 / 4-28）。
+>
+> **新工作不再写入此文件**。
+
+---
+
 ### 2026-04-28 17:50 — 8 Agent frontmatter 升级（model 分级 + effort: xhigh，DEC-023）
 
 **任务**：基于 17:25 symlink 修复后 frontmatter 自动加载机制可用，批量升级 8 个 agent frontmatter 默认值。

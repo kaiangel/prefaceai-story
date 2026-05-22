@@ -1,9 +1,10 @@
 """
 角色类型系统 - 支持多元角色类型
 
-支持 17 种角色类型：
+支持 18 种角色类型：
 - human: 人类
-- animal: 动物
+- animal: 动物（真实动物，无服装，四足）
+- anthropomorphic_animal: 拟人化动物（有意识、穿服装、两足站立，但保留物种特征）
 - fantasy_creature: 奇幻生物
 - robot: 机器人/AI
 - object_personified: 拟人化物品
@@ -29,10 +30,11 @@ from pydantic import BaseModel
 
 
 class CharacterType(str, Enum):
-    """角色类型枚举 - 17种类型"""
+    """角色类型枚举 - 18种类型"""
     # 基础类型
     HUMAN = "human"
     ANIMAL = "animal"
+    ANTHROPOMORPHIC_ANIMAL = "anthropomorphic_animal"
     FANTASY_CREATURE = "fantasy_creature"
     ROBOT = "robot"
     OBJECT_PERSONIFIED = "object"
@@ -424,6 +426,7 @@ class Character(BaseModel):
 CHARACTER_TYPE_DECLARATIONS = {
     CharacterType.HUMAN: "This is a HUMAN character.",
     CharacterType.ANIMAL: "This is an ANIMAL character, NOT a human.",
+    CharacterType.ANTHROPOMORPHIC_ANIMAL: "This is an ANTHROPOMORPHIC ANIMAL — a sentient animal character with human-like consciousness, upright posture, and clothing, but retaining the species' natural features (fur, ears, tail, snout/beak). NOT a human. NOT a regular animal. Draw the species body with animal fur/feathers, animal face/snout/beak, animal ears and tail — but standing upright and wearing clothes.",
     CharacterType.FANTASY_CREATURE: "This is a FANTASY CREATURE.",
     CharacterType.ROBOT: "This is a ROBOT/MECHANICAL character.",
     CharacterType.OBJECT_PERSONIFIED: "This is a PERSONIFIED OBJECT with face and personality.",

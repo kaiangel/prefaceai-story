@@ -26,6 +26,7 @@ import asyncio
 import base64
 import json
 import logging
+import random
 import ssl
 import time
 import urllib.error
@@ -37,6 +38,7 @@ import certifi
 from PIL import Image
 
 from app.config import settings
+from app.services.seedream_metrics import seedream_metrics
 
 logger = logging.getLogger("xuhua")
 
@@ -98,8 +100,15 @@ PAYLOAD_DOWNSAMPLE_THRESHOLD_BYTES = 10 * 1024 * 1024  # 10 MB
 
 MAX_REFERENCE_IMAGES = 14  # 火山方舟上限
 SEEDREAM_MAX_SANITIZE_ATTEMPTS = 3  # D.17: 3 次 sanitize 失败后返回 content_safety_failure（不再降级 NB2）
-SEEDREAM_TIMEOUT_SEC = 180
+SEEDREAM_TIMEOUT_SEC = settings.IMAGE_GENERATION_TIMEOUT  # Wave 11.4 + RISK-NEW-2: 从 settings 读, 跟 config.py 统一; 默认 210s (Wave 11.4 调研), 可通过 .env IMAGE_GENERATION_TIMEOUT 覆盖
 SEEDREAM_HTTP_RETRIES = 3  # Bug 3 fix: 网络层瞬时错误（IncompleteRead/429/5xx）指数退避次数，2→3
+
+# BUG-SHOT-RETRY-NETWORK-FRAGILE (Wave 6 / 2026-05-11):
+# test12 Shot 9 IncompleteRead 4 次重试全失败（旧退避 2/4/8/16s 共 30s 不够撑过阿里云网络抖动窗口）
+# 新策略：固定阶梯 2/8/30/60s + 30% jitter，4 次尝试总等待 ≥ 100s
+# 适用所有非 HTTP-error 类网络异常（IncompleteRead / ConnectionError / TimeoutError 等）
+SEEDREAM_NETWORK_RETRY_DELAYS_SEC = [2, 8, 30, 60]
+SEEDREAM_RETRY_JITTER_RATIO = 0.3  # ±30% 随机抖动，错开重试洪峰
 
 
 # ---------------------------------------------------------------------------
@@ -436,6 +445,9 @@ def _call_seedream_sync(
     last_err: dict = {"success": False, "error": "unknown", "error_kind": "api_error"}
     # Bug 3 fix: 追踪每次调用的重试次数，便于监控 IncompleteRead fail rate
     _retry_count: int = 0
+    # T18-D: 区分 IncompleteRead / TimeoutError 计数，返回给上层做 metrics 聚合
+    _incomplete_read_count: int = 0
+    _timeout_count: int = 0
 
     for attempt in range(1, SEEDREAM_HTTP_RETRIES + 2):
         req = urllib.request.Request(SEEDREAM_ENDPOINT, data=body, headers=headers, method="POST")
@@ -483,14 +495,31 @@ def _call_seedream_sync(
             return last_err
         except Exception as e:
             latency = round(time.monotonic() - start, 2)
+            exc_name = type(e).__name__
             logger.warning(
-                f"    [SeedreamGenerator] {type(e).__name__} (attempt {attempt}): {e}"
+                f"    [SeedreamGenerator] {exc_name} (attempt {attempt}): {e}"
             )
+            # T18-D: 按异常类型区分计数（TimeoutError vs IncompleteRead/其他网络异常）
+            if "TimeoutError" in exc_name or "timeout" in str(e).lower():
+                _timeout_count += 1
+            else:
+                _incomplete_read_count += 1
             if attempt <= SEEDREAM_HTTP_RETRIES:
                 _retry_count += 1
-                backoff = 2 ** attempt
+                # BUG-SHOT-RETRY-NETWORK-FRAGILE (Wave 6 / 2026-05-11):
+                # 旧退避 2^attempt = 2/4/8/16s (4 次共 ~30s) 不够撑过阿里云网络抖动
+                # 新策略：固定阶梯 2/8/30/60s + ±30% jitter
+                # attempt 是 1..SEEDREAM_HTTP_RETRIES+1 (1..4)，index = attempt - 1
+                _delay_idx = min(attempt - 1, len(SEEDREAM_NETWORK_RETRY_DELAYS_SEC) - 1)
+                _base_delay = SEEDREAM_NETWORK_RETRY_DELAYS_SEC[_delay_idx]
+                _jitter = random.uniform(
+                    -_base_delay * SEEDREAM_RETRY_JITTER_RATIO,
+                    _base_delay * SEEDREAM_RETRY_JITTER_RATIO,
+                )
+                backoff = max(1.0, _base_delay + _jitter)  # 至少 1s
                 logger.info(
-                    f"    [SeedreamGenerator] {type(e).__name__} 重试 #{_retry_count}，sleep {backoff}s"
+                    f"    [SeedreamGenerator] {type(e).__name__} 重试 #{_retry_count}，"
+                    f"sleep {backoff:.1f}s (base={_base_delay}s, jitter={_jitter:+.1f}s)"
                 )
                 time.sleep(backoff)
                 continue
@@ -500,6 +529,8 @@ def _call_seedream_sync(
                 "error_kind": "network",
                 "latency_sec": latency,
                 "retry_count": _retry_count,
+                "incomplete_read_count": _incomplete_read_count,
+                "timeout_count": _timeout_count,
             }
 
         # 解析响应
@@ -564,6 +595,8 @@ def _call_seedream_sync(
             "usage": data.get("usage"),
             "model_used": SEEDREAM_MODEL,
             "retry_count": _retry_count,  # Bug 3: 重试次数统计
+            "incomplete_read_count": _incomplete_read_count,  # T18-D: metrics
+            "timeout_count": _timeout_count,  # T18-D: metrics
         }
 
     return last_err
@@ -620,16 +653,38 @@ async def generate_shot_image_seedream(
 
     if not base_prompt.strip():
         logger.error(f"    [SeedreamGenerator] Shot {shot_id} 没有可用 prompt，返回失败（D.17: 无 fallback）")
+        try:
+            seedream_metrics.record_shot(
+                shot_id=shot_id,
+                success=False,
+                duration_sec=0.0,
+                attempt_count=0,
+                error_kind="empty_prompt",
+            )
+            logger.debug(f"    [SeedreamMetrics] metric recorded shot={shot_id} fail=empty_prompt")
+        except Exception as _metric_err:
+            logger.warning(f"[SeedreamMetrics] record_shot 失败（非阻塞）: {_metric_err}")
         return _make_failure_dict(reason="empty_prompt", failed_prompt="")
 
+    # POST_BETA-5: 加 ref count 类型详情（角色参考图数量从 characters_in_scene 推断）
+    _total_refs = len(reference_images or [])
+    _char_count = len(shot.get("characters_in_scene", []))
+    _scene_ref_count = max(0, _total_refs - _char_count)
     logger.info(
         f"    [SeedreamGenerator] Shot {shot_id} 开始生成 "
-        f"(refs={len(reference_images or [])}, prompt={len(base_prompt)} chars)"
+        f"(refs={_total_refs} ({_char_count} portrait + {_scene_ref_count} scene_ref), "
+        f"prompt={len(base_prompt)} chars)"
     )
 
     start = time.time()
     sanitize_attempts: list[dict] = []
     current_prompt = base_prompt
+
+    # T18-D: 跨 sanitize 循环累计 IncompleteRead / TimeoutError 次数（用于 record_shot）
+    _metric_incomplete_reads: int = 0
+    _metric_timeouts: int = 0
+    # sanitize 循环轮次（= _call_seedream_sync 总调用次数，每次内部可能有多次网络 retry）
+    _metric_sanitize_call_count: int = 0
 
     for attempt in range(0, SEEDREAM_MAX_SANITIZE_ATTEMPTS + 1):
         # attempt=0：原 prompt；attempt 1/2/3：sanitize 力度递增
@@ -659,6 +714,17 @@ async def generate_shot_image_seedream(
             aspect_ratio,
             api_key,
         )
+        _metric_sanitize_call_count += 1
+
+        # T18-D: 累计本次 _call_seedream_sync 内部的网络异常计数
+        _metric_incomplete_reads += result.get("incomplete_read_count", 0)
+        _metric_timeouts += result.get("timeout_count", 0)
+        # 兜底：如果是网络失败但 _call_seedream_sync 没有返回详细计数（旧路径），
+        # 用 retry_count 作为 IncompleteRead 的保守估算
+        if not result.get("success") and result.get("error_kind") == "network":
+            _rc = result.get("retry_count", 0)
+            if _rc > 0 and result.get("incomplete_read_count") is None:
+                _metric_incomplete_reads += _rc
 
         if result.get("success"):
             pil_image: Image.Image = result["pil_image"]
@@ -670,6 +736,24 @@ async def generate_shot_image_seedream(
                 f"    [SeedreamGenerator] ✅ Shot {shot_id} 生成成功 "
                 f"({pil_image.width}x{pil_image.height}, {total_time}s, sanitize_attempts={attempt})"
             )
+
+            # T18-D: 记录成功 shot 到 SeedreamMetrics（实际 attempt_count = 内部 retry 数 + 1）
+            _http_retry_count = result.get("retry_count", 0)
+            try:
+                seedream_metrics.record_shot(
+                    shot_id=shot_id,
+                    success=True,
+                    duration_sec=total_time,
+                    attempt_count=_http_retry_count + 1,
+                    incomplete_read_attempts=_metric_incomplete_reads,
+                    timeout_attempts=_metric_timeouts,
+                )
+                logger.debug(
+                    f"    [SeedreamMetrics] metric recorded shot={shot_id} "
+                    f"attempt={_http_retry_count + 1} ir={_metric_incomplete_reads} to={_metric_timeouts}"
+                )
+            except Exception as _metric_err:
+                logger.warning(f"[SeedreamMetrics] record_shot 失败（非阻塞）: {_metric_err}")
 
             # TASK-PARALLEL-M1 ARCH-4: 写入 api_cost_logs INSERT 路径（Seedream 路径）
             # ARCH-4 round 2: 从 **_kwargs 提取 project_id（由 pipeline_orchestrator 透传）
@@ -702,7 +786,7 @@ async def generate_shot_image_seedream(
                     "api_latency_sec": result.get("latency_sec"),
                     "size": result.get("size"),
                     "usage": result.get("usage"),
-                    "http_retry_count": result.get("retry_count", 0),  # Bug 3: IncompleteRead 重试次数
+                    "http_retry_count": _http_retry_count,  # Bug 3: IncompleteRead 重试次数
                 },
             }
 
@@ -711,6 +795,20 @@ async def generate_shot_image_seedream(
             logger.error(
                 f"    [SeedreamGenerator] Shot {shot_id} ARK_API_KEY 缺失，返回失败（D.17: 无 fallback）"
             )
+            _total_time_fail = round(time.time() - start, 2)
+            try:
+                seedream_metrics.record_shot(
+                    shot_id=shot_id,
+                    success=False,
+                    duration_sec=_total_time_fail,
+                    attempt_count=_metric_sanitize_call_count,
+                    error_kind="missing_api_key",
+                    incomplete_read_attempts=_metric_incomplete_reads,
+                    timeout_attempts=_metric_timeouts,
+                )
+                logger.debug(f"    [SeedreamMetrics] metric recorded shot={shot_id} fail=missing_api_key")
+            except Exception as _metric_err:
+                logger.warning(f"[SeedreamMetrics] record_shot 失败（非阻塞）: {_metric_err}")
             return _make_failure_dict(
                 reason="missing_api_key",
                 sanitize_attempts=sanitize_attempts,
@@ -724,6 +822,20 @@ async def generate_shot_image_seedream(
                     f"    [SeedreamGenerator] Shot {shot_id} sanitize {SEEDREAM_MAX_SANITIZE_ATTEMPTS} 次仍拦截，"
                     f"返回 content_safety_failure（D.17: 无 NB2 fallback）"
                 )
+                _total_time_fail = round(time.time() - start, 2)
+                try:
+                    seedream_metrics.record_shot(
+                        shot_id=shot_id,
+                        success=False,
+                        duration_sec=_total_time_fail,
+                        attempt_count=_metric_sanitize_call_count,
+                        error_kind="sensitive_content",
+                        incomplete_read_attempts=_metric_incomplete_reads,
+                        timeout_attempts=_metric_timeouts,
+                    )
+                    logger.debug(f"    [SeedreamMetrics] metric recorded shot={shot_id} fail=sensitive_content")
+                except Exception as _metric_err:
+                    logger.warning(f"[SeedreamMetrics] record_shot 失败（非阻塞）: {_metric_err}")
                 return _make_failure_dict(
                     reason="sanitize_exhausted",
                     sanitize_attempts=sanitize_attempts,
@@ -736,6 +848,20 @@ async def generate_shot_image_seedream(
         logger.error(
             f"    [SeedreamGenerator] Shot {shot_id} 非敏感内容错误（{kind}），返回失败: {result.get('error','')[:200]}"
         )
+        _total_time_fail = round(time.time() - start, 2)
+        try:
+            seedream_metrics.record_shot(
+                shot_id=shot_id,
+                success=False,
+                duration_sec=_total_time_fail,
+                attempt_count=_metric_sanitize_call_count,
+                error_kind=kind or "unknown",
+                incomplete_read_attempts=_metric_incomplete_reads,
+                timeout_attempts=_metric_timeouts,
+            )
+            logger.debug(f"    [SeedreamMetrics] metric recorded shot={shot_id} fail={kind}")
+        except Exception as _metric_err:
+            logger.warning(f"[SeedreamMetrics] record_shot 失败（非阻塞）: {_metric_err}")
         return _make_failure_dict(
             reason=f"seedream_error:{kind}",
             sanitize_attempts=sanitize_attempts,
@@ -744,6 +870,20 @@ async def generate_shot_image_seedream(
         )
 
     # 理论上不会到这
+    _total_time_fail = round(time.time() - start, 2)
+    try:
+        seedream_metrics.record_shot(
+            shot_id=shot_id,
+            success=False,
+            duration_sec=_total_time_fail,
+            attempt_count=_metric_sanitize_call_count,
+            error_kind="unknown",
+            incomplete_read_attempts=_metric_incomplete_reads,
+            timeout_attempts=_metric_timeouts,
+        )
+        logger.debug(f"    [SeedreamMetrics] metric recorded shot={shot_id} fail=unexpected_exit")
+    except Exception as _metric_err:
+        logger.warning(f"[SeedreamMetrics] record_shot 失败（非阻塞）: {_metric_err}")
     return _make_failure_dict(
         reason="unexpected_exit",
         sanitize_attempts=sanitize_attempts,

@@ -22,7 +22,21 @@ from app.config import settings
 
 logger = logging.getLogger("xuhua")
 
-from app.prompts.storyboard_prompts import NARRATION_TO_VISUAL_EXTRACTION_RULES, COMIC_MODE_NARRATIVE_RULES
+from app.prompts.storyboard_prompts import (
+    NARRATION_TO_VISUAL_EXTRACTION_RULES,
+    COMIC_MODE_NARRATIVE_RULES,
+    HAND_PROP_ANATOMY_RULES,  # B45 2026-05-11: 手+道具 anatomy 几何规则
+    HAIR_COLOR_REQUIREMENT_RULE,  # DEC-048 Layer 1 2026-05-22: 已重写为 IDENTITY ANCHORS DELEGATION 分工说明
+    OFF_SCREEN_SOUND_HANDLING_RULES,  # RISK-T15-10 Wave 9 Phase 3 2026-05-13: 画外音/off-screen audio 误转视觉元素修复
+    SPECIES_FIDELITY_RULES,  # DEC-045 T20-17 2026-05-19: 物种保真规则
+    SEEDREAM_SAFETY_AVOIDANCE_RULES,  # DEC-045 T20-26 2026-05-19: Seedream 安全词规避规则
+    ANATOMY_FIDELITY_RULES,  # T20-48 2026-05-20: 预防 Seedream anatomy hallucination 4 hands 等
+    DEC046_V3_STAGE4_RULES,  # DEC-046 T20-28 2026-05-20: v3 通用叙事原则 Stage 4 规则块
+    build_stage4_character_data_block,  # DEC-045 T20-17: 给 LLM 加 character_type/species/appearance
+)
+from app.prompts.identity_anchor_prompts import (
+    NARRATIVE_VARIABLES_GUIDANCE,  # DEC-048 Layer 1 2026-05-22: LLM 创意层指引 — anchors 由 backend post-process 强注入
+)
 
 
 # T18: 场景道具连续性规则（同 NARRATION_TO_VISUAL_EXTRACTION_RULES 模式注入）
@@ -314,6 +328,538 @@ CINEMATOGRAPHY_GUIDE = """
 """
 
 
+def _contains_chinese(text: str) -> bool:
+    """检测字符串是否包含中文字符 (CJK Unified Ideographs 范围)。"""
+    return any('一' <= ch <= '鿿' for ch in text)
+
+
+def _extract_english_from_field(value: str, field_name: str = "") -> str:
+    """RISK-T19-8 Wave 14: 从可能含中英双语的字段中提取英文部分。
+
+    策略（按优先级）:
+    1. 如果整个字符串不含中文 → 直接返回
+    2. 如果含中文 → 尝试按常见分隔符 ('。', '. ', ' A ', ' The ') 拆分，
+       取最后一段纯英文段落
+    3. 兜底 → 返回空字符串（不把中文带入 image_prompt）
+
+    适用场景: character.description (中英双语), clothing.top/bottom (纯中文), 等。
+    """
+    if not value:
+        return ""
+    if not _contains_chinese(value):
+        return value  # 纯英文，直接返回
+
+    # 策略 1: 按 '. ' 或 '。' 或 ' A ' 等分隔符拆分，取纯英文片段
+    # 双语描述格式通常是 "中文描述。English description." 或 "中文 A English."
+    candidates = []
+    # 先按句号拆分（中文句号 + 英文句号）
+    for sep in ['。', '. ']:
+        parts = value.split(sep)
+        for part in parts:
+            part = part.strip()
+            if part and not _contains_chinese(part) and len(part) > 10:
+                candidates.append(part)
+
+    if candidates:
+        # 取最长的纯英文片段
+        best = max(candidates, key=len)
+        if field_name:
+            print(f"  [INFO] _extract_english_from_field: '{field_name}' 含中文，提取英文部分 ({len(best)} chars)")
+        return best
+
+    # 兜底: 中文字段无法提取英文，跳过（返回空字符串）
+    if field_name:
+        print(f"  [WARN] _extract_english_from_field: '{field_name}' 含中文且无法提取英文部分，已跳过")
+    return ""
+
+
+def _atmosphere_to_str(atm) -> str:
+    """Wave 10.1 / RISK-T17-6: atmosphere 字段容错 (LLM 可能返回 str 或 dict)。
+    Wave 12 / RISK-T19-1: 防御中文泄露——含中文的字段跳过，只保留英文部分。
+
+    Stage 3 (Sonnet 4.6) 有时输出 atmosphere 为 dict
+    {mood, sound_design_hint, temperature_feel} 而非 str，
+    直接拼接会导致 TypeError。此函数统一转换为可安全拼接的 str。
+
+    中文防御策略: 如果某个子字段含中文字符，跳过该字段并打印 WARNING，
+    只保留纯英文的部分。这防止中文 atmosphere 流入 image_prompt 引发
+    pipeline_schemas.py 中文比例校验失败。
+    """
+    if not atm:
+        return ""
+    if isinstance(atm, str):
+        if _contains_chinese(atm):
+            # 整个字符串含中文: 尝试提取第一个纯英文词（mood 通常在最前面）
+            first_part = atm.split(",")[0].strip()
+            if first_part and not _contains_chinese(first_part):
+                print(f"  [WARN] _atmosphere_to_str: str 含中文，仅保留首段英文部分: '{first_part}'")
+                return first_part
+            print(f"  [WARN] _atmosphere_to_str: str 含中文，已跳过整个 atmosphere: '{atm[:40]}'")
+            return ""
+        return atm
+    if isinstance(atm, dict):
+        mood = atm.get("mood")
+        sdh = atm.get("sound_design_hint")
+        tf = atm.get("temperature_feel")
+        parts = []
+        for label, val in [("mood", mood), ("sound_design_hint", sdh), ("temperature_feel", tf)]:
+            if not val:
+                continue
+            val_str = str(val)
+            if _contains_chinese(val_str):
+                print(f"  [WARN] _atmosphere_to_str: dict 字段 '{label}' 含中文，已跳过: '{val_str[:40]}'")
+                continue
+            parts.append(val_str)
+        return ", ".join(parts) if parts else json.dumps(atm, ensure_ascii=False)
+    return str(atm)
+
+
+# ============================================================================
+# RISK-T20-7 + T20-4 (2026-05-18): B51 fallback 增强 — screenplay-aware prompt
+# ============================================================================
+#
+# 背景: test18 实证 Shot 5/13 都是 B51 fallback, 应该的剧情（林晓雨×陈默对视 +
+# 林晓雨看账单震惊）完全消失，退化为空门 wide shot 几乎完全一样。
+#
+# 旧 fallback prompt (storyboard_director.py L734-739 原版):
+#   "Establishing shot of {scene_heading}. Atmosphere: {atm}.
+#    Wide angle, showing the environment and setting clearly.
+#    No specific character interaction required."
+#
+# 5 层叠加根因:
+#   1. Stage 4 LLM 自检返空 shots → 触发 B51 fallback
+#   2. fallback 模板极度模糊
+#   3. ❌ 完全抛弃 screenplay 的 action_beats + narration
+#   4. ❌ 主动指令 "No specific character interaction required" → 模型必然不画人
+#   5. 同 location_id 多 fallback shot 共用 scene_ref → 输出几乎完全相同
+#
+# 修复方案:
+# - 从 screenplay 数据自动提取关键画面元素（角色/动作/道具）
+# - 使用 characters_in_scene + characters.name_en 构建英文角色列表
+# - 使用 _extract_english_from_field 复用提取角色英文服装
+# - 使用 _atmosphere_to_str 已英文化 atmosphere
+# - 同 location_id 多次 fallback 时按 fallback_seq 选择不同角度/聚焦点（差异化）
+# - 完全英文 prompt（不含中文，复用现有中文防御）
+# ============================================================================
+
+
+# 同 location 多次 fallback 时的角度/聚焦点变奏（universal，不依赖任何故事类型）
+_FALLBACK_ANGLE_VARIANTS = [
+    # idx 0 (first fallback at a location)
+    {
+        "angle_phrase": "Eye-level establishing shot",
+        "focus_phrase": "centered on the doorway and architectural threshold",
+        "framing_hint": "subject framed in the middle of the composition",
+    },
+    # idx 1 (second fallback at the same location — must look distinctly different)
+    {
+        "angle_phrase": "Low-angle wide shot",
+        "focus_phrase": "with focus drawn to the foreground details (puddle reflection, wet ground, fallen leaves, doorway threshold)",
+        "framing_hint": "camera positioned near the ground looking up slightly",
+    },
+    # idx 2 (third fallback)
+    {
+        "angle_phrase": "High-angle medium-wide shot",
+        "focus_phrase": "emphasizing the surrounding lighting fixtures, signage edges, or natural light source",
+        "framing_hint": "camera elevated, looking down at a slight angle",
+    },
+    # idx 3 (fourth fallback — rare)
+    {
+        "angle_phrase": "Side-angle medium shot",
+        "focus_phrase": "highlighting the side profile of the environment (wall textures, window panes, door frame)",
+        "framing_hint": "camera positioned at the side of the location",
+    },
+]
+
+
+def _extract_narration_keywords(narration: str, max_keywords: int = 4) -> list:
+    """RISK-T20-7: 从 narration 中提取已英文化的视觉关键词（道具/动作 hint）。
+
+    通用策略（不 hardcode 任何故事类型）:
+    - narration 通常以中文为主（用于 TTS）
+    - 提取其中夹带的英文片段（罕见但可能存在）
+    - 不强制翻译中文 — 复用 _extract_english_from_field 逻辑
+    - 返回最多 max_keywords 个英文片段（去重、长度过滤）
+
+    返回示例:
+    - 全中文 narration → 返回 [] （fallback 走环境通用 phrase）
+    - 含英文片段 → 返回 ["dimly lit corridor", "warm yellow streetlight"]
+    """
+    if not narration:
+        return []
+    # 复用 _extract_english_from_field 的句号拆分逻辑
+    candidates = []
+    for sep in ['。', '. ']:
+        for part in narration.split(sep):
+            part = part.strip().rstrip(',.')
+            if part and not _contains_chinese(part) and 5 < len(part) < 80:
+                candidates.append(part)
+    # 去重 + 截取
+    seen = set()
+    result = []
+    for c in candidates:
+        key = c.lower()
+        if key not in seen:
+            seen.add(key)
+            result.append(c)
+            if len(result) >= max_keywords:
+                break
+    return result
+
+
+def _extract_action_beats_english(beats: list, max_beats: int = 2) -> list:
+    """RISK-T20-7: 从 action_beats 提取英文化动作元素。
+
+    每个 beat 是 dict: {beat_id, action (通常中文), emotional_note (可能英文), duration_hint, ...}
+
+    通用策略:
+    - emotional_note 字段通常是 LLM 输出的英文情绪标签（e.g. "tense", "solemn"）→ 直接保留
+    - action 字段通常中文 → 复用 _extract_english_from_field 提取英文片段
+    - 返回 max_beats 个 dict: [{"emotional_note": "tense", "english_action": ""}]
+
+    设计取舍:
+    - 不调用 LLM 翻译 action 中文（fallback 路径必须快、稳）
+    - 只用结构化数据 + 已英文化字段
+    - 若 action 全中文，使用 emotional_note 作为情绪锚点
+    """
+    if not beats:
+        return []
+    extracted = []
+    for beat in beats[:max_beats]:
+        if not isinstance(beat, dict):
+            continue
+        action_raw = beat.get("action", "")
+        emotional_note = beat.get("emotional_note", "")
+        # emotional_note 可能含中文，过滤
+        if emotional_note and _contains_chinese(str(emotional_note)):
+            emotional_note = ""
+        # action 提取英文部分
+        english_action = _extract_english_from_field(str(action_raw), "")
+        extracted.append({
+            "emotional_note": str(emotional_note).strip() if emotional_note else "",
+            "english_action": english_action,
+            "beat_id": beat.get("beat_id", ""),
+        })
+    return extracted
+
+
+def _build_character_descriptors(
+    characters_in_scene: list,
+    characters: dict,
+) -> list:
+    """RISK-T20-7: 为 fallback prompt 构建已英文化的角色描述符。
+
+    输出格式: [{"id": "char_001", "name_en": "Chen Mo", "clothing": "dark plaid shirt, dark trousers"}]
+
+    通用策略:
+    - 用 name_en（兜底 name）— 英文优先
+    - 提取 clothing.top/bottom 英文部分（_extract_english_from_field）
+    - 包括 character_type（用于通用动物/机器人/人类区分）
+    - 不输出中文（fallback 路径要保证 100% 英文 prompt）
+    """
+    if not characters_in_scene or not characters:
+        return []
+    char_lookup = {}
+    for ch in characters.get("characters", []):
+        if ch.get("id"):
+            char_lookup[ch["id"]] = ch
+    descriptors = []
+    for cid in characters_in_scene:
+        ch = char_lookup.get(cid)
+        if not ch:
+            # 角色 id 在 scene 但不在 characters.json → 用 id 占位
+            descriptors.append({
+                "id": cid,
+                "name_en": cid,
+                "clothing": "",
+                "type": "",
+            })
+            continue
+        name_en = ch.get("name_en") or ch.get("name") or cid
+        if _contains_chinese(name_en):
+            # 中文 name 兜底 → 用 id（防止中文泄露到 image_prompt）
+            name_en = cid
+        clothing = ch.get("clothing", {})
+        top = _extract_english_from_field(clothing.get("top", ""), f"{cid}.clothing.top")
+        bottom = _extract_english_from_field(clothing.get("bottom", ""), f"{cid}.clothing.bottom")
+        clothing_summary = ", ".join([p for p in [top, bottom] if p])
+        descriptors.append({
+            "id": cid,
+            "name_en": name_en,
+            "clothing": clothing_summary,
+            "type": ch.get("character_type", ""),
+        })
+    return descriptors
+
+
+def _build_chinese_translation_request(
+    scene: dict,
+    scene_heading_safe: str,
+    atmosphere_str: str,
+) -> Optional[str]:
+    """RISK-T20-7 v2 (2026-05-18 治本): 构建给 LLM 的简单翻译任务 prompt.
+
+    设计原则:
+    - 任务极简化: 只翻译 + 精简, 不让 LLM 做创意决策 (拒绝率极低, 不会再触发 B51)
+    - 50 words max 强约束: 防止 LLM 输出过长
+    - "Output ONLY the English prompt": 防止 LLM 输出解释/前缀
+
+    返回 None 表示没有需要翻译的中文内容 (走静态 fallback 即可).
+    """
+    beats = scene.get("action_beats", []) or []
+    narration = scene.get("narration", "") or ""
+
+    # 找第一个含中文的 action_beat 或 narration
+    first_action = ""
+    if beats and isinstance(beats[0], dict):
+        first_action = str(beats[0].get("action", "") or "")
+    second_action = ""
+    if len(beats) >= 2 and isinstance(beats[1], dict):
+        second_action = str(beats[1].get("action", "") or "")
+
+    has_chinese_action = _contains_chinese(first_action) or _contains_chinese(second_action)
+    has_chinese_narration = _contains_chinese(narration)
+
+    if not has_chinese_action and not has_chinese_narration:
+        return None  # 没有中文需要翻译，调用方走静态
+
+    # 构建输入块（只放中文素材，英文素材已经被静态 fallback 用了）
+    input_lines = []
+    if scene_heading_safe:
+        input_lines.append(f"Scene heading: {scene_heading_safe}")
+    if atmosphere_str:
+        input_lines.append(f"Atmosphere: {atmosphere_str}")
+    if first_action:
+        input_lines.append(f"Action (may be Chinese): {first_action[:300]}")
+    if second_action:
+        input_lines.append(f"Action 2 (may be Chinese): {second_action[:200]}")
+    if narration:
+        input_lines.append(f"Narration (may be Chinese): {narration[:400]}")
+
+    input_block = "\n".join(input_lines)
+
+    # 简单翻译任务，不让 LLM 做创意决策
+    return (
+        "Translate the Chinese scene description below into a CONCISE English image generation "
+        "prompt fragment (50 words MAX, single paragraph).\n\n"
+        "Focus on these visual elements (in this priority order):\n"
+        "1. Characters present, their posture, gaze, body language\n"
+        "2. Key visible props (objects, papers, phones, weapons, etc.)\n"
+        "3. Location atmosphere details (lighting, weather, textures)\n\n"
+        "STRICT RULES:\n"
+        "- Output ONLY the English prompt fragment, no explanation, no preamble, no JSON wrapper\n"
+        "- NO Chinese characters in output (will cause downstream pipeline failure)\n"
+        "- DO NOT include character names (the calling code will add them)\n"
+        "- DO NOT include emotional labels like 'tense' (the calling code will add them)\n"
+        "- 50 words MAX\n\n"
+        f"Input:\n{input_block}\n\n"
+        "Output:"
+    )
+
+
+def _sanitize_llm_translation(raw: str) -> str:
+    """RISK-T20-7 v2: 清洗 LLM 翻译输出.
+
+    - 去除首尾空白 + markdown 反引号 + 多余引号
+    - 去除常见前缀 ("Here is..." / "Output:" / "Translation:")
+    - 含中文字符 → 返回空 (上层走静态)
+    - 长度异常 → 截断
+    """
+    if not raw:
+        return ""
+    s = raw.strip()
+    # 去除 markdown 包装
+    if s.startswith("```"):
+        # 提取 ``` 之间的内容
+        m = re.search(r"```(?:\w+)?\s*\n?(.*?)```", s, re.DOTALL)
+        if m:
+            s = m.group(1).strip()
+        else:
+            s = s.lstrip("`").rstrip("`").strip()
+    # 去除常见前缀（LLM 偶尔违规）
+    for prefix in [
+        "Output:", "OUTPUT:", "Translation:", "TRANSLATION:",
+        "Here is the English prompt:", "Here is the prompt:",
+        "Here's the translation:", "English prompt:",
+        "Prompt:", "PROMPT:",
+    ]:
+        if s.startswith(prefix):
+            s = s[len(prefix):].strip()
+            break
+    # 去除首尾引号
+    if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
+        s = s[1:-1].strip()
+    # 含中文 → 拒绝（上层走静态）
+    if _contains_chinese(s):
+        return ""
+    # 长度过短 → 拒绝（LLM 没理解任务）
+    if len(s) < 20:
+        return ""
+    # 截断到合理长度（防 LLM 失控输出 1000+ chars）
+    if len(s) > 600:
+        s = s[:600].rsplit(".", 1)[0] + "."
+    return s
+
+
+def build_screenplay_aware_fallback_prompt(
+    scene: dict,
+    characters: dict,
+    scene_heading_safe: str,
+    atmosphere_str: str,
+    fallback_seq: int = 0,
+    llm_translation: str = "",
+) -> str:
+    """RISK-T20-7 + T20-4 (2026-05-18) + RISK-T20-7 v2 (2026-05-18 治本):
+    screenplay-aware B51 fallback prompt builder.
+
+    替代原版 5-行模糊 prompt，从 screenplay 数据自动提取关键画面元素构建有剧情的英文 prompt。
+
+    参数:
+      scene: 完整 scene dict (含 action_beats, narration, characters_in_scene)
+      characters: 完整 characters dict (用于查 name_en + clothing 英文部分)
+      scene_heading_safe: 已经 _contains_chinese 防御过的 scene_heading
+      atmosphere_str: 已经 _atmosphere_to_str 英文化的 atmosphere
+      fallback_seq: 同 location_id 内第几个 fallback shot (0-based)，用于差异化角度/聚焦
+      llm_translation: (RISK-T20-7 v2) 调用方预先用 LLM 翻译好的英文剧情片段（可选）.
+          为空时走第一轮 (v1) 静态实现 — 100% 向后兼容.
+          有值时插入"Scene details" 段, 替换静态 action/narration 提取段.
+
+    返回: 100% 英文 image_prompt（不会含任何中文字符）
+
+    设计原则:
+    - 完全 universal: 不 hardcode 故事类型/角色类型/风格
+    - 100% 英文输出（多层中文防御 + 兜底全英文）
+    - 角色显式化: 不再 "No specific character interaction required"，
+      改为 "include characters_in_scene if present, capturing their key emotional reaction"
+    - 差异化: 同 location_id 多 fallback 用不同角度/聚焦点（轮换 _FALLBACK_ANGLE_VARIANTS）
+    - 容错: 任何字段缺失都不会崩，降级到通用环境描述
+    - v2 治本: 如果调用方传入 llm_translation, 用 LLM 翻译的剧情细节替换静态片段
+        (中文 narration / action 不再丢失剧情)
+    """
+    chars_in_scene = scene.get("characters_in_scene", []) or []
+    location_id = scene.get("location_id", "") or ""
+    narration = scene.get("narration", "") or ""
+    beats = scene.get("action_beats", []) or []
+
+    # ---- 1. 角度/聚焦差异化（T20-4 修复）----
+    variant_idx = fallback_seq % len(_FALLBACK_ANGLE_VARIANTS)
+    variant = _FALLBACK_ANGLE_VARIANTS[variant_idx]
+
+    # ---- 2. 角色英文化（用 name_en）----
+    char_descriptors = _build_character_descriptors(chars_in_scene, characters)
+
+    # ---- 3. 提取 action_beats 英文 ----
+    beats_extracted = _extract_action_beats_english(beats, max_beats=2)
+
+    # ---- 4. 提取 narration 英文片段（罕见）----
+    narration_keywords = _extract_narration_keywords(narration, max_keywords=2)
+
+    # ---- 5. 校验 llm_translation 仍然纯英文（防上游遗漏中文检测） ----
+    safe_llm_translation = ""
+    if llm_translation:
+        if _contains_chinese(llm_translation):
+            print(
+                f"  [WARN] build_screenplay_aware_fallback_prompt: llm_translation 含中文，已忽略 "
+                f"(前 60 chars: '{llm_translation[:60]}')"
+            )
+        elif len(llm_translation.strip()) < 20:
+            # 过短无意义，丢弃
+            pass
+        else:
+            safe_llm_translation = llm_translation.strip()
+
+    # ---- 6. 构建 prompt 段落 ----
+    parts = []
+
+    # 段 A: 角度 + scene_heading（已英文化）
+    if scene_heading_safe:
+        parts.append(f"{variant['angle_phrase']} of {scene_heading_safe}.")
+    else:
+        parts.append(f"{variant['angle_phrase']} of the scene.")
+
+    # 段 B: atmosphere
+    if atmosphere_str:
+        parts.append(f"Atmosphere: {atmosphere_str}.")
+
+    # 段 C: 角色描述（T20-7 核心修复 — 不再"No character interaction required"）
+    if char_descriptors:
+        char_phrases = []
+        for d in char_descriptors:
+            name = d["name_en"]
+            clothing = d["clothing"]
+            piece = name
+            if clothing:
+                piece += f" wearing {clothing}"
+            char_phrases.append(piece)
+        char_count = len(char_descriptors)
+        char_list_str = "; ".join(char_phrases)
+        parts.append(
+            f"EXACTLY {char_count} character{'s' if char_count != 1 else ''} visible in this shot: {char_list_str}."
+        )
+        # 加情感反应锚点（来自 action_beats[0].emotional_note）
+        emo_anchors = [
+            b["emotional_note"]
+            for b in beats_extracted
+            if b["emotional_note"]
+        ]
+        if emo_anchors:
+            parts.append(
+                f"Capture their key emotional reaction ({', '.join(emo_anchors[:2])}) through posture, gaze, and body language."
+            )
+        else:
+            parts.append(
+                "Capture their key emotional reaction through posture, gaze, and body language."
+            )
+    else:
+        # 纯环境镜头（无角色）— 仍说明明确意图
+        parts.append("No characters are present in this shot. Pure environmental composition.")
+
+    # 段 D/E: 剧情细节
+    # RISK-T20-7 v2 治本: 优先用 LLM 翻译的剧情段落（更准确还原中文剧情）
+    # 兜底: 走原 v1 静态提取（emotional_note + emotional_note + english 字段）
+    if safe_llm_translation:
+        # LLM 翻译路径: 整段插入, 替换 v1 段 D + 段 E (action/narration 提取段)
+        parts.append(f"Scene details: {safe_llm_translation}")
+    else:
+        # 静态 fallback 路径 (v1 行为): 提取已英文化字段
+        # 段 D: action_beats 英文片段（如果可用）
+        english_action_pieces = [
+            b["english_action"] for b in beats_extracted if b["english_action"]
+        ]
+        if english_action_pieces:
+            # 仅取第一个，避免 prompt 过长
+            parts.append(f"Key action: {english_action_pieces[0][:120]}.")
+
+        # 段 E: narration 英文片段（如果有）
+        if narration_keywords:
+            parts.append(f"Visual cues: {'; '.join(narration_keywords)}.")
+
+    # 段 F: 差异化聚焦点 + framing
+    parts.append(f"Compositional focus: {variant['focus_phrase']}, {variant['framing_hint']}.")
+
+    # 段 G: 环境元素从 scene_ref 继承（不强制具体）
+    parts.append(
+        "Maintain visual continuity with the scene reference image (lighting, weather, architectural details), "
+        "while showing a distinct camera angle and composition from any prior shots in the same location."
+    )
+
+    final_prompt = " ".join(parts)
+
+    # ---- 7. 最后中文兜底（防 _extract_english_from_field 漏网中文） ----
+    if _contains_chinese(final_prompt):
+        # 极端兜底: 移除所有中文字符（保留结构）
+        cleaned = "".join(ch for ch in final_prompt if not ('一' <= ch <= '鿿'))
+        # 清理多余空白和标点
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        print(
+            f"  [WARN] build_screenplay_aware_fallback_prompt: 兜底剥离中文字符 "
+            f"(原 {len(final_prompt)} chars → 清理后 {len(cleaned)} chars)"
+        )
+        final_prompt = cleaned
+
+    return final_prompt
+
+
 class StoryboardDirector:
     """
     分镜脚本生成器
@@ -329,7 +875,7 @@ class StoryboardDirector:
         self.claude_client = None
         self.claude_model = "claude-sonnet-4-6"
         if settings.ANTHROPIC_API_KEY:
-            self.claude_client = anthropic.Anthropic(
+            self.claude_client = anthropic.AsyncAnthropic(
                 api_key=settings.ANTHROPIC_API_KEY
             )
 
@@ -348,7 +894,7 @@ class StoryboardDirector:
         characters_overview: list = None,
         family_relationships: list = None,
         progress_callback=None,
-        chapter_duration_minutes: int = 3,  # O-2: 用于计算 max_shots 上限
+        chapter_duration_minutes: int = 3,  # DEC-028: 参数保留做向后兼容，不再用于截断
     ) -> dict:
         """
         生成分镜脚本（按scene分批生成，解决LLM输出不完整问题）
@@ -420,6 +966,7 @@ class StoryboardDirector:
                 global_visual_direction = gvd
         else:
             print(f"❌ 失败")
+            logger.error(f"[StoryboardDirector] Scene 1 生成失败: shots 为空，检查 LLM 返回或 JSON 解析")
 
         # B-4: Scene 进度回调（Scene 1 完成）
         if progress_callback and len(valid_scenes) > 0:
@@ -454,6 +1001,7 @@ class StoryboardDirector:
                         print(f"✅ {len(shots)} shots")
                     else:
                         print(f"❌ 失败")
+                        logger.error(f"[StoryboardDirector] Scene {scene_id} 生成失败: shots 为空，检查 LLM 返回或 JSON 解析")
 
                     # T-2: 每个 scene 完成后立即推进度回调（不等 gather 全部结束）
                     if progress_callback:
@@ -492,24 +1040,12 @@ class StoryboardDirector:
         if not all_shots:
             raise ValueError("无法生成任何shots")
 
-        # O-2: cap 上限 — 根据 chapter_duration_minutes 截断超出部分
-        if chapter_duration_minutes <= 3:
-            _max_shots = 18
-        elif chapter_duration_minutes <= 6:
-            _max_shots = 36
-        else:
-            _max_shots = 60
-
-        if len(all_shots) > _max_shots:
-            logger.warning(
-                f"[StoryboardDirector] O-2: LLM 生成 {len(all_shots)} shots，超出上限 {_max_shots}（"
-                f"chapter_duration={chapter_duration_minutes}min），自动截断"
-            )
-            print(f"  [O-2] ⚠️ shots 超出上限 {_max_shots}（实际 {len(all_shots)}），截断")
-            all_shots = all_shots[:_max_shots]
-            # 重新统一 shot_id 编号（截断后保持连续）
-            for idx, s in enumerate(all_shots):
-                s["shot_id"] = idx + 1
+        # DEC-028 (2026-05-13): 不再自动截断 shots — 多出的当作送给用户的惊喜。
+        # LLM 生成多少 shots 就跑多少，ETA 算法会用 actual_shot_count 动态计算。
+        # 原 O-2 截断逻辑已移除：chapter_duration / shot_duration 上限不再强制执行。
+        logger.info(
+            f"[StoryboardDirector] DEC-028: 总 shots={len(all_shots)}（不截断，全量进 pipeline）"
+        )
 
         total_duration = sum(s.get("estimated_duration", 5) for s in all_shots)
 
@@ -551,8 +1087,12 @@ class StoryboardDirector:
         characters_overview: list = None,
         family_relationships: list = None
     ) -> tuple:
-        """为单个scene生成shots"""
-        max_attempts = 2
+        """为单个scene生成shots
+
+        B51 v2: shots 为空时自动重试最多 2 次额外尝试（共 3 次），
+        全部失败时返回 fallback minimal shot（保证每个 Scene 至少 1 张图）。
+        """
+        max_attempts = 3  # B51 v2: 从 2 增加到 3 次（空 shots 时额外尝试）
 
         for attempt in range(max_attempts):
             prompt = self._build_scene_prompt(
@@ -564,6 +1104,10 @@ class StoryboardDirector:
                 characters_overview=characters_overview,
                 family_relationships=family_relationships
             )
+
+            # B51 v2: 第 2 次重试时在 prompt 末尾加简化提示，降低复杂度
+            if attempt == 2:
+                prompt = prompt + "\n\n⚠️ SIMPLIFIED RETRY: Generate just 1-2 simple shots for this scene. Keep image_prompt short (40-60 words). JSON only."
 
             try:
                 # DEBUG: 保存第一个scene的prompt
@@ -601,12 +1145,122 @@ class StoryboardDirector:
                         for shot in valid_shots:
                             self._check_prompt_quality(shot)
                         return valid_shots, gvd
+                    else:
+                        # B51 v2: shots 为空，记录并继续重试
+                        logger.warning(
+                            f"[StoryboardDirector] B51: Scene {scene.get('scene_id', scene_idx+1)} "
+                            f"attempt {attempt+1}/{max_attempts} — shots 为空（LLM 返回 {len(content)} chars），"
+                            f"{'继续重试' if attempt < max_attempts - 1 else '将使用 fallback shot'}"
+                        )
 
             except Exception as e:
+                logger.warning(
+                    f"[StoryboardDirector] B51: Scene {scene.get('scene_id', scene_idx+1)} "
+                    f"attempt {attempt+1}/{max_attempts} 异常: {e}"
+                )
                 if attempt == max_attempts - 1:
                     print(f"(error: {e})", end=" ")
+                    logger.exception(f"[StoryboardDirector] _generate_scene_shots 最终失败 (attempt {attempt+1}): {e}")
 
-        return [], None
+        # B51 v2: 3 次都失败 → 生成 fallback minimal shot，保证 Scene 不丢
+        scene_id = scene.get("scene_id", scene_idx + 1)
+        scene_heading = scene.get("scene_heading", f"Scene {scene_id}")
+        atmosphere = scene.get("atmosphere", "")
+        narration = scene.get("narration", "")
+        chars_in_scene = scene.get("characters_in_scene", [])
+        location_id = scene.get("location_id", "")
+
+        # RISK-T17-6 Wave 10.1: atmosphere 可能是 dict，用容错函数转换
+        atmosphere_str = _atmosphere_to_str(atmosphere)
+
+        # RISK-T19-4 Wave 13: scene_heading 中文防御
+        # scene_heading 来自 Stage 3 LLM 输出，可能含中文（如 "EXT. 白桦树下 - 立春清晨 - 晴"）。
+        # 含中文时直接拼入 image_prompt 会导致中文比例 >5% → pipeline_schemas.py 校验失败。
+        # 防御: 检测中文 → 替换为 "Scene {scene_id}" 安全占位。
+        if _contains_chinese(scene_heading):
+            print(
+                f"  [WARN] fallback_image_prompt: scene_heading 含中文，已替换为 Scene {scene_id}: '{scene_heading}'"
+            )
+            scene_heading_safe = f"Scene {scene_id}"
+        else:
+            scene_heading_safe = scene_heading
+
+        # RISK-T20-7 + T20-4 (2026-05-18): 改用 screenplay-aware fallback prompt builder
+        # - 提取 action_beats / characters_in_scene / clothing 已英文化数据
+        # - 不再 "No specific character interaction required"（这导致 Seedream 必然不画人）
+        # - 改为 "EXACTLY N characters visible: ..."
+        # - 同 location_id 多 fallback 时按 (location_id, scene_id) hash 选不同角度/聚焦点
+        #   （stateless 差异化，无需共享状态，对并行 scene 生成友好）
+        if location_id:
+            fallback_seq = (hash(f"{location_id}|{scene_id}") & 0xFFFF) % len(
+                _FALLBACK_ANGLE_VARIANTS
+            )
+        else:
+            fallback_seq = scene_id % len(_FALLBACK_ANGLE_VARIANTS)
+
+        # RISK-T20-7 v2 (2026-05-18 治本): 调 LLM 翻译中文 narration/action 为英文剧情片段
+        # 设计原则:
+        # - 不让 LLM 做创意决策 (storyboard 生成), 只做翻译 (拒绝率极低)
+        # - 失败完全降级到静态实现 (v1) — 不会比第一轮差
+        # - 15s 超时 (防 LLM hang 拖慢 Pipeline)
+        # - 任何异常静默 catch + log + 继续走静态
+        llm_translation = ""
+        try:
+            llm_translation = await self._translate_chinese_to_image_prompt(
+                scene=scene,
+                scene_heading_safe=scene_heading_safe,
+                atmosphere_str=atmosphere_str,
+                timeout_seconds=15.0,
+            )
+        except Exception as _te:
+            # 完全静默 — fallback 路径不能再崩
+            logger.warning(
+                f"[StoryboardDirector] [T20-7-v2] LLM 翻译 fallback 失败 (降级到静态): {_te}"
+            )
+            llm_translation = ""
+
+        fallback_image_prompt = build_screenplay_aware_fallback_prompt(
+            scene=scene,
+            characters=characters,
+            scene_heading_safe=scene_heading_safe,
+            atmosphere_str=atmosphere_str,
+            fallback_seq=fallback_seq,
+            llm_translation=llm_translation,
+        )
+
+        # RISK-T20-7 防御: 即使 builder 异常返回空 string，也保证 fallback 不崩
+        if not fallback_image_prompt or len(fallback_image_prompt) < 30:
+            fallback_image_prompt = (
+                f"Eye-level establishing shot of {scene_heading_safe or 'the scene'}. "
+                f"{'Atmosphere: ' + atmosphere_str + '. ' if atmosphere_str else ''}"
+                f"Wide composition showing the environment and any present characters naturally."
+            )
+
+        fallback_shot = {
+            "shot_id": shot_id_start,
+            "scene_id": scene_id,
+            "image_prompt": fallback_image_prompt,
+            "narration_segment": narration[:200] if narration else "",
+            "shot_type": "wide_shot",
+            "camera": {"shot_size": "wide_shot", "angle": "eye_level", "movement": "static"},
+            "composition": {"subject_position": "center"},
+            "lighting": {"key_light": "natural", "mood": "neutral"},
+            "character_direction": {"characters_visible": chars_in_scene},
+            "characters_in_scene": chars_in_scene,
+            "location_id": location_id,
+            "estimated_duration": 5.0,
+            "_is_fallback": True,  # 标记为 fallback，便于后续审计
+            "_fallback_seq": fallback_seq,  # RISK-T20-4: 差异化 variant idx
+            "_fallback_used_llm_translation": bool(llm_translation),  # RISK-T20-7 v2: 是否调 LLM 翻译成功
+        }
+
+        translation_tag = "+LLM" if llm_translation else "+static"
+        logger.error(
+            f"[StoryboardDirector] B51 fallback (T20-7 v2 {translation_tag}): Scene {scene_id} ({scene_heading}) "
+            f"3 次 LLM 全部失败，使用 screenplay-aware fallback shot (variant_idx={fallback_seq})"
+        )
+        print(f"(B51 fallback v2 variant={fallback_seq} {translation_tag})", end=" ")
+        return [fallback_shot], None
 
     async def _call_llm_with_retry(self, prompt: str, max_tokens: int = 16384) -> str:
         """
@@ -642,7 +1296,7 @@ class StoryboardDirector:
                 if self.claude_client:
                     try:
                         call_start = time.time()
-                        response = self.claude_client.messages.create(
+                        response = await self.claude_client.messages.create(
                             model=self.claude_model,
                             max_tokens=max_tokens,
                             temperature=0.8,
@@ -697,6 +1351,105 @@ class StoryboardDirector:
         total_elapsed = time.time() - llm_start
         logger.error(f"[StoryboardDirector] ❌ LLM 调用失败 ({retry + 1} 次尝试, 总耗时 {total_elapsed:.1f}s): {last_error}")
         raise ValueError(f"LLM 调用失败（{retry + 1} 次尝试）: {last_error}")
+
+    async def _translate_chinese_to_image_prompt(
+        self,
+        scene: dict,
+        scene_heading_safe: str,
+        atmosphere_str: str,
+        timeout_seconds: float = 15.0,
+    ) -> str:
+        """RISK-T20-7 v2 (2026-05-18 治本): 调 LLM 翻译中文 narration/action 为英文 image_prompt 片段.
+
+        设计原则 (universal + 防 fallback 死循环):
+        1. **不再赌 LLM 返空**: 用简单"翻译任务" (不是 storyboard 生成), LLM 拒绝率极低
+        2. **多重兜底**:
+           - 没有中文需要翻译 → 返回 ""（调用方走静态 fallback）
+           - 没有可用 LLM 客户端 → 返回 ""
+           - LLM 翻译超时/异常 → 返回 ""
+           - LLM 返空/含中文/过短 → 返回 ""
+        3. **不阻断 Pipeline**: 15s 超时 + 完全静默失败 + logger.warning
+        4. **轻量调用**: max_tokens=400 (足够 50 word + 安全余量), 不走 _call_llm_with_retry 的重试链
+           - 翻译失败一次就放弃 → 静态 fallback 已经能保证基础质量
+
+        返回: 纯英文 image_prompt 片段 (≤ 600 chars), 或空字符串 (调用方走静态)
+        """
+        # 构建翻译请求 (如果没有中文需翻译, 返回 None → 走静态)
+        translation_request = _build_chinese_translation_request(
+            scene=scene,
+            scene_heading_safe=scene_heading_safe,
+            atmosphere_str=atmosphere_str,
+        )
+        if translation_request is None:
+            # 没有中文内容需要翻译 — 直接走静态 fallback
+            return ""
+
+        # 没有 LLM 客户端 → 走静态
+        if not self.claude_client and not self.gemini_client:
+            logger.info("[StoryboardDirector] [T20-7-v2] 无 LLM 客户端可用，降级到静态 fallback")
+            return ""
+
+        async def _single_attempt() -> str:
+            """单次 LLM 调用 (不重试) — 失败就走静态."""
+            # 优先 Claude (与主 Pipeline 一致)
+            if self.claude_client:
+                try:
+                    response = await self.claude_client.messages.create(
+                        model=self.claude_model,
+                        max_tokens=400,  # 50 word + 安全余量 (1 word ≈ 4-6 tokens)
+                        temperature=0.3,  # 翻译任务用低温度 (准确性 > 创造性)
+                        messages=[{"role": "user", "content": translation_request}],
+                    )
+                    if response and response.content:
+                        return response.content[0].text or ""
+                except Exception as ce:
+                    logger.warning(
+                        f"[StoryboardDirector] [T20-7-v2] Claude 翻译失败 (降级 Gemini): {ce}"
+                    )
+            # Gemini 兜底
+            if self.gemini_client:
+                try:
+                    response = await self.gemini_client.aio.models.generate_content(
+                        model=self.gemini_model,
+                        contents=translation_request,
+                        config={"max_output_tokens": 400, "temperature": 0.3},
+                    )
+                    return response.text or ""
+                except Exception as ge:
+                    logger.warning(
+                        f"[StoryboardDirector] [T20-7-v2] Gemini 翻译失败 (降级静态): {ge}"
+                    )
+            return ""
+
+        # 带超时的单次调用
+        try:
+            raw_translation = await asyncio.wait_for(
+                _single_attempt(),
+                timeout=timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                f"[StoryboardDirector] [T20-7-v2] LLM 翻译超时 ({timeout_seconds}s)，降级到静态 fallback"
+            )
+            return ""
+        except Exception as e:
+            logger.warning(
+                f"[StoryboardDirector] [T20-7-v2] LLM 翻译异常 (降级静态): {e}"
+            )
+            return ""
+
+        # 清洗 LLM 输出 (去包装/前缀/中文检测/长度过滤)
+        cleaned = _sanitize_llm_translation(raw_translation)
+        if not cleaned:
+            logger.info(
+                f"[StoryboardDirector] [T20-7-v2] LLM 翻译输出被拒 (空/含中文/过短/过长)，降级静态"
+                f" — raw 前 80 chars: {(raw_translation or '')[:80]}"
+            )
+        else:
+            logger.info(
+                f"[StoryboardDirector] [T20-7-v2] ✅ LLM 翻译成功 ({len(cleaned)} chars)"
+            )
+        return cleaned
 
     def _check_prompt_quality(self, shot: dict) -> None:
         """检查单个shot的image_prompt质量"""
@@ -786,20 +1539,31 @@ class StoryboardDirector:
             beats_list.append(f"  Shot {shot_id_start + i}: Beat {beat_id} - \"{action}...\"")
         beats_str = "\n".join(beats_list)
 
-        # 简化角色信息
-        chars_simplified = []
-        for char in characters.get("characters", []):
-            chars_simplified.append({
-                "id": char.get("id"),
-                "name": char.get("name"),
-                "clothing_summary": f"{char.get('clothing', {}).get('top', '')}, {char.get('clothing', {}).get('bottom', '')}",
-            })
-        characters_json = json.dumps(chars_simplified, ensure_ascii=False, indent=2)
+        # DEC-045 RISK-T20-17 (2026-05-19): 给 LLM 的 character data 块加 character_type +
+        # species + appearance + distinctive_marks. 旧逻辑只传 {id, name, clothing_summary},
+        # LLM 对非 human 角色物种零信息 → 输出 "hedgehog-like creature" (Milly 实际是 rabbit).
+        # 详见 storyboard_prompts.SPECIES_FIDELITY_RULES + build_stage4_character_data_block docstring
+        characters_block = build_stage4_character_data_block(characters)
+
+        # RISK-T19-8 Wave 14: scene_json 中文字段防御
+        # - scene_heading 含中文时替换为安全占位（与 fallback 路径逻辑一致）
+        # - atmosphere 用 _atmosphere_to_str() 过滤中文
+        raw_scene_heading = scene.get("scene_heading", "")
+        if _contains_chinese(raw_scene_heading):
+            safe_scene_heading = f"Scene {scene_id}"
+            print(
+                f"  [WARN] _build_scene_prompt: scene_heading 含中文已替换: '{raw_scene_heading}' → '{safe_scene_heading}'"
+            )
+        else:
+            safe_scene_heading = raw_scene_heading
+
+        raw_atmosphere = scene.get("atmosphere", {})
+        safe_atmosphere_str = _atmosphere_to_str(raw_atmosphere)
 
         scene_json = json.dumps({
             "scene_id": scene_id,
-            "scene_heading": scene.get("scene_heading", ""),
-            "atmosphere": scene.get("atmosphere", {}),
+            "scene_heading": safe_scene_heading,
+            "atmosphere": safe_atmosphere_str,  # 已过滤中文的字符串（不再传原始 dict）
             "characters_in_scene": scene.get("characters_in_scene", []),
             "action_beats": beats,
             "dialogue_beats": scene.get("dialogue_beats", []),
@@ -852,18 +1616,74 @@ class StoryboardDirector:
 
         return f"""Generate {num_beats} shots for Scene {scene_id}.
 
+═══════════════════════════════════════════════════════════
+CRITICAL: IMAGE_PROMPT MUST BE WRITTEN ENTIRELY IN ENGLISH
+═══════════════════════════════════════════════════════════
+The `image_prompt` field for EVERY shot MUST be 100% English.
+- The scene data below contains Chinese text (action_beats, narration, dialogue_beats) — this is for your UNDERSTANDING ONLY. Do NOT copy or transliterate any Chinese characters into image_prompt.
+- Character names in image_prompt MUST use the English name (e.g. "Grey Fox", "Milly", "Jiu Jiu") — NOT Chinese names.
+- Clothing, environment, and action descriptions in image_prompt MUST be in English.
+- `narration_segment` field is the ONLY field that may contain Chinese (used for TTS audio).
+- VIOLATION: Any Chinese character (汉字) in image_prompt will cause a pipeline schema validation failure.
+═══════════════════════════════════════════════════════════
+
+═══════════════════════════════════════════════════════════
+🚨 RISK-T20-1 (2026-05-18) — MANDATORY: NEVER RETURN EMPTY SHOTS ARRAY
+═══════════════════════════════════════════════════════════
+You MUST output {num_beats} shots in the `shots` array. NEVER return `"shots": []`.
+
+This rule applies to ALL scene types — INCLUDING:
+- Conflict / confrontation scenes (arguments, breakups, fights)
+- Emotionally intense scenes (crying, grief, rage)
+- Rainy night / dark / heavy weather scenes
+- Quiet introspective scenes
+- Sensitive content scenes (death, injury, intimacy)
+- Repeated location scenes (multiple scenes at the same location_id)
+
+If the scene feels difficult to storyboard, generate AT LEAST ONE shot per action_beat using the screenplay data:
+- Dialogue beats → reaction close-up of the speaker
+- Pure emotional beats → environmental detail shot (rain on window, hand close-up) tied to the mood
+- Conflict scenes → the confrontation moment itself (eye contact, posture shift, hand gesture)
+
+❌ FORBIDDEN OUTPUT (triggers B51 fallback degradation — visibly inferior quality):
+- `"shots": []`     (empty array)
+- `"shots": null`   (null)
+- Refusing to generate citing sensitivity / difficulty
+
+✅ REQUIRED: `"shots": [<beat 1 shot>, <beat 2 shot>, ...]` with concrete imagery for every beat.
+
+ANTI-PATTERN: "Rainy night breakup confrontation" → ❌ shots:[] is WRONG.
+✅ Correct minimum: 2 shots — (1) wide of two characters meeting eyes under streetlamp,
+(2) close-up of one character's reaction. Always produce SOMETHING.
+═══════════════════════════════════════════════════════════
+
 Required shots (one shot per beat):
 {beats_str}
 
 Scene data:
 {scene_json}
 
-Character data:
-{characters_json}
+{characters_block}
 {char_relationships_block}
 {NARRATION_TO_VISUAL_EXTRACTION_RULES}
 
+{OFF_SCREEN_SOUND_HANDLING_RULES}
+
 {COMIC_MODE_NARRATIVE_RULES}
+
+{HAND_PROP_ANATOMY_RULES}
+
+{HAIR_COLOR_REQUIREMENT_RULE}
+
+{NARRATIVE_VARIABLES_GUIDANCE}
+
+{SPECIES_FIDELITY_RULES}
+
+{SEEDREAM_SAFETY_AVOIDANCE_RULES}
+
+{ANATOMY_FIDELITY_RULES}
+
+{DEC046_V3_STAGE4_RULES}
 
 ## IMAGE PROMPT QUALITY REQUIREMENTS (MANDATORY)
 
@@ -894,8 +1714,11 @@ Each image_prompt MUST depict EXACTLY the characters listed in characters_in_sce
 - FORBIDDEN language: "blurred forms of other men/people", "other diners in the background", "busy restaurant with patrons"
 - Empty chairs, empty tables, empty seats MUST remain empty — do NOT fill them with unnamed figures
 - If the scene is a public place (restaurant, park, street), describe ONLY the named characters + environment/furniture/props — NEVER add ambient human figures
+- ⚠️ OFF-SCREEN AUDIO DOES NOT COUNT AS A VISIBLE CHARACTER: If narration describes sounds/voices/footsteps/alarms/dialogue from characters NOT listed in characters_in_scene, those characters are OFF-SCREEN AUDIO CUES ONLY — DO NOT render their silhouettes, shadows, blurred figures, or body parts in the image. See OFF-SCREEN AUDIO HANDLING block below for full rules.
 ❌ BAD: "the two friends sit at a table, blurred forms of other diners visible in the background"
 ✅ GOOD: "EXACTLY 2 characters in this scene. The two friends sit at a table, empty chairs and warm pendant lights fill the rest of the restaurant"
+❌ BAD (off-screen sound mistranslated): narration "走廊传来脚步声，林晓月独自站在中央" → prompt "Lin Xiaoyue stands alone, two blurred nurse silhouettes move inside the room behind her" (silhouettes WILL be rendered as extra characters)
+✅ GOOD (off-screen sound handled): narration "走廊传来脚步声，林晓月独自站在中央" → prompt "Lin Xiaoyue stands alone in the empty corridor, her head turning slightly toward an unseen sound off-frame, the open doorway behind her glowing harshly. EXACTLY 1 character visible."
 
 ### 7. OBJECT PHYSICAL PLAUSIBILITY ON SHARED SURFACES (CRITICAL)
 When multiple objects sit on the same surface (table, desk, counter, shelf, floor), each object MUST have a distinct spatial anchor. Objects MUST NOT overlap or occupy the same position.
@@ -1052,6 +1875,15 @@ Count your text_type distribution across all shots. If narration > 15%, convert 
 - thought: "（角色内心独白内容）"
 - narration: "旁白描述文字"
 
+## REQUIRED FIELDS (every shot MUST include ALL of these — no exceptions):
+- `shot_id`: integer (sequential, starting from {shot_id_start})
+- `scene_id`: integer (must match the scene)
+- `image_prompt`: full English prompt, 80-120 words
+- `narration_segment`: Chinese narration for TTS
+- `shot_type`: REQUIRED — human-readable shot size label (e.g. "wide shot", "medium shot", "close-up", "medium wide shot", "medium close-up", "establishing shot"). NEVER leave blank or null.
+- `camera_angle`: REQUIRED — human-readable angle label (e.g. "eye level", "low angle", "high angle", "bird's eye view", "dutch angle"). NEVER leave blank or null.
+- `characters_in_scene`: REQUIRED — list of character IDs present in this shot (e.g. ["char_001", "char_002"]). Use empty list [] ONLY if the shot is purely environmental with zero characters.
+
 Output format (JSON only, no other text):
 ```json
 {{
@@ -1066,6 +1898,9 @@ Output format (JSON only, no other text):
             "shot_id": {shot_id_start},
             "scene_id": {scene_id},
             "action_beat_id": "beat_id",
+            "shot_type": "medium shot",
+            "camera_angle": "eye level",
+            "characters_in_scene": ["char_001"],
             "camera": {{"shot_size": "wide/medium/close_up", "angle": "eye_level/low/high", "movement": "static/pan/dolly", "focal_length": "24mm/35mm/50mm/85mm"}},
             "composition": {{"subject_position": "left_third/center/right_third", "foreground": "foreground element for depth (blurred object, rain, frame edge...)", "background": "background element (city lights, room interior, landscape...)", "depth_layers": "2_layers/3_layers"}},
             "lighting": {{"key_light": "light source", "mood": "atmosphere"}},
@@ -1120,19 +1955,10 @@ You MUST generate one shot for each action_beat! Do NOT stop after 1-2 shots!
             })
         screenplay_json = json.dumps(scenes_simplified, ensure_ascii=False, indent=2)
 
-        # 简化角色信息
-        chars_simplified = []
-        for char in characters.get("characters", []):
-            chars_simplified.append({
-                "id": char.get("id"),
-                "name": char.get("name"),
-                "name_en": char.get("name_en"),
-                "physical_summary": f"{char.get('physical', {}).get('hair_color', '')} {char.get('physical', {}).get('hair_style', '')}, {char.get('physical', {}).get('eye_color', '')} eyes",
-                "clothing_summary": f"{char.get('clothing', {}).get('top', '')}, {char.get('clothing', {}).get('bottom', '')}",
-                "default_expression": char.get("character_specific_directions", {}).get("default_expression", "neutral"),
-                "posture": char.get("character_specific_directions", {}).get("posture", "natural")
-            })
-        characters_json = json.dumps(chars_simplified, ensure_ascii=False, indent=2)
+        # DEC-045 RISK-T20-17 (2026-05-19): 同步 _build_scene_prompt 的 character data 改动
+        # 旧 chars_simplified loop 只传 {id, name, clothing_summary} — 物种零信息。
+        # 改用 build_stage4_character_data_block 统一出口（此函数当前为 dead code，同步避免未来遗漏）
+        characters_block = build_stage4_character_data_block(characters)
 
         visual_tone_json = json.dumps(visual_tone, ensure_ascii=False, indent=2)
 
@@ -1172,7 +1998,23 @@ You MUST generate a shot for each beat above, total {total_beats} shots.
 
 {NARRATION_TO_VISUAL_EXTRACTION_RULES}
 
+{OFF_SCREEN_SOUND_HANDLING_RULES}
+
 {COMIC_MODE_NARRATIVE_RULES}
+
+{HAND_PROP_ANATOMY_RULES}
+
+{HAIR_COLOR_REQUIREMENT_RULE}
+
+{NARRATIVE_VARIABLES_GUIDANCE}
+
+{SPECIES_FIDELITY_RULES}
+
+{SEEDREAM_SAFETY_AVOIDANCE_RULES}
+
+{ANATOMY_FIDELITY_RULES}
+
+{DEC046_V3_STAGE4_RULES}
 
 {SCENE_PROP_CONTINUITY_RULES}
 
@@ -1180,7 +2022,7 @@ You MUST generate a shot for each beat above, total {total_beats} shots.
 {visual_tone_json}
 
 ## Character Data
-{characters_json}
+{characters_block}
 
 ## Screenplay
 {screenplay_json}
@@ -1203,6 +2045,9 @@ Strictly follow this JSON format (MUST include {min_shots} shots):
             "shot_id": 1,
             "scene_id": 1,
             "action_beat_id": "1a",
+            "shot_type": "wide shot",
+            "camera_angle": "eye level",
+            "characters_in_scene": ["char_001"],
             "camera": {{
                 "shot_size": "wide_shot",
                 "angle": "eye_level",
@@ -1374,33 +2219,12 @@ Output JSON only, no other text:
         return "\n".join(lines) if lines else "  (no action_beats)"
 
     def _extract_json(self, content: str) -> Optional[dict]:
-        """从LLM响应中提取JSON"""
-        import re
+        """从LLM响应中提取JSON
 
-        # 尝试提取```json ... ```块
-        json_match = re.search(r'```json\s*([\s\S]*?)\s*```', content)
-        if json_match:
-            try:
-                return json.loads(json_match.group(1))
-            except json.JSONDecodeError:
-                pass
-
-        # 尝试直接解析整个内容
-        try:
-            return json.loads(content)
-        except json.JSONDecodeError:
-            pass
-
-        # 尝试找到第一个{和最后一个}
-        start = content.find('{')
-        end = content.rfind('}')
-        if start != -1 and end != -1 and end > start:
-            try:
-                return json.loads(content[start:end+1])
-            except json.JSONDecodeError:
-                pass
-
-        return None
+        B59-hotfix (2026-05-12): 委托给共用 helper，支持未闭合 ``` 容错
+        """
+        from app.services._llm_helpers import extract_json_from_llm_response
+        return extract_json_from_llm_response(content)
 
     def _extract_gaze_cues(self, narration: str, characters_in_scene: list) -> dict:
         """
@@ -1555,6 +2379,54 @@ Output JSON only, no other text:
             # 验证estimated_duration
             if "estimated_duration" not in shot:
                 shot["estimated_duration"] = 5.0
+
+            # RISK-T15-14: post-process fallback — shot_type / camera_angle / characters_in_scene
+            # LLM 偶尔遗漏这三个顶层字段（Shot 21/22 实证），补救逻辑如下：
+            camera = shot.get("camera", {})
+
+            # shot_type: 从 camera.shot_size 派生（human-readable）
+            if not shot.get("shot_type"):
+                shot_size_raw = camera.get("shot_size", "medium_shot")
+                shot_type_map = {
+                    "wide_shot": "wide shot",
+                    "establishing": "establishing shot",
+                    "medium_wide": "medium wide shot",
+                    "medium_shot": "medium shot",
+                    "medium_close_up": "medium close-up",
+                    "close_up": "close-up",
+                    "extreme_close_up": "extreme close-up",
+                    "insert": "insert shot",
+                }
+                derived_shot_type = shot_type_map.get(shot_size_raw, shot_size_raw.replace("_", " "))
+                shot["shot_type"] = derived_shot_type
+                print(f"  ℹ️ [T15-14] Shot {shot_id}: shot_type 空，从 camera.shot_size='{shot_size_raw}' 补填 '{derived_shot_type}'")
+
+            # camera_angle: 从 camera.angle 派生（human-readable）
+            if not shot.get("camera_angle"):
+                angle_raw = camera.get("angle", "eye_level")
+                angle_map = {
+                    "eye_level": "eye level",
+                    "low_angle": "low angle",
+                    "low": "low angle",
+                    "high_angle": "high angle",
+                    "high": "high angle",
+                    "bird_eye": "bird's eye view",
+                    "birds_eye": "bird's eye view",
+                    "dutch_angle": "dutch angle",
+                    "overhead": "overhead",
+                }
+                derived_angle = angle_map.get(angle_raw, angle_raw.replace("_", " "))
+                shot["camera_angle"] = derived_angle
+                print(f"  ℹ️ [T15-14] Shot {shot_id}: camera_angle 空，从 camera.angle='{angle_raw}' 补填 '{derived_angle}'")
+
+            # characters_in_scene: 优先从 character_direction.characters_visible 派生
+            if shot.get("characters_in_scene") is None:
+                chars_visible = shot.get("character_direction", {}).get("characters_visible", [])
+                shot["characters_in_scene"] = list(chars_visible) if chars_visible else []
+                if chars_visible:
+                    print(f"  ℹ️ [T15-14] Shot {shot_id}: characters_in_scene 空，从 characters_visible 补填 {chars_visible}")
+                else:
+                    print(f"  ℹ️ [T15-14] Shot {shot_id}: characters_in_scene 空且 characters_visible 也空，补填 []")
 
             # T5: speaker-visibility 校验
             # 若 text_type 含 dialogue，speaker 必须在 characters_visible 中

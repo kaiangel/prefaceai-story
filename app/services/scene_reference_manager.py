@@ -297,6 +297,14 @@ class SceneReferenceManager:
         delay: float = 3.0,
         location_character_counts: Dict[str, int] = None,
         seed_images: Dict[str, "Image.Image"] = None,
+        aspect_ratio: str = "2:3",
+        # T21-NEW-6 (2026-05-21): sub-stage progress callback for frontend stage_message 细化
+        # 每个 view (interior/exterior) 完成时回调: (stage, progress_pct, message)
+        # 用于 Stage 4.5 scene_image_preparation 细化 "生成场景参考图 (interior 1/4: 客厅)..."
+        sub_progress_callback=None,
+        sub_progress_stage_name: str = "scene_image_preparation",
+        sub_progress_base_pct: int = 60,
+        sub_progress_max_pct: int = 63,
     ) -> Dict[str, Dict[str, Any]]:
         """
         P2.0核心方法：为每种场景类型生成锚点图
@@ -327,70 +335,110 @@ class SceneReferenceManager:
         print(f"  需要生成 {len(anchor_needs)} 张锚点图: {list(anchor_needs.keys())}")
 
         results = {}
+        results_lock = asyncio.Lock()  # 保护并行写入 results dict
 
         # 2. 按location_id分组，确保内景先于外景生成
         location_groups = self._group_anchors_by_location(anchor_needs)
 
-        total_count = len(anchor_needs)
-        current_index = 0
+        # RISK-T14-10 (DEC-029): 跨 location 并行生成（Semaphore 3 路并发）
+        # 同一 location 内 interior → exterior 仍串行（exterior 依赖 interior 作参考）
+        _loc_sem = asyncio.Semaphore(3)
 
-        # 3. 按location逐个处理，确保内外景关联
-        for location_id, anchors in location_groups.items():
+        # T21-NEW-6: 计算所有 view total (interior + exterior 各 1, 不一定全有)
+        _total_views = sum(
+            (1 if f"{loc_id}_interior_anchor" in anchors else 0) +
+            (1 if f"{loc_id}_exterior_anchor" in anchors else 0)
+            for loc_id, anchors in location_groups.items()
+        )
+        _completed_views = [0]  # mutable counter for sub-progress
+        _completed_lock = asyncio.Lock()
+
+        async def _emit_sub_progress(view_label: str, location_zh: str):
+            """T21-NEW-6: 单 view 完成后回调 sub-stage progress 细化"""
+            if sub_progress_callback is None:
+                return
+            try:
+                async with _completed_lock:
+                    _completed_views[0] += 1
+                    _done = _completed_views[0]
+                _pct_range = max(sub_progress_max_pct - sub_progress_base_pct, 1)
+                _pct = sub_progress_base_pct + int(_pct_range * _done / max(_total_views, 1))
+                _msg = (
+                    f"生成场景参考图 ({view_label} {_done}/{_total_views}: {location_zh})..."
+                )
+                await sub_progress_callback(sub_progress_stage_name, _pct, _msg)
+            except Exception as _cb_e:
+                print(f"  [SceneRefManager] sub_progress_callback 失败（非阻塞）: {_cb_e}")
+
+        async def _gen_one_location(location_id: str, anchors: dict):
+            """单 location 的内外景生成（interior→exterior 串行，保留参考关系）"""
             interior_image = None
             # T21: 获取该场景的角色数量
             loc_num_chars = (location_character_counts or {}).get(location_id)
+            # T21-NEW-6: 中文 location 名(优先 display_name, 回退 location_id)
+            _loc_zh = location_id
+            for _ak, _ai in anchors.items():
+                if _ai.get('location_name'):
+                    _loc_zh = _ai['location_name']
+                    break
 
             # 3.1 先生成内景（如果有）
             interior_key = f"{location_id}_interior_anchor"
             if interior_key in anchors:
-                current_index += 1
                 anchor_info = anchors[interior_key]
-                print(f"  生成锚点图 [{current_index}/{total_count}]: {interior_key}...")
+                print(f"  生成锚点图: {interior_key}...")
 
                 # seed_image: 用户上传的场景参考图（如有）
                 scene_seed = (seed_images or {}).get(location_id)
-                interior_image, interior_result = await self._generate_single_anchor(
-                    anchor_key=interior_key,
-                    anchor_info=anchor_info,
-                    view_type='interior',
-                    project_style=project_style,
-                    image_generator=image_generator,
-                    reference_image=scene_seed,  # 用户 seed 图或 None
-                    location_id=location_id,  # 🚨 传入原始location_id用于存储
-                    num_characters=loc_num_chars  # T21: 角色数量
-                )
-
-                results[interior_key] = interior_result
-
-                if current_index < total_count:
-                    await asyncio.sleep(delay)
+                async with _loc_sem:
+                    interior_image, interior_result = await self._generate_single_anchor(
+                        anchor_key=interior_key,
+                        anchor_info=anchor_info,
+                        view_type='interior',
+                        project_style=project_style,
+                        image_generator=image_generator,
+                        reference_image=scene_seed,  # 用户 seed 图或 None
+                        location_id=location_id,  # 传入原始location_id用于存储
+                        num_characters=loc_num_chars,  # T21: 角色数量
+                        aspect_ratio=aspect_ratio,
+                    )
+                async with results_lock:
+                    results[interior_key] = interior_result
+                # T21-NEW-6: 细化 sub-stage progress
+                await _emit_sub_progress("interior", _loc_zh)
 
             # 3.2 再生成外景（如果有），把内景作为参考图
             exterior_key = f"{location_id}_exterior_anchor"
             if exterior_key in anchors:
-                current_index += 1
                 anchor_info = anchors[exterior_key]
 
                 if interior_image:
-                    print(f"  生成锚点图 [{current_index}/{total_count}]: {exterior_key}（使用内景作为参考）...")
+                    print(f"  生成锚点图: {exterior_key}（使用内景作为参考）...")
                 else:
-                    print(f"  生成锚点图 [{current_index}/{total_count}]: {exterior_key}...")
+                    print(f"  生成锚点图: {exterior_key}...")
 
-                _, exterior_result = await self._generate_single_anchor(
-                    anchor_key=exterior_key,
-                    anchor_info=anchor_info,
-                    view_type='exterior',
-                    project_style=project_style,
-                    image_generator=image_generator,
-                    reference_image=interior_image,  # 🚨 关键：内景作为参考
-                    location_id=location_id,  # 🚨 传入原始location_id用于存储
-                    num_characters=loc_num_chars  # T21: 角色数量
-                )
+                async with _loc_sem:
+                    _, exterior_result = await self._generate_single_anchor(
+                        anchor_key=exterior_key,
+                        anchor_info=anchor_info,
+                        view_type='exterior',
+                        project_style=project_style,
+                        image_generator=image_generator,
+                        reference_image=interior_image,  # 关键：内景作为参考
+                        location_id=location_id,  # 传入原始location_id用于存储
+                        num_characters=loc_num_chars,  # T21: 角色数量
+                        aspect_ratio=aspect_ratio,
+                    )
+                async with results_lock:
+                    results[exterior_key] = exterior_result
+                # T21-NEW-6: 细化 sub-stage progress
+                await _emit_sub_progress("exterior", _loc_zh)
 
-                results[exterior_key] = exterior_result
-
-                if current_index < total_count:
-                    await asyncio.sleep(delay)
+        # 并行执行所有 location（location 内部 interior→exterior 串行保持）
+        await asyncio.gather(
+            *[_gen_one_location(loc_id, anchors) for loc_id, anchors in location_groups.items()],
+            return_exceptions=True,
+        )
 
         return results
 
@@ -439,7 +487,8 @@ class SceneReferenceManager:
         image_generator,
         reference_image: Optional[Image.Image] = None,
         location_id: str = None,
-        num_characters: int = None
+        num_characters: int = None,
+        aspect_ratio: str = "2:3",
     ) -> tuple:
         """
         生成单个锚点图
@@ -488,7 +537,7 @@ class SceneReferenceManager:
         result = await image_generator.generate_image(
             prompt=prompt,
             negative_prompt=negative_prompt,
-            aspect_ratio="2:3",  # 场景参考图统一2:3（DEC-010）
+            aspect_ratio=aspect_ratio,  # D.15: 由 pipeline 传入 project.aspect_ratio
             reference_images=reference_images
             # 不传use_pro_model，默认使用Flash
         )
@@ -500,7 +549,7 @@ class SceneReferenceManager:
             result = await image_generator.generate_image(
                 prompt=simplified_prompt,
                 negative_prompt=negative_prompt,
-                aspect_ratio="2:3",
+                aspect_ratio=aspect_ratio,
                 reference_images=reference_images
             )
 
@@ -515,7 +564,7 @@ class SceneReferenceManager:
                     result = await image_generator.generate_image(
                         prompt=rewritten,
                         negative_prompt=negative_prompt,
-                        aspect_ratio="2:3",
+                        aspect_ratio=aspect_ratio,
                         reference_images=reference_images
                     )
             except Exception as rw_err:
@@ -732,23 +781,21 @@ class SceneReferenceManager:
 
     def _detect_signage_name(self, location_name: str, location_desc: str,
                               signage_text: str = '') -> Optional[str]:
-        """T31+T-C: 检测场景是否含招牌，返回招牌文字（中文名）或 None
-        优先使用 Stage 1 生成的 signage_text，fallback 到 display_name 清洗"""
-        # T-C: 优先使用 Stage 1 生成的 signage_text
+        """T-C: 信任 Stage 1 LLM 的 signage_text 决策。
+
+        Stage 1 outline LLM 已经判断:
+        - 该地点是否有招牌 (有招牌场所如客栈/店铺/柜台等)
+        - 招牌名是什么 (简短名 e.g. "万象珠宝", 而非整段 location 描述)
+
+        不再用 keyword fallback (e.g. 含"楼"字就误判为招牌场所), 因为:
+        - keyword 易误判 (办公楼/教学楼/出租屋的"楼"不是招牌)
+        - 即使该有招牌, 把整段 display_name 当招牌也是错的 (太长 + 含修饰词)
+        - 信任 LLM 决策最 universal (任何故事类型不出错)
+
+        修复历史: 2026-05-18 TASK-T20-FIXBATCH T20-3 P0 招牌污染 (test18 实证).
+        """
         if signage_text:
             return signage_text
-        # T-C: Fallback — 从 display_name 清洗（去除 · 分隔符后部分）
-        cleaned = location_name.split('·')[0].strip()
-        # 检查中文关键词
-        for kw in self._SIGNAGE_KEYWORDS_ZH:
-            if kw in cleaned:
-                return cleaned
-        # 检查英文关键词（在 description 或 location_name 中）
-        combined = (cleaned + " " + location_desc).lower()
-        for kw in self._SIGNAGE_KEYWORDS_EN:
-            if kw in combined:
-                if cleaned:
-                    return cleaned
         return None
 
     def _build_anchor_prompt(

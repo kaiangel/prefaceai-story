@@ -82,7 +82,8 @@ class ReferenceImageManager:
         project_style: ProjectStyleConfig,
         image_generator,
         ref_type: str = 'fullbody',
-        portrait_ref: Optional[Image.Image] = None
+        portrait_ref: Optional[Image.Image] = None,
+        aspect_ratio: str = "2:3",
     ) -> Dict[str, Any]:
         """
         生成角色参考图（单张）
@@ -93,6 +94,7 @@ class ReferenceImageManager:
             image_generator: 图片生成器实例
             ref_type: 参考图类型 'portrait' 或 'fullbody'
             portrait_ref: 肖像参考图（用于全身图生成时确保人脸一致）
+            aspect_ratio: 宽高比（D.15: 由 pipeline 传入 project.aspect_ratio，不硬编码）
 
         Returns:
             生成结果
@@ -104,15 +106,16 @@ class ReferenceImageManager:
         # 根据类型构建不同的prompt
         if ref_type == 'portrait':
             prompt = self._build_portrait_prompt(character, char_type, project_style)
-            aspect_ratio = "2:3"  # 肖像用竖版（抖音适配）
-            reference_images = None  # 肖像不需要参考图
+            # Wave 10 / RISK-T16-2: portrait regenerate 时也传原 portrait 作 ref，
+            # Seedream 把原 portrait 当 ground truth → identity 一致 + 只调整 prompt 改的字段。
+            # First-time generation 时 portrait_ref=None → 走完全靠 prompt 文本路径（不变）。
+            reference_images = [portrait_ref] if portrait_ref else None
         else:
             # 全身图：如果有肖像参考，传入以确保人脸一致
             prompt = self._build_reference_prompt(
                 character, char_type, project_style,
                 portrait_ref=portrait_ref
             )
-            aspect_ratio = "2:3"  # 全身用竖版（抖音适配）
             # 如果有肖像参考图，传给图像生成器
             reference_images = [portrait_ref] if portrait_ref else None
 
@@ -169,6 +172,7 @@ class ReferenceImageManager:
         delay: float = 3.0,
         seed_image: "Image.Image | None" = None,
         skip_portrait: bool = False,
+        aspect_ratio: str = "2:3",
     ) -> Dict[str, Any]:
         """
         生成角色的多张参考图（肖像+全身）- 串行生成确保一致性
@@ -187,6 +191,7 @@ class ReferenceImageManager:
             skip_portrait: P1-3/R7-4: 若为 True，跳过肖像生成，直接使用
                            seed_image 作为 portrait 参考生成全身图
                            （portrait 已在 adjust_character 后新鲜重生成时使用）
+            aspect_ratio: 宽高比（D.15: 由 pipeline 传入 project.aspect_ratio，不硬编码）
 
         Returns:
             {ref_type: generation_result}
@@ -218,7 +223,8 @@ class ReferenceImageManager:
                 project_style=project_style,
                 image_generator=image_generator,
                 ref_type='portrait',
-                portrait_ref=seed_image  # 用户上传图作为参考（or None）
+                portrait_ref=seed_image,  # 用户上传图作为参考（or None）
+                aspect_ratio=aspect_ratio,
             )
             results['portrait'] = portrait_result
 
@@ -238,7 +244,8 @@ class ReferenceImageManager:
             project_style=project_style,
             image_generator=image_generator,
             ref_type='fullbody',
-            portrait_ref=portrait_image  # 传入肖像作为参考！
+            portrait_ref=portrait_image,  # 传入肖像作为参考！
+            aspect_ratio=aspect_ratio,
         )
         results['fullbody'] = fullbody_result
 
@@ -304,6 +311,32 @@ All subsequent images of this character must match this exact face.
 Each character has UNIQUE facial features - do not homogenize.
 
 Single person only, no other people, no text, no logos."""
+
+        elif char_type == 'anthropomorphic_animal':
+            # 拟人化动物肖像：强调动物面部特征
+            core_prompt = f"""CLOSE-UP PORTRAIT - ANTHROPOMORPHIC ANIMAL CHARACTER REFERENCE
+
+═══════════════════════════════════════════════════════════
+CRITICAL: THIS IS AN ANTHROPOMORPHIC ANIMAL — NOT A HUMAN
+═══════════════════════════════════════════════════════════
+
+{char_desc}
+
+FACE RENDERING REQUIREMENTS:
+- Show the ANIMAL species face: snout/muzzle/beak, animal nose, animal mouth
+- Show ANIMAL ears (species-specific shape and position)
+- Show FUR or FEATHERS on the face/head (NOT human hair or human skin)
+- Eyes should be expressive but still animal-shaped eyes
+- DO NOT render a human face — must be recognizable as the animal species
+
+COMPOSITION:
+- Close-up portrait view focusing on head and shoulders
+- 3/4 angle or front-facing
+- Simple solid neutral background
+- Show clothing/accessories around neck/shoulders if present
+
+IMPORTANT: Must be clearly recognizable as a {char_desc.split("anthropomorphic")[1].split("—")[0].strip() if "anthropomorphic" in char_desc else "animal"} character.
+Single character only, no other characters, no text."""
 
         else:
             # 非人类角色使用简化的肖像prompt
@@ -444,6 +477,32 @@ DETAILS TO CAPTURE:
 
 Single animal character only, no humans, no other animals, no text."""
 
+        elif char_type == 'anthropomorphic_animal':
+            core_prompt = f"""FULL BODY CHARACTER REFERENCE - ANTHROPOMORPHIC ANIMAL
+{char_desc}
+{consistency_instruction}
+CRITICAL CHARACTER TYPE RULES:
+- This is an ANTHROPOMORPHIC ANIMAL — standing upright on two legs, wearing clothes
+- MUST show ANIMAL features: fur/feathers, animal face/snout/muzzle/beak, animal ears, tail
+- MUST show HUMAN-LIKE features: upright bipedal posture, wearing clothing/accessories
+- DO NOT draw as a human — the face/head must be the ANIMAL species face, NOT a human face
+- DO NOT draw as a plain quadruped animal — must stand upright and wear clothes
+
+COMPOSITION:
+- Full body upright standing pose, 3/4 angle
+- Simple solid neutral background
+- Head to toe visible, showing complete clothing
+
+DETAILS TO CAPTURE:
+- Animal species face: snout/muzzle/beak shape, animal nose, animal mouth
+- Animal ears (species-appropriate: rabbit ears / fox ears / etc.)
+- Fur/feathers: color, texture, pattern
+- Tail (if species has one)
+- Complete clothing outfit from head to toe
+- Accessories and distinctive markings
+
+Single anthropomorphic animal character only, no humans, no plain animals, no text."""
+
         elif char_type == 'human':
             core_prompt = f"""FULL BODY CHARACTER REFERENCE
 {char_desc}
@@ -481,6 +540,8 @@ Single person only, no other people, no text, no logos."""
                 'fantasy_creature': 'fantasy creature',
                 'object': 'personified object',
                 'hybrid': 'hybrid character',
+                # anthropomorphic_animal 有专属 if-branch，此处不会命中，只作为兜底保险
+                'anthropomorphic_animal': 'anthropomorphic animal',
             }
             type_label = type_labels.get(char_type, 'character')
 
@@ -539,6 +600,7 @@ and smaller build — NOT by switching to a cuter or more cartoon-like art style
             # 基础类型
             'human': ", animal features, cartoon proportions, furry, animal ears, tail",
             'animal': ", human features, human face, human body, humanoid, person, hands, fingers",
+            'anthropomorphic_animal': ", human face, realistic human skin, human hair, human nose, fully human appearance, quadruped pose, plain animal without clothes",
             'robot': ", organic features, flesh, skin, human face, fur, feathers",
             'fantasy_creature': ", modern elements, realistic photo, real world objects",
             'object': ", human features, animal features, realistic proportions",
@@ -714,7 +776,13 @@ and smaller build — NOT by switching to a cuter or more cartoon-like art style
 
     def save_all_references(self, output_dir: str) -> Dict[str, Dict[str, str]]:
         """
-        保存所有参考图到目录
+        保存所有参考图到目录。
+
+        T20-50-fix-round3 (2026-05-20): 文件已存在时不覆盖，信任用户操作。
+        背景: Founder 手动重生 portrait 后，image_preparation 阶段 save_all_references
+        会把 in-memory dict 里的旧 portrait 覆盖磁盘上的新文件 (~500KB 内容差异实测证实)。
+        修复: 文件已存在 → skip save，仅记 logger.info。
+        KEY_LEARNINGS #46: 磁盘文件 = 最新用户意图，in-memory = 可能是过时副本。
 
         Args:
             output_dir: 输出目录
@@ -731,8 +799,17 @@ and smaller build — NOT by switching to a cuter or more cartoon-like art style
             saved[char_id] = {}
             for ref_type, image in char_refs.items():
                 file_path = os.path.join(output_dir, f"{char_id}_{ref_type}.png")
-                image.save(file_path)
-                saved[char_id][ref_type] = file_path
+                if os.path.exists(file_path):
+                    # T20-50-fix-round3: 文件已存在，信任磁盘文件（用户操作），不覆盖
+                    saved[char_id][ref_type] = file_path
+                    import logging as _logging
+                    _logging.getLogger(__name__).info(
+                        f"[ReferenceImageManager] save_all_references: "
+                        f"{char_id}_{ref_type}.png 已存在，信任用户操作 (no overwrite)"
+                    )
+                else:
+                    image.save(file_path)
+                    saved[char_id][ref_type] = file_path
 
         return saved
 

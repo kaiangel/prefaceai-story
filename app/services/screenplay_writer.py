@@ -19,7 +19,57 @@ import anthropic
 from google import genai
 from app.config import settings
 
+# RISK-T20-21 (2026-05-19) — DEC-044 去旁白 prompt wire
+# AI-ML Wave 1 已实现 prompt 模块 (app/prompts/screenplay_prompts.py).
+# Backend wire: 1 import + 2 inject + 1 narration target 调整.
+# 详见 .team-brain/TEAM_CHAT.md 2026-05-19 17:25 AI-ML 报告 + screenplay_prompts.py INTEGRATION_NOTES.
+from app.prompts.screenplay_prompts import (
+    DEC044_SCREENPLAY_RULES,
+    DEC044_SCREENPLAY_OUTPUT_EXAMPLE,
+    get_dec044_narration_max_chars,
+    DEC046_V3_NARRATIVE_PRINCIPLES,     # v3 新增 (TASK-T20-FIXBATCH-6 Wave 5 2026-05-20)
+    DEC046_V3_OUTPUT_EXAMPLE,           # v3 新增 (含 scene_self_evaluation 字段)
+    validate_scene_self_evaluation,     # v3 85% KPI enforce (T20-29 2026-05-20)
+    get_85_kpi_threshold,               # v3 阈值
+    detect_narrative_cluster,           # v3 P2: narrative_cluster fallback (T20-29 2026-05-20)
+)
+
 logger = logging.getLogger("xuhua")
+
+
+def _fix_inner_quotes_shared(src: str) -> str:
+    """R4-4: 修复 LLM 在 JSON 字符串值中输出未转义的双引号。
+    例如: "emotion": "声音在"走"字上轻微破碎"
+    策略: 遍历字符，在字符串内部检测到的 " 如果后面不是 JSON 分隔符 (,}]:)
+    则替换为中文引号 \\u201c（左双引号）。
+    """
+    out = []
+    i = 0
+    in_str = False
+    while i < len(src):
+        ch = src[i]
+        if ch == '\\' and in_str and i + 1 < len(src):
+            out.append(ch)
+            out.append(src[i + 1])
+            i += 2
+            continue
+        if ch == '"':
+            if not in_str:
+                in_str = True
+                out.append(ch)
+            else:
+                # Is this the real end of the string?
+                rest = src[i + 1:].lstrip()
+                if not rest or rest[0] in ',}]:':
+                    in_str = False
+                    out.append(ch)
+                else:
+                    # Unescaped inner quote — replace with Chinese left quote
+                    out.append('“')
+        else:
+            out.append(ch)
+        i += 1
+    return ''.join(out)
 
 
 class ScreenplayWriter:
@@ -37,7 +87,7 @@ class ScreenplayWriter:
         self.claude_client = None
         self.claude_model = "claude-sonnet-4-6"
         if settings.ANTHROPIC_API_KEY:
-            self.claude_client = anthropic.Anthropic(
+            self.claude_client = anthropic.AsyncAnthropic(
                 api_key=settings.ANTHROPIC_API_KEY
             )
 
@@ -208,10 +258,15 @@ class ScreenplayWriter:
         characters: dict,
         previous_scenes: List[dict]
     ) -> Optional[dict]:
-        """为单个plot_point生成scene（带字数验证和扩写机制）"""
+        """为单个plot_point生成scene（DEC-044: caption-style narration ≤120 chars）"""
 
         duration = plot_point.get("estimated_duration_seconds", 30)
-        target_narration_words = max(80, int(duration * 4))
+        # T20-21 / DEC-044: narration 不再 TTS, 改为 caption-style 短文案.
+        # 旧公式 max(80, int(duration * 4)) 产出 80-400 字 prose → 用户听不到也看不到完整版.
+        # 新公式 min(get_dec044_narration_max_chars(), int(duration * 1.5)) → 硬上限 ≤120 chars.
+        target_narration_words = min(
+            get_dec044_narration_max_chars(), int(duration * 1.5)
+        )
 
         max_attempts = 3
         best_scene = None
@@ -254,6 +309,14 @@ class ScreenplayWriter:
                     # 达标检查（80%容差）
                     if actual_words >= target_narration_words * 0.8:
                         self._validate_scene(scene, plot_point_index + 1)
+                        # T20-29 v3 85% KPI 软警告 (DEC-046 2026-05-20, 不阻塞 Pipeline)
+                        _kpi_result = validate_scene_self_evaluation(scene)
+                        if not _kpi_result.get('passes_85_kpi'):
+                            logger.warning(
+                                f"[T20-29 v3 KPI] Scene {scene.get('scene_id', plot_point_index + 1)} "
+                                f"可读性 {_kpi_result.get('score', '?')} < {get_85_kpi_threshold()}: "
+                                f"{'; '.join(_kpi_result.get('issues', []))}"
+                            )
                         return scene
                     else:
                         if attempt < max_attempts - 1:
@@ -274,6 +337,14 @@ class ScreenplayWriter:
 
         if best_scene:
             self._validate_scene(best_scene, plot_point_index + 1)
+            # T20-29 v3 85% KPI 软警告 (DEC-046 2026-05-20, 不阻塞 Pipeline)
+            _kpi_result = validate_scene_self_evaluation(best_scene)
+            if not _kpi_result.get('passes_85_kpi'):
+                logger.warning(
+                    f"[T20-29 v3 KPI] Scene {best_scene.get('scene_id', plot_point_index + 1)} "
+                    f"可读性 {_kpi_result.get('score', '?')} < {get_85_kpi_threshold()}: "
+                    f"{'; '.join(_kpi_result.get('issues', []))}"
+                )
 
         return best_scene
 
@@ -342,6 +413,14 @@ class ScreenplayWriter:
         for i, scene in enumerate(scenes):
             expected_id = scene_id_offset + i + 1
             self._validate_scene(scene, expected_id)
+            # T20-29 v3 85% KPI 软警告 (DEC-046 2026-05-20, 不阻塞 Pipeline)
+            _kpi_result = validate_scene_self_evaluation(scene)
+            if not _kpi_result.get('passes_85_kpi'):
+                logger.warning(
+                    f"[T20-29 v3 KPI] Scene {scene.get('scene_id', expected_id)} "
+                    f"可读性 {_kpi_result.get('score', '?')} < {get_85_kpi_threshold()}: "
+                    f"{'; '.join(_kpi_result.get('issues', []))}"
+                )
             validated.append(scene)
 
         return validated if validated else None
@@ -365,7 +444,11 @@ class ScreenplayWriter:
             char_name = char.get('name')
             chars_info.append(f"- {char_id}: {char_name} ({char.get('role', 'character')})")
             clothing = char.get('clothing', {})
-            accessories = clothing.get('accessories', [])
+            # B58-followup: defensive — clothing may be str if adjust_character Haiku output schema not strict
+            if isinstance(clothing, str):
+                accessories = []
+            else:
+                accessories = clothing.get('accessories', [])
             if accessories:
                 chars_props.append(f"  - {char_name} ({char_id}): {', '.join(accessories)}")
             else:
@@ -411,13 +494,15 @@ class ScreenplayWriter:
             first_location_id = "default_location"
 
         # 构建 plot_points 描述
+        # T20-21 / DEC-044: target_words 改为 caption-style 上限 (≤120 chars hard cap).
+        # 不再写"目标旁白字数 ≥X"硬要求 — narration 是 caption, 不是 prose.
         pp_lines = []
         for i, pp in enumerate(plot_points):
             sid = scene_id_offset + i + 1
             beat = pp.get("beat", f"plot_{sid}")
             desc = pp.get("description", "")
             dur = pp.get("estimated_duration_seconds", 30)
-            target_words = max(80, int(dur * 4))
+            target_caption_max = get_dec044_narration_max_chars()  # 120 chars
             # B-3: 旧公式 int(dur/6) 产出 5 beats/scene → 30 shots/短篇
             # DEC-011 短篇~18 shots ÷ 6 scenes ≈ 3 beats/scene
             target_beats = max(2, int(dur / 10))
@@ -426,7 +511,7 @@ class ScreenplayWriter:
                 f"- 节拍类型: {beat}\n"
                 f"- 描述: {desc}\n"
                 f"- 目标时长: {dur}秒\n"
-                f"- 目标旁白字数: ≥{target_words}字\n"
+                f"- narration caption 上限: ≤{target_caption_max}字 (DEC-044 caption-style)\n"
                 f"- 目标 action_beats 数: ≥{target_beats}"
             )
         pp_block = "\n\n".join(pp_lines)
@@ -458,6 +543,10 @@ ALLOWED props for each character (from characters.json):
 ✅ CORRECT: Use only defined accessories, use natural alternatives for plot needs
 
 ═══════════════════════════════════════════════════════════
+{DEC044_SCREENPLAY_RULES}
+
+{DEC046_V3_NARRATIVE_PRINCIPLES}
+═══════════════════════════════════════════════════════════
 
 ## 角色
 {chars_str}
@@ -474,13 +563,14 @@ ALLOWED props for each character (from characters.json):
 {pp_block}
 
 ═══════════════════════════════════════════════════════════
-## 对话与内心独白要求（CRITICAL）
+## 对话与内心独白要求（DEC-044 — see RULES above for full detail）
 ═══════════════════════════════════════════════════════════
 
 每个 action_beat 必须有至少 1 个对应的 dialogue_beat（对话或内心独白）。
-dialogue_beats 中 thought 类型 ≥20%。
-对话必须简洁有力，每句≤20字。
+dialogue_beats 中 thought 类型 ≥25% (DEC-044 提高), dialogue 类型 50-65%.
+每句 dialogue/thought ≤25 字 (DEC-044 caption-friendly hard cap).
 thought 类型用括号包裹：line="（内心独白内容）"
+**每个 scene 至少 1 个 thought + 至少 1 个含数字/线索/决定/揭示的 plot-essential 句**.
 
 ### DIALOGUE NATURALNESS RULES
 1. Dialogue should not contradict common knowledge
@@ -494,36 +584,41 @@ thought 类型用括号包裹：line="（内心独白内容）"
 ## 输出格式
 
 直接输出 JSON 数组（不要```json```包裹，不要任何解释文字）。
-每个元素是一个 scene 对象，格式如下：
 
-[
-    {{
-        "scene_id": {scene_id_offset + 1},
-        "scene_heading": "EXT/INT. LOCATION - TIME - WEATHER",
-        "plot_point": "beat_name",
-        "location_id": "{first_location_id}",
-        "time_of_day": "时间",
-        "weather": "天气",
-        "lighting_condition": "光线条件",
-        "atmosphere": {{
-            "mood": "English only mood word",
-            "sound_design_hint": "音效提示",
-            "temperature_feel": "温度感受"
-        }},
-        "characters_in_scene": ["char_001"],
-        "action_beats": [
-            {{"beat_id": "1a", "action": "动作描述", "duration_hint": 5, "emotional_note": "情绪"}}
-        ],
-        "dialogue_beats": [
-            {{"beat_id": "1a_dialogue", "type": "dialogue", "speaker": "char_001", "line": "对话≤20字", "emotion": "情绪"}}
-        ],
-        "narration": "TTS朗读旁白，有文学性，详细描写人物神态动作、内心活动、环境氛围...",
-        "narration_tone": "情绪基调",
-        "narration_pace": "节奏"
-    }}
-]
+═══════════════════════════════════════════════════════════
+CRITICAL — ENGLISH ONLY RULES (image generation requirement)
+═══════════════════════════════════════════════════════════
+The following fields are injected directly into image generation prompts.
+They MUST be in English — DO NOT use Chinese characters.
 
-必须输出 {n} 个 scene 对象，scene_id 从 {scene_id_offset + 1} 到 {scene_id_offset + n}。"""
+1. scene_heading: Use English location names.
+   ❌ WRONG: "EXT. 白桦树下 - 立春清晨 - 晴"
+   ✅ CORRECT: "EXT. Birch grove - Early spring morning - clear"
+   ❌ WRONG: "INT. 祠堂 - 傍晚 - 阴"
+   ✅ CORRECT: "INT. Ancestral hall - Dusk - overcast"
+
+2. atmosphere.sound_design_hint and atmosphere.temperature_feel MUST be in English.
+   ❌ WRONG: "远山鸟鸣稀疏，踩雪声轻脆"
+   ❌ WRONG: "凛冽中带一丝初春的微暖"
+   ✅ CORRECT: "distant bird calls, crisp footsteps in snow"
+   ✅ CORRECT: "biting cold with a hint of spring warmth"
+═══════════════════════════════════════════════════════════
+
+## DEC-044 OUTPUT EXAMPLE (caption-style narration ≤120 chars total)
+{DEC044_SCREENPLAY_OUTPUT_EXAMPLE}
+
+{DEC046_V3_OUTPUT_EXAMPLE}
+
+═══════════════════════════════════════════════════════════
+
+输出为 JSON 数组, 每个元素是符合上述 EXAMPLE 结构的 scene 对象.
+必须输出 {n} 个 scene 对象，scene_id 从 {scene_id_offset + 1} 到 {scene_id_offset + n}。
+
+⚠️ 严格遵守:
+- narration ≤{get_dec044_narration_max_chars()} CJK chars total (每句 ≤25 chars caption-style)
+- 每 action_beat ≥1 dialogue_beat (≤25 字/句)
+- 每 scene ≥1 thought + ≥1 plot-essential 句 (含数字/线索/决定/揭示)
+- scene_heading / atmosphere.sound_design_hint / atmosphere.temperature_feel 全英文"""
 
     def _extract_batch_json(self, content: str) -> Optional[List[dict]]:
         """
@@ -571,40 +666,8 @@ thought 类型用括号包裹：line="（内心独白内容）"
             except json.JSONDecodeError:
                 pass
 
-            # R4-4: 修复 LLM 在 JSON 字符串值中输出未转义的双引号
-            # 例如: "emotion": "声音在"走"字上轻微破碎"
-            # 策略: 遍历字符，在字符串内部检测到的 " 如果后面不是 JSON 分隔符 (,}]:)
-            # 则替换为中文引号 \u201c（左双引号）
-            def _fix_inner_quotes(src: str) -> str:
-                out = []
-                i = 0
-                in_str = False
-                while i < len(src):
-                    ch = src[i]
-                    if ch == '\\' and in_str and i + 1 < len(src):
-                        out.append(ch)
-                        out.append(src[i + 1])
-                        i += 2
-                        continue
-                    if ch == '"':
-                        if not in_str:
-                            in_str = True
-                            out.append(ch)
-                        else:
-                            # Is this the real end of the string?
-                            rest = src[i + 1:].lstrip()
-                            if not rest or rest[0] in ',}]:':
-                                in_str = False
-                                out.append(ch)
-                            else:
-                                # Unescaped inner quote — replace with Chinese left quote
-                                out.append('\u201c')
-                    else:
-                        out.append(ch)
-                    i += 1
-                return ''.join(out)
-
-            quote_fixed = _fix_inner_quotes(fixed)
+            # R4-4: 修复 LLM 在 JSON 字符串值中输出未转义的双引号（共用模块级 helper）
+            quote_fixed = _fix_inner_quotes_shared(fixed)
             if quote_fixed != fixed:
                 try:
                     result = json.loads(quote_fixed)
@@ -694,7 +757,7 @@ thought 类型用括号包裹：line="（内心独白内容）"
                 if self.claude_client:
                     try:
                         call_start = time.time()
-                        response = self.claude_client.messages.create(
+                        response = await self.claude_client.messages.create(
                             model=self.claude_model,
                             max_tokens=max_tokens,
                             temperature=0.8,
@@ -751,66 +814,24 @@ thought 类型用括号包裹：line="（内心独白内容）"
         raise ValueError(f"LLM 调用失败（{retry + 1} 次尝试）: {last_error}")
 
     async def _expand_narration_if_needed(self, scene: dict, target_words: int) -> dict:
-        """如果narration太短，调用LLM进行扩写"""
+        """T20-21 / DEC-044: narration 扩写已 DISABLE.
 
-        current_narration = scene.get("narration", "")
-        current_words = len(current_narration)
+        旧逻辑: narration 太短 → 调 LLM 扩写到 ≥80% target (~200-400 字 prose for TTS).
+        新策略 (DEC-044): narration 是 caption-style 短文案 (≤120 CJK chars).
+        如果 LLM 输出更短 (e.g. 15 chars), 这是 DEC-044 期望的形态, 不需要扩写.
 
-        if current_words >= target_words * 0.8:
-            return scene  # 不需要扩写
+        扩写反而违反 DEC-044 caption ≤25/句 ≤120/scene 上限.
 
-        expand_prompt = f"""请扩写以下旁白，使其达到{target_words}字以上。
+        v1 策略: 直接返回 scene 不变. 等 test17 v3 真跑后观察是否需要 v2 改为
+        "扩写 dialogue/thought density 而非 narration prose".
 
-## 场景背景
-- 场景: {scene.get('scene_heading', '')}
-- 氛围: {scene.get('atmosphere', {}).get('mood', '')}
-- 出场角色: {', '.join(scene.get('characters_in_scene', []))}
+        Args:
+            scene: 当前 scene dict
+            target_words: 旧的 narration 字数目标 (DEC-044 后忽略)
 
-## 当前旁白（{current_words}字，需要扩展到{target_words}字）
-{current_narration}
-
-## 扩写要求
-1. 保留原有内容的核心信息和情感基调
-2. 增加感官细节（视觉、听觉、触觉、嗅觉）
-3. 增加人物内心活动描写
-4. 增加环境氛围渲染
-5. 语言要有文学性，适合TTS朗读
-
-直接输出扩写后的旁白文本，不要任何解释或标记："""
-
-        try:
-            expanded = None
-
-            # 优先使用 Gemini 3 Flash
-            if self.gemini_client:
-                try:
-                    response = await self.gemini_client.aio.models.generate_content(
-                        model=self.gemini_model,
-                        contents=expand_prompt,
-                        config={"max_output_tokens": 16384, "temperature": 0.8}
-                    )
-                    expanded = response.text.strip()
-                except Exception:
-                    pass
-
-            # Fallback到Claude Haiku
-            if expanded is None and self.claude_client:
-                response = self.claude_client.messages.create(
-                    model=self.claude_model,
-                    max_tokens=16384,
-                    temperature=0.8,
-                    messages=[{"role": "user", "content": expand_prompt}]
-                )
-                expanded = response.content[0].text.strip()
-
-            # 验证扩写结果
-            if expanded and len(expanded) > current_words:
-                scene["narration"] = expanded
-                print(f"({current_words}→{len(expanded)}字)", end=" ")
-
-        except Exception as e:
-            print(f"(扩写失败)", end=" ")
-
+        Returns:
+            scene 不变
+        """
         return scene
 
     def _build_single_scene_prompt(
@@ -832,7 +853,10 @@ thought 类型用括号包裹：line="（内心独白内容）"
         # 计算目标数量
         # B-3: DEC-011 短篇~18 shots ÷ 6 scenes ≈ 3 beats/scene
         target_beats = max(2, int(duration / 10))
-        target_narration_words = max(80, int(duration * 4))  # 4字/秒
+        # T20-21 / DEC-044: narration 不再 TTS, 改 caption-style 短文案 ≤120 chars.
+        target_narration_words = min(
+            get_dec044_narration_max_chars(), int(duration * 1.5)
+        )
 
         # 前情提要
         previous_context = ""
@@ -855,7 +879,11 @@ thought 类型用括号包裹：line="（内心独白内容）"
 
             # 提取角色的合法道具/配饰
             clothing = char.get('clothing', {})
-            accessories = clothing.get('accessories', [])
+            # B58-followup: defensive — clothing may be str if adjust_character Haiku output schema not strict
+            if isinstance(clothing, str):
+                accessories = []
+            else:
+                accessories = clothing.get('accessories', [])
             if accessories:
                 chars_props.append(f"  - {char_name} ({char_id}): {', '.join(accessories)}")
             else:
@@ -884,6 +912,34 @@ thought 类型用括号包裹：line="（内心独白内容）"
                     "and emotional dynamics between characters:\n"
                     + "\n".join(rel_lines)
                 )
+
+        # B20: 从 outline 提取 overall_mood，用于 sound_design_hint 约束
+        visual_tone = outline.get("visual_tone", {})
+        overall_mood = visual_tone.get("overall_mood", "")
+        mood_sound_constraint = ""
+        if overall_mood:
+            mood_to_sound_style = {
+                "comedic": "轻快活泼（如: 欢快的背景音乐、夸张的音效、生动的碰撞声），禁止使用沉重或压抑的音效",
+                "warm": "温馨柔和（如: 轻柔的背景音乐、日常生活音效、舒缓的环境声），禁止使用紧张或恐怖的音效",
+                "heartwarming": "温暖感人（如: 舒缓的旋律、自然环境声、日常情境音效），禁止使用高强度或激烈的音效",
+                "tense": "紧张压抑（如: 低频嗡鸣、心跳声、环境噪声加强），禁止使用轻松欢快的音效",
+                "melancholic": "忧郁克制（如: 轻柔的钢琴声、远处的城市噪声、雨声），禁止使用欢快或激烈的音效",
+                "heroic": "热血激昂（如: 鼓点节拍、壮阔背景音乐、动作音效），禁止使用轻柔或哀伤的音效",
+                "mysterious": "神秘幽深（如: 回声效果、低沉环境声、悬疑音效），禁止使用明亮欢快的音效",
+                "romantic": "浪漫抒情（如: 柔和弦乐、微风声、轻柔背景音乐），禁止使用激烈或沉重的音效",
+            }
+            sound_style = mood_to_sound_style.get(overall_mood.lower(), "")
+            if sound_style:
+                mood_sound_constraint = f"""
+═══════════════════════════════════════════════════════════
+MOOD COHERENCE — SOUND DESIGN (MANDATORY)
+═══════════════════════════════════════════════════════════
+本故事的整体情绪基调为: {overall_mood}
+sound_design_hint 必须与整体基调保持一致: {sound_style}
+❌ 禁止: 情绪基调为 {overall_mood} 的故事出现与基调冲突的音效描述
+✅ 要求: 每个 sound_design_hint 都应强化故事的 {overall_mood} 基调
+═══════════════════════════════════════════════════════════
+"""
 
         # 场景位置信息 - 构建详细的location列表
         locations = outline.get("unique_locations", [])
@@ -925,6 +981,10 @@ ALLOWED props for each character (from characters.json):
 - For checking time: use "pulled out phone to check time" or use character's defined watch
 
 ═══════════════════════════════════════════════════════════
+{DEC044_SCREENPLAY_RULES}
+
+{DEC046_V3_NARRATIVE_PRINCIPLES}
+═══════════════════════════════════════════════════════════
 
 ## 当前任务
 生成第 {scene_id} 场戏（共 {total_plot_points} 场）
@@ -949,7 +1009,7 @@ This is scene {scene_id} of {total_plot_points} — you MUST generate this scene
 {locations_str}
 
 ⚠️ 重要：location_id 必须完全匹配上述列表中的值（如 "{first_location_id}"），不要自己编造新的ID。
-
+{mood_sound_constraint}
 ═══════════════════════════════════════════════════════════
 ## 对话与内心独白要求（CRITICAL）
 ═══════════════════════════════════════════════════════════
@@ -1035,70 +1095,74 @@ When writing dialogue_beats, you SHOULD follow these guidelines to ensure natura
 
 ═══════════════════════════════════════════════════════════
 
-## 输出要求
+## 输出要求 (DEC-044 严格遵守)
 这个scene必须包含：
 - 至少 {target_beats} 个 action_beats
 - 每个 action_beat 必须有至少 1 个对应的 dialogue_beat（dialogue 或 thought 类型）
-- dialogue_beats 中 thought 类型 ≥20%（5 beats 至少 1 个，6+ beats 至少 2 个）
+- dialogue_beats 中 thought 类型 ≥25% (DEC-044), dialogue 类型 50-65%
 - 每个 dialogue_beat 必须有 type 字段（"dialogue" 或 "thought"）
-- 约 {target_narration_words} 字的 narration（有文学性的旁白）
+- 每句 dialogue/thought ≤25 CJK 字 (DEC-044 caption-friendly hard cap)
+- 至少 1 个 thought + 至少 1 个 plot-essential 句 (含数字/线索/决定/揭示)
+- narration ≤{target_narration_words} CJK 字 (DEC-044 caption-style 总上限, 每句 ≤25 字)
+  — narration 不再是 TTS 朗读 prose, 而是 caption: 短句 1-4 句, 揭示场景或剧情转折
+  — 长 prose 必须改入 dialogue 或 thought
+- narration 中引用角色台词时，**必须**用「」（中文书名号），**不得**使用英文双引号 ""
+  ❌ 错误: 他叹道"你知道的，我没有别的选择。"
+  ✅ 正确: 他叹道「你知道的，我没有别的选择。」
 
-直接输出JSON，不要```json```包裹，不要任何解释文字：
-{{
-    "scene_id": {scene_id},
-    "scene_heading": "EXT/INT. LOCATION - TIME - WEATHER",
-    "plot_point": "{beat_name}",
-    "location_id": "{first_location_id}",
-    "time_of_day": "时间",
-    "weather": "天气",
-    "lighting_condition": "光线条件",
-    "atmosphere": {{
-        "mood": "tense / melancholic / hopeful / peaceful (English only, for image generation)",
-        "sound_design_hint": "音效提示",
-        "temperature_feel": "温度感受"
-    }},
-    "characters_in_scene": ["char_001"],
-    "action_beats": [
-        {{"beat_id": "{scene_id}a", "action": "动作描述", "duration_hint": 5, "emotional_note": "情绪"}},
-        {{"beat_id": "{scene_id}b", "action": "动作描述", "duration_hint": 5, "emotional_note": "情绪"}},
-        {{"beat_id": "{scene_id}c", "action": "动作描述", "duration_hint": 5, "emotional_note": "情绪"}}
-    ],
-    "dialogue_beats": [
-        {{"beat_id": "{scene_id}a_dialogue", "type": "dialogue", "speaker": "char_001", "line": "对话内容（≤20字）", "emotion": "情绪标注"}},
-        {{"beat_id": "{scene_id}a_dialogue_2", "type": "dialogue", "speaker": "char_002", "line": "回应内容（≤20字）", "emotion": "情绪标注"}},
-        {{"beat_id": "{scene_id}b_thought", "type": "thought", "speaker": "char_001", "line": "（角色内心独白≤20字）", "emotion": "情绪标注"}}
-    ],
-    "narration": "【字数硬性要求：必须≥{target_narration_words}字】这是TTS朗读的旁白，要有文学性。详细描写：人物神态动作、内心活动、环境氛围、情绪变化、感官细节。充分展开，不要惜字如金。写够{target_narration_words}字...",
-    "narration_tone": "情绪基调",
-    "narration_pace": "节奏"
-}}"""
+═══════════════════════════════════════════════════════════
+CRITICAL — ENGLISH ONLY RULES (image generation requirement)
+═══════════════════════════════════════════════════════════
+The following fields are injected directly into image generation prompts.
+They MUST be in English — DO NOT use Chinese characters.
+
+1. scene_heading: Use English location names.
+   ❌ WRONG: "EXT. 白桦树下 - 立春清晨 - 晴"
+   ✅ CORRECT: "EXT. Birch grove - Early spring morning - clear"
+   ❌ WRONG: "INT. 祠堂 - 傍晚 - 阴"
+   ✅ CORRECT: "INT. Ancestral hall - Dusk - overcast"
+
+2. atmosphere.sound_design_hint and atmosphere.temperature_feel MUST be in English.
+   ❌ WRONG: "远山鸟鸣稀疏，踩雪声轻脆"
+   ❌ WRONG: "凛冽中带一丝初春的微暖"
+   ✅ CORRECT: "distant bird calls, crisp footsteps in snow"
+   ✅ CORRECT: "biting cold with a hint of spring warmth"
+═══════════════════════════════════════════════════════════
+
+## DEC-044 OUTPUT EXAMPLE (caption-style, ≤120 chars total)
+{DEC044_SCREENPLAY_OUTPUT_EXAMPLE}
+
+{DEC046_V3_OUTPUT_EXAMPLE}
+
+═══════════════════════════════════════════════════════════
+
+请按上述 EXAMPLE 结构输出 JSON, 直接输出 (不要 ```json``` 包裹, 不要任何解释文字).
+当前 scene 必须 scene_id={scene_id}, plot_point="{beat_name}", location_id="{first_location_id}"."""
 
     def _extract_json(self, content: str) -> Optional[dict]:
-        """从LLM响应中提取JSON"""
-        import re
+        """从LLM响应中提取JSON
 
-        # 尝试提取```json ... ```块
-        json_match = re.search(r'```json\s*([\s\S]*?)\s*```', content)
-        if json_match:
-            try:
-                return json.loads(json_match.group(1))
-            except json.JSONDecodeError:
-                pass
+        B59-hotfix (2026-05-12): 先走共用 helper（含未闭合 ``` 容错），
+        helper 失败后再尝试 R4-4 内部引号修复（screenplay 特有的额外 fallback）
+        """
+        from app.services._llm_helpers import extract_json_from_llm_response
+        result = extract_json_from_llm_response(content)
+        if result is not None:
+            return result
 
-        # 尝试直接解析整个内容
-        try:
-            return json.loads(content)
-        except json.JSONDecodeError:
-            pass
-
-        # 尝试找到第一个{和最后一个}
+        # R4-4: 修复 LLM 在 JSON 字符串值中输出未转义的双引号（screenplay 特有 fallback）
         start = content.find('{')
         end = content.rfind('}')
         if start != -1 and end != -1 and end > start:
-            try:
-                return json.loads(content[start:end+1])
-            except json.JSONDecodeError:
-                pass
+            quote_fixed = _fix_inner_quotes_shared(content[start:end+1])
+            if quote_fixed != content[start:end+1]:
+                try:
+                    fixed_result = json.loads(quote_fixed)
+                    if isinstance(fixed_result, dict):
+                        print(f"  [R4-4] _extract_json: 未转义内部引号已修复")
+                        return fixed_result
+                except json.JSONDecodeError:
+                    pass
 
         return None
 
@@ -1136,6 +1200,11 @@ When writing dialogue_beats, you SHOULD follow these guidelines to ensure natura
                 "sound_design_hint": "",
                 "temperature_feel": ""
             }
+
+        # T20-29 v3 P2: narrative_cluster fallback — 若 LLM 未输出则用 detect_narrative_cluster 补 (DEC-046 2026-05-20)
+        if not scene.get("narrative_cluster"):
+            plot_text = scene.get("plot_point", "") or scene.get("scene_heading", "") or ""
+            scene["narrative_cluster"] = detect_narrative_cluster(plot_text=plot_text)
 
         if "narration_tone" not in scene:
             scene["narration_tone"] = "neutral"

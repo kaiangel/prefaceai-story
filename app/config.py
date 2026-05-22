@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     # Image Generation Settings
     IMAGE_MAX_CONCURRENT: int = 3  # 最大并发生成数
-    IMAGE_GENERATION_TIMEOUT: int = 120  # 单张图片生成超时（秒）
+    IMAGE_GENERATION_TIMEOUT: int = 210  # Wave 11.4: 防 Seedream 长尾 (177s+) 偶发超时, +30s buffer. 跟 SEEDREAM_TIMEOUT_SEC 统一
 
     # ===== Phase 3: Audio =====
     # OpenAI (Whisper)
@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     # "nb2"      → Nano Banana 2（Gemini 3.1 Flash Image Preview），MVP 默认主力
     # "seedream" → Seedream 5.0-lite（火山方舟国内版），测试期主力（成本降 55%）
     # Seedream 路径会在 sanitize 3 次失败后自动降级到 NB2，保证 Pipeline 不断
-    IMAGE_GEN_PROVIDER: str = "nb2"
+    IMAGE_GEN_PROVIDER: str = "seedream"
 
     # 火山方舟 Ark API Key（Seedream 5.0-lite 调用鉴权）
     # 仅当 IMAGE_GEN_PROVIDER=seedream 时必需

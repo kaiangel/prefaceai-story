@@ -3,10 +3,14 @@ FFmpeg 音频后处理服务
 
 负责对 Mureka API 输出的 BGM 进行：
   1. 切末尾 4 秒水印（Mureka "当前内容由 AI 生成" 水印）
-  2. 根据故事篇幅裁剪到目标时长（快闪 ~60s / 短篇 ~90s / 中篇 ~180s）
-  3. 应用音量系数（用户调过的 bgm_volume，0.0-1.0，破坏性应用）
-  4. 淡入（1s）+ 淡出（3s）
-  5. QA 检测：静音检测 + 音量电平（LUFS）
+  2. 应用音量系数（用户调过的 bgm_volume，0.0-1.0，破坏性应用）
+  3. 淡入（1s）+ 淡出（3s）
+  4. QA 检测：静音检测 + 音量电平（LUFS）
+
+B31 变更（2026-05-09）：
+  - 不再严格裁剪到 target_duration_sec
+  - 只切掉最后 4 秒 Mureka 水印（"内容由 AI 生成" 语音）
+  - process_bgm() 的 target_duration_sec 参数保留但不再用于裁剪，仅写入返回 dict 供调用方参考
 
 使用 subprocess 直接调用 FFmpeg 命令行，不依赖 ffmpeg-python 第三方库。
 """
@@ -111,37 +115,39 @@ def get_audio_duration(file_path: str) -> float:
 def process_bgm(
     input_path: str,
     output_path: str,
-    target_duration_sec: float,
+    target_duration_sec: Optional[float] = None,
     volume: float = 1.0,
 ) -> dict:
     """
-    FFmpeg 后处理：切水印 + 裁剪 + 淡入淡出 + 音量系数 + QA 检测。
+    FFmpeg 后处理：切水印 + 淡入淡出 + 音量系数 + QA 检测。
+
+    B31 行为（2026-05-09）：
+      - 不再裁剪到 target_duration_sec（参数保留向后兼容，但不再用于裁剪）
+      - 只切掉最后 4 秒 Mureka 水印（语音"内容由 AI 生成"）
+      - 保护：若 input < 8s，不切水印（避免极端短音频被切成空/负值）
+      - output_duration = input_duration - 4.0（正常情况）
 
     处理步骤（一次性 filter_complex）：
       1. 切末尾 4 秒（Mureka 水印）
-      2. 裁剪到目标时长（不补长，只裁短）
-      3. 应用音量系数（0.0-1.0，破坏性）
-      4. 淡入 1 秒 + 淡出 3 秒
-      5. 编码为 mp3 (libmp3lame, qscale:a 2)
-      6. QA：静音检测 (-30dB / ≥5s 段)
-      7. QA：LUFS 响度检测 (-23 ~ -14 范围)
-
-    目标时长预设：
-      - 快闪（~10 shots）: 60s
-      - 短篇（~18 shots）: 90s
-      - 中篇（~36 shots）: 180s
+      2. 应用音量系数（0.0-1.0，破坏性）
+      3. 淡入 1 秒 + 淡出 3 秒
+      4. 编码为 mp3 (libmp3lame, qscale:a 2)
+      5. QA：静音检测 (-30dB / ≥5s 段)
+      6. QA：LUFS 响度检测 (-23 ~ -14 范围)
 
     Args:
         input_path:          原始 Mureka mp3 路径。
         output_path:         处理后 mp3 输出路径。
-        target_duration_sec: 目标时长秒（60 / 90 / 180 等）。
+        target_duration_sec: 保留参数（向后兼容），B31 后不再用于裁剪。传 None 或任何值均不影响裁剪行为。
         volume:              音量系数 0.0-1.0。超过 1.0 不放大，强制截断到 1.0。
 
     Returns:
         dict 包含以下字段：
             success (bool)               — 处理是否成功
             output_path (str)            — 输出文件路径（成功时）
+            input_duration_sec (float)   — 原始输入时长（成功时）
             output_duration_sec (float)  — 实际输出时长（成功时）
+            watermark_trimmed_sec (float) — 实际切掉的水印秒数（0.0 若保护触发）
             qa_silence_detected (bool)   — True 表示发现 ≥5s / -30dB 静音段
             qa_silence_details (str)     — 静音段描述（诊断用）
             qa_lufs (float)              — 整体响度 LUFS 值
@@ -185,27 +191,31 @@ def process_bgm(
         return {"success": False, "error": str(e)}
 
     logger.info(
-        "[FFmpegPostProcessor] 开始处理 BGM: input=%s, input_duration=%.2fs, "
-        "target=%.2fs, volume=%.2f",
-        input_path, input_duration, target_duration_sec, volume,
+        "[FFmpegPostProcessor] 开始处理 BGM: input=%s, input_duration=%.2fs, volume=%.2f",
+        input_path, input_duration, volume,
     )
 
     # ------------------------------------------------------------------
-    # 2. 计算实际裁剪时长
-    #    先切末尾水印：effective_input = input_duration - WATERMARK
-    #    再裁剪到目标时长：actual_duration = min(target, effective_input)
-    #    边界：如果原始文件太短，保留去水印后全部内容
+    # 2. 计算实际裁剪时长（B31：只切末尾水印，不再裁到 target_duration）
+    #
+    #    保护规则：input < 8s 时不切水印（避免极端短音频被切空或产生负值）
+    #    正常情况：effective_input = input_duration - WATERMARK_DURATION (4s)
     # ------------------------------------------------------------------
-    effective_input = input_duration - MUREKA_WATERMARK_DURATION_SEC
-    if effective_input <= 0:
+    watermark_trimmed = 0.0
+    if input_duration < 8.0:
         warnings.append(
-            f"输入文件时长 {input_duration:.2f}s 不足以切除 {MUREKA_WATERMARK_DURATION_SEC}s 水印，"
-            "将直接使用原始文件（不切水印）。"
+            f"输入文件时长 {input_duration:.2f}s 不足 8s，跳过水印切除（保护短音频）。"
         )
         effective_input = input_duration
+    else:
+        effective_input = input_duration - MUREKA_WATERMARK_DURATION_SEC
+        watermark_trimmed = MUREKA_WATERMARK_DURATION_SEC
+        logger.info(
+            "[FFmpegPostProcessor] B31 切末尾水印 %.1fs: %.2fs → %.2fs",
+            watermark_trimmed, input_duration, effective_input,
+        )
 
-    # 实际输出时长：不补长，只裁短
-    actual_duration = min(target_duration_sec, effective_input)
+    actual_duration = effective_input
 
     # 淡出起始位置：在输出音频的末尾 3 秒开始淡出
     fade_out_start = max(0.0, actual_duration - FADE_OUT_DURATION_SEC)
@@ -213,19 +223,16 @@ def process_bgm(
     # ------------------------------------------------------------------
     # 3. 构建 FFmpeg filter 链（一次性，不多次调用）
     #
-    #    atrim=0:{effective_input}         → 切末尾水印
-    #    atrim=0:{actual_duration}         → 裁剪到目标时长
-    #    volume={volume}                   → 音量系数
-    #    afade=t=in:st=0:d=1              → 淡入 1s
+    #    atrim=0:{effective_input}            → 切末尾水印
+    #    asetpts=PTS-STARTPTS                → 重置时间戳
+    #    volume={volume}                     → 音量系数
+    #    afade=t=in:st=0:d=1               → 淡入 1s
     #    afade=t=out:st={fade_out_start}:d=3 → 淡出 3s
     #
-    #    注意：两个 atrim 串联，第一个切水印，第二个裁剪时长。
-    #    asetpts=PTS-STARTPTS 在每个 atrim 后重置时间戳，防止跳帧/静音。
+    #    B31：移除第二个 atrim（原来的 target_duration 裁剪），只保留水印裁剪。
     # ------------------------------------------------------------------
     filter_chain = (
         f"atrim=0:{effective_input:.6f},"
-        f"asetpts=PTS-STARTPTS,"
-        f"atrim=0:{actual_duration:.6f},"
         f"asetpts=PTS-STARTPTS,"
         f"volume={volume:.4f},"
         f"afade=t=in:st=0:d={FADE_IN_DURATION_SEC},"
@@ -421,7 +428,9 @@ def process_bgm(
     return {
         "success": True,
         "output_path": output_path,
+        "input_duration_sec": input_duration,
         "output_duration_sec": output_duration,
+        "watermark_trimmed_sec": watermark_trimmed,
         "qa_silence_detected": qa_silence_detected,
         "qa_silence_details": qa_silence_details,
         "qa_lufs": qa_lufs,

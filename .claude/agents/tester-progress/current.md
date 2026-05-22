@@ -1,11 +1,114 @@
 # Tester Agent - 当前任务
 
-> **最后更新**: 2026-04-29 [Tester]
-> **状态**: ✅ Wave 3.6 R7-3 独立复测 PASS — 6 证据点全部通过，R7-3 修复确认有效
+> **最后更新**: 2026-05-22 [Tester]
+> **状态**: Wave 7+8 综合 regression 完成 ✅ — 534/534 PASS (13 test files), 0.84s, 0 API 调用
+
+---
+
+## 当前状态 (2026-05-22)
+
+**Wave 7+8 综合 regression + T22-NEW-7 ID format robustness 全完成 ✅**
+
+### pytest 真自跑结果 (KEY_LEARNINGS #47 铁律)
+
+```
+13 test files 综合:
+  534/534 PASS, 0 FAIL, 0 SKIP
+  elapsed: 0.84s
+  API calls: 0 (零成本 mock)
+```
+
+### 新建 test_t22_new_7_id_format_robustness.py (65 cases)
+
+- Section 1: Format A (char_id) × 19 types = 19 PASS
+- Section 2: Format B (name_en) × 19 types = 19 PASS  ← T22-NEW-7 根因修后实证
+- Section 3: Format C (mixed)   × 19 types = 19 PASS
+- Section 4: Boundary cases                  = 8 PASS
+- Total: 65/65 PASS
+
+### T22-NEW-7 修后真实证
+
+Format B (name_en): 19/19 types 全成功匹配 — 修前 Shot 1-3 chars=0 (Coral 变蓝发人腿), 修后 resolve_characters_in_shot 三路 fuzzy match 全通过.
+
+### import 模式 (KEY_LEARNINGS #52 铁律)
+
+使用 `importlib.util.spec_from_file_location` + sys.modules 注册，镜像 baseline 真 pattern，绕过 `app/services/__init__.py` cascade 避免 google.genai ImportError。
+
+---
+
+## 下一步
+
+PM 终审 → e2e test22 重跑验证视觉 → Founder 验证 → 内测启动
 
 ---
 
 ## 刚完成
+
+### B16 P1 Hotfix 重测 [2026-05-08 20:33-20:36]
+
+**测试项目**: test7 UUID `edd4e938-68f6-4ffe-84f5-503442034dca`
+**Backend PID 35835 (PM 重启，hotfix 生效)**
+
+**重测验证结果**:
+
+| 验证项 | 结果 | 证据 |
+|--------|------|------|
+| Backend 真重启确认 | PASS | PID 35835 (新), /health HTTP 200, "Application startup complete" |
+| HTTP 200 响应 | PASS | status="completed", message="Shot 1 重新生成成功" |
+| imageUrl 含 ?v= cache bust | PASS | `?v=1778243792` |
+| Seedream 真重新生图 | PASS | log: "Shot 1 生成成功 (1664x2218, 147.36s, sanitize_attempts=0)" |
+| shot_01.png mtime 变化 | PASS | 1778230393 (16:53) → 1778243792 (20:36) |
+| 文件大小变化 | PASS | 2716589 bytes → 2436064 bytes (不同图像) |
+| PIL 尺寸验证 | PASS | 1664x2218 RGB，符合 D.15 |
+| "生成图像数据格式异常" 不再出现 | PASS | grep count = 0 |
+| storyboard_json 写回 DB | PASS | log: UPDATE project_chapters SET storyboard_json, COMMIT |
+| 角色一致性回归 | 低风险/已完成进程 | PID 32983 已结束; 5-08 零触碰高风险文件 |
+
+**B16 Hotfix 验收**: PASS — chapters.py L1682-1710 三路判断正确，pil_image 优先路径生效
+
+---
+
+### TASK-T8-INTEGRATION-VERIFY — 5-08 修复批集成验证 [2026-05-08]
+
+**测试项目**: test7 UUID `edd4e938-68f6-4ffe-84f5-503442034dca` (《我妈骂的AI客服是我训练的》)
+**测试时间**: 2026-05-08 19:50 - 20:30
+**Backend PID 26925 / Frontend PID 26957 (5-08 19:36 启动)**
+
+**验证结果汇总**:
+
+| 验证项 | 状态 | 说明 |
+|--------|------|------|
+| **V7 pytest 全套** | PASS (295/3 failed/6 errors) | 与 Wave 5.2 基线一致，零退化 |
+| **架构测试** | PASS 11/11 | test_architecture.py + test_quality_gates.py 全通过 |
+| **B8 _extract_json inner quote fix** | PASS | R4-4 修复: 未转义内部引号解析成功，直接 parse 失败后 fix 成功 |
+| **B6 /story 404 for pending/generating_story** | PASS | pending/generating_story -> 404，failed -> 400，completed -> 200 |
+| **B11 BGM 6 桶 meta-prompt** | PASS | 6 桶调性词全部验证：bouncy(13次)/syncopated(5次)/driving(7次)/minor key(3次)等全部存在 |
+| **B17 ShotValidator anatomy** | PASS 3/3 | severe→valid=False, mild→valid=True, UPPERCASE+string→valid=False |
+| **D.24 cache bust** | PASS | bustCache 逻辑正确：无?v=时加 Date.now()，已有时保留 |
+| **D.25 BGM 文案** | PASS | "换种风格"+"再来一首"+tooltip 代码已确认 |
+| **B16 regenerate_shot 真生图** | **FAIL P1** | 图像生成成功(1664x2218,446s)，但save步骤失败(HTTP500) |
+| **角色一致性回归** | RUNNING | test仍在运行中(Stage 1 LLM生成阶段，高风险文件未被修改) |
+
+**B16 P1 Bug 详情**:
+- **症状**: POST /chapters/1/shots/1/regenerate → HTTP 500 "生成图像数据格式异常"
+- **根因**: chapters.py L1683 `image_data = result.get("image_data")` 从 Seedream 返回的是 base64 string，不是 bytes 也不是 PIL Image。代码 isinstance(bytes) 和 hasattr("save") 均不匹配，fall through 到 else raise 500。PIL Image 在 `result.get("pil_image")` 有但代码未检查
+- **Seedream 返回格式**: `{"success": True, "image_data": "<base64_string>", "pil_image": <PIL.Image>, ...}`
+- **修复方向**: chapters.py 第1683行附近加一路: `elif result.get("pil_image") and hasattr(result["pil_image"], "save"):` 或先尝试 `pil_image = result.get("pil_image")`
+- **严重度**: P1 — 用户无法通过重新生成按钮更新画面
+- **图像已真实生成**: 446s Seedream 调用成功，只是保存步骤代码逻辑错误
+- **派给**: @backend 修复 `app/api/chapters.py` L1683-1696
+
+**B6 failed状态的分歧**:
+- 任务 spec 说 failed → 404，但代码返回 400（"故事生成失败: ${error_message}"）
+- 400 语义上更准确（有内容但生成失败），但与 Frontend 处理逻辑需对齐
+- 建议 @backend 与 @frontend 对齐处理（现有代码 400 已有明确错误信息）
+
+**角色一致性分析**:
+- 5-08 修改文件: chapters.py / projects.py / screenplay_writer.py / shot_validator.py / story_outline_generator.py
+- 零触碰高风险文件: image_generator.py / storyboard_prompts.py / storyboard_service.py / reference_image_manager.py
+- 结论: 极低风险，预期 PASS
+
+---
 
 ### Wave 3.6 — R7-3 P1 portrait 重生独立复测 [2026-04-29]
 

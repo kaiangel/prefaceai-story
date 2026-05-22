@@ -12,6 +12,7 @@ interface StoryCardProps {
   index: number;
   onDelete?: (id: string) => void;
   onContinue?: (id: string) => void;
+  isNewlyCompleted?: boolean;
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -29,7 +30,7 @@ function formatDate(dateStr: string): string {
   return `${month}/${day} ${hours}:${mins}`;
 }
 
-export default function StoryCard({ story, index, onDelete, onContinue }: StoryCardProps) {
+export default function StoryCard({ story, index, onDelete, onContinue, isNewlyCompleted = false }: StoryCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   const styleLabel = STYLE_PRESETS.find((s) => s.key === story.style)?.label ?? story.style;
   const status = STATUS_LABELS[story.status] ?? STATUS_LABELS.complete;
@@ -78,6 +79,14 @@ export default function StoryCard({ story, index, onDelete, onContinue }: StoryC
               {story.shotCount} shots
             </span>
           </div>
+          {/* RISK-T14-12: Newly completed badge — shown when story completes during this session */}
+          {isNewlyCompleted && (
+            <div className="absolute top-2 right-2">
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-success/90 backdrop-blur-sm text-white font-medium">
+                ✨ 新故事完成
+              </span>
+            </div>
+          )}
           {/* Generating progress overlay */}
           {story.status === "generating" && (
             <div className="absolute inset-x-0 bottom-0">

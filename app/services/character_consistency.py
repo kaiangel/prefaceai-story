@@ -8,9 +8,12 @@
 支持最多10个角色的一致性管理
 """
 
+import logging
 from typing import List, Dict, Optional
 from dataclasses import dataclass, field
 from enum import Enum
+
+logger = logging.getLogger("xuhua")
 
 
 class CharacterType(Enum):
@@ -430,8 +433,16 @@ class CharacterConsistencyManager:
     def add_character(self, character: Character) -> bool:
         """添加角色"""
         if len(self.characters) >= self.MAX_CHARACTERS:
+            logger.warning(
+                f"[CharacterConsistency] add_character rejected: MAX_CHARACTERS={self.MAX_CHARACTERS} reached, "
+                f"cannot add {character.id} ({character.name_en})"
+            )
             return False
         self.characters[character.id] = character
+        logger.info(
+            f"[CharacterConsistency] add_character: {character.id} ({character.name_en}), "
+            f"type={character.char_type.value}, total={len(self.characters)}"
+        )
         return True
 
     def get_character(self, char_id: str) -> Optional[Character]:
@@ -441,12 +452,18 @@ class CharacterConsistencyManager:
     def set_visual_style(self, style: VisualStyle):
         """设置视觉风格"""
         self.visual_style = style
+        logger.info(
+            f"[CharacterConsistency] set_visual_style: art_style={style.art_style}, "
+            f"rendering={style.rendering}, atmosphere={style.atmosphere}"
+        )
 
     def set_reference_image(self, char_id: str, image) -> bool:
         """设置角色参考图（方案B）"""
         if char_id not in self.characters:
+            logger.warning(f"[CharacterConsistency] set_reference_image: char_id={char_id} not found in characters")
             return False
         self.reference_images[char_id] = image
+        logger.info(f"[CharacterConsistency] set_reference_image: {char_id} reference image registered")
         return True
 
     def build_scene_prompt(
@@ -470,6 +487,17 @@ class CharacterConsistencyManager:
         Returns:
             完整的图像生成prompt
         """
+        resolved_chars = [cid for cid in character_ids if cid in self.characters]
+        missing_chars = [cid for cid in character_ids if cid not in self.characters]
+        if missing_chars:
+            logger.warning(
+                f"[CharacterConsistency] build_scene_prompt: char_ids not found in registry: {missing_chars}"
+            )
+        logger.info(
+            f"[CharacterConsistency] build_scene_prompt: {len(resolved_chars)} chars resolved "
+            f"({resolved_chars}), include_style={include_style}"
+        )
+
         parts = []
 
         # 1. 视觉风格（放在最前面，设定整体基调）
@@ -505,6 +533,10 @@ class CharacterConsistencyManager:
         for char_id in character_ids:
             if char_id in self.reference_images:
                 images.append(self.reference_images[char_id])
+        logger.info(
+            f"[CharacterConsistency] get_reference_images_for_scene: "
+            f"requested={len(character_ids)} chars, found={len(images)} ref images"
+        )
         return images
 
     def export_character_sheet(self) -> str:

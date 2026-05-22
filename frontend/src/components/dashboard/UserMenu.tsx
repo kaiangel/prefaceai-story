@@ -12,7 +12,7 @@ export default function UserMenu() {
 
   if (!user) return null;
 
-  const initials = user.name
+  const initials = (user?.name ?? "")
     .split(/[\s_-]/)
     .map((w) => w[0])
     .join("")
@@ -26,15 +26,15 @@ export default function UserMenu() {
         className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
       >
         {/* Avatar */}
-        {user.avatarUrl ? (
-          <img src={user.avatarUrl} alt={user.name} className="w-7 h-7 rounded-full object-cover" />
+        {user?.avatarUrl ? (
+          <img src={user.avatarUrl} alt={user?.name ?? ""} className="w-7 h-7 rounded-full object-cover" />
         ) : (
           <div className="w-7 h-7 rounded-full bg-brand-primary/20 flex items-center justify-center text-[11px] font-medium text-brand-primary">
             {initials}
           </div>
         )}
         <span className="text-sm text-text-secondary hidden sm:block max-w-[100px] truncate">
-          {user.name}
+          {user?.name}
         </span>
         <ChevronDown className={`w-3.5 h-3.5 text-text-muted transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -52,8 +52,8 @@ export default function UserMenu() {
             >
               {/* User info */}
               <div className="px-3 py-2 border-b border-white/5">
-                <p className="text-sm font-medium text-text-primary truncate">{user.name}</p>
-                <p className="text-xs text-text-muted truncate">{user.email}</p>
+                <p className="text-sm font-medium text-text-primary truncate">{user?.name}</p>
+                <p className="text-xs text-text-muted truncate">{user?.email}</p>
               </div>
 
               {/* Links */}

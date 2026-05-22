@@ -14,7 +14,7 @@ Pipeline 阶段间数据 Schema - Harness Engineering 的 Sensor
 import re
 import logging
 from typing import List, Optional, Dict, Any, Union
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 logger = logging.getLogger("xuhua")
 
@@ -153,48 +153,142 @@ class OutlineSchema(BaseModel):
 
 
 class CharacterPhysical(BaseModel):
-    """角色物理外观 — Stage 2 CharacterDesigner 输出的 physical 字段"""
+    """
+    角色物理外观 — Stage 2 CharacterDesigner 输出的 physical 字段
 
-    height: str
-    build: str
-    skin_tone: str
-    face_shape: str
-    hair_color: str
-    hair_style: str
-    eye_color: str
-    # 以下字段在 CharacterDesigner prompt 中要求，但 LLM 有时会省略，
-    # 设为 Optional 允许缺失，核心 5 字段 (上方) 必须存在
+    DEC-043 RISK-T20-10 (2026-05-19 方案 C):
+    - 所有 sub-field 改 Optional 以支持 19 种 character_type
+      (human 用 hair/skin/face_shape, anthropomorphic_animal 用 species/fur_color/ear_style 等)
+    - `extra='allow'` 允许 LLM 输出各 character_type 特有字段
+      (species, fur_color, snout_shape, robot_type, creature_type 等不在此 schema 列出但合法)
+    - 核心字段最小集校验由 CharacterSchema.validate_physical_by_type model_validator 兜底
+    """
+
+    model_config = ConfigDict(extra='allow')  # 允许任意 character_type 特有字段透传
+
+    # 通用维度 (任何 character_type 都可能用)
+    height: Optional[str] = None
+    build: Optional[str] = None
+    distinctive_marks: Optional[List[str]] = None
+
+    # human / anthropomorphic_animal / supernatural / undead / miniature / giant 等可能用
+    skin_tone: Optional[str] = None
+    face_shape: Optional[str] = None
+    hair_color: Optional[str] = None
+    hair_style: Optional[str] = None
     hair_texture: Optional[str] = None
+    eye_color: Optional[str] = None
     eye_shape: Optional[str] = None
     eye_size: Optional[str] = None
     eye_description: Optional[str] = None
     eyebrows: Optional[str] = None
     nose: Optional[str] = None
     lips: Optional[str] = None
-    distinctive_marks: Optional[List[str]] = None
 
 
 class CharacterClothing(BaseModel):
-    """角色服装 — Stage 2 CharacterDesigner 输出的 clothing 字段"""
+    """
+    角色服装 — Stage 2 CharacterDesigner 输出的 clothing 字段
 
-    top: str
-    bottom: str
-    footwear: str
-    style: str
-    # outerwear 和 condition 在 prompt 中要求但 LLM 可能省略
+    DEC-043 RISK-T20-10: 部分非 human 类型 (animal/elemental/digital_virtual 等) 可能
+    无服装。允许全部 Optional，校验由 CharacterSchema model_validator 兜底。
+    """
+
+    model_config = ConfigDict(extra='allow')
+
+    top: Optional[str] = None
+    bottom: Optional[str] = None
+    footwear: Optional[str] = None
+    style: Optional[str] = None
     outerwear: Optional[str] = None
     accessories: Optional[List[str]] = None
     condition: Optional[str] = None
+
+
+# ============================================================
+# 通用 Humanoid Fallback 架构 (Wave 8, 2026-05-22)
+#
+# 设计原则 (方案 B):
+# ─────────────────────────────────────────────────────────────
+# 旧方式 (Wave 4 + 4.5 hotfix): 17 个 character_type 各自手动写 humanoid 外貌字段
+#   fallback 规则 → 重复、脆弱、新 type 需手动追加。
+#
+# 新方式: 通用 fallback 函数 has_humanoid_fallback() —
+#   任何 character 含 humanoid 外貌字段 (hair_color / skin_tone / face_shape /
+#   eye_color / eye_shape) 即视为有效拟人形态，不验 type-specific 字段。
+#
+# 严格 type (不接受 humanoid fallback):
+#   animal          — 纯动物，不呈人形，必须有 species + 皮毛字段
+#   vehicle_character — 变形金刚等机械载具，必须有 vehicle_type
+#
+# 特殊 type:
+#   human           — 保留严格规则 (hair_color AND skin_tone 都必须非空)
+#   anthropomorphic_animal — 2-group AND 结构
+#                     group 1: species 必须有 (动物拟人化的核心要求)
+#                     group 2: 毛色/羽色/scale_color 任一 OR humanoid fallback 任一
+#
+# 其余 15 type: 走通用 fallback — 含 humanoid 外貌字段即 PASS，否则 fallback 告警
+# ─────────────────────────────────────────────────────────────
+
+# humanoid fallback 判定字段集 — 含任一非空即视为拟人形态
+_HUMANOID_FALLBACK_FIELDS: tuple = (
+    'hair_color', 'skin_tone', 'face_shape', 'eye_color', 'eye_shape',
+)
+
+# 严格 type 集合 — 不接受 humanoid fallback
+_STRICT_TYPES: frozenset = frozenset({'animal', 'vehicle_character'})
+
+# anthropomorphic_animal 特殊: group 2 毛色/羽色字段集 (含 humanoid 外貌)
+_ANTHRO_ANIMAL_APPEARANCE_FIELDS: tuple = (
+    'fur_color', 'feather_color', 'plumage_color', 'coat_color', 'scale_color',
+    # Wave 4.5 P0 — 狼人/猫娘半人形外貌: hair_color / skin_tone / face_shape
+    'hair_color', 'skin_tone', 'face_shape',
+)
+
+# 严格 type 校验规则 (仅 animal + vehicle_character 使用)
+_TYPE_REQUIRED_GROUPS: Dict[str, List[tuple]] = {
+    # human: hair_color AND skin_tone 都必须非空 (两 group AND)
+    'human': [('hair_color',), ('skin_tone',)],
+    # anthropomorphic_animal: species AND (毛色/羽色/.../ 人外貌 任一) 两 group AND
+    'anthropomorphic_animal': [
+        ('species',),
+        _ANTHRO_ANIMAL_APPEARANCE_FIELDS,
+    ],
+    # 纯动物 — 严格不接受 humanoid fallback
+    'animal': [('species',), ('fur_color', 'feather_color', 'plumage_color', 'scale_color', 'skin_color', 'chitin_color')],
+    # 载具角色 — 严格不接受 humanoid fallback
+    'vehicle_character': [('vehicle_type',)],
+}
+
+
+def has_humanoid_fallback(phys_dict: dict) -> bool:
+    """
+    通用判断: character physical 字段中含人类外貌关键字段即视为拟人形态。
+
+    判定字段: hair_color / skin_tone / face_shape / eye_color / eye_shape
+    任一非空 (str 非空 / list 非空 / truthy) → True
+
+    用于 validate_physical_by_type 在以下情况下提前 PASS:
+    - character_type 不在严格集合 (_STRICT_TYPES) 中
+    - character_type 不是 'human' / 'anthropomorphic_animal' (各有独立规则)
+    - LLM 给了 humanoid 外貌字段 (合理且正确的行为)
+
+    Args:
+        phys_dict: CharacterPhysical.model_dump() 的结果 (含 extra='allow' 字段)
+
+    Returns:
+        True 如果含任一 humanoid 外貌字段非空，False 否则
+    """
+    return any(bool(phys_dict.get(f)) for f in _HUMANOID_FALLBACK_FIELDS)
 
 
 class CharacterSchema(BaseModel):
     """
     单个角色的完整 Schema — Stage 2 CharacterDesigner 输出
 
-    对应 character_designer.py 的 _validate_characters() 要求的字段:
-    必需: name, name_en, role, character_type, gender, physical, clothing
-    physical 必需: hair_color, hair_style, eye_color, skin_tone, face_shape
-    clothing 必需: top, bottom, footwear, style
+    必需: id, name, name_en, role, character_type, gender, physical, clothing
+    physical 核心字段最小集: 按 character_type 动态校验
+    (DEC-043 RISK-T20-10 方案 C, 2026-05-19)
     """
 
     id: str
@@ -209,6 +303,75 @@ class CharacterSchema(BaseModel):
     # 可选字段
     personality: Optional[Dict[str, Any]] = None
     character_specific_directions: Optional[Dict[str, Any]] = None
+
+    @model_validator(mode='after')
+    def validate_physical_by_type(self) -> 'CharacterSchema':
+        """
+        DEC-043 RISK-T20-10 + Wave 8 通用 fallback 架构: 按 character_type 动态校验 physical 字段最小集。
+
+        校验流程 (Wave 8, 2026-05-22):
+        ─────────────────────────────────────────────────────────────
+        1. human / anthropomorphic_animal → 走 _TYPE_REQUIRED_GROUPS 精确规则
+        2. animal / vehicle_character (_STRICT_TYPES) → 走 _TYPE_REQUIRED_GROUPS 严格规则
+        3. 其余 15 type →
+             先检查 has_humanoid_fallback():
+               - 含 humanoid 外貌字段 (hair_color / skin_tone / face_shape 等) → 直接 PASS
+               - 不含 → logger.warning 告警 (不 raise, 允许 type-specific 字段灵活性)
+        4. 未知 character_type → logger.warning 跳过 (给 LLM 扩展新 type 的灵活性)
+        ─────────────────────────────────────────────────────────────
+
+        extra='allow' 允许 LLM 输出 type 特有字段 (species/fur_color/robot_type/etc.)
+        字段精确规则定义见 _TYPE_REQUIRED_GROUPS (仅 4 个 type)
+        通用 humanoid fallback 字段见 _HUMANOID_FALLBACK_FIELDS
+        """
+        ct = (self.character_type or '').strip().lower()
+        if not ct:
+            raise ValueError("character_type 不能为空")
+
+        # physical 字段 (含 extra='allow' 注入的字段)
+        phys_dict = self.physical.model_dump()
+
+        # ─── 路径 1: 有精确规则的 type (human / anthropomorphic_animal / animal / vehicle_character)
+        groups = _TYPE_REQUIRED_GROUPS.get(ct)
+        if groups is not None:
+            missing_groups = []
+            for grp in groups:
+                # 每个 group 要求至少一个字段非空 (允许 str / list / 任意 truthy)
+                satisfied = any(
+                    bool(phys_dict.get(field_name))
+                    for field_name in grp
+                )
+                if not satisfied:
+                    missing_groups.append(' OR '.join(grp))
+
+            if missing_groups:
+                raise ValueError(
+                    f"character_type={ct} physical 字段缺少最小集: "
+                    f"需要至少满足 [{' AND '.join(missing_groups)}]，"
+                    f"实际 physical keys={sorted(phys_dict.keys())}"
+                )
+            return self
+
+        # ─── 路径 2: 严格 type (animal / vehicle_character 已在 _TYPE_REQUIRED_GROUPS 处理)
+        # 以下为保险兜底 — 理论上不会到这里 (animal + vehicle_character 已在 groups 分支处理)
+        if ct in _STRICT_TYPES:
+            logger.warning(
+                f"[CharacterSchema] 严格 type='{ct}' 未找到精确规则，跳过校验"
+            )
+            return self
+
+        # ─── 路径 3: 通用 fallback — 其余 15 种 type
+        # 含 humanoid 外貌字段 → 直接 PASS (LLM 给了人形描述，合理且正确)
+        if has_humanoid_fallback(phys_dict):
+            return self
+
+        # 不含 humanoid 外貌字段也不含 type-specific 字段 → 告警但不 raise
+        # 这给了 LLM 输出纯 type-specific 字段的灵活性 (e.g. robot_type / creature_type)
+        logger.warning(
+            f"[CharacterSchema] character_type='{ct}' 既无 humanoid 外貌字段也无 type 特有字段，"
+            f"建议补全 physical 描述。实际 physical keys={sorted(phys_dict.keys())}"
+        )
+        return self
 
 
 class CharactersOutput(BaseModel):
@@ -264,6 +427,9 @@ class SceneSchema(BaseModel):
     每个 action_beat 必须有 beat_id
     """
 
+    # DEC-046 T20-28 v3: 允许 LLM 输出 narrative_cluster + scene_self_evaluation 等新字段透传
+    model_config = ConfigDict(extra='allow')
+
     scene_id: int
     scene_heading: Optional[str] = None
     plot_point: Optional[str] = None
@@ -288,6 +454,9 @@ class ScreenplaySchema(BaseModel):
     每个 scene 必须有 scene_id, location_id, characters_in_scene, action_beats (min 1)
     每个 action_beat 必须有 beat_id
     """
+
+    # DEC-046 T20-28 v3: 允许 LLM 输出 narrative_cluster + scene_self_evaluation 等新字段透传
+    model_config = ConfigDict(extra='allow')
 
     scenes: List[SceneSchema] = Field(min_length=1)
 
