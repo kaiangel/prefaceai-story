@@ -22,7 +22,7 @@ from app.services.character_prompt_builder import CharacterPromptBuilder
 from app.services.style_enforcer import StyleEnforcer
 from app.models.style_config import ProjectStyleConfig
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("xuhua")  # Wave 10 P3-3: 统一 logger name (与 identity_anchor_injector 一致, 便于 log 聚合)
 
 
 def _label_reference_image(image: Image.Image, label: str) -> Image.Image:
@@ -870,8 +870,8 @@ and smaller build — NOT by switching to a cuter or more cartoon-like art style
                 if os.path.exists(file_path):
                     # T20-50-fix-round3: 文件已存在，信任磁盘文件（用户操作），不覆盖
                     saved[char_id][ref_type] = file_path
-                    import logging as _logging
-                    _logging.getLogger(__name__).info(
+                    # Wave 10 P3-3: 统一用模块顶部 logger (xuhua name), 不再 inline _logging
+                    logger.info(
                         f"[ReferenceImageManager] save_all_references: "
                         f"{char_id}_{ref_type}.png 已存在，信任用户操作 (no overwrite)"
                     )

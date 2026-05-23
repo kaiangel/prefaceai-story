@@ -1,7 +1,75 @@
 # AI-ML Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 AI-ML 的工作状态和 Prompt 约束
-> **最后更新**: 2026-05-22 20:30 (Wave 9.1 完成 — fullbody Layer 1 wire, 三路统一)
+> **最后更新**: 2026-05-23 (Wave 10 完成 — 6 项 P2/P3, 4 个新 const)
+
+---
+
+# 🟢 [2026-05-23] Wave 10: 4 个新 prompt const + Backend 接力清单
+
+**4 个新 const (位于 `app/prompts/storyboard_prompts.py`)**:
+
+| Const | 行数 | 用途 | Wire 状态 |
+|-------|------|------|----------|
+| `CHARACTER_COUNT_FIDELITY_RULES` | 3207 chars | P3-4: 禁止描述里 "visible figures of others" 与 EXACTLY N 矛盾 | ✅ 已 wire 到 storyboard_director.py L1685+L2026 |
+| `KEY_PROPS_CONSTRAINT_RULES` | 2718 chars | P3-5: key_props ≤ 3 项 ≤ 50 char each, atomic only | ✅ 已 wire 到 storyboard_director.py L1687+L2028 |
+| `ASPECT_RATIO_FIDELITY_RULES` | 2750 chars | P3-2: 禁止从 examples 抄 "2:3", 必用 input 传入值 | ✅ 已 wire (部分; backend 接力传 project_aspect_ratio 字段) |
+| `CHARACTER_FIELD_PRESERVATION_RULES` | 4461 chars | P3-1: adjust 时保留 8 个 mandatory schema 字段 | ⏳ 待 Backend wire (api/projects.py L1193 + L1286) |
+
+**给 Backend 的接力清单**:
+
+### 1. P3-1 Backend wire (URGENT — fix UNKNOWN warn)
+```python
+# 改 1: app/api/projects.py L1193 (adjust_character LLM prompt)
+from app.prompts.storyboard_prompts import CHARACTER_FIELD_PRESERVATION_RULES
+prompt = f"""... [原 prompt] ...
+
+{CHARACTER_FIELD_PRESERVATION_RULES}
+
+直接输出修改后的完整角色 JSON 对象..."""
+
+# 改 2: app/api/projects.py L1286 改为 deep-merge 不覆盖
+# 旧: characters_overview[char_index] = updated_char  # ❌ 全替换
+# 新:
+merged = dict(target_char)  # 从原 char 开始
+for key, val in updated_char.items():
+    merged[key] = val
+characters_overview[char_index] = merged
+
+# 改 3 (建议): app/services/story_outline_generator.py L376 加 character_type 字段
+# Stage 1 outline characters_overview 模板加入 character_type 字段 + 19 值清单
+```
+
+### 2. P3-2 Backend wire (传 project_aspect_ratio 到 LLM input)
+```python
+# app/services/storyboard_director.py:
+# - _build_scene_prompt() 加 project_aspect_ratio: str 参数
+# - 在 scene_json 拼接 + 在 prompt 文档说明 "user's aspect_ratio in input: <X>"
+# - 调用方 (pipeline_orchestrator) 必须传入 project.aspect_ratio
+
+# 同时 (保险措施) 改 storyboard_director.py 2 处 runtime fallback dict literal:
+# L1065 + L2327: hardcoded "aspect_ratio": "2:3" → 用 project.aspect_ratio 代入
+```
+
+### 3. P3-3 完成 (无需 Backend 接力)
+RIM logger 改 `xuhua` 已完成。如 backend 担心 log 不能精细 filter，可改 dual: `getLogger("xuhua.reference_image_manager")` — 不影响 Wave 10 此次提交。
+
+### 4. P3-4 + P3-5 完成 (无需 Backend 接力)
+两个 const 已 wire 到 storyboard_director.py LLM prompt template。下次 Stage 4 LLM 调用自动生效。
+
+---
+
+# 🟢 [2026-05-23] P2-2 verify 结论 (重要 — memory 同步建议)
+
+`reference_image_manager.get_smart_references_for_scene` (L756-801) 行为 by-design:
+- close_up / extreme_close_up / medium_close_up → portrait (面部细节优先)
+- T20 优化: medium_shot + ≤2 角色 → portrait (面部更丰富，加 T20 时引入)
+- 其余 (wide/full/medium 多角色/establishing) → fullbody
+- fallback: 无 fullbody 时退 portrait
+
+test27 log `refs=2 (1 portrait + 1 scene_ref)` = 该 shot 命中 close-up 或 medium-shot ≤2 角色规则，**by-design, 不是 bug**。
+
+**给 PM**: 建议同步 `CLAUDE.md` L210/L241/L283 的 "传入仅 fullbody" 描述 → "smart selection 根据 shot_type 选 portrait 或 fullbody"。
 
 ---
 

@@ -1323,6 +1323,385 @@ the prompt prevents this class of hallucination entirely.
 """
 
 # ============================================================================
+# Wave 10 P3-4 — CHARACTER_COUNT_FIDELITY_RULES (2026-05-23)
+# ----------------------------------------------------------------------------
+# 背景: test27 Shot 31 (chars=3/1 FAIL) 真根因分析:
+#   - LLM 已按 Rule 6 在 image_prompt 末尾加 "EXACTLY 1 character visible"
+#   - 但 LLM 在场景描述中又写 "two small retreating figures of the couple
+#     visible in the deep soft-focus background" — 自相矛盾
+#   - Seedream 优先听描述里的 "visible"，画了 3 角色
+# 修复: 禁止 LLM 在 image_prompt 描述里提任何 "visible figures of other characters"
+#   即使是背景/远景/剪影/silhouettes。EXACTLY N 必须与描述完全一致。
+# 与 Rule 6 (STRICT CHARACTER COUNT) 互补: Rule 6 说"末尾加 EXACTLY N"，
+#   此规则说"描述里禁止出现矛盾 visible 措辞"。
+# ============================================================================
+
+CHARACTER_COUNT_FIDELITY_RULES = """
+═══════════════════════════════════════════════════════════
+CHARACTER COUNT FIDELITY (Wave 10 P3-4 — CRITICAL HARD CONSTRAINT)
+═══════════════════════════════════════════════════════════
+
+Image generation models (Seedream) interpret EVERY mention of "visible figures",
+"silhouettes", "retreating shapes", "distant people" in the prompt description
+as a SEPARATE character to render — even when the prompt also says "EXACTLY 1
+character visible" at the end.
+
+## ABSOLUTE RULE (NO EXCEPTIONS)
+
+When an image_prompt ends with "EXACTLY N character visible" (N = count of
+characters_in_scene), the prompt description MUST NOT mention ANY of the
+following — they will be rendered as extra characters:
+
+❌ FORBIDDEN phrases (will become extra rendered figures):
+  - "two small retreating figures of the couple visible in the background"
+  - "silhouettes of distant people"
+  - "blurred forms of bystanders"
+  - "shadows of other characters"
+  - "the couple visible in the deep soft-focus background"
+  - "figures in the distance"
+  - "other people walking by"
+  - "background crowd"
+  - "ambient figures"
+  - "passersby in soft focus"
+
+## CORRECT REWRITE PATTERNS
+
+If narration mentions other characters who should be off-frame:
+
+❌ BAD: "Lu Bo's gaze follows the two small retreating figures of the couple
+        visible in the deep soft-focus background. EXACTLY 1 character visible."
+
+✅ GOOD (option A — off-frame, no visual mention):
+   "Lu Bo gazes toward the empty bridge stretching into the distance, his
+    eyes fixed on a point beyond the frame. EXACTLY 1 character visible."
+
+✅ GOOD (option B — environmental cue without people):
+   "Lu Bo gazes at the moonlit bridge ahead, apricot petals settling on the
+    empty stones where the couple's footsteps faded. EXACTLY 1 character visible."
+
+✅ GOOD (option C — symbolic memory, not visual):
+   "Lu Bo's gaze lingers on the empty bridge, his expression carrying the
+    weight of the parting. EXACTLY 1 character visible."
+
+## SELF-CHECK BEFORE OUTPUT
+
+Before finalizing any image_prompt:
+1. Find the "EXACTLY N character visible" at the end
+2. Scan the prompt description for these red flags:
+   - words: "figures", "silhouettes", "shapes", "forms", "people", "crowd",
+     "passersby", "bystanders"
+   - phrases: "in the background", "in the distance", "in soft focus",
+     "blurred", "retreating", "walking by"
+3. If a red flag appears in description but N=1 (or smaller than red flag implies):
+   → REWRITE the description to remove the figure mention entirely
+   → Replace with environmental detail (empty objects, light, weather, etc.)
+
+## WHY THIS IS CRITICAL (test27 Shot 31 evidence)
+
+Shot 31 image_prompt ended with "EXACTLY 1 character visible" but description
+said "two small retreating figures of the couple visible in the deep soft-focus
+background". Seedream rendered 3 characters total (Lu Bo + 2 background couple)
+because "visible" in description overrode the count constraint at the end.
+
+T17 ShotValidator flagged chars=3/1 FAIL. T17 retried 4 times and used last
+result — still 3 characters. Root cause: prompt description's own self-
+contradiction, NOT model misbehavior.
+
+═══════════════════════════════════════════════════════════
+"""
+
+
+# ============================================================================
+# Wave 10 P3-5 — KEY_PROPS_CONSTRAINT_RULES (2026-05-23)
+# ----------------------------------------------------------------------------
+# 背景: test27 Shot 14 (杏花桥) ShotValidator FAIL missing_props 含 3 项过长描述:
+#   - 'gnarled tree roots and shadow patches at the very base of frame'
+#   - 'dappled tree shadow on the bridge stone surface, warm amber light filtering
+#      through leaves, two pairs of feet barely visible at the far right edge of
+#      frame — one belonging to Li Mubai, one to Su Li — separated by distance'
+# 原因: LLM 给 key_props 没有数量/长度上限, 写得越多 Seedream 越跟不上 (注意力分散)
+# 修复: key_props ≤ 3 项 + 每项 ≤ 50 char + 必须是 atomic prop (不混描述+人物)
+# ============================================================================
+
+KEY_PROPS_CONSTRAINT_RULES = """
+═══════════════════════════════════════════════════════════
+KEY PROPS CONSTRAINT (Wave 10 P3-5 — IMPORTANT)
+═══════════════════════════════════════════════════════════
+
+Image generation models (Seedream) have finite attention budget per prompt.
+Too many key_props with overly detailed descriptions cause prop omission —
+the model picks 2-3 props to render and silently drops the rest.
+
+## HARD LIMITS (per shot)
+
+For every shot's `key_props` field (or any prop list passed downstream to
+ShotValidator):
+
+1. **MAX 3 items per shot** (was: unbounded, often 5-8 items)
+2. **MAX 50 characters per item** (was: unbounded, often 100-200 chars)
+3. **ATOMIC prop only** — single object, no composite descriptions
+4. **NO character names embedded in prop** — props are environmental, not people
+
+## CORRECT EXAMPLES
+
+✅ GOOD (3 atomic props, each ≤ 50 char):
+  ["stone bridge railing", "apricot blossom petals", "moonlit water"]
+
+✅ GOOD (2 props with brief modifier):
+  ["white silk robe with cloud embroidery", "jade pendant on silver chain"]
+
+## INCORRECT EXAMPLES
+
+❌ BAD (1 item > 50 char, mixes props + people + emotion):
+  ["dappled tree shadow on the bridge stone surface, warm amber light
+    filtering through leaves, two pairs of feet barely visible at the far
+    right edge of frame — one belonging to Li Mubai, one to Su Li —
+    separated by distance"]
+  → Should be: ["dappled tree shadow on stone bridge", "warm amber filtered light"]
+  → (foot positions go in composition/blocking, not key_props)
+
+❌ BAD (8 props, ShotValidator picks 3 to verify, rest silently dropped):
+  ["stone bridge railing", "carved dragon column", "lantern hanging from rope",
+   "fish lantern", "incense burner", "bronze bell", "embroidered banner",
+   "stone steps to water"]
+  → Pick 3 most plot-relevant: ["stone bridge railing", "hanging lanterns",
+                                 "stone steps to water"]
+
+## RATIONALE
+
+ShotValidator (Sonnet 4.6 vision) reads the generated image + compares with
+expected key_props. If key_props has 8 items but Seedream only rendered 3,
+ShotValidator flags 5 missing_props → shot FAIL → retry → still FAIL after
+4 attempts → wasted compute, user gets approximation anyway.
+
+By limiting key_props to 3 atomic items ≤ 50 char each, both LLM (Stage 4)
+and Seedream (Stage 5) have aligned, achievable targets.
+
+## SELF-CHECK BEFORE OUTPUT
+
+For every shot's key_props list:
+1. Count items: if > 3, drop least plot-relevant items
+2. Measure each item length: if > 50 chars, split or shorten
+3. Check each item: does it mention a character name? → move to composition
+4. Check each item: is it composite (A + B + C)? → split into atomic items
+
+═══════════════════════════════════════════════════════════
+"""
+
+
+# ============================================================================
+# Wave 10 P3-2 — ASPECT_RATIO_FIDELITY_RULES (2026-05-23)
+# ----------------------------------------------------------------------------
+# 背景: test27 storyboard JSON `global_visual_direction.aspect_ratio = "2:3"`
+#   但 Founder 在 Stage A 选的是 3:4 (memory feedback_aspect_ratio_user_perception)
+#   根因: storyboard_director.py LLM prompt 模板 L1892 / L2038 / L2312 hardcoded
+#         examples 含 "aspect_ratio": "2:3" — LLM 看到示例直接抄
+# 修复: 加 const 给 LLM 强约束 "use project's aspect_ratio passed in input,
+#       NEVER hardcode 2:3 from examples"
+# Backend 接力: 在 _build_scene_prompt LLM 输入 dict 显式传入 project_aspect_ratio
+# ============================================================================
+
+ASPECT_RATIO_FIDELITY_RULES = """
+═══════════════════════════════════════════════════════════
+ASPECT RATIO FIDELITY (Wave 10 P3-2 — MANDATORY)
+═══════════════════════════════════════════════════════════
+
+The `global_visual_direction.aspect_ratio` field MUST be exactly the user's
+chosen aspect_ratio (passed to you in the input under "project_aspect_ratio"
+or "user_aspect_ratio"). NEVER copy a hardcoded value (like "2:3") from
+output format examples — examples are illustrative templates, not values.
+
+## RULE AR-1: ASPECT_RATIO COMES FROM INPUT, NEVER FROM EXAMPLES
+
+Your input will include a field like:
+  "project_aspect_ratio": "3:4"   ← USE THIS EXACTLY
+
+The output format example in this prompt shows:
+  "aspect_ratio": "2:3"           ← THIS IS A PLACEHOLDER — DO NOT COPY
+
+When emitting `global_visual_direction`, use the user's aspect_ratio:
+  "aspect_ratio": "3:4"           ← CORRECT (matches user input)
+
+## RULE AR-2: WHEN INPUT IS MISSING ASPECT_RATIO
+
+If for some reason no `project_aspect_ratio` is passed in the input (legacy
+data), default to "2:3" (vertical comic standard). Log this as a fallback
+in `_fallback_reason` field. Do NOT silently substitute.
+
+## VALID ASPECT_RATIO VALUES (Seedream supported)
+
+- "1:1"   square (Instagram / WeChat moments)
+- "2:3"   vertical comic (default, standard webtoon)
+- "3:4"   vertical photo (slightly wider than 2:3)
+- "3:2"   horizontal photo
+- "16:9"  widescreen (cinema)
+- "9:16"  vertical video (TikTok / Shorts)
+- "4:3"   horizontal classic
+
+Anything else → fallback to user input verbatim (Seedream will reject if
+unsupported, downstream error handling will surface it).
+
+## SELF-CHECK BEFORE OUTPUT
+
+Before emitting `global_visual_direction`:
+1. Find the user's aspect_ratio in input (search keys:
+   "project_aspect_ratio" / "user_aspect_ratio" / "aspect_ratio" in input)
+2. Copy that EXACT value into `global_visual_direction.aspect_ratio`
+3. Do NOT use the value from the output format example block
+
+## WHY THIS IS CRITICAL (test27 evidence)
+
+test27 user selected aspect_ratio="3:4" in Stage A. Pipeline correctly
+passed project.aspect_ratio="3:4" to backend image generation (D.15 +
+B39 fix already wires this for actual image rendering).
+
+However, storyboard JSON's `global_visual_direction.aspect_ratio` was
+"2:3" — LLM copied the example value. Backend D.15 override means actual
+images were still 3:4 (correct), but storyboard JSON had wrong metadata.
+
+This is a data integrity issue — frontend/analytics/audit tools reading
+storyboard JSON see wrong aspect_ratio. Memory:
+feedback_aspect_ratio_user_perception ("用户选了画幅但实际没看到 = P0
+灾难") applies to JSON metadata too — any disagreement between user
+choice and recorded value is a trust violation.
+
+═══════════════════════════════════════════════════════════
+"""
+
+
+# ============================================================================
+# Wave 10 P3-1 — CHARACTER_FIELD_PRESERVATION_RULES (2026-05-23)
+# ----------------------------------------------------------------------------
+# 背景: test27 Founder 改 char_002 服装后 RIM + CharacterPromptBuilder 反复 warn:
+#   "⚠️ 角色 'Unknown' 缺少 character_type 字段"
+# 根因 2 层:
+#   Layer A — story_outline_generator.py Stage 1 prompt 模板 characters_overview
+#             没 character_type 字段 → outline 中没保存
+#   Layer B — api/projects.py adjust_character LLM prompt 8 条要求 + L1286
+#             characters_overview[char_index] = updated_char (完全覆盖)
+#             → LLM 重写时可能丢 character_type / name / role 字段
+# 此规则给 adjust_character LLM 调用 + 任何 character 字段重写场景使用
+# Backend 接力: api/projects.py L1193 prompt 加 const wire + L1286 改 merge 保留
+# ============================================================================
+
+CHARACTER_FIELD_PRESERVATION_RULES = """
+═══════════════════════════════════════════════════════════
+CHARACTER FIELD PRESERVATION (Wave 10 P3-1 — MANDATORY)
+═══════════════════════════════════════════════════════════
+
+When rewriting an existing character based on a user adjustment, you MUST
+preserve ALL fields that the user did NOT explicitly ask to change. This
+includes structural identity fields that downstream services (RIM,
+CharacterPromptBuilder, ImageGenerator) depend on.
+
+## MANDATORY PRESERVED FIELDS (NEVER drop, NEVER blank)
+
+The following fields are SCHEMA-CRITICAL — every character schema MUST have
+them after rewrite, regardless of what the user asked to change:
+
+1. **character_type** (string, required)
+   - Values: "human" / "anthropomorphic_animal" / "animal" / "fantasy_creature"
+     / "robot" / "insect" / "aquatic" / "plant" / "mythological"
+     / "supernatural" / "undead" / "elemental" / "alien" / "vehicle_character"
+     / "digital_virtual" / "concept_personified" / "miniature" / "giant"
+     / "hybrid" / "object" (19 types)
+   - Downstream impact: CharacterPromptBuilder uses this to dispatch
+     to type-specific description builder (_build_human, _build_animal, etc.)
+   - If missing → falls back to 'unknown' → wrong prompt template chosen
+
+2. **id** (string, e.g. "char_001")
+   - Downstream impact: ReferenceImageManager file naming, scene lookup
+
+3. **name** (string, native language)
+   - Downstream impact: UI display, log output, error messages
+
+4. **name_en** (string, English)
+   - Downstream impact: image_prompt character reference, file paths
+     (Western render systems prefer ASCII names)
+
+5. **role** (string: "protagonist" / "supporting" / "background")
+   - Downstream impact: shot allocation, dialogue distribution
+
+6. **gender** (string: "male" / "female")
+   - Downstream impact: pronoun selection, prompt grammar
+
+7. **age_appearance** (string: "child" / "teen" / "young_adult" / etc.)
+   - Downstream impact: cross-age style consistency (T14+T19)
+
+8. **personality** (dict)
+   - Downstream impact: scene action selection, emotional beats
+
+## RULE CFP-1: MERGE, DO NOT REPLACE
+
+When rewriting based on adjustment:
+- Start from the ORIGINAL character dict (deep copy)
+- Apply user's adjustment to specific field(s) (e.g. clothing.top, physical.hair_color)
+- Return the MERGED dict — original fields preserved, adjusted fields updated
+- NEVER return a partial dict with only the changed fields
+
+❌ BAD (Haiku tendency — returns only adjusted fields):
+```json
+{
+  "physical": {"hair_color": "bright_red", ...},
+  "clothing": {"top": "beige knit sweater", ...},
+  "description": "..."
+}
+// MISSING: character_type, id, name, name_en, role, gender, age_appearance, personality
+```
+
+✅ GOOD (full schema preserved + adjustments applied):
+```json
+{
+  "id": "char_002",
+  "name": "苏蓠",
+  "name_en": "Su Li",
+  "role": "protagonist",
+  "character_type": "human",
+  "gender": "female",
+  "age_appearance": "young_adult",
+  "personality": {...},
+  "physical": {"hair_color": "bright_red", ...},
+  "clothing": {"top": "beige knit sweater", ...},
+  "description": "..."
+}
+```
+
+## RULE CFP-2: WHEN ADJUSTMENT TARGETS UNRELATED FIELD
+
+If user says "把头发染红" (only physical.hair_color):
+- physical.hair_color → "bright_red"
+- description → update to reflect new hair color
+- physical.{eye_color, skin_tone, hair_style, etc.} → UNCHANGED
+- clothing → UNCHANGED
+- ALL preserved fields (character_type, id, name, ...) → UNCHANGED
+
+## SELF-CHECK BEFORE OUTPUT
+
+For every character rewrite output:
+1. List ALL 8 mandatory preserved fields (character_type, id, name, name_en,
+   role, gender, age_appearance, personality)
+2. Verify EACH exists in output with NON-EMPTY value
+3. Verify EACH matches original value (unless user specifically requested change)
+4. If any missing → re-emit with original value copied in
+
+## WHY THIS IS CRITICAL (test27 evidence)
+
+test27 Founder adjusted char_002 clothing. Haiku LLM returned dict missing
+character_type field. API L1286 did full replace (not merge).
+
+Result: characters_overview[char_002] lost character_type → downstream RIM
++ CharacterPromptBuilder warns "⚠️ 'Unknown' 缺少 character_type 字段" 5+
+times per shot generation → 30+ warns per pipeline run → log pollution.
+
+Worse: CharacterPromptBuilder falls back to `_build_generic_description`
+instead of `_build_human_description` → less detailed prompt → Seedream
+gets less character info → lower consistency.
+
+═══════════════════════════════════════════════════════════
+"""
+
+
+# ============================================================================
 # DEC-046 T20-28 v3 Stage 4 STORYBOARD DIRECTOR — Universal Narrative Principles
 # ----------------------------------------------------------------------------
 # Stage 4 由 Stage 3 输出的 dialogue_beats / narration / action_beats 构造每个

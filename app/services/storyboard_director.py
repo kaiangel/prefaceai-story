@@ -32,6 +32,9 @@ from app.prompts.storyboard_prompts import (
     SEEDREAM_SAFETY_AVOIDANCE_RULES,  # DEC-045 T20-26 2026-05-19: Seedream 安全词规避规则
     ANATOMY_FIDELITY_RULES,  # T20-48 2026-05-20: 预防 Seedream anatomy hallucination 4 hands 等
     DEC046_V3_STAGE4_RULES,  # DEC-046 T20-28 2026-05-20: v3 通用叙事原则 Stage 4 规则块
+    CHARACTER_COUNT_FIDELITY_RULES,  # Wave 10 P3-4 2026-05-23: 禁止描述里"visible figures of others"与 EXACTLY N 矛盾
+    KEY_PROPS_CONSTRAINT_RULES,  # Wave 10 P3-5 2026-05-23: key_props ≤ 3 项 ≤ 50 char each
+    ASPECT_RATIO_FIDELITY_RULES,  # Wave 10 P3-2 2026-05-23: 禁止从 examples 抄 "2:3"，必用 input 传入值
     build_stage4_character_data_block,  # DEC-045 T20-17: 给 LLM 加 character_type/species/appearance
 )
 from app.prompts.identity_anchor_prompts import (
@@ -1683,6 +1686,12 @@ Scene data:
 
 {ANATOMY_FIDELITY_RULES}
 
+{CHARACTER_COUNT_FIDELITY_RULES}
+
+{KEY_PROPS_CONSTRAINT_RULES}
+
+{ASPECT_RATIO_FIDELITY_RULES}
+
 {DEC046_V3_STAGE4_RULES}
 
 ## IMAGE PROMPT QUALITY REQUIREMENTS (MANDATORY)
@@ -1889,7 +1898,7 @@ Output format (JSON only, no other text):
 {{
     "global_visual_direction": {{
         "style_enforcement": "{style_preset}_cinematic",
-        "aspect_ratio": "2:3",
+        "aspect_ratio": "<COPY USER'S aspect_ratio FROM INPUT — DO NOT HARDCODE, e.g. 3:4 or 2:3 or 16:9>",
         "color_grade": "based on atmosphere",
         "overall_lighting": "based on atmosphere"
     }},
@@ -2014,6 +2023,12 @@ You MUST generate a shot for each beat above, total {total_beats} shots.
 
 {ANATOMY_FIDELITY_RULES}
 
+{CHARACTER_COUNT_FIDELITY_RULES}
+
+{KEY_PROPS_CONSTRAINT_RULES}
+
+{ASPECT_RATIO_FIDELITY_RULES}
+
 {DEC046_V3_STAGE4_RULES}
 
 {SCENE_PROP_CONTINUITY_RULES}
@@ -2035,7 +2050,7 @@ Strictly follow this JSON format (MUST include {min_shots} shots):
 {{
     "global_visual_direction": {{
         "style_enforcement": "{style_preset}_cinematic",
-        "aspect_ratio": "2:3",
+        "aspect_ratio": "<COPY USER'S aspect_ratio FROM INPUT — DO NOT HARDCODE, e.g. 3:4 or 2:3 or 16:9>",
         "color_grade": "based on visual_tone",
         "overall_lighting": "based on visual_tone",
         "lens_style": "35mm_shallow_depth"

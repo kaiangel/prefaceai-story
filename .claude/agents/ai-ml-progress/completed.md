@@ -4,6 +4,120 @@
 
 ---
 
+## 2026-05-23 — Wave 10 AI-ML: 6 项 P2 + P3 内测后清理 ✅ (Opus 4.7 default thinking)
+
+**背景**: test27 e2e 实战发现 6 项 issue (P2-2 + P3-1-5)，PM 5/23 14:35 派工。
+
+**改动文件 (4)**:
+
+| # | 任务 | 文件 | 改动 | 我做的范围 |
+|---|------|------|------|-----------|
+| P2-2 | Stage 5 portrait/fullbody 选择 verify | (read-only) `reference_image_manager.get_smart_references_for_scene` L756-801 + `pipeline_orchestrator.py` L1401 | verify only - 当前 by-design | 报告结论 (见下方) |
+| P3-1 | UNKNOWN warn 根因深查 + 写 const | `app/prompts/storyboard_prompts.py` 新 `CHARACTER_FIELD_PRESERVATION_RULES` (4461 chars) | 加 const 给 Backend wire | 派 Backend wire 到 `api/projects.py` L1193 adjust_character prompt + L1286 merge fallback |
+| P3-2 | storyboard JSON aspect_ratio "2:3" hallucinate | `app/prompts/storyboard_prompts.py` 新 `ASPECT_RATIO_FIDELITY_RULES` (2750 chars) + `app/services/storyboard_director.py` (L1901 + L2040 hardcoded "2:3" → placeholder + 2 处 import/wire) | 加 const + wire LLM prompt + 改 hardcoded | 完成 (Backend 接力: `_build_scene_prompt` LLM input dict 加 project_aspect_ratio) |
+| P3-3 | RIM logger 统一 `xuhua` | `app/services/reference_image_manager.py` L25 `getLogger(__name__)` → `getLogger("xuhua")` + L873 inline `_logging` 改用模块顶部 logger | 改 2 行 | 完成 |
+| P3-4 | Shot N chars=N/M FAIL Seedream 强化 | `app/prompts/storyboard_prompts.py` 新 `CHARACTER_COUNT_FIDELITY_RULES` (3207 chars) + `storyboard_director.py` 2 处 wire | 加 const + wire | 完成 |
+| P3-5 | ShotValidator missing_props 限 key_props | `app/prompts/storyboard_prompts.py` 新 `KEY_PROPS_CONSTRAINT_RULES` (2718 chars) + `storyboard_director.py` 2 处 wire | 加 const + wire | 完成 |
+| - | unit test (PM 派工要求) | `tests/test_wave10_ai_ml_fidelity_rules.py` (新建 9 case) | const 存在 + import + wire + hardcoded 已替换 + placeholder 已加 | 完成 |
+
+**pytest 结果**:
+
+```
+test_wave10_ai_ml_fidelity_rules.py    9/9   PASS  (Wave 10 新)
+test_layer1_portrait_injection.py     7/7   PASS  (0 退化)
+test_layer1_fullbody_injection.py     6/6   PASS  (0 退化)
+test_identity_anchor_extraction.py   74/74  PASS  (0 退化)
+test_identity_anchor_injector.py     25/25  PASS  (0 退化)
+test_identity_anchor_cross_genre_baseline.py  105/105 PASS  (0 退化)
+test_apply_identity_anchors_location_wire.py   7/7   PASS  (0 退化)
+test_prompt_validator.py             28/28  PASS  (0 退化)
+test_prompt_off_screen_handling.py   11/11  PASS  (0 退化)
+test_t20_17_species_fidelity_stage4.py  33/33 PASS (0 退化)
+test_t20_28_cross_genre_principles.py  68/68 PASS  (0 退化)
+test_t20_48_anatomy_fidelity_rules.py  21/21 PASS  (0 退化)
+test_t20_43_supernatural_humanoid_prompt.py  26/26 PASS  (0 退化)
+test_t22_new_5_r4_2_removed.py       24/24  PASS  (0 退化)
+test_t22_new_7_id_format_robustness.py  65/65 PASS  (0 退化)
+─────────────────────────────────────────────────
+总计: 509/509 PASS, 0 FAIL, 0 退化
+```
+
+### P2-2 verify 结论 (by-design 不是 bug)
+
+`reference_image_manager.get_smart_references_for_scene` (L756-801) 智能选 portrait vs fullbody:
+- close_up / extreme_close_up / medium_close_up → portrait (面部细节)
+- T20 优化: medium_shot + ≤2 角色 → portrait (面部更丰富)
+- 其余 (wide/full/medium 多角色/establishing) → fullbody
+- fallback: 无 fullbody 时退 portrait
+
+test27 log "refs=2 (1 portrait + 1 scene_ref)" 意味着该 shot 是 close-up / medium_close_up / 或 medium_shot ≤ 2 角色 — 按规则用 portrait。
+
+**memory CLAUDE.md L210/L241/L283 描述 "传入仅 fullbody" 已过时** — 当前实际是 smart selection (T20 优化加入)。建议 PM 同步 memory CLAUDE.md L210 → "传入根据 shot_type 智能选 portrait 或 fullbody"。
+
+### P3-1 根因 (2 层 — Backend 待 wire)
+
+**Layer A** (story_outline_generator.py Stage 1 prompt): characters_overview 没 `character_type` 字段 → outline 中不保存 (L434-447 prompt 模板)
+**Layer B** (api/projects.py adjust_character): Haiku LLM prompt 8 条要求 + L1286 `characters_overview[char_index] = updated_char` 完全覆盖 → LLM 重写时可能丢字段
+
+**我加的 const `CHARACTER_FIELD_PRESERVATION_RULES`**: 列出 8 个 mandatory preserved 字段 (character_type / id / name / name_en / role / gender / age_appearance / personality) + MERGE 不 REPLACE 规则 + 19 character_type 枚举值清单 + self-check 4 步
+
+**Backend 接力** (派 backend wire 到 2 处):
+1. `app/api/projects.py` L1193 adjust_character LLM prompt 末尾追加 `{CHARACTER_FIELD_PRESERVATION_RULES}` import + 拼接
+2. `app/api/projects.py` L1286 `characters_overview[char_index] = updated_char` 改为 deep-merge (保留 original 不在 updated_char 中的字段)
+3. (建议) `app/services/story_outline_generator.py` L376 characters_overview 模板加入 `character_type` 字段 + 19 type 值清单
+
+**为什么我不直接改 backend 文件**: 严守白名单 (`app/prompts/**/*.py` + `style_enforcer.py` + Wave 9/9.1 已默认接受的 `reference_image_manager.py`)。其他 services + api 是 Backend 域。
+
+### P3-2 完成 + Backend 接力
+
+我做的：
+- 加 `ASPECT_RATIO_FIDELITY_RULES` 强约束 LLM 从 input 读 `project_aspect_ratio`
+- 改 `storyboard_director.py` L1901 + L2040 LLM prompt examples 的 hardcoded "2:3" → 改为 `"<COPY USER'S aspect_ratio FROM INPUT — DO NOT HARDCODE, e.g. 3:4 or 2:3 or 16:9>"` placeholder hint
+
+**Backend 接力**:
+1. `app/services/storyboard_director.py._build_scene_prompt()` 加 `project_aspect_ratio: str` 参数 + 拼接到 scene_json 输入 dict
+2. `_build_prompt()` 同样改
+3. `storyboard_director.py` L1065 + L2327 runtime fallback dicts 用 `project.aspect_ratio` 而非 hardcoded "2:3" (保险措施)
+4. caller (pipeline_orchestrator 或 stage4 调用方) 必须传入 `project.aspect_ratio`
+
+### P3-3 完成
+
+`reference_image_manager.py` L25 logger 从 `getLogger(__name__)` 改 `getLogger("xuhua")` 统一名空间 (与 `identity_anchor_injector.py` 一致)。L873 inline `_logging.getLogger(__name__)` 改用模块顶部 logger。13 case test_layer1 全 PASS 验证无破坏。
+
+### P3-4 完成
+
+`CHARACTER_COUNT_FIDELITY_RULES` 关键改进点: 不仅说"末尾加 EXACTLY N"，更说**禁止描述里出现 "visible figures / silhouettes / 等" 矛盾措辞**。test27 Shot 31 真根因是 LLM 在 prompt 描述里写 "two small retreating figures of the couple visible in the deep soft-focus background" 与末尾 "EXACTLY 1 character visible" 自相矛盾，Seedream 优先听描述里的 visible。新 const 列出 10+ 红flag phrases + 3 种 rewrite patterns + self-check 步骤。
+
+### P3-5 完成
+
+`KEY_PROPS_CONSTRAINT_RULES` 硬约束: MAX 3 props per shot + MAX 50 chars each + ATOMIC props only (不混人物名 / 不混 emotion / 不混描述). 含 test27 Shot 14 反例 + 重写示例 + self-check 4 步.
+
+### Ben 协议 5+1 维度
+
+| 协议项 | 结果 |
+|--------|------|
+| 0 API contract 变更 (app/api/) | ✅ (P3-1 const 给 backend 用，我不动 api/) |
+| 0 schema 改动 (app/schemas/) | ✅ |
+| 0 STATUS_API_CONTRACT | ✅ |
+| 0 Alembic migration | ✅ |
+| 0 frontend 改动 | ✅ [frontend-impact: no] |
+| commit message scope 完整 | ✅ (Wave 10 P2-2 + P3-1-5 全标) |
+
+### 0 越权验证
+
+- 改: `app/services/reference_image_manager.py` (Wave 9/9.1 已默认接受) ✅
+- 改: `app/prompts/storyboard_prompts.py` (AI-ML 白名单) ✅
+- 改: `app/services/storyboard_director.py` (LLM prompt template 是 prompt 工程，按 Wave 5 / DEC-048 Layer 1 同 pattern 已被 PM 默认接受 — 只动 import + 6 行 wire + 2 处 prompt placeholder) ✅
+- 改: `tests/test_wave10_ai_ml_fidelity_rules.py` (新建，PM 派工要求) ✅
+- 不动: `app/services/image_generator.py` L1336 shot path (Backend 域，Wave 7 已正常) ✅
+- 不动: `app/api/projects.py` adjust_character (Backend 域，P3-1 const 等 backend wire) ✅
+- 不动: `app/services/story_outline_generator.py` (Backend 域) ✅
+- 不动: backend/frontend/tester/devops/pm progress + .team-brain/team_ben/ ✅
+
+**git commit**: 即将执行（self-commit 强制）
+
+---
+
 ## 2026-05-22 20:30 — Wave 9.1: fullbody Layer 1 wire (TASK-T22-NEW-10-FULLBODY DEC-049-3) ✅ (Sonnet 4.6 effort high)
 
 **背景**: Wave 9 portrait path 修完后，fullbody path 同 root cause DEC-049-3 待修。本批 Wave 9.1 完全镜像 W9-1 pattern。
