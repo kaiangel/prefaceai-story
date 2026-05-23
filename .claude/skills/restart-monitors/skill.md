@@ -16,6 +16,29 @@
 
 ## 完整流程 (按顺序执行)
 
+### Step 0: 先停所有旧 cron + 旧/冗余/zombie Monitor (新启动前清理监控层)
+
+⚠️ **必须先停旧**, 否则新 Monitor 启动后老 zombie 还在 fire events, 监控数据混乱 + Bash 子 shell 进程 zombie 堆积。
+
+```
+# 步骤 1: CronList → CronDelete 所有 cron
+- 调用 CronList tool 列出现有 cron jobs
+- 对每个 cron id 调用 CronDelete
+
+# 步骤 2: TaskList → TaskStop 所有 Monitor (含 zombie)
+- 调用 TaskList tool 列出现有 background tasks
+- 对每个 Monitor task_id 调用 TaskStop
+
+# 步骤 3 (可选): 收 zombie event
+- 即使 TaskList = No tasks, 之前 session 残留 Monitor 仍可能 fire events
+- 收到任何 zombie event (task_id 不在 TaskList) → 立即再 TaskStop 该 task_id
+- 不阻塞下一步, 但需要在 fresh 启动后注意 events 是否还有非新 Monitor 来源
+```
+
+如有 zombie event 不停止, 后续 Founder 浏览器开测时**监控数据混乱** — 看不清是新 session error 还是旧 session 残留。
+
+---
+
 ### Step 1: 清理 — 先 audit 再 kill
 
 ```bash
@@ -166,10 +189,15 @@ tail -F /Users/kaisbabybook/AIFun/xuhuastory/xuhua_story/logs/<LOG>.log 2>/dev/n
 - Cron prompt 含 6 检查项 (health + 3 log + 进程 + Pipeline)
 - 0 阻塞 = 一句话简报, 有阻塞 = PushNotification
 
-### Zombie Monitor 处理
+### Zombie Monitor 处理 (Step 0 重点)
 - TaskStop 后 events 队列残留 flush 几条是正常的
 - 如 TaskList 显示 No tasks 但 events 仍 fire = zombie (上一 session 残留)
 - 收到 zombie event 立即再 TaskStop 该 task_id
+- **Step 0 必须先全 stop**, 否则:
+  - 新 + 旧 Monitor 同时 fire 同一 log 事件 (重复通知)
+  - 旧 filter 跟新 filter 不一致 (覆盖范围混乱)
+  - Bash 子 shell 进程 zombie 堆积
+  - Founder 看监控数据时不知道 event 来源是新还是旧 session
 
 ---
 
