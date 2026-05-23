@@ -24,6 +24,41 @@
 ### 🟡 P2 (内测后/不阻塞)
 - **TASK-T22-NEW-1-TEST-ISOLATION-EXTENDED** — test_status_authoritative 综合跑 mock 污染 (生产 0 影响, Wave 9+ 修)
 
+### 🔴 P0 紧急待办 (test27 跑完后处理, Founder 5/22 20:20 决策"先记下")
+- **TASK-GEMINI-KEY-ROTATE-AFTER-GOOGLE-REVOKE** — Google 主动 revoke 当前 Gemini key
+  - **事件**: 5/22 20:18 test27 Stage 3 ScreenplayWriter 调 Gemini 403 PERMISSION_DENIED:
+    ```
+    {'error': {'code': 403,
+      'message': 'Your API key was reported as leaked. Please use another API key.',
+      'status': 'PERMISSION_DENIED'}}
+    ```
+  - **根因**: 5/22 17:01 GitGuardian 警报 → 18:50 DevOps force push 清 git history (Step 4-5) → Founder 17:10 决策"先用着 Google 控制台限额兜底, 不需 revoke" — 但 Google 后台依然主动 revoke 了 key (大概率因 GitGuardian 联动)
+  - **当前状态**: `.env GEMINI_API_KEY=AIzaSyBm...` 已 invalid (4/29 轮换的, 也是泄漏过的)
+  - **Pipeline 影响**: 自动 fallback Claude (T20-14 内置 fallback), Pipeline 不阻塞, 但每 LLM Stage 多 9s 重试 + Claude 成本高 (test27 实战已自动 fallback 跑通)
+  - **修复 (test27 跑完后)**:
+    1. Founder Google Cloud Console (https://console.cloud.google.com/apis/credentials) 生成第 3 把新 key
+    2. 通过私聊 (微信/Signal, 不在 TEAM_CHAT 贴) 给 PM
+    3. DevOps 更新本地 `.env` + VPS `.env` (sed 精确匹配整行)
+    4. 重启 backend (nohup uvicorn 不带 --reload) + VPS Docker restart api
+    5. 验证 settings 加载新 key + /api/health 200
+  - **同时验证**: GitGuardian 警报状态 (force push 后应自动 mark resolved, 但 Google 自动 revoke 行为待复查)
+  - **DEC-050 候选更新**: SECRET_HANDLING_PROTOCOL 加入"Google 控制台主动 revoke 行为 — 即使 force push 清 git history 后 key 也可能被 Google 主动 disable"
+
+### 🟢 P3 (Wave 10 / 内测后 long-tail, 不阻塞)
+- **TASK-WAVE-10-UNKNOWN-CHARACTER-TYPE-WARN** (5/22 test27 实战发现, Founder 要求记下不忘)
+  - 现象: AdjustCharacter (Founder 改 char_002 服装) 后 ReferenceImageManager + CharacterPromptBuilder 报 warn:
+    ```
+    ⚠️ [ReferenceImageManager] 角色 'Unknown' 缺少 character_type 字段，请检查 story.json
+    ⚠️ [CharacterPromptBuilder] 角色 'Unknown' 缺少 character_type 字段，请检查 story.json
+    ```
+  - **不阻塞**: Layer 1 inject `char=Li Mubai` 同时成功, 'Unknown' 不是 Li Mubai 本身
+  - **跟 Wave 9 W9-1 wire 无关**: 我们 wire 用 `character.get('id', character.get('name_en', 'unknown'))` 自带 fallback
+  - **可能根因**: AdjustCharacter LLM 返回 incomplete schema 某字段, CharacterPromptBuilder fallback 报 warn 后继续 (不阻塞下游)
+  - **待查 (Wave 10)**: 
+    - 深查 'Unknown' 来源 (哪个 character object 没 character_type 字段)
+    - 评估是否影响生成质量 (大概率不影响, fallback 用默认 schema)
+    - 是否在 portrait/fullbody 生成时 inject 多个 character 数据中混入了 placeholder 空数据
+
 ### 🔮 长期 (memory 待办)
 - `project_mysql_migration.md` — 生产 MySQL 迁移 (Ben 决定时机, Phase 6+)
 - `project_schema_humanoid_fallback_remaining.md` — Wave 8 T22-NEW-9 真**已根治**, memory 可标 ✅
