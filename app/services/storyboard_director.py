@@ -898,6 +898,7 @@ class StoryboardDirector:
         family_relationships: list = None,
         progress_callback=None,
         chapter_duration_minutes: int = 3,  # DEC-028: 参数保留做向后兼容，不再用于截断
+        project_aspect_ratio: str = "3:4",  # P3-2 Wave10: 用户选择的画幅，透传到 LLM prompt
     ) -> dict:
         """
         生成分镜脚本（按scene分批生成，解决LLM输出不完整问题）
@@ -956,7 +957,8 @@ class StoryboardDirector:
             style_preset=style_preset,
             shot_id_start=shot_id_counter,
             characters_overview=characters_overview,
-            family_relationships=family_relationships
+            family_relationships=family_relationships,
+            project_aspect_ratio=project_aspect_ratio,  # P3-2 Wave10: 透传用户画幅
         )
 
         if first_shots:
@@ -998,7 +1000,8 @@ class StoryboardDirector:
                         style_preset=style_preset,
                         shot_id_start=1,  # 临时值，后面统一重编号
                         characters_overview=characters_overview,
-                        family_relationships=family_relationships
+                        family_relationships=family_relationships,
+                        project_aspect_ratio=project_aspect_ratio,  # P3-2 Wave10: 透传用户画幅
                     )
                     if shots:
                         print(f"✅ {len(shots)} shots")
@@ -1062,7 +1065,7 @@ class StoryboardDirector:
         storyboard = {
             "global_visual_direction": global_visual_direction or {
                 "style_enforcement": f"{style_preset}_cinematic",
-                "aspect_ratio": "2:3",
+                "aspect_ratio": project_aspect_ratio,  # P3-2 Wave10: 用户选画幅（不再 hardcoded "2:3"）
                 "color_grade": "neutral",
                 "overall_lighting": "natural",
                 "lens_style": "35mm"
@@ -1074,7 +1077,7 @@ class StoryboardDirector:
         }
 
         # T5+T7: 验证 + speaker-visibility 校验 + text_type 分布检查
-        self._validate_storyboard(storyboard, characters=characters)
+        self._validate_storyboard(storyboard, characters=characters, project_aspect_ratio=project_aspect_ratio)
         self._rebalance_text_types(storyboard)
 
         return storyboard
@@ -1088,7 +1091,8 @@ class StoryboardDirector:
         style_preset: str,
         shot_id_start: int,
         characters_overview: list = None,
-        family_relationships: list = None
+        family_relationships: list = None,
+        project_aspect_ratio: str = "3:4",  # P3-2 Wave10: 用户选择的画幅
     ) -> tuple:
         """为单个scene生成shots
 
@@ -1105,7 +1109,8 @@ class StoryboardDirector:
                 style_preset=style_preset,
                 shot_id_start=shot_id_start,
                 characters_overview=characters_overview,
-                family_relationships=family_relationships
+                family_relationships=family_relationships,
+                project_aspect_ratio=project_aspect_ratio,  # P3-2 Wave10: 透传用户画幅
             )
 
             # B51 v2: 第 2 次重试时在 prompt 末尾加简化提示，降低复杂度
@@ -1527,7 +1532,8 @@ class StoryboardDirector:
         style_preset: str,
         shot_id_start: int,
         characters_overview: list = None,
-        family_relationships: list = None
+        family_relationships: list = None,
+        project_aspect_ratio: str = "3:4",  # P3-2 Wave10: 用户选择的画幅，注入 LLM prompt
     ) -> str:
         """为单个scene构建prompt"""
         scene_id = scene.get("scene_id", 1)
@@ -1570,7 +1576,8 @@ class StoryboardDirector:
             "characters_in_scene": scene.get("characters_in_scene", []),
             "action_beats": beats,
             "dialogue_beats": scene.get("dialogue_beats", []),
-            "narration": scene.get("narration", "")
+            "narration": scene.get("narration", ""),
+            "project_aspect_ratio": project_aspect_ratio,  # P3-2 Wave10: 用户选择的画幅，LLM 必须用此值
         }, ensure_ascii=False, indent=2)
 
         # T24: 构建角色关系表（PM Code Review Fix: 修正字段名匹配 Stage 1 输出）
@@ -2312,7 +2319,7 @@ Output JSON only, no other text:
 
         return result
 
-    def _validate_storyboard(self, storyboard: dict, characters: dict = None) -> None:
+    def _validate_storyboard(self, storyboard: dict, characters: dict = None, project_aspect_ratio: str = "3:4") -> None:
         """验证分镜脚本（含 T5 speaker-visibility 校验）"""
         shots = storyboard.get("shots", [])
 
@@ -2324,7 +2331,7 @@ Output JSON only, no other text:
         if not gvd:
             storyboard["global_visual_direction"] = {
                 "style_enforcement": "realistic_cinematic",
-                "aspect_ratio": "2:3",
+                "aspect_ratio": project_aspect_ratio,  # P3-2 Wave10: 用户选画幅（不再 hardcoded "2:3"）
                 "color_grade": "neutral",
                 "overall_lighting": "natural",
                 "lens_style": "35mm"

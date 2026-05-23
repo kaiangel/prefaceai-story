@@ -1,6 +1,36 @@
 # Backend Agent - 给其他 Agent 的上下文
 
-> **最后更新**: [2026-05-22 ~19:00] ✅ Wave 8 第 3 批 T22-NEW-5 完成 — R4-2 wait loop 移除 + scene_review ui_phase 移除 + STATUS_API_CONTRACT v1.5. 24/24 新单测 PASS + 172/172 回归 PASS. 0 越界.
+> **最后更新**: [2026-05-23] ✅ Wave 10 Backend 接力完成 — P3-1 + P3-2 wire, 81+227 PASS, 0 退化, 0 越权
+
+---
+
+## ✅ [Wave 10 Backend 接力 — P3-1 + P3-2] 完成 [2026-05-23]
+
+### P3-1: adjust_character CHARACTER_FIELD_PRESERVATION_RULES wire
+
+- `app/api/projects.py` ~L1192: `from app.prompts.storyboard_prompts import CHARACTER_FIELD_PRESERVATION_RULES` (lazy import)
+- ~L1230: 在 adjust_character LLM prompt 末尾拼接 `{CHARACTER_FIELD_PRESERVATION_RULES}` (4461 chars)
+- ~L1286: `characters_overview[char_index] = updated_char` → **deep-merge** `merged_char = {**target_char, **updated_char}` (updated 优先, mandatory 字段兜底)
+- portrait/fullbody 重生成、chapter sync、return 全部改用 `merged_char`
+
+### P3-2: storyboard_director.py project_aspect_ratio 参数链
+
+| 位置 | 改动 |
+|------|------|
+| `direct()` | 加 `project_aspect_ratio: str = "3:4"` 参数 |
+| `_generate_scene_shots()` | 加 `project_aspect_ratio: str = "3:4"` 参数 + 透传给 `_build_scene_prompt()` |
+| `_build_scene_prompt()` | 加 `project_aspect_ratio: str = "3:4"` 参数 + 注入 `scene_json["project_aspect_ratio"]` |
+| `_validate_storyboard()` | 加 `project_aspect_ratio: str = "3:4"` 参数 + fallback dict 改用 `project_aspect_ratio` |
+| L1068 (runtime fallback) | `"aspect_ratio": "2:3"` → `"aspect_ratio": project_aspect_ratio` |
+| L2334 (validate fallback) | 同上 |
+| `pipeline_orchestrator.py` | `storyboard_director.direct()` 加 `project_aspect_ratio=aspect_ratio` |
+
+### 给 @pm + @devops
+
+- **0 frontend-impact**: 纯 LLM prompt 参数链，API schema 不变
+- `[frontend-impact: no]`
+- 0 Ben 协议越界 (0 API/schema/STATUS_API/Alembic/frontend 改动)
+- 0 越权 AI-ML 已 commit 的 const (storyboard_prompts.py 4 个新 const 未动)
 
 ---
 

@@ -4,6 +4,32 @@
 
 ---
 
+## 2026-05-23
+
+### Wave 10 Backend 接力 — P3-1 + P3-2 wire ✅ [2026-05-23 — Sonnet 4.6 xhigh, ~30min]
+
+**任务**: 接力 AI-ML commit 3faf585, 完成 2 项 wire
+
+**P3-1 改动** (`app/api/projects.py`):
+- import CHARACTER_FIELD_PRESERVATION_RULES (4461 chars)
+- 拼接到 adjust_character LLM prompt 末尾 (保护 8 mandatory fields + character_type)
+- L1286 直接覆盖 → deep-merge: `merged_char = dict(target_char); merged_char.update(updated_char)` (updated 优先, mandatory 兜底)
+- portrait/fullbody 重生成、chapter sync、return 全部改用 `merged_char`
+
+**P3-2 改动** (`app/services/storyboard_director.py` + `pipeline_orchestrator.py`):
+- `direct()` 加 `project_aspect_ratio: str = "3:4"` 参数
+- `_generate_scene_shots()` 加同参 + 透传
+- `_build_scene_prompt()` 加同参 + 注入 `scene_json["project_aspect_ratio"]` 到 LLM input
+- `_validate_storyboard()` 加同参 + fallback dict 用 `project_aspect_ratio`
+- L1068 + L2334 hardcoded `"2:3"` → `project_aspect_ratio`
+- `pipeline_orchestrator.py`: `storyboard_director.direct()` 加 `project_aspect_ratio=aspect_ratio`
+
+**pytest**: 81/81 (Wave 10 suite) + 227/227 (回归) = 308 PASS, 0 退化
+**Ben 协议**: 0 schema / 0 Alembic / 0 STATUS_API / 0 frontend 影响 / [frontend-impact: no]
+**0 越权**: 不动 AI-ML 已 commit 的 4 个 const
+
+---
+
 ## 2026-05-22
 
 ### Wave 8 第 3 批 — T22-NEW-5 R4-2 砍掉 (scene_review 移除) ✅ [2026-05-22 ~19:00 — Sonnet 4.6 xhigh, ~2h]

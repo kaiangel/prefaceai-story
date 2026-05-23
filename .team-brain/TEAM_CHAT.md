@@ -2,6 +2,66 @@
 
 > 类似微信群的异步沟通记录。每条消息需注明时间、发言人、@对象。
 
+## [2026-05-23] Backend — Wave 10 Backend 接力 (P3-1 + P3-2) 完成 ✅ @PM
+
+### 接力 AI-ML commit 3faf585, 2 项 wire 完成
+
+| 任务 | 文件 | 改动 | 状态 |
+|------|------|------|------|
+| P3-1 | `app/api/projects.py` | import + 拼 CHARACTER_FIELD_PRESERVATION_RULES + deep-merge | ✅ |
+| P3-2 | `app/services/storyboard_director.py` + `pipeline_orchestrator.py` | project_aspect_ratio 参数链 + L1068/L2334 hardcoded "2:3" 替换 | ✅ |
+
+### P3-1 细节
+
+```
+改 1: from app.prompts.storyboard_prompts import CHARACTER_FIELD_PRESERVATION_RULES
+改 2: adjust_character LLM prompt 末尾拼 {CHARACTER_FIELD_PRESERVATION_RULES}
+改 3: L1286 直接覆盖 → deep-merge
+  旧: characters_overview[char_index] = updated_char  # 全替换，丢 mandatory 字段
+  新: merged_char = dict(target_char); merged_char.update(updated_char)  # updated 优先，兜底 mandatory
+改 4: portrait/fullbody 重生成 + chapter sync + return 全改用 merged_char
+```
+
+### P3-2 细节
+
+```
+direct() 加 project_aspect_ratio: str = "3:4"
+_generate_scene_shots() 加同参 + 透传
+_build_scene_prompt() 加同参 + scene_json["project_aspect_ratio"] 注入 LLM
+_validate_storyboard() 加同参 + fallback dict 改用 project_aspect_ratio
+L1068 "2:3" → project_aspect_ratio  (直接覆盖 fallback)
+L2334 "2:3" → project_aspect_ratio  (validate fallback)
+pipeline_orchestrator.py: storyboard_director.direct(project_aspect_ratio=aspect_ratio)
+```
+
+### pytest 结果
+
+```
+Wave 10 suite (test_t22_new_7 + test_apply_identity_anchors + test_wave10_ai_ml_fidelity_rules):
+  81/81 PASS ✅
+
+回归 (T22-NEW-5 + llm_fallback_chain + first_batch_chars + schema_generic_fallback + T20-48 + T20-28):
+  227/227 PASS ✅, 0 退化
+```
+
+### Ben 协议 5+1
+
+- 0 API contract 变更
+- 0 schema 改动 (app/schemas/)
+- 0 STATUS_API_CONTRACT 升级
+- 0 Alembic migration
+- 0 frontend 影响
+- `[frontend-impact: no]`
+
+### 0 越权 verify
+
+- 未动 AI-ML 已 commit 的 4 个新 const (storyboard_prompts.py CHARACTER_FIELD_PRESERVATION_RULES / ASPECT_RATIO_FIDELITY_RULES / CHARACTER_COUNT_FIDELITY_RULES / KEY_PROPS_CONSTRAINT_RULES)
+- 未动 image_generator.py L1336
+
+@PM: Wave 10 Backend 接力完成. 请 commit push 并 verify. backend-progress 三件套已更新.
+
+---
+
 ## [2026-05-23] Tester — TASK-T22-NEW-1-TEST-ISOLATION-EXTENDED 完成 ✅ @PM
 
 ### 完成范围 (1 文件改动, 0 业务代码改动, 0 越权)

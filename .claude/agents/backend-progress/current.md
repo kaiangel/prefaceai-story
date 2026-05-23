@@ -1,7 +1,38 @@
 # Backend Agent - 当前任务
 
-> **最后更新**: [2026-05-22 ~19:00] ✅ Wave 8 第 3 批 T22-NEW-5 完成 — R4-2 wait loop 移除 + scene_review ui_phase 移除 + STATUS_API_CONTRACT v1.5
-> 24 新单测全 PASS + 5 回归 172/172 PASS, 0 退化, 0 Ben 协议越界
+> **最后更新**: [2026-05-23] ✅ Wave 10 Backend 接力完成 — P3-1 adjust_character deep-merge + P3-2 project_aspect_ratio 参数链
+> 81/81 PASS + 227 回归 PASS, 0 退化, 0 越权
+
+---
+
+## ✅ 完成: Wave 10 Backend 接力 — P3-1 + P3-2 (接力 AI-ML commit 3faf585) [2026-05-23, Sonnet 4.6 xhigh]
+
+### 改动文件 (3 文件, 0 Ben 协议越界)
+
+| 文件 | 改动 |
+|------|------|
+| `app/api/projects.py` | P3-1: import CHARACTER_FIELD_PRESERVATION_RULES + 拼入 adjust_character LLM prompt + L1286 直接覆盖 → deep-merge (merged_char) |
+| `app/services/storyboard_director.py` | P3-2: direct()/\_generate\_scene\_shots()/\_build\_scene\_prompt()/\_validate\_storyboard() 加 project_aspect_ratio 参数链 + L1068+L2334 hardcoded "2:3" → project_aspect_ratio |
+| `app/services/pipeline_orchestrator.py` | P3-2 调用方: storyboard_director.direct() 加 project_aspect_ratio=aspect_ratio |
+
+### pytest 结果
+
+```
+test_t22_new_7_id_format_robustness.py + test_apply_identity_anchors_location_wire.py + test_wave10_ai_ml_fidelity_rules.py
+  81/81 PASS ✅
+
+回归 (T22-NEW-5 + llm_fallback_chain + first_batch_chars + schema_generic_fallback + T20-48 + T20-28):
+  227/227 PASS ✅, 0 退化
+```
+
+### Ben 5/13 协议
+
+- 0 API contract 变更
+- 0 schema 改动
+- 0 Alembic migration
+- 0 frontend 影响
+- 0 越权 AI-ML 已 commit 的 const
+- [frontend-impact: no]
 
 ---
 

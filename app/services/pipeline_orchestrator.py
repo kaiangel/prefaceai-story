@@ -857,6 +857,7 @@ class Phase2PipelineOrchestrator:
                 family_relationships=outline.get("family_relationships", []),
                 progress_callback=progress_callback,
                 chapter_duration_minutes=target_duration_minutes,  # O-2: 传入时长用于 shot cap
+                project_aspect_ratio=aspect_ratio,  # P3-2 Wave10: 透传用户选画幅到 Stage 4 LLM prompt
             )
             # 成本计数: Stage 4 Sonnet 调用
             cost_tracker.add_cost("sonnet", 0.05, "Stage 4")

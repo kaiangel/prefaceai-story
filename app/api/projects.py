@@ -1189,6 +1189,7 @@ async def adjust_character(
         call_llm_with_fallback as _call_llm_with_fallback,
         friendly_error_message as _friendly_err,
     )
+    from app.prompts.storyboard_prompts import CHARACTER_FIELD_PRESERVATION_RULES
 
     prompt = f"""你是一个专业的角色设计师。请根据用户的调整指令，修改角色的外观描述。
 
@@ -1224,7 +1225,9 @@ async def adjust_character(
 **重要**: 检查你的输出——description 中描述的颜色/特征必须与 physical.hair_color 等字段完全一致，不能有矛盾。
 
 直接输出修改后的完整角色 JSON 对象（不要 ```json``` 包裹，不要解释文字）。
-保持原始 JSON 结构，所有字段都保留。"""
+保持原始 JSON 结构，所有字段都保留。
+
+{CHARACTER_FIELD_PRESERVATION_RULES}"""
 
     try:
         # T22-NEW-4: 三层 fallback (Haiku → Gemini Flash → Sonnet)
@@ -1283,7 +1286,12 @@ async def adjust_character(
         raise HTTPException(status_code=500, detail=f"角色调整失败: {str(e)}")
 
     # 5. 更新 outline 中的角色数据
-    characters_overview[char_index] = updated_char
+    # P3-1 deep-merge (Wave 10): updated_char 优先，但保留 original 的 mandatory 字段作兜底
+    # 防止 LLM 输出遗漏 character_type / id / name 等 8 mandatory fields
+    merged_char = dict(target_char)   # 从原始角色开始（含所有 mandatory 字段）
+    for key, val in updated_char.items():
+        merged_char[key] = val        # updated_char 字段优先覆盖，缺字段从 target_char 兜底
+    characters_overview[char_index] = merged_char
     outline["characters_overview"] = characters_overview
 
     # 写回 confirmed_outline（如有）或 raw_outline
@@ -1301,10 +1309,10 @@ async def adjust_character(
         try:
             chars_list = json.loads(chapter.characters_json)
             if char_index < len(chars_list):
-                # 合并更新: 只更新 physical / clothing / description
+                # 合并更新: 只更新 physical / clothing / description（使用 merged_char 含 mandatory 字段保护）
                 for key in ("physical", "clothing", "description"):
-                    if key in updated_char:
-                        chars_list[char_index][key] = updated_char[key]
+                    if key in merged_char:
+                        chars_list[char_index][key] = merged_char[key]
                 chapter.characters_json = json.dumps(chars_list, ensure_ascii=False)
         except (json.JSONDecodeError, IndexError):
             pass
@@ -1338,7 +1346,7 @@ async def adjust_character(
             _existing_portrait_pil = _PilImage.open(_existing_portrait_path).convert("RGB")
 
         _portrait_result = await _ref_manager.generate_character_reference(
-            character=updated_char,
+            character=merged_char,  # P3-1: 使用 merged_char（含 mandatory 字段保护）
             project_style=_project_style,
             image_generator=_image_gen,
             ref_type="portrait",
@@ -1360,9 +1368,9 @@ async def adjust_character(
             # 更新 updated_at 时间戳到角色 JSON，Stage 5 freshness check 用此判断肖像是否新鲜
             from datetime import datetime as _dt
             _now_iso = _dt.utcnow().isoformat() + "Z"
-            updated_char["updated_at"] = _now_iso
-            updated_char["portrait_url"] = portrait_url  # T21-NEW-4: outline 同写 cache-busted URL
-            characters_overview[char_index] = updated_char
+            merged_char["updated_at"] = _now_iso
+            merged_char["portrait_url"] = portrait_url  # T21-NEW-4: outline 同写 cache-busted URL
+            characters_overview[char_index] = merged_char
             outline["characters_overview"] = characters_overview
             if project.confirmed_outline_json:
                 project.confirmed_outline_json = json.dumps(outline, ensure_ascii=False)
@@ -1388,7 +1396,7 @@ async def adjust_character(
             try:
                 logger.info(f"[AdjustCharacter] B57: 同步重生 {char_id} fullbody（用新 portrait 作参考）")
                 _fullbody_result = await _ref_manager.generate_character_reference(
-                    character=updated_char,
+                    character=merged_char,  # P3-1: 使用 merged_char（含 mandatory 字段保护）
                     project_style=_project_style,
                     image_generator=_image_gen,
                     ref_type="fullbody",
@@ -1426,7 +1434,7 @@ async def adjust_character(
 
     return {
         "success": True,
-        "character": updated_char,
+        "character": merged_char,  # P3-1: 返回 merged_char（含 mandatory 字段保护）
         "char_id": char_id,
         "portrait_url": portrait_url,
         "message": "角色已调整",
