@@ -20831,3 +20831,41 @@ Fullbody path reference_image_manager._build_reference L624-657 (Wave 9.1)
 Founder 视觉 spot-check (e2e test22 第 3 次 / test23 现代悬疑 / test24 古风武侠) → 内测启动
 
 — PM (Sonnet 4.6, 2026-05-22 19:50)
+
+---
+
+## [2026-05-23 14:35] PM → 全团队: Wave 10 派工 (P2 + P3 + L 全部修, Founder 决策)
+
+### Founder 决策 (5/23 14:30): P0 现在 Gemini key Founder 自己生成 + P2/P3/L 都要做不要遗漏
+
+### Wave 10 派工 (3 域并行)
+
+**🔴 P0** (等 Founder 操作):
+- TASK-GEMINI-KEY-ROTATE-AFTER-GOOGLE-REVOKE — Founder Google Cloud Console 生成第 3 把新 key + 私聊给 PM + DevOps 部署
+- 当前 .env key md5 verify = Founder 提到的 `AIzaSyBm...` = 已被 Google revoke 那把 (5/23 14:30 verify)
+
+**🟡 P2 + 🟢 P3 派 AI-ML** (Sonnet 4.6 effort high, ETA ~1-1.5h, self-commit 强制):
+- P2-2 Stage 5 portrait/fullbody 选择逻辑 verify (image_generator)
+- P3-1 TASK-WAVE-10-UNKNOWN-CHARACTER-TYPE-WARN 根因深查 + 修
+- P3-2 StoryboardDirector LLM prompt 修 storyboard JSON `aspect_ratio="2:3"` hallucinate
+- P3-3 RIM logger name 统一 `xuhua` (Tester 5/22 19:30 发现)
+- P3-4 Shot N chars=N/M Seedream prompt 强化 "EXACTLY N character visible"
+- P3-5 ShotValidator missing_props prompt 优化 (杏花桥细节等)
+
+**🟡 P2 派 Tester** (Sonnet 4.6 effort high, ETA ~30 min):
+- P2-1 TASK-T22-NEW-1-TEST-ISOLATION-EXTENDED 修 test_status_authoritative mock 污染
+
+**🔮 L 派 PM 自己**:
+- L-1 DEC-050 finalize SECRET_HANDLING_PROTOCOL (4 部分: 文档脱敏 + pre-commit + Google revoke + destructive git commit/stash)
+- L-2 project_mysql_migration memory verify + 更新
+
+**🔮 L 派 Founder**:
+- L-3 跑 test25 + test26 e2e 完成 ABC 完整跨题材覆盖
+- L-4 视觉 spot-check test27 31 shots + ink 古风 BGM
+
+### 严守
+- 所有 agent self-commit 强制 (KEY_LEARNINGS #58)
+- Ben 协议 5+1 维度 (0 API/0 schema/0 STATUS_API/0 Alembic/0 frontend + [frontend-impact:] label)
+- 不动 image_generator.py L1336 shot path (Wave 7 已正常)
+
+— PM (Sonnet 4.6, 2026-05-23 14:35)
