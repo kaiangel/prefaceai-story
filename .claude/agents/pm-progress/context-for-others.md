@@ -1,89 +1,56 @@
-# PM Agent - 给其他Agent的信息
+# PM Agent - 给其他 Agent 的信息
 
-> **最后更新**: 2026-05-22 15:25
-> **当前阶段**: Wave 7+8 全闭环 (6 task, 786+ PASS) — Tester baseline regression 跑中, 等内测启动
+> **最后更新**: 2026-05-23 17:30
+> **当前阶段**: Wave 10 全完成 (P0+P2+P3+L) — 剩 L-3/L-4 Founder + 可选 VPS 第 3 次部署
 
----
+## Wave 10 完成数据 (5/23 14:30-17:30, 3h)
 
-## 内测启动状态 (5/22 15:25)
+- 4 域并行: AI-ML Opus 4.7 (6 项) + Tester Sonnet 4.6 (P2-1) + Backend Sonnet 4.6 接力 (P3-1+P3-2 wire) + PM 自做 (L-1+L-2)
+- 4 commit: 3faf585 + e938eaa + 28e33a7 + 0204b8c
+- 138 PASS, 0 fail (PM 用 venv 自跑 verify)
+- Ben 协议 5+1 全守住
 
-✅ **6 个 P0/P2 task 全修齐** (5/22 14:25-15:17):
-- Wave 7 Backend (Opus 4.7 max): T22-NEW-7 (chars=0 ID format mismatch 根因修) + T22-NEW-4 (Haiku→Gemini→Sonnet 三层 fallback 4 endpoint) + T22-NEW-6 (Layer 1 location wire)
-- Wave 7 Frontend (Sonnet 4.6): T22-NEW-2 (SceneRefsPreview 智能展示)
-- Wave 8 Frontend (Sonnet 4.6): T22-NEW-5 frontend (砍 R4-2 5 文件) + T22-NEW-8 (0 改动 已实现)
-- Wave 8 Backend (Sonnet 4.6): T22-NEW-9 (通用 fallback 架构 19→4 entries) + T22-NEW-5 backend (R4-2 wait loop 移除 + STATUS_API_CONTRACT v1.5)
+## 给所有 agent 的重要提醒 (Wave 10 新加)
 
-🟡 **进行中**: Tester Sonnet 4.6 跨题材 baseline regression (~1h)
-🔮 **剩余**: DevOps 同步部署 + e2e 重跑 test22 + Founder 视觉验证 → 内测启动
+### 1. Layer 0 SECRET SCANNER (commit 0ad9beb)
+- `scripts/pre-commit-frontend-impact.sh` 含 4 模式拦截: `AIzaSy[33char]` / `sk-ant-` / `sk-` / `AKLT`
+- 拦截 staged 文件内容 (不只 file name)
+- 白名单: `[redacted-key]` / `xxx` / `***` 占位符
+- **任何 commit 含真 key → exit 1**
+- 强制启用 (新开发环境 `bash scripts/install_pre_commit_hook.sh`)
 
-## 关键架构改造 (Wave 6-8 累计)
+### 2. DEC-050 SECRET_HANDLING_PROTOCOL (commit 0204b8c)
+- 文档脱敏铁律 + Pre-commit Layer 0 + Key Rotation 流程 + Destructive Git 前 commit/stash + Google 自动 revoke 行为
+- 详见 `.team-brain/decisions/DECISIONS.md` DEC-050
 
-### Layer 1 Identity Anchor Framework v1.0 (DEC-048)
-- AI-ML M1 spec: `.claude/agents/ai-ml-progress/context-for-others.md` (837 行)
-- Backend 实施: `app/services/identity_anchor_injector.py` (400+ 行) + `app/services/prompt_validator.py` (260 行)
-- 5 维 anchor (character/style/location/props/time) 强注入 Stage 5 image_prompt
-- **关键 fix (5/22 Wave 7)**: `resolve_characters_in_shot()` 三 key fuzzy match (id/name_en/name) 修 ID format mismatch
+### 3. Wave 10 AI-ML 4 个新 const (commit 3faf585, app/prompts/storyboard_prompts.py)
+- `CHARACTER_FIELD_PRESERVATION_RULES` (4461 chars) — AdjustCharacter LLM mandatory fields 8 项 (含 character_type)
+- `ASPECT_RATIO_FIDELITY_RULES` (2750 chars) — storyboard 用 project's aspect_ratio
+- `CHARACTER_COUNT_FIDELITY_RULES` (3207 chars) — Seedream chars=N 强化 (禁 visible 矛盾措辞)
+- `KEY_PROPS_CONSTRAINT_RULES` (2718 chars) — key_props MAX 3 × 50 char
 
-### 三层 LLM Fallback Chain (T22-NEW-4 Wave 7)
-- `app/services/llm_fallback_chain.py` 新建 (404 行)
-- `call_llm_with_fallback(operation_label, ...)` Haiku 4.5 → Gemini 3.1 Flash → Sonnet 4.6
-- 跨 provider 优先 (Anthropic overload 时 Gemini 接管)
-- 接入: AdjustCharacter + Shot Regenerate + Music BGM (RegeneratePortrait 不需要, 不调 LLM)
-- log: `[LLMFallbackChain] op=X chain_depth=N provider_used=Y SUCCESS via FALLBACK`
+### 4. Backend 接力 wire (commit 28e33a7)
+- `api/projects.py` AdjustCharacter: lazy import CHARACTER_FIELD_PRESERVATION_RULES + 拼到 LLM prompt + deep-merge `merged_char = dict(target_char); merged_char.update(updated_char)`
+- `storyboard_director.py` + `pipeline_orchestrator.py`: 加 `project_aspect_ratio: str` 参数 + 透传 + L1068 + L2334 fallback 改用 project.aspect_ratio
 
-### 通用 Schema Fallback 架构 (T22-NEW-9 Wave 8)
-- `pipeline_schemas.py` 重构: `_TYPE_REQUIRED_GROUPS` 19→4 entries (减 79%)
-- 新增: `has_humanoid_fallback()` / `_HUMANOID_FALLBACK_FIELDS` / `_STRICT_TYPES` / `_ANTHRO_ANIMAL_APPEARANCE_FIELDS`
-- 通用 fallback: 任何 character 含 humanoid 外貌字段 → 视为有效拟人形态
-- 严格 2 type: animal + vehicle_character (不接受 humanoid fallback)
-- 行为变更: `_warns_not_raises` (Pipeline 不阻塞)
+### 5. RIM logger 统一 xuhua (commit 3faf585)
+- `reference_image_manager.py` L25 + L873 logger `getLogger(__name__)` → `getLogger("xuhua")`
+- 跟 `identity_anchor_injector.py` 一致, 便于 log 聚合
 
-### 砍 R4-2 文字层场景确认 (T22-NEW-5 Wave 8)
-- Backend: `pipeline_orchestrator.py` R4-2 wait loop 完整移除 (Stage 3 → 直接 Stage 4)
-- Backend: `chapters.py` `confirm-scenes` endpoint noop + deprecation log (向后兼容)
-- Backend: `_derive_ui_phase` 移除 scene_review (scenes_ready → storyboard_running 直连)
-- Contract: STATUS_API_CONTRACT v1.4→v1.5 (8 状态机, scene_review 移除)
-- Frontend: 5 文件改 (types/createUrl/CreateContent/StageC/StageB)
-- **部署铁律**: Frontend + Backend 必须**同时部署**
+### 6. P2-2 Stage 5 portrait/fullbody = by-design (AI-ML verify)
+- RIM smart selection: close-up/medium-shot ≤ 2 角色 → portrait, 其余 → fullbody
+- 不是 bug, memory CLAUDE.md L210/L241/L283 "传入仅 fullbody" 描述过时, Founder 需同步
 
-### Stage 4.5 Scene Image Preparation (DEC-047 Wave 5)
-- 在 Stage 4 storyboard 后, Stage 5 前插入 Stage 4.5
-- 提前生成 interior/exterior 场景参考图 → 用户在 R4-3 视觉确认
-- T21-NEW-7 优化: Stage 5 复用 Stage 4.5 scene_ref_manager (省 5+ min)
-- DB: `projects.scene_references_confirmed` + `project_chapters.scene_references_json` (Alembic 006)
+### 7. Stage 5 单角色 shot test27 实测看到 `refs=2 (1 portrait + 1 scene_ref)` 是正确 (by-design)
 
-## 给所有 agent 的重要提醒 (5/22 update)
+### 8. Pipeline 跑 LLM 的 fallback chain
+- Gemini key revoke 后 Pipeline 自动 fallback Claude (T20-14 内置)
+- 5/23 已 rotate 第 3 把 key (PM 自做), Pipeline 现在用新 key
+- LLMFallbackChain (T22-NEW-4) Haiku → Gemini → Sonnet 仍工作
 
-### 1. STATUS_API_CONTRACT v1.5 (T22-NEW-5 升级)
-- 8 ui_phase 状态机 (scene_review 移除)
-- `_derive_ui_phase` 真**不再返** scene_review
-- 转换图: Stage 3 完成 → 直接 storyboard_running (不再 scenes_ready 等待)
-- 改任何 backend 监控字段必须 commit message 含 `[frontend-impact: yes/no]` label
+## 文档路径
 
-### 2. Layer 1 Identity Anchor 强注入 (Wave 6+7)
-- `image_generator._apply_identity_anchors` 真**自动**调 `inject_identity_anchors` + `PromptValidator`
-- 真**重要**: shot 真`characters_in_scene` 字段真**可以是** char_id / name_en / name 任意, Backend 真**三 key fuzzy match**
-- 添新 character_type 真**不需要** hotfix (Wave 8 通用 fallback)
-
-### 3. 三层 Fallback Chain (T22-NEW-4)
-- 任何调 LLM 真**应该**用 `llm_fallback_chain.call_llm_with_fallback(operation_label, ...)`
-- 不要直接调 anthropic.Anthropic 真**裸调** (除 Pipeline Stage 1-5 真**已有 T20-14 fallback**)
-
-### 4. 本地 backend 禁用 --reload
-uvicorn --reload + 阿里云远程 MySQL = metadata lock 死锁。用 `nohup uvicorn ... --port 8000` 不带 --reload。
-
-### 5. 单一画幅铁律 (D.15) + 单一生图模型铁律 (D.17)
-全 Pipeline 用 Seedream (`doubao-seedream-5-0-260128`), 严禁 NB2/Seedream 运行时混用。
-
-### 6. 高风险文件回归测试
-改 `image_generator.py` / `storyboard_prompts.py` / `storyboard_service.py` / `pipeline_schemas.py` 必须跑回归测试 (Wave 7+8 累计 786+ test)。
-
-## 关键文档路径
-
-- `.team-brain/handoffs/PENDING.md` — 头部新加 COMPLETED 汇总 (Wave 1-8) + 剩余 task 真**0 P0**
-- `.team-brain/contracts/STATUS_API_CONTRACT.md` v1.5
-- `.team-brain/decisions/DECISIONS.md` — DEC-047 Stage 4.5 + DEC-048 Layer 1 (DEC-049 候选: T22-NEW-9 通用 fallback 架构)
-- `.team-brain/knowledge/KEY_LEARNINGS.md` — #44-56 (5/22 新加 #50-56)
-- `.team-brain/analysis/E2E_TEST22_LAYER1_FULL_AUDIT_2026-05-22.md` — 5/22 e2e Layer 1 audit
-- `.team-brain/analysis/SESSION_FULL_BUG_AUDIT_2026-05-21.md` — 5/21 历史 78 bug audit
-- `docs/CHARACTER_IDENTITY_FRAMEWORK.md` v1.0 — Layer 1 spec
+- `.team-brain/handoffs/PENDING.md` — Wave 10 全标 ✅
+- `.team-brain/decisions/DECISIONS.md` DEC-050 (5/23 finalize)
+- `.team-brain/knowledge/KEY_LEARNINGS.md` #57 (跨路径 wire) + #58 (destructive git)
+- `.team-brain/analysis/E2E_TEST22_TEST27_FULL_DEEP_RETROSPECTIVE_2026-05-22.md` (12 章节回溯)

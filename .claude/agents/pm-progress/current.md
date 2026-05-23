@@ -1,99 +1,76 @@
 # PM Agent - 当前任务
 
-> **最后更新**: 2026-05-22 19:45
-> **状态**: 🟢 Wave 9 + 9.1 + Tester 全完成 (3 commit, 623/623 PASS, 0 退化, Ben 协议 0 违反) → 待派 DevOps 第 2 次部署
-> **下一步**: 派 DevOps Sonnet 4.6 effort high → Founder spot-check → 内测启动
+> **最后更新**: 2026-05-23 17:30
+> **状态**: 🟢 Wave 10 全完成 (P0 Gemini key + P2 + P3 + L 全做) — 剩 L-3/L-4 Founder + 可选 VPS 第 3 次部署
+> **下一步**: Founder 决策 — L-3/L-4 跑 test25/26 + spot-check test27 / DevOps 第 3 次部署 Wave 10 / 内测启动
 
-## Tester 独立 baseline 完成 ✅ (5/22 19:30-19:45, 9 min wall clock)
+## Wave 10 全完成 (5/23 14:30-17:30)
 
-- commit c570c2d, 6 files +1300 -5
-- 623/623 PASS in 0.90s (16 test files, $0 API)
-- 60 跨题材矩阵 case 全 PASS + 12 边缘 case 全 PASS
-- 3 路 log marker 实际触发 verify (portrait/fullbody/skip 不是死代码)
-- P3 非阻塞发现: RIM logger name 不统一
-- 结论: Wave 9+9.1 **可部署**
+### Founder 5/23 14:30 决策: P0 现在做 + P2 + P3 + L 都要做不要遗漏
 
-## Wave 9 + 9.1 全完成里程碑 (5/22 19:30)
+### 派工 + 完成 (~3h)
 
-**Layer 1 三路统一**: shot path (W7) + portrait path (W9 commit 89bcfc7) + fullbody path (W9.1 commit 1629332) 全 wire 接通
-
-| Wave | commit | 文件 | 测试 |
+| 任务 | Agent / 模型 | commit | 结果 |
 |---|---|---|---|
-| Wave 9 portrait | 89bcfc7 | reference_image_manager.py + style_enforcer.py + new test (318 行) | 7/7 + 218 baseline 0 退化 |
-| Wave 9.1 fullbody | 1629332 | reference_image_manager.py + new test (镜像 W9-1) | 6/6 + 178 baseline 0 退化 |
+| 🔴 P0 Gemini key rotation | PM 自做 (5 min) | 0ad9beb (前置 secret scanner) + .env sed | md5 verify + API 200 + backend 重启 PID 54357 ✅ |
+| 🟡 P2-1 test isolation | Tester Sonnet 4.6 effort high | e938eaa | mock pollution + outdated tests 修, 44 PASS (27 errors → 0) |
+| 🟡 P2-2 Stage 5 portrait/fullbody | AI-ML (合并 commit) | 3faf585 | verify = **by-design** (RIM smart selection based on shot_type) |
+| 🟢 P3-1 UNKNOWN warn | AI-ML + Backend 接力 | 3faf585 + 28e33a7 | CHARACTER_FIELD_PRESERVATION_RULES 4461 chars + deep-merge wire |
+| 🟢 P3-2 storyboard aspect_ratio | AI-ML + Backend 接力 | 3faf585 + 28e33a7 | ASPECT_RATIO_FIDELITY_RULES + project_aspect_ratio 11 occurrence |
+| 🟢 P3-3 RIM logger 统一 xuhua | AI-ML | 3faf585 | reference_image_manager.py L25 + L873 |
+| 🟢 P3-4 chars=N/M Seedream | AI-ML | 3faf585 | CHARACTER_COUNT_FIDELITY_RULES 3207 chars (禁矛盾措辞) |
+| 🟢 P3-5 missing_props prompt | AI-ML | 3faf585 | KEY_PROPS_CONSTRAINT_RULES 2718 chars (MAX 3 props × 50 char) |
+| 🔮 L-1 DEC-050 finalize | PM 自做 | 0204b8c | SECRET_HANDLING_PROTOCOL 5 部分 |
+| 🔮 L-2 mysql memory verify | PM 自做 | 0204b8c | 已用阿里云 MySQL, memory 标 ✅ 已完成 |
+| 🔮 L-3 跑 test25 + test26 | Founder 自做 | - | 🟡 等 Founder |
+| 🔮 L-4 视觉 spot-check test27 | Founder 自做 | - | 🟡 等 Founder |
 
-PM 审查通过: 各 11 维度 + Ben 协议 5+1 维度 (含 pre-commit hook 自动验证)
+### PM 11 维度地毯式审查 (5/23 17:30) ✅
 
-## Tester 派工 (5/22 19:30 启动)
+按 memory feedback_carpet_review_deep_dive + feedback_trace_full_callstack_not_pattern + Ben 协议 5+1:
+- A commit metadata + B Ben 协议 5+1 + C+D code diff + E PM 自跑 pytest 138 PASS (用 venv 修正后) + F 5 层调用链路 (4 const → import → 拼接 / project_aspect_ratio 11 occurrence / merged_char 12 occurrence) + G+H KEY_LEARNINGS+DECISIONS + I progress 三件套全更新 (5/23 17:07-17:21) + J 0 越权
+- 🟡 1 小问题: Tester e938eaa 缺 [frontend-impact:] label (tests/ 不在 watched files, 非违规但建议补)
 
-| Agent | 模型 | 任务 | ETA |
-|---|---|---|---|
-| Tester | Sonnet 4.6 effort high | 跨题材独立 baseline (manga + children_book + cyberpunk + ink + realistic 5+ 风格) + 跨 character_type 19+ humanoid + 跨 location 类型 — 独立第二意见, 防 AI-ML 自测偏差 | ~1h |
+### PM 自己今日失误 (Wave 10 期间) — 永久教训
 
-## Wave 9 重做完成 + 审查通过 (5/22 19:00-19:35)
+1. **PM 自跑 pytest 用 system python** (没 fastapi) 误判 Tester 失败 — 必须用 `venv/bin/python3 -m pytest`, 否则触发 ModuleNotFoundError
+2. **PENDING + TODAY_FOCUS + PM progress** 多次没及时更新 (Founder 5+ 次提醒) — 每个 spawn 后立即更新
 
-### 灾难回顾
-- 5/22 17:00-18:30 AI-ML Wave 9 Opus 4.7 max 完成 (未 commit)
-- 5/22 18:45 DevOps `git filter-repo --replace-text --force` 重写 working tree → AI-ML 1.5h 工作全丢
-- 5/22 19:00 PM 派 AI-ML Sonnet 4.6 重做 (spec + test 文件已存在, 45 min 完成)
-- 5/22 19:02 AI-ML self-commit 89bcfc7 防再丢
+## 今日全程战果汇总 (5/22 + 5/23)
 
-### PM 11 维度地毯式审查 ✅
-- A commit 元数据 (9 files +704 -3)
-- B Ben 协议 5 维度 (0 命中禁区, [frontend-impact: no] label)
-- C+D W9-1+W9-2 code diff 完美 (lazy import + try/except + 类型防御)
-- E PM 自跑 pytest 7/7 PASS (不凭自报)
-- F 5 层调用链路完整接通 (定义→调用→参数→数据流→消费)
-- G KEY_LEARNINGS #57 完整 (跨路径 wire 一致性教训 4 段)
-- H DEC-049 候选 3 条决策完整
-- I AI-ML progress 三件套全更新
-- J 0 越权 (9 文件全 AI-ML 域)
-- K 高风险 baseline 218 passed 0 退化
+### 5/22 (16h+)
+- 早间 08:30-12:35: Layer 1 全闭环
+- 中午-下午 12:35-15:17: Wave 7+8 6 task 全修
+- 傍晚 15:30-16:55: e2e test22 Round 2 + VPS 部署 + 同步 verify
+- 17:00-18:50: P0 SECRET-LEAK + filter-repo 灾难
+- 19:00-19:45: Wave 9 重做 + Wave 9.1 + Tester
+- 19:45-19:50: DevOps 第 2 次部署 (PM 代做)
+- 19:50-20:01: 清理监控 + 重启服务 + Fresh 监控
+- 20:05-20:59: e2e test27 (53 min, ink + 浪漫 + 3:4) — Wave 7+8+9+9.1 15+ 项实战 verify
+- 20:18: 🚨 Google 主动 revoke Gemini key, Pipeline 自动 fallback Claude
 
-## Wave 9.1 派工 (5/22 19:35 启动)
+### 5/23 (~3h)
+- 14:00-14:30: PM 全维度回溯文档 (12 章节)
+- 14:30-14:35: Founder 决策 + 提供新 Gemini key + 模型升级建议
+- 14:35-16:35: PM 自做 key rotation + secret scanner + commit + push (3 commit)
+- 16:35-17:30: Wave 10 spawn 4 域并行 (AI-ML Opus 4.7 + Tester Sonnet 4.6 + Backend Sonnet 4.6 接力 + PM 自做 L-1+L-2) — 4 commit
 
-### 任务: TASK-T22-NEW-10-FULLBODY-LAYER1-WIRE (DEC-049-3 待修)
+### 累计 commit chain (今日 10 commit)
+```
+d02e14b  docs(Wave9): audit + gitleaks + 故事 idea
+4e4a4cf  docs(test27+retrospective): test25-27 + PENDING + 5/22 全天回溯
+0ad9beb  feat(secret-scanner): pre-commit hook Layer 0 (Wave 10 P0)
+3faf585  fix(Wave10-AI-ML): 6 项 P2-2 + P3-1/2/3/4/5
+e938eaa  fix(test-isolation): T22-NEW-1 修 test_status_authoritative
+28e33a7  fix(Wave10-backend): wire P3-1+P3-2 接力 AI-ML 3faf585
+0204b8c  docs(Wave10): DEC-050 finalize + L-2 mysql memory verify
+```
 
-| Agent | 模型 | 任务 | ETA |
-|---|---|---|---|
-| AI-ML | Sonnet 4.6 effort high | W9.1-1 `_build_reference_prompt()` L467 fullbody path 镜像 W9-1 wire Layer 1 + is_bw_style 条件 + try/except 防御 + self-commit | ~30 min |
+GitHub HEAD = local HEAD = 0204b8c
 
-任务清单 (跟 W9-1 完全镜像):
-- W9.1-1 `reference_image_manager.py` `_build_reference_prompt()` enforced_prompt 之后 wire Layer 1 (跟 W9-1 同 pattern)
-- W9.1-2 跑现有 218 baseline + 新加 fullbody case
-- W9.1-3 progress 三件套 + TEAM_CHAT 更新
-- W9.1-4 self-commit 强制 (防再丢)
+## 剩余 (Founder 决策)
 
-### 验收标准
-- [ ] _build_reference_prompt() wire Layer 1 + is_bw_style + try/except
-- [ ] 跑 218 baseline 0 退化 + fullbody 新加 case 全 PASS
-- [ ] AI-ML progress 三件套 + TEAM_CHAT 更新
-- [ ] self-commit 已执行
-- [ ] 0 越权 + Ben 协议 5 维度守住
-
-## 今日 (5/22) 全程战果总览
-
-### 早间 (08:30-12:35) Layer 1 全闭环 ✅
-### 中午-下午 (12:35-15:17) Wave 7+8 6 task 全修 ✅
-### 傍晚 (15:30-16:55) e2e test22 Round 2 + VPS 部署 + 同步 verify ✅
-### 17:00-18:50 P0 SECRET-LEAK 全维度清理 ✅
-- DevOps Opus 4.7 + Sonnet 4.6 两轮: audit + 脱敏 + 防御 + filter-repo + force push
-- PM 脱敏 5 文件 7 处 + 通知 Ben
-- Step 6 跳过 (Founder Google 限额兜底)
-- **附带灾难**: filter-repo --force 重写 working tree 清除 AI-ML 1.5h 工作
-
-### 19:00-19:35 Wave 9 重做 + PM 11 维度审查 ✅
-- AI-ML Sonnet 4.6 重做 45 min (commit 89bcfc7)
-- PM 自跑 pytest + 5 层调用链路 + Ben 协议 全维度 verify
-
-## 永久教训 (将沉淀 KEY_LEARNINGS #58)
-
-任何 destructive git 操作 (filter-repo / reset --hard / clean -fdx) 前, 必须先 commit / stash 所有 working tree。Spawn destructive 任务 spawn prompt 必须明确要求"先 verify git status clean"。
-
-## 关键文档路径
-
-- `.team-brain/analysis/T22_NEW_10_PORTRAIT_LAYER1_AUDIT_2026-05-22.md` — 680 行 9 维度 audit
-- `.team-brain/knowledge/KEY_LEARNINGS.md` #57 — 跨路径 wire 一致性
-- `.team-brain/decisions/DECISIONS.md` DEC-049 — 3 条决策 (DEC-049-3 fullbody = Wave 9.1)
-- `tests/test_layer1_portrait_injection.py` — 7 case 全 PASS
-- commit 89bcfc7 — Wave 9 重做完整 9 文件 +704 -3
+1. L-3 跑 test25 (manga + supernatural 银发狐妖) + test26 (cyberpunk + ai_entity 出租车 AI) e2e
+2. L-4 视觉 spot-check test27 31 shots + ink 古风 BGM
+3. (可选) DevOps 第 3 次部署 Wave 10 到 VPS (AI-ML 3faf585 + Backend 28e33a7 改了 app/ 需 rebuild)
+4. CLAUDE.md L210/L241/L283 "传入仅 fullbody" → "smart selection" (Founder 改, AI-ML P2-2 verify 发现)
