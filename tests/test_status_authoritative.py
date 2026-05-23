@@ -10,11 +10,150 @@
 
 运行命令:
   pytest tests/test_status_authoritative.py -v
+
+T22-NEW-1 改动说明:
+  - 加 autouse fixture _ensure_real_app_config，镜像 T20-52 修法，隔离
+    test_t21_digital_virtual_fallback.py 注入的 app.config stub（SimpleNamespace
+    缺少 DATABASE_URL），防止综合跑时 setup_method 中的延迟 import 因
+    settings.DATABASE_URL AttributeError 导致 27 errors。
+  - 更新 3 个因 T22-NEW-5 (scene_review 已移除) 而过时的测试用例。
 """
 
+import sys
+import types
 import json
+from pathlib import Path
 from unittest.mock import MagicMock, AsyncMock, patch
 import pytest
+
+# ─────────────────────────────────────────────────────────────────────────────
+# T22-NEW-1: Mock 污染隔离 autouse fixture
+#
+# 根因: test_t21_digital_virtual_fallback.py 在 sys.modules["app.config"] 注入
+#   SimpleNamespace(ANTHROPIC_API_KEY=..., GEMINI_API_KEY=...) — 仅 4 个属性。
+#   当 test_status_authoritative 随后在 setup_method 做
+#   "from app.api.chapters import _derive_ui_phase" 时:
+#     → app.api.chapters 进而 import app.database
+#     → app.database L13: _db_url = settings.DATABASE_URL  ← AttributeError
+#   → 所有 setup_method 中含此 import 的 test 变成 ERROR。
+#
+# 修复策略 (镜像 T20-52 autouse fixture 模式):
+#   每 test 前检测 app.config.settings 是否为 stub (无 DATABASE_URL)，
+#   若是则删除所有 app.* 污染条目，让 setup_method 的延迟 import 重新加载真实模块。
+#   Teardown: 移除 app.api.chapters + app.database 条目，让下一 test 也能重新加载。
+# ─────────────────────────────────────────────────────────────────────────────
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+# ─────────────────────────────────────────────────────────────────────────────
+# T22-NEW-1 helper: stub attribute augmentation
+#
+# 策略: 不移除 stub，而是给 stub 打补丁，补充 chapters 启动所需的缺失 attributes。
+#   - app.config.settings 补充 DATABASE_URL, DEBUG 等缺失字段
+#   - google.genai stub 补充 types 子模块 (story_generator 需要 "from google.genai import types")
+#   - app.api.chapters 加载成功后，之后的 test 直接复用 cached module (不清除)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_SETTINGS_AUGMENT = {
+    # Use mysql+aiomysql URL so pool_size/max_overflow/pool_timeout are accepted.
+    # The engine is created but never used to connect in unit tests.
+    "DATABASE_URL": "mysql+aiomysql://test:test@127.0.0.1:3306/test_stub",
+    "DEBUG": False,
+    "PIPELINE_COST_LIMIT": 10.0,
+    "SKIP_IMAGE_GENERATION": True,
+    "IMAGE_MAX_CONCURRENT": 1,
+    "IMAGE_GEN_PROVIDER": "seedream",
+    "VOLCENGINE_ACCESS_KEY": "test",
+    "VOLCENGINE_SECRET_KEY": "test",
+    "VOLCENGINE_TTS_APPID": "test",
+    "VOLCENGINE_TTS_CLUSTER": "test",
+    "SEEDREAM_ACCESS_KEY": "test",
+    "SEEDREAM_SECRET_KEY": "test",
+    "MUREKA_API_KEY": "test",
+}
+
+
+def _augment_settings_stub() -> bool:
+    """If app.config.settings is a stub missing DATABASE_URL, augment it in place.
+
+    Returns True if augmentation was needed, False if settings were already complete.
+    """
+    config_mod = sys.modules.get("app.config")
+    if config_mod is None:
+        return False
+    settings_obj = getattr(config_mod, "settings", None)
+    if settings_obj is None:
+        return False
+    if hasattr(settings_obj, "DATABASE_URL"):
+        return False  # already complete, nothing to do
+
+    # Augment stub in place
+    for attr, val in _SETTINGS_AUGMENT.items():
+        if not hasattr(settings_obj, attr):
+            setattr(settings_obj, attr, val)
+    return True
+
+
+def _is_module_stub(mod) -> bool:
+    """Return True if mod is a stub (not from site-packages, not from real app path)."""
+    if mod is None:
+        return False
+    file_attr = getattr(mod, "__file__", None)
+    if file_attr and "site-packages" in str(file_attr):
+        return False
+    path_attr = getattr(mod, "__path__", None)
+    if path_attr:
+        path_strs = [str(p) for p in path_attr]
+        if any("site-packages" in p for p in path_strs):
+            return False
+    # Stub: __path__ == [] or no __file__ and no real path
+    if path_attr == [] or path_attr == [""]:
+        return True
+    if file_attr is None and (path_attr is None or path_attr == []):
+        return True
+    return False
+
+
+def _clean_google_genai_stubs() -> None:
+    """Remove any stub google.genai / google.genai.types from sys.modules.
+
+    These stubs (added by test_llm_fallback_chain.py, test_t21_*, etc.) block
+    the real google.genai from loading properly when app.api.chapters is imported.
+
+    After removal, the real package will be loaded from venv/site-packages on demand.
+    """
+    for key in ("google.genai.types", "google.genai", "google"):
+        mod = sys.modules.get(key)
+        if _is_module_stub(mod):
+            sys.modules.pop(key, None)
+
+
+@pytest.fixture(autouse=True)
+def _ensure_chapters_importable():
+    """T22-NEW-1: 确保 app.api.chapters 可以被 setup_method 的延迟 import 正确加载。
+
+    问题根因:
+      test_t21_digital_virtual_fallback.py 模块级代码在 pytest collection 时就注入:
+      1. sys.modules["app.config"].settings = SimpleNamespace(无 DATABASE_URL)
+      2. sys.modules["google.genai"] = 空 ModuleType (无 types)
+      当 setup_method 执行 "from app.api.chapters import ..." 时:
+        app.api.chapters → app.database → settings.DATABASE_URL → AttributeError
+        app.api.chapters → pipeline_orchestrator → story_generator → google.genai.types → ImportError
+
+    修复: 在每 test 前:
+      1. 检测 app.config.settings stub，补全缺失的 DATABASE_URL 等属性
+      2. 检测 google.genai stub，注入 types 子模块
+      3. 若 app.api.chapters 已缓存 (成功加载过)，保留不动 (复用 cached module)
+
+    注意: 不清除 app.api.chapters from sys.modules (避免触发重新加载失败)。
+    若本 test 首次加载成功，后续 test 直接复用该 cached module。
+    """
+    # Step 1: Fix app.config.settings stub (add missing DATABASE_URL etc.)
+    _augment_settings_stub()
+    # Step 2: Remove google.genai stubs so real package can load (for app.api.chapters cascade)
+    _clean_google_genai_stubs()
+    yield
+    # Teardown: 不清除 app.api.chapters (保留 cached module 供后续 test 复用)
 
 
 # --------------------------------------------------------------------------
@@ -154,12 +293,13 @@ class TestUiPhaseDerivation:
         job = make_job(current_stage="screenplay")
         assert self._derive_ui_phase(job, project, chapter) == "scene_review_pending"
 
-    def test_scenes_ready_unconfirmed_returns_scene_review(self) -> None:
-        """scenes_ready + 未确认 → scene_review（R4-2 等用户）"""
+    def test_scenes_ready_unconfirmed_returns_storyboard_running(self) -> None:
+        """T22-NEW-5: scenes_ready + scenes_confirmed=False → storyboard_running
+        (R4-2 scene_review 等待环节已移除，Stage 3→4 直连，scenes_confirmed 不再用作等待信号)"""
         project = make_project(characters_confirmed=True, scenes_confirmed=False)
         chapter = make_chapter()
         job = make_job(current_stage="scenes_ready")
-        assert self._derive_ui_phase(job, project, chapter) == "scene_review"
+        assert self._derive_ui_phase(job, project, chapter) == "storyboard_running"
 
     def test_scenes_ready_confirmed_returns_storyboard_running(self) -> None:
         """scenes_ready + 已确认（瞬态）→ storyboard_running"""
@@ -237,14 +377,13 @@ class TestHydrateHints:
         assert hints.display_field == "characters"
         assert "Character" in hints.expected_data_shape
 
-    def test_scene_review_hints_to_story_endpoint(self) -> None:
-        """⭐ RISK-T15-3 核心: scene_review 阶段 hydrate /story（返 scenes），不是 /storyboard"""
+    def test_scene_review_phase_removed_returns_none(self) -> None:
+        """T22-NEW-5: scene_review ui_phase 已移除 (R4-2 确认环节砍掉, Stage 3→4 直连).
+        _build_hydrate_hints("scene_review") 应返回 None (无 hydrate 分支).
+        历史背景: RISK-T15-3 要求 scene_review hydrate /story，
+        但 T22-NEW-5 移除了 scene_review 整个状态，此 hydrate 分支同步删除."""
         hints = self._build_hydrate_hints("scene_review", chapter_number=1)
-        assert hints is not None
-        assert "/story" in hints.endpoint, "scene_review 必须 hydrate /story（顺解 T15-3）"
-        assert "/storyboard" not in hints.endpoint, "不能 hydrate /storyboard（Stage 4 后才有）"
-        assert hints.display_field == "scenes"
-        assert "Scene" in hints.expected_data_shape
+        assert hints is None, "T22-NEW-5 移除 scene_review 后，此 phase 应返 None hydrate_hints"
 
     def test_shot_generating_hints_to_storyboard_endpoint(self) -> None:
         """shot_generating 阶段 hydrate /storyboard endpoint（含 image_url）"""
@@ -282,8 +421,10 @@ class TestHydrateHints:
         assert "/chapters/1" not in hints.endpoint
 
     def test_endpoint_has_project_id_placeholder(self) -> None:
-        """endpoint 含 {project_id} 占位符（frontend 实际调用时替换）"""
-        hints = self._build_hydrate_hints("scene_review", chapter_number=1)
+        """endpoint 含 {project_id} 占位符（frontend 实际调用时替换）.
+        T22-NEW-5: 改用 char_review (scene_review 已移除) 验证占位符机制."""
+        hints = self._build_hydrate_hints("char_review", chapter_number=1)
+        assert hints is not None, "char_review 应有 hydrate_hints"
         assert "{project_id}" in hints.endpoint, \
             "endpoint 应含 {project_id} 占位符让 frontend 替换"
 

@@ -1,10 +1,25 @@
 # Tester Agent - 给其他Agent的上下文
 
-> **最后更新**: 2026-05-22 21:30 [Tester]
+> **最后更新**: 2026-05-23 [Tester]
 
 ---
 
-## 当前状态 (2026-05-22)
+## 当前状态 (2026-05-23)
+
+**TASK-T22-NEW-1-TEST-ISOLATION-EXTENDED 完成 ✅**
+
+| 运行方式 | 修复前 | 修复后 |
+|---------|--------|--------|
+| 单跑 test_status_authoritative.py | 41 PASS + 3 FAIL | **44 PASS** |
+| 综合跑 (含 t21_digital_virtual + schema_generic + llm_fallback) | 27 errors + 4 fail | **44 PASS** |
+| 17文件联跑 Wave 9 全量 | 636 PASS + 27 errors | **667 PASS** |
+
+**根因**: 多文件 collection 时 stub 污染 — `app.config.settings` 无 DATABASE_URL + `google.genai.types` stub 阻断真实包
+**修法**: autouse fixture 补全 settings stub + 清除 google stub
+
+---
+
+## 上一完成 (2026-05-22)
 
 **TASK-WAVE-9-TESTER-INDEPENDENT-BASELINE 完成 ✅ (独立第二意见)**
 

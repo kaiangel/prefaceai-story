@@ -4,6 +4,31 @@
 
 ---
 
+## 2026-05-23 — TASK-T22-NEW-1-TEST-ISOLATION-EXTENDED ✅ (44/44 PASS, 0 errors)
+
+**任务**: test_status_authoritative 综合跑 mock 污染修复 (T22-NEW-1)
+
+**改动**: `tests/test_status_authoritative.py`
+
+**根因 (两层)**:
+1. 多个 test 文件 collection 时注入 `app.config.settings` stub (无 DATABASE_URL) + `google.genai` stub (无 types)，导致 `setup_method` 的延迟 import 失败 — 27 errors
+2. 3 个测试断言 `scene_review` phase（T22-NEW-5 已移除）— 3 fail
+
+**修法**:
+- `autouse` fixture `_ensure_chapters_importable()`:
+  - `_augment_settings_stub()`: 补全 settings 12 个缺失属性 (DATABASE_URL 等)
+  - `_clean_google_genai_stubs()`: 移除 google.genai / google.genai.types stubs，让真实包加载
+- 3 个过时测试更新至 T22-NEW-5 现行行为
+
+**pytest 对比**:
+```
+修复前: 单跑 44/44 3 FAIL → 综合跑 27 errors + 4 fail
+修复后: 单跑 44/44 PASS → 综合跑 44/44 PASS (0 errors, 0 fail)
+17文件联跑: 667/667 PASS
+```
+
+---
+
 ## 2026-05-22 — TASK-WAVE-9-TESTER-INDEPENDENT-BASELINE ✅ (623/623 PASS)
 
 **任务**: Wave 9+9.1 Tester 跨题材独立第二意见 baseline verify

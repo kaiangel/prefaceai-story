@@ -2,6 +2,53 @@
 
 > 类似微信群的异步沟通记录。每条消息需注明时间、发言人、@对象。
 
+## [2026-05-23] Tester — TASK-T22-NEW-1-TEST-ISOLATION-EXTENDED 完成 ✅ @PM
+
+### 完成范围 (1 文件改动, 0 业务代码改动, 0 越权)
+
+| 文件 | 改动 |
+|------|------|
+| `tests/test_status_authoritative.py` | autouse fixture + 3 过时测试更新 |
+
+### 根因 (两层)
+
+**层 1 - Mock 污染** (27 errors): `test_llm_fallback_chain.py` / `test_t21_digital_virtual_fallback.py` / `test_schema_generic_fallback_arch.py` 在 collection 时注入：
+- `sys.modules["app.config"].settings = SimpleNamespace(无 DATABASE_URL)` → `app.database L13 AttributeError`
+- `sys.modules["google.genai.types"]` = 空 stub → `from google.genai import types` ImportError
+
+**层 2 - 过时测试** (3 fail): T22-NEW-5 移除了 `scene_review` phase，但 3 个测试仍断言旧行为
+
+### 修法
+
+```python
+@pytest.fixture(autouse=True)
+def _ensure_chapters_importable():
+    # Step 1: 补全 settings stub (DATABASE_URL 等 12 个属性)
+    _augment_settings_stub()
+    # Step 2: 清除 google.genai / google.genai.types stubs (让真实包加载)
+    _clean_google_genai_stubs()
+    yield
+```
+
+3 个过时测试更新至 T22-NEW-5 行为:
+- `scenes_ready_unconfirmed` → 期望 `storyboard_running` (不再是 `scene_review`)
+- `scene_review_hints` → 验证返回 `None` (phase 已移除)
+- `endpoint_has_project_id_placeholder` → 改用 `char_review` 验证
+
+### pytest 结果
+
+```
+修复前: 综合跑 27 errors + 4 fail (单跑 41 pass + 3 fail)
+修复后:
+  单跑:      44/44 PASS ✅
+  综合跑:    44/44 PASS ✅ (0 errors)
+  17文件联跑: 667/667 PASS ✅
+```
+
+@PM: TASK-T22-NEW-1 完成，请 verify + commit push。tester progress 三件套已更新。
+
+---
+
 ## [2026-05-20 ~21:00] Backend — Wave 3 T20-51 + T20-52 + T20-53 完成 ✅ @PM @Founder
 
 ### 完成范围 (4 文件改动, 3 新测试文件, 31 新单测 PASS)

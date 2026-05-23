@@ -1,11 +1,50 @@
 # Tester Agent - 当前任务
 
-> **最后更新**: 2026-05-22 21:30 [Tester]
-> **状态**: TASK-WAVE-9-TESTER-INDEPENDENT-BASELINE 完成 ✅ — 623/623 PASS (16 test files), 0.90s, 0 API 调用
+> **最后更新**: 2026-05-23 [Tester]
+> **状态**: TASK-T22-NEW-1-TEST-ISOLATION-EXTENDED 完成 ✅ — 44/44 PASS (isolation) + 44/44 PASS (full suite combined), 0 errors, 0 API 调用
 
 ---
 
-## 当前状态 (2026-05-22)
+## 当前状态 (2026-05-23)
+
+**TASK-T22-NEW-1-TEST-ISOLATION-EXTENDED 完成 ✅**
+
+### pytest 结果
+
+| 运行方式 | 结果 |
+|---------|------|
+| 单跑 `pytest tests/test_status_authoritative.py` | **44/44 PASS** |
+| 综合跑 `pytest tests/ -k status_authoritative` | **44/44 PASS** |
+| 17文件联跑 (Wave 9 + t21 + status_authoritative) | **667/667 PASS** |
+| 综合跑含 t21_digital_virtual_fallback + schema_generic_fallback | **0 errors, 0 fail** |
+
+### 根因 + 修法
+
+**根因 1**: `test_t21_digital_virtual_fallback.py` + `test_schema_generic_fallback_arch.py` + `test_llm_fallback_chain.py` 在 pytest collection 时注入：
+- `sys.modules["app.config"].settings` = `SimpleNamespace`（缺 `DATABASE_URL`）
+- `sys.modules["google.genai"]` = 空 `ModuleType`（无 `types`）
+- `sys.modules["google.genai.types"]` = 空 stub（无 `HttpOptions`）
+
+**级联**: `setup_method` 做 `from app.api.chapters import _derive_ui_phase` 时：
+- `app.database L13: settings.DATABASE_URL` → `AttributeError` (27 errors)
+- 或 `story_generator: from google.genai import types` → `ImportError` (cascade)
+
+**修法**: `autouse` fixture `_ensure_chapters_importable()` 每 test 前执行：
+1. `_augment_settings_stub()`: 检测 `app.config.settings` 缺 `DATABASE_URL` → 补全 MySQL URL 等 12 个属性
+2. `_clean_google_genai_stubs()`: 检测 `google.genai` / `google.genai.types` 是 stub → 从 sys.modules 删除 → 允许真实包加载
+
+**根因 2**: 3 个测试断言 `scene_review` phase 存在 (`scene_review_hints_to_story_endpoint`, `scenes_ready_unconfirmed_returns_scene_review`, `endpoint_has_project_id_placeholder`) — 但 T22-NEW-5 已移除此 phase。
+
+**修法**: 更新 3 个测试以匹配当前实现：
+- `test_scenes_ready_unconfirmed_returns_scene_review` → 改期望 `storyboard_running`
+- `test_scene_review_hints_to_story_endpoint` → 改为验证 `None`（phase 已移除）
+- `test_endpoint_has_project_id_placeholder` → 改用 `char_review` 验证占位符机制
+
+### 修改文件
+
+- `tests/test_status_authoritative.py` — autouse fixture + 3 个过时测试更新
+
+### 上一完成 (2026-05-22)
 
 **TASK-WAVE-9-TESTER-INDEPENDENT-BASELINE 全完成 ✅ (独立第二意见)**
 
