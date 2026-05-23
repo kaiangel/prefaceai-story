@@ -5,6 +5,66 @@
 
 ---
 
+## [2026-05-23 17:00] DEC-050 SECRET_HANDLING_PROTOCOL — 全员强制 Secret 处理协议 (Wave 10 finalize)
+
+### 背景
+
+5/22-5/23 累计 4 大事件触发协议 finalize:
+1. 5/22 17:01 GitGuardian 警报: DevOps 4/29 progress 写完整 Google API Key 明文 → 5/22 16:44 push e5470e8 时连带泄漏
+2. 5/22 18:50 DevOps `git filter-repo --force` 重写 working tree 副灾难: 清除 AI-ML 1.5h Wave 9 工作 + PM completed.md 块 (KEY_LEARNINGS #58)
+3. 5/22 20:18 Google 主动 revoke 已泄漏 key (即使 force push 清 git history 后, Google 仍 disable)
+4. 5/23 14:30 Founder 严令 "之后再也不能出现这种 API key 泄漏的风险了"
+
+### 协议 4 部分 (全员强制)
+
+#### 1. 文档脱敏铁律
+- **任何 progress / TEAM_CHAT / DECISIONS / KEY_LEARNINGS / 任何 git tracked 文件** 绝不写完整 API key
+- 脱敏格式: `AIzaSy***[redacted-key-<日期>-<用途>]` (前 8 char + 星号 + 描述)
+- 即使是历史已 revoke 的 key 也必须脱敏 (Google 可能误判联动)
+- 例外: 文档示例占位符 `AIzaSyxxx` / `sk-ant-xxx` / `sk-xxx` / `AKLTxxx` OK
+
+#### 2. Pre-commit Hook Layer 0 SECRET SCANNER (必装)
+- 实施: `scripts/pre-commit-frontend-impact.sh` Layer 0 + .gitleaks.toml + symlink .git/hooks/pre-commit
+- 拦截 4 模式: `AIzaSy[33char]` (Google) / `sk-ant-` (Anthropic) / `sk-` (OpenAI) / `AKLT` (火山引擎)
+- 白名单: `[redacted-key]` / `xxx` / `***` 占位符
+- staged 文件内容扫 (不只 file name)
+- 实测 verify: 写假 key → git add → hook exit 1 拦截
+- 强制启用 (新开发环境 `bash scripts/install_pre_commit_hook.sh`)
+
+#### 3. Key Rotation 流程
+- **Founder 操作**: Google Cloud Console (https://console.cloud.google.com/apis/credentials) revoke 泄漏 key + 生成新 key
+- **私聊给 PM** (微信/Signal, **严禁** TEAM_CHAT / DECISIONS / 任何 git tracked 文档)
+- **PM 直接 sed `.env`** (常规 5 min 任务, 不派 DevOps): `perl -i -pe 's|^GEMINI_API_KEY=AIzaSy<old>$|GEMINI_API_KEY=<new>|' .env`
+- 自动 backup `.env.backup-keyrotate-<timestamp>` (`.gitignore` 已覆盖 `.env.*`)
+- 重启 backend (`nohup uvicorn ... --port 8000` 不带 --reload, memory feedback_local_backend_no_reload)
+- 立即 verify: `curl 'https://generativelanguage.googleapis.com/v1beta/models?key=<new>'` HTTP 200
+- 同步 VPS (rsync `.env` 或 ssh sed) + Docker restart api
+
+#### 4. Destructive Git 前必须 commit/stash (KEY_LEARNINGS #58)
+- 任何 destructive git (`filter-repo` / `reset --hard` / `clean -fdx` / `checkout -- .`) 前
+  - 跑 `git status` verify clean
+  - 有 uncommitted modified → 立即 commit 或 stash
+  - 跨多 agent 工作时 PM 协调 verify 所有 agent self-commit 后再 destructive
+- Spawn destructive 任务 spawn prompt 必含 "verify git status clean" + "self-commit 强制"
+
+#### 5. Google 自动 revoke 行为 (5/22 实证)
+- 即使 force push 清 git history, GitGuardian 仍可能向 Google 报告
+- Google 可能在 4-12h 内主动 disable 泄漏 key
+- 教训: 一旦 GitGuardian 警报 → 立即假设 key 已死, 立即生成新 key (不等观察期)
+
+### 验收
+
+- ✅ Layer 0 SECRET SCANNER 实测拦截 (5/23 16:35 PM verify)
+- ✅ Gemini key rotation 流程跑通 (5/23 16:44 PM 自做 5 min, 0 派 DevOps)
+- ✅ KEY_LEARNINGS #58 沉淀 (5/22 19:30)
+- ✅ memory feedback_shared_db_only + feedback_local_backend_no_reload 协同
+
+### 关联
+
+DEC-030 (Ben 方案 B pre-commit hook) + KEY_LEARNINGS #58 (destructive git) + TASK-SECRET-LEAK-REMEDIATION + TASK-GEMINI-KEY-ROTATE-AFTER-GOOGLE-REVOKE
+
+---
+
 ## DEC-036: Wave 14 (5/15 18:00) — 4 RISK 全修 + anthropomorphic_animal 真根因 + B51 fallback 6 中文来源
 
 **日期**: 2026-05-15 17:55
