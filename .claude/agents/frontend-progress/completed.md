@@ -4,6 +4,24 @@
 
 ---
 
+## TASK-WAVE-11-LP-IMAGE-LCP-PRIORITY LP 首屏 LCP 图 priority (2026-05-24)
+
+**模型**: Sonnet 4.6
+**文件改动 (1)**: `frontend/src/components/sections/Showcase.tsx`
+
+**任务**: LP 主页 `/comics/story-a/shot_01.png` `<Image>` 加 priority prop, 消除 Next.js LCP warn
+
+**分析**:
+- HeroSection.tsx 中已有 `priority={index < 2}` (index=0 时 = priority={true}), 正确覆盖
+- Showcase.tsx grid 中 story-a/shot_01.png 无 priority, 被 Next.js LCP 检测机制识别为 LCP 图 → 触发 warn
+- 修复: `priority={work.image === "/comics/story-a/shot_01.png"}` — 只给这一张加 priority (Surgical)
+
+**验证**: npm run build 20 routes 0 errors (Compiled successfully)
+
+**越权 verify**: 仅改 frontend/src/components/sections/Showcase.tsx 一行, 0 越权
+
+---
+
 ## T22-NEW-8 StageB confirm-outline wire 审查 (2026-05-22)
 
 **模型**: Sonnet 4.6

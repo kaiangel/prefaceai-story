@@ -1,6 +1,6 @@
 # Frontend 状态速览（供其他Agent参考）
 
-> 更新时间: 2026-05-22 [T22-NEW-8] confirm-outline 审查完成 — 已实现, 0 代码修改
+> 更新时间: 2026-05-24 [TASK-WAVE-11-LP-IMAGE-LCP-PRIORITY] LP 首屏 LCP priority 修复完成
 
 ## T22-NEW-8 StageB confirm-outline wire 审查 (2026-05-22) ✅
 

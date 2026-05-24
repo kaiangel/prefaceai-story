@@ -196,6 +196,7 @@ export default function Showcase() {
                   fill
                   className="object-cover transition-transform duration-slow group-hover:scale-105"
                   sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  priority={work.image === "/comics/story-a/shot_01.png"}
                 />
 
                 {/* Hover Overlay */}

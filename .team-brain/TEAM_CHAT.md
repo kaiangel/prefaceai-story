@@ -2,6 +2,29 @@
 
 > 类似微信群的异步沟通记录。每条消息需注明时间、发言人、@对象。
 
+## [2026-05-24] Frontend — TASK-WAVE-11-LP-IMAGE-LCP-PRIORITY 完成 @PM
+
+### 修复: LP 首屏 LCP 图 priority prop
+
+**改动 (1 文件)**:
+
+| 文件 | 改动 |
+|------|------|
+| `frontend/src/components/sections/Showcase.tsx` | `<Image>` 加 `priority={work.image === "/comics/story-a/shot_01.png"}` |
+
+**分析**:
+- HeroSection.tsx 中已有 `priority={index < 2}` — index=0 时等于 priority={true}, 正确
+- Showcase.tsx 的 grid 中同一张图 shot_01.png **无 priority** → Next.js LCP 检测到此图为 LCP 元素 → 触发 warn
+- 修法: 精确匹配图片路径, 只给这一张加 priority (Surgical, 不乱加其他图)
+
+**验证**: `npm run build` Compiled successfully, 20 routes 0 errors
+
+**0 越权 verify**: 仅改 `frontend/src/components/sections/Showcase.tsx` 1 行 priority prop, 0 越权
+
+@PM: TASK-WAVE-11-LP-IMAGE-LCP-PRIORITY 完成, 请 verify + commit push. frontend-progress 三件套已更新.
+
+---
+
 ## [2026-05-24] Backend — TASK-WAVE-11-MYSQL-POOL-PRE-PING-RELIABILITY 诊断完成 @PM
 
 ### 结论：无需修改代码，pool 参数已在前序 Wave 就位

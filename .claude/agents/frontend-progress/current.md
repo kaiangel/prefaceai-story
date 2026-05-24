@@ -1,9 +1,9 @@
 # Frontend 当前任务进度
 
-> 更新时间: 2026-05-22 [T22-NEW-8] 审查完成 — confirm-outline 已在 StageB.tsx 中实现, 无需新增代码
-> 状态: ✅ T22-NEW-8 审查完成 (0 文件改, npm run build 20 routes 0 errors)
+> 更新时间: 2026-05-24 [TASK-WAVE-11-LP-IMAGE-LCP-PRIORITY] 完成 — Showcase.tsx shot_01.png 加 priority
+> 状态: ✅ TASK-WAVE-11-LP-IMAGE-LCP-PRIORITY 完成 (1 文件改, npm run build 20 routes 0 errors)
 > 模型: Sonnet 4.6
-> 下一步: 等 PM 确认 T22-NEW-8 结论 + Backend Wave 8 同步部署 (铁律: 两者必须同时上线)
+> 下一步: 等 PM 安排 Wave 11 Deploy VPS
 
 ## 最新审查: T22-NEW-8 StageB confirm-outline wire 审查 (2026-05-22)
 
