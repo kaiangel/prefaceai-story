@@ -1,6 +1,6 @@
 # Backend Agent - 给其他 Agent 的上下文
 
-> **最后更新**: [2026-05-23] ✅ Wave 10 Backend 接力完成 — P3-1 + P3-2 wire, 81+227 PASS, 0 退化, 0 越权
+> **最后更新**: [2026-05-24] ✅ Wave 11 TASK-WAVE-11-MYSQL-POOL-PRE-PING-RELIABILITY 诊断完成 — pool 参数已在 Wave 4+T20-53 就位，无需改代码；middleware retry 决策不加；66 PASS 0 退化
 
 ---
 

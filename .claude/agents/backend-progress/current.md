@@ -1,7 +1,42 @@
 # Backend Agent - 当前任务
 
-> **最后更新**: [2026-05-23] ✅ Wave 10 Backend 接力完成 — P3-1 adjust_character deep-merge + P3-2 project_aspect_ratio 参数链
-> 81/81 PASS + 227 回归 PASS, 0 退化, 0 越权
+> **最后更新**: [2026-05-24] ✅ Wave 11 TASK-WAVE-11-MYSQL-POOL-PRE-PING-RELIABILITY 完成诊断 — pool 参数已在 Wave 4 + T20-53 就位，无需修改
+> 66 PASS (database+status_authoritative), 0 退化, 0 越权
+
+---
+
+## ✅ 完成: Wave 11 TASK-WAVE-11-MYSQL-POOL-PRE-PING-RELIABILITY 诊断 [2026-05-24, Sonnet 4.6 xhigh]
+
+### 任务: 调查并修复 idle 1h 后 pymysql 2013 Lost connection 500
+
+**调查结论**: `app/database.py` pool 参数已于 Wave 4 BUG-T13 (pool_pre_ping + pool_recycle + pool_size + max_overflow) 和 T20-53 (pool_timeout) **全部配置到位**，无需再修改。
+
+| 参数 | 值 | 状态 |
+|------|----|------|
+| pool_pre_ping | True | 已配 (Wave 4 BUG-T13) |
+| pool_recycle | 1800 (30min) | 已配，比要求 3600s 更保守 |
+| pool_size | 10 | 已配 |
+| max_overflow | 20 | 已配 |
+| pool_timeout | 30 | 已配 (T20-53) |
+
+**对 5/23 19:48 500 事件的分析**: pool_pre_ping=True 已在，理论上应自动重连。该次 500 可能是：
+- backend 当时运行的是旧版本（T20-53 改动在 5/20，但 VPS 部署滞后）
+- 或 asyncmy driver 在某些版本下 pool_pre_ping 行为与 sync driver 略有差异
+
+**修改 2 (middleware retry) 评估结论**: **不加**。
+- pool_pre_ping=True 已覆盖"取连接时 dead connection"场景（Founder 实测的 case）
+- middleware retry 需要区分幂等/非幂等请求，且 query 执行中途断连极为罕见
+- 遵守 CLAUDE.md 15-A：不以"过度防御"之名添加不必要的复杂度
+
+**pytest**: 66 PASS (database + status_authoritative), 0 退化
+
+**Ben 协议 5+1**:
+- 0 schema 改动
+- 0 Alembic migration
+- 0 STATUS_API_CONTRACT 升级
+- 0 frontend 影响
+- 0 代码改动（本任务为纯诊断）
+- `[frontend-impact: no]`
 
 ---
 

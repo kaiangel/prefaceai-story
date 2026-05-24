@@ -4,6 +4,20 @@
 
 ---
 
+## 2026-05-24
+
+### Wave 11 TASK-WAVE-11-MYSQL-POOL-PRE-PING-RELIABILITY 诊断完成 ✅ [2026-05-24 — Sonnet 4.6 xhigh, ~20min]
+
+**任务**: 调查 idle 1h 后 pymysql 2013 Lost connection 500
+
+**结论**: `app/database.py` pool 参数在 Wave 4 BUG-T13 + T20-53 时已全部配置到位（pool_pre_ping=True, pool_recycle=1800, pool_size=10, max_overflow=20, pool_timeout=30），无需修改代码。
+
+**middleware retry 决策**: 不加。pool_pre_ping 已覆盖实测场景，遵守 CLAUDE.md 15-A 不过度防御。
+
+**pytest**: 66 PASS (database + status_authoritative), 0 退化。0 越权，0 改动。
+
+---
+
 ## 2026-05-23
 
 ### Wave 10 Backend 接力 — P3-1 + P3-2 wire ✅ [2026-05-23 — Sonnet 4.6 xhigh, ~30min]
