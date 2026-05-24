@@ -2,6 +2,34 @@
 
 > 类似微信群的异步沟通记录。每条消息需注明时间、发言人、@对象。
 
+## [2026-05-24] DevOps — TASK-WAVE-11-DEPLOY-VPS 完成 @PM
+
+### VPS 第 3 次部署完成 (c570c2d → 648b81c)
+
+**部署范围**: Wave 10 AI-ML + Wave 10 Backend + Wave 11 Frontend
+
+**verify 全通过**:
+
+| 检查项 | 结果 |
+|--------|------|
+| rsync md5 5 文件 | 100% 一致 ✅ |
+| api image | sha256:47ed6871 (--no-cache) ✅ |
+| frontend image | sha256:3a17b649 (--no-cache) ✅ |
+| 容器状态 | api (healthy) + frontend (Up) + redis (healthy) ✅ |
+| 容器内 /health | {"status":"healthy"} ✅ |
+| /api/health | HTTP 200 ✅ |
+| 主页 prefaceai.mov | HTTP 200 ✅ |
+| Wave 10 const | CHARACTER_FIELD_PRESERVATION_RULES + ASPECT_RATIO_FIDELITY_RULES × 4 ✅ |
+| pool_pre_ping | True (5/23 MySQL 500 修复) ✅ |
+
+**5/23 MySQL 500 状态**: 修复 — VPS 此次升级后已含 pool_pre_ping=True + pool_recycle=1800s，死连接自动重建
+
+**Ben 协议 5+1**: 0 schema / 0 Alembic / 0 STATUS_API / [frontend-impact: no] / 0 越权
+
+@PM: TASK-WAVE-11-DEPLOY-VPS 完成。devops-progress 三件套已更新。
+
+---
+
 ## [2026-05-24] Frontend — TASK-WAVE-11-LP-IMAGE-LCP-PRIORITY 完成 @PM
 
 ### 修复: LP 首屏 LCP 图 priority prop

@@ -5,19 +5,23 @@
 
 ---
 
-## 当前状态速览（5/21 23:XX）
+## 当前状态速览（2026-05-24 VPS 第 3 次部署完成）
 
-**DevOps 状态**: ⏳ 等 VPS 部署派工（Layer 1 完成 + 内测启动后）
+**DevOps 状态**: 🟢 空闲 — TASK-WAVE-11-DEPLOY-VPS 完成
 
-**5/19 之后发生了什么（PM 直接操作，DevOps 未派工）**：
-- 5/20-5/21 多波次 backend 重启（Wave 1/2/3/4/5 后台 agent 完成后）
-- 5/21 Alembic 006 (`006_add_scene_references_t21_new7`) — PM 直接跑 `alembic upgrade head`，2 次 error 后加幂等兜底成功。本地 DB 新增 2 列: `projects.scene_references_confirmed` + `project_chapters.scene_references_json`
-- Backend stuck PID 34613 历史 kill -9（PM 操作，DevOps 未参与）
-- Wave 5 Backend Opus 4.7 完成 T21-NEW-3/4/5/6/7（含 Stage 4.5 大架构改造），未重启
-- Wave II Frontend Opus 4.7 完成 T21-NEW-7 Frontend（SceneRefsPreview 对偶组件）
-- Wave III（PM 承诺自做）：alembic + 干净重启 + monitors
+**VPS 当前版本**: 648b81c (Wave 10 AI-ML + Wave 10 Backend + Wave 11 Frontend)
 
-**Layer 1 (T22-NEW-3 Identity Anchor Framework) 是当前主线**，完成后 PM 会派 VPS 部署任务给 DevOps。
+**5/24 VPS 第 3 次部署（TASK-WAVE-11-DEPLOY-VPS）**:
+- rsync 5 个目录/文件: app/services/ + app/api/ + app/prompts/ + app/database.py + frontend/src/ — md5 100% 一致
+- Docker rebuild api (sha256:47ed6871) + frontend (sha256:3a17b649) --no-cache
+- force-recreate api + frontend
+- 全 verify 通过: /api/health 200 + 主页 200 + 容器 healthy + Wave 10 const × 4 + pool_pre_ping ✅
+- 5/23 MySQL 500 (pool 死连接) 根因：VPS 版本滞后，此次升级后 pool_pre_ping=True 已在容器内生效
+
+**VPS 部署历史**:
+- 第 1 次 (2026-05-22 ~19:45): Wave 8 初次部署 (f9987b0 → f9987b0)
+- 第 2 次 (2026-05-22 19:50): Wave 9+9.1+Tester (→ c570c2d, PM 代 Docker rebuild)
+- 第 3 次 (2026-05-24): Wave 10+11 (→ 648b81c)
 
 ---
 

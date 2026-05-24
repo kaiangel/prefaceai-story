@@ -1,8 +1,42 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-05-22 19:50 — TASK-WAVE-9-DEPLOY 完成 (PM 代 DevOps, 因 agent classifier 拦 Docker rebuild)
-> **状态**: 🟢 VPS 第 2 次部署完成, 全 verify 通过, 等 Founder spot-check
-> **Step 6 SECRET-LEAK 状态**: Step 6 (key rotation) 跳过 (Founder 5/22 17:10 决策 Google 控制台限额兜底)
+> **最后更新**: 2026-05-24 — TASK-WAVE-11-DEPLOY-VPS 完成 (DevOps Sonnet 4.6 effort high 全程自执行)
+> **状态**: 🟢 VPS 第 3 次部署完成 (c570c2d → 648b81c), 全 verify 通过
+> **当前空闲**, 等待 PM 下一任务
+>
+> SECRET-LEAK 历史: Step 6 (key rotation) 5/22 跳过 (Founder 决策 Google 控制台限额兜底)
+
+---
+
+## TASK-WAVE-11-DEPLOY-VPS [2026-05-24 开工 / 完成] (DevOps Sonnet 4.6 effort high 全程自执行)
+
+**背景**: VPS 跑 c570c2d (Wave 9+9.1+Tester)，升级到 648b81c (Wave 10 AI-ML + Wave 10 Backend + Wave 11 Frontend)。同时 5/23 MySQL 500 修复（VPS pool 配置升级）。
+
+**执行摘要**:
+
+| Step | 内容 | 状态 |
+|------|------|------|
+| 0 | git status verify (HEAD=648b81c, GitHub HEAD=648b81c) | ✅ |
+| 1 | git rev-parse + gh api 验证 GitHub HEAD | ✅ |
+| 2 | rsync 5 个目标: services/ + api/ + prompts/ + database.py + frontend/src/ | ✅ |
+| 2v | md5 verify 5 文件 100% 一致 | ✅ |
+| 3 | Docker rebuild api --no-cache (sha256:47ed6871) | ✅ |
+| 3b | Docker rebuild frontend --no-cache (sha256:3a17b649) | ✅ |
+| 4 | force-recreate api + frontend | ✅ |
+| 5a | 容器状态: docker-api-1 Up healthy / docker-frontend-1 Up / docker-redis-1 healthy | ✅ |
+| 5b | 容器内 /health: {"status":"healthy"} | ✅ |
+| 5c | 外部 /api/health: HTTP 200 + 主页: HTTP 200 | ✅ |
+| 5d | 容器内 Wave 10 const grep: CHARACTER_FIELD_PRESERVATION_RULES + ASPECT_RATIO_FIDELITY_RULES = 4 处 | ✅ |
+| 5e | 容器内 pool_pre_ping verify: 2 处日志 + 注释 | ✅ |
+| 6 | devops-progress 三件套 + TEAM_CHAT + self-commit + push | ✅ |
+
+**关键细节**:
+- rsync trailing slash 正确: `app/services/` → `/opt/xuhua-story/app/services/`，`frontend/src/` → `/opt/xuhua-story/frontend/src/`
+- database.py rsync: speedup=31.96 (92 bytes only) — 文件已与 VPS 一致，pool 配置早已在 VPS
+- frontend 第 1 次 rebuild 38 行即退出（SSH 管道超时），第 2 次 rebuild 成功 (sha256:3a17b649)
+- 5/23 MySQL 500 根因: VPS 版本滞后 (c570c2d) 不含 pool_pre_ping，此次升级到 648b81c 修复
+
+**Ben 协议 5+1**: 0 schema / 0 Alembic / 0 STATUS_API / 0 frontend 代码改动（仅 rsync） / 0 越权
 
 ---
 
