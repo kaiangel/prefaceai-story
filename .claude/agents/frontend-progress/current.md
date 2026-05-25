@@ -1,9 +1,57 @@
 # Frontend 当前任务进度
 
-> 更新时间: 2026-05-24 [TASK-WAVE-11-LP-IMAGE-LCP-PRIORITY] 完成 — Showcase.tsx shot_01.png 加 priority
-> 状态: ✅ TASK-WAVE-11-LP-IMAGE-LCP-PRIORITY 完成 (1 文件改, npm run build 20 routes 0 errors)
-> 模型: Sonnet 4.6
-> 下一步: 等 PM 安排 Wave 11 Deploy VPS
+> 更新时间: 2026-05-24 [TASK-TEST26-FRONTEND-4] 完成 — adjust 异步轮询 + ETA 插值 + NETWORK_ERROR 计时 + 404 分级
+> 状态: ✅ 4 项完成 (5 文件改, npm run build 20 routes 0 errors, tsc 0, useETA 15/15 PASS, lint 0 新增)
+> 模型: Opus 4.7 xhigh
+> 下一步: 等 PM 审查 + Founder e2e 实测 (重点验"陈明转圈"消失)
+
+## 最新完成: TASK-TEST26-FRONTEND-4 (2026-05-24, test26 4 前端问题)
+
+### 背景
+test26 (cyberpunk + ai_entity) 全维度回溯暴露 4 个前端问题 (TEST26_FULL_RETROSPECTIVE):
+P2-1 adjust 转圈 (陈明"重新生成"死等 90s + POST 发 3 次) / P2-2 ETA Stage 1-4 冻结 / P3-2 NETWORK_ERROR 96min 异常计时 / P3-3 404 日志分级不一致.
+
+### 改动 5 文件 (0 越权, 全在 frontend/src)
+
+| 文件 | 任务 | 改动 |
+|------|------|------|
+| `StageC.tsx` | ① P2-1 | `handleApplyAdjustment` 改异步轮询 (POST→202 拿 job_id → 轮询 GET adjust-jobs/{job_id} 每 2s 直到 completed/failed); 加 `adjustJobMsg` state; loading UI 显 stage_message+progress (不再裸 spinner); completed 用 cache-buster 刷 portraitUrl + 清 portraitErrors; failed 读 error 提示 |
+| `useETA.ts` | ② P2-2 | P1 backend authoritative 分支加时间插值: anchor (last backend value + 首见时刻), 同值冻结时按 elapsed 平滑递减, 新值来时 re-anchor; floor 在 NEAR_ZERO_SEC 防 Stage 1-4 误显"即将完成"; resetForStage 重置 anchor |
+| `useETA.test.ts` | ② P2-2 | 加 `testP22_BackendEtaInterpolation` (15/15 PASS): 首见verbatim / 冻结递减 / 新值re-anchor / NEAR_ZERO floor / 小值floor |
+| `api.ts` | ③ P3-2 | NETWORK_ERROR catch: elapsed>120s 或 document.hidden → 判 tab 挂起, 降级 console.error→console.warn + 标注"elapsed unreliable"; 真网络错 (<2min + 可见) 仍 console.error |
+| `layout.tsx` | ④ P3-3 | fetch wrapper 对 `/chapters/{n}/(status|story|storyboard|bgm|scene-references)` 的 404 改记 `level: 'routine-404'` (原全记 level:'network'), 与应用层 routine warn 统一 |
+
+### 严格遵循 §9.7 契约
+- POST adjust 读 `job_id` (§9.7.1)
+- GET adjust-jobs/{job_id} 读 `status`/`progress`/`stage_message`/`result`/`error` (§9.7.2 精确字段名, 无自创)
+- completed → `result.portrait_url` + `result.character.description_zh` (§9.7.2 result shape)
+- 404 = 过期/未注册 → 重试 (§9.7.2)
+- DEC-030: 前端只按 status+progress 派生 loading UI, 不本地猜 90s
+
+### 关键设计决策
+- **reroll (留空) 不动**: §9.7.3 明确 regenerate-portrait 本轮未异步化, `handleRegenerate` 仍同步, 保持原样
+- **ETA 插值不破坏 backendEstimatedSecondsRef (T20-9)**: 插值只在 P1 branch 内平滑*显示*同一 backend 值, 优先级链 + isBackendAuthoritative bypass smoothing 全保留
+- **NETWORK_ERROR 真伪区分**: 1.25min (MySQL 真 transient, tab 可见) 仍 error; 96min/18min (tab 挂起) 降 warn
+- **P3-3 真根因**: silentStatuses 只压 api.ts 内部 warn, layout.tsx 全局 fetch wrapper 独立记 level:network — 故 18 个 pre-confirm 404 全混进 network bucket. 改 wrapper 按 endpoint 分流 routine-404
+
+### 验证
+- ✅ `npx tsc --noEmit` 0 errors
+- ✅ `npm run build` 20 routes 0 errors (warnings 全 pre-existing img)
+- ✅ `npx ts-node useETA.test.ts` 15/15 PASS
+- ✅ `npx next lint` 我改的 5 文件 0 新增 warning
+- ✅ 0 越权 (仅 frontend/src: StageC/useETA/useETA.test/api/layout)
+
+### 等 Founder e2e 实测
+| 验证项 | 期望 |
+|------|------|
+| adjust (填描述重生) | 点"重新生成"后 loading 显 "AI 重绘中 X%", 不再死等转圈; 完成自动刷新头像; POST 只发 1 次 |
+| adjust 失败 | 显 "调整失败：{原因}" toast |
+| ETA Stage 1-4 | "预计还需约 N 分钟"随时间递减, 不冻结在固定值 |
+| NETWORK_ERROR | tab 挂起后 client.log 不再有 error-level "NETWORK_ERROR 96min" (改 warn) |
+| 404 分级 | /outline 停留, pre-confirm 404 记 level:'routine-404' (非 network/error) |
+
+---
+
 
 ## 最新审查: T22-NEW-8 StageB confirm-outline wire 审查 (2026-05-22)
 

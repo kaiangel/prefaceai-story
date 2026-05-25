@@ -238,7 +238,7 @@ Flash模型仅用于参考图生成（无多角色混淆风险），成本仅为
 
 **技术实现要点**：
 - 串行生成参考图：先肖像 → 用肖像作为参考生成全身图
-- 场景图生成时传入角色参考图（仅fullbody）+ 场景参考图
+- 场景图生成时传入角色参考图（**SQ-2 智能选择 portrait vs fullbody**：close-up/medium-shot ≤ 2 角色 → portrait, 其余 → fullbody）+ 场景参考图 — 见下方 L301
 - 详细的角色描述：physical字段（含face_shape, skin_tone, eye_description）+ clothing字段
 - `_extract_actual_characters_from_description()` 智能提取实际出场角色
 - `_build_identity_line()` 构建含面部特征的身份描述
@@ -656,6 +656,15 @@ python tests/test_character_consistency_regression.py
     - 不要写 `field1 or field2` 这种兼容旧字段的代码
     - 如果LLM输出旧格式，修改prompt而不是写兼容代码
     - 理由：兼容代码会快速变成"屎山"，难以维护
+
+15-A. **简化的红线 — 防御性 fallback 不可删（Karpathy Simplicity 规则的项目豁免，DEC-051）**：
+    全局 CLAUDE.md 的 "Simplicity First / No error handling for impossible scenarios" 适用于**真正不可能的场景**，但**严禁**以"简化"名义删除以下已知 transient error 的兜底：
+    - `LLMFallbackChain`（Haiku→Gemini→Sonnet，T22-NEW-4）
+    - Stage 1-5 LLM 的 Gemini→Claude fallback（T20-14，5/22 Google 封 key 时救了整个 Pipeline）
+    - `ShotValidator` retry（T17）
+    - Layer 1 inject 的 try/except 兜底（W9-1/W9.1）
+    - `image_generator` 重试 3 次 / 所有服务降级策略
+    判据：API overload / key 失效 / 模型不听话 = **已知高频场景**，不是 impossible scenario。删任何 fallback 前必须 @pm 确认。
 
 ### 文档更新规则
 16. **每批代码任务完成后，必须先更新对应的团队文档，再汇报完成**。文档更新不是可选项，而是任务完成的前置条件。

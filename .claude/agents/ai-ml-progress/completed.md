@@ -4,6 +4,45 @@
 
 ---
 
+## 2026-05-24 — Wave 12 P1: style 画风漂移系统评估 + 分层修复 ✅ (Opus 4.7 xhigh)
+
+**背景**: test26《深夜小七》cyberpunk + ai_entity 实测老周(写实)/陈明(动漫)画风分叉。PM 发现 cyberpunk 是 28 style 唯一「0 画风锁定」。任务: 全 28 style 四维评估 + 高风险实测 + 分层补强 + 不破坏 by-design 动漫类。
+
+**架构根因 (完整调用栈)**:
+- Seedream payload (`_build_payload`) 无 negative_prompt → `build_style_negative_prompt()` 对 Seedream 无效。
+- forbidden/mandatory 影响 Seedream 唯一通道 = prefix 的 DO NOT USE/MUST INCLUDE 行, 取 forbidden[:8]/mandatory[:5] (`build_mandatory_prefix` + `extract_style_anchors` 同切片)。
+- shot 路径 dispatch (image_generator L1086/L1726) 不传 full_prompt → shot 用 Stage 4 LLM image_prompt 原文, 不过 enforce_prompt; forbidden/mandatory 经参考图路径 (RIM L381/L621) + Layer 1 inject (`_render_style_anchor_block` top5/top8) 生效。
+- **铁律: anti-anime 词必须挤进 forbidden[:8]/mandatory[:5]**。
+
+**28 style 实测校准** (强动漫先验角色 28岁帅哥, doubao-seedream 直生, `scripts/style_drift_probe.py`):
+| style | PM纸面 | 实测 | 证据 |
+|---|---|---|---|
+| cyberpunk | 🔴 | 🔴确认 | 二次元帅哥 |
+| pastel_dream | 🟡 | 🔴上调 | full anime 美少年 |
+| gothic | 🟡 | 🟡轻 | 光面CG idol |
+| ink/watercolor/ukiyo_e | 🔴 | 🟢下调 | 真水墨/水彩/木版画(介质锚点守住) |
+| pixel | 🟡 | 🟢下调 | 真16-bit像素 |
+| noir | 🟡 | ✅守住 | B&W摄影 |
+| 其余 20 (含 realistic/cartoon/anime/manga/ghibli/...) | — | OK | 防护足/by-design |
+
+根因模式: 漂移 ⟺ mandatory[:5] 只锁氛围/色调/场景不锁渲染介质 + forbidden[:8] 无 anti-anime。
+
+**改动 (style_enforcer.py, 3 style 逐个甄别)**:
+- cyberpunk: mandatory[:5] +photorealistic +cinematic film still (+realistic skin texture 后置) / forbidden[:8] +anime/cartoon/manga/cel-shaded/2D illustration/stylized digital painting/glossy idol render/chibi (场景排除词后置保留)
+- pastel_dream: mandatory[:5] +soft painterly illustration +airbrushed soft shading (不加 photorealistic) / forbidden[:8] +cel-shaded/hard anime lineart/manga/sharp ink outlines/glossy idol render
+- gothic: mandatory dark romantic aesthetic→dark romantic painting / forbidden[:8] +anime/cel-shaded/manga/glossy idol render
+
+**未动** (实测守住): ink/watercolor/ukiyo_e/pixel/noir。**零破坏 by-design**: cartoon/ghibli/manga/chibi/illustration/korean_webtoon/anime/slam_dunk。
+
+**实测验证**: cyberpunk 强改善(→真写实电影感)/pastel_dream 改善(硬动漫→柔笔触)/gothic 轻横移。
+
+**回归**: 377 PASS 0 FAIL 0 退化; 28/28 prefix render OK; DEC-051 0 删 fallback。
+
+**文件**: style_enforcer.py(改) + scripts/style_drift_probe.py(新) + STYLE_ANTI_ANIME_FORBIDDEN_GAP 第七章 + progress 三件套。
+**Ben 协议**: [frontend-impact: no] 0 API/0 schema/0 STATUS_API/0 Alembic。
+
+---
+
 ## 2026-05-23 — Wave 10 AI-ML: 6 项 P2 + P3 内测后清理 ✅ (Opus 4.7 default thinking)
 
 **背景**: test27 e2e 实战发现 6 项 issue (P2-2 + P3-1-5)，PM 5/23 14:35 派工。

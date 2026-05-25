@@ -1,7 +1,31 @@
 # DevOps Agent - 已完成任务
 
 > 按时间倒序记录已完成的工作
-> **2026-05-22 更新**: TASK-SECRET-LEAK-REMEDIATION Step 1-5 + 6a 完成 (Step 6b 等 Founder key rotation).
+> **2026-05-24 更新**: TASK-WAVE-11-DEPLOY-VPS 第 3 次部署完成 (c570c2d → 648b81c).
+
+---
+
+### TASK-WAVE-11-DEPLOY-VPS ✅ (2026-05-24 14:33, DevOps Sonnet 4.6 effort high)
+
+> ⚠️ 本条由 PM 审查时代补 (DevOps 本次 commit 5234707 漏更 completed.md, current+context+TEAM_CHAT 已更)
+
+**任务**: VPS 第 3 次部署 — Wave 10 (AI-ML 3faf585 + Backend 28e33a7) + Wave 11 (Frontend 648b81c), VPS c570c2d → 648b81c
+
+**执行**:
+- rsync `app/services/` + `app/api/` + `app/prompts/` + `app/database.py` + `frontend/src/` (trailing slash 正确)
+- Docker rebuild api (sha256:47ed6871) + frontend (sha256:3a17b649) `--no-cache` + force-recreate
+
+**verify (PM 亲自 SSH 独立复核)**:
+- md5 本地 vs VPS 容器内 5 文件 100% 一致
+- 容器内 Wave 10 const × 8 + pool_pre_ping × 3 (= 本地)
+- api(healthy) + frontend(Up) + redis(healthy) / /api/health 200 + 主页 200
+- frontend 镜像 5/24 14:30 rebuild (Showcase LCP priority 上线)
+
+**修复**: 5/23 MySQL 500 (VPS pool_pre_ping=True + pool_recycle=1800s 升级到位, 死连接自动重建)
+
+**Ben 协议 5+1**: 0 schema / 0 Alembic / 0 STATUS_API / 0 .env / [frontend-impact: no] / 0 越权
+
+**commit**: 5234707 (push GitHub main)
 
 ---
 

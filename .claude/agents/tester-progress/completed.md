@@ -4,6 +4,20 @@
 
 ---
 
+## 2026-05-25 — TASK-WAVE12-INDEPENDENT-RETEST ✅ (58+15=73 new PASS, 0 退化)
+
+**任务**: Wave 13 #1 — Wave 12 三项改动独立复测 (style 画风 / adjust 异步 / ETA 不冻结)
+
+**新建文件**: `tests/test_wave12_style_anti_anime.py` (58 cases)
+
+**核心结论**:
+- 3 style 画风防护 (cyberpunk/pastel_dream/gothic): 58/58 PASS — mandatory/forbidden 前缀配置正确, by-design 动漫类 0 破坏
+- adjust 异步端到端: 15/15 PASS — AdjustJobManager 全功能验证
+- ETA Stage 1-4 不冻结: character_design band (6,10) 正确, ETA 单调递减
+- pytest 全量: 0 新退化 (15 pre-existing fail 全确认为 Wave 11 baseline 时已存在)
+
+---
+
 ## 2026-05-23 — TASK-T22-NEW-1-TEST-ISOLATION-EXTENDED ✅ (44/44 PASS, 0 errors)
 
 **任务**: test_status_authoritative 综合跑 mock 污染修复 (T22-NEW-1)

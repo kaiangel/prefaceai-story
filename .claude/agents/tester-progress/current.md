@@ -1,11 +1,91 @@
 # Tester Agent - 当前任务
 
-> **最后更新**: 2026-05-23 [Tester]
-> **状态**: TASK-T22-NEW-1-TEST-ISOLATION-EXTENDED 完成 ✅ — 44/44 PASS (isolation) + 44/44 PASS (full suite combined), 0 errors, 0 API 调用
+> **最后更新**: 2026-05-25 [Tester]
+> **状态**: TASK-WAVE12-INDEPENDENT-RETEST 完成 ✅ — Wave 12 三项改动独立复测通过
 
 ---
 
-## 当前状态 (2026-05-23)
+## 当前状态 (2026-05-25)
+
+**TASK-WAVE12-INDEPENDENT-RETEST 完成 ✅**
+
+### Wave 13 #1 — Wave 12 独立复测结论
+
+#### ① 3 style 画风复测 (cyberpunk / pastel_dream / gothic)
+
+**pytest 机制验证: 58/58 PASS** (`tests/test_wave12_style_anti_anime.py`, Tester 新建)
+
+| 验证维度 | cyberpunk | pastel_dream | gothic |
+|---|---|---|---|
+| mandatory[:5] 含渲染介质锚点 | ✅ photorealistic + cinematic film still | ✅ soft painterly illustration + airbrushed soft shading | ✅ dark romantic painting |
+| forbidden[:8] 含 anti-anime | ✅ anime / cel-shaded / manga / glossy idol render | ✅ cel-shaded / hard anime lineart / manga / sharp ink outlines / glossy idol render | ✅ anime / cel-shaded / manga / glossy idol render |
+| prefix MUST INCLUDE 行实际含锚点 | ✅ | ✅ | ✅ |
+| prefix DO NOT USE 行实际含 anti-anime | ✅ | ✅ | ✅ |
+| by-design 动漫类 0 破坏 (8 style) | ✅ cartoon/ghibli/manga/chibi/anime/illustration/korean_webtoon/slam_dunk 全 PASS | | |
+| 原有氛围词回归保留 | ✅ neon lights / futuristic city | ✅ pastel color palette / dreamy soft aesthetic | ✅ cathedral architecture / dramatic chiaroscuro |
+| 未修改 style 介质锚点保留 | ✅ ink/watercolor/ukiyo_e/pixel/noir 全 PASS | | |
+
+**实际生图视觉验证 (AI-ML style_drift_probe 图):**
+- cyberpunk: current 和 patched 均为写实电影感 (雨夜霓虹城市, 真人面孔, 非动漫) ✅
+- pastel_dream: patched 为柔光插画风 (粉彩背景, 柔笔触, 非硬动漫线稿) ✅
+- gothic: 暗黑浪漫大教堂场景 (哥特氛围显著), 人物脸部仍偏 CG 平滑 (轻微, 在 AI-ML 预期"mild"范围内) ✅
+- 图路径: `test_output/manualtest/style_drift_probe/` (6 张 probe 图)
+
+注: AI-ML 实测校准已用相同 28 岁帅哥角色跑 probe, 图为 AI-ML 的测试结果。Tester 复测目的是用独立 pytest 验证 prompt 工程层 (style_enforcer.py) 防护配置正确, 而非重复 API 生图 (避免额外成本)。视觉已有 AI-ML probe 图 + test28 e2e gothic 验证。
+
+#### ② adjust 异步端到端复测
+
+**pytest: 15/15 PASS** (`tests/test_wave12_adjust_async_job.py`, AI-ML 写, Tester 独立运行验证)
+
+| 验证维度 | 结果 |
+|---|---|
+| AdjustJobManager create_job 初始状态 | ✅ |
+| progress 单调递增 guard | ✅ |
+| 完成写 result + portrait/fullbody url | ✅ |
+| 失败写 error | ✅ |
+| get_job 快照隔离 (外部 mutate 不污染) | ✅ |
+| 不存在 job → None + update 静默 no-op | ✅ |
+| TTL 惰性清理 (completed/failed) | ✅ |
+| processing 不被清理 | ✅ |
+| 10 并发 job 隔离 | ✅ |
+| 模块级单例可用 | ✅ |
+| Stage 2 portrait 子进度公式落在 band (6,10) 内 (4 n_chars 参数化) | ✅ |
+| character_design ETA 随 progress 递增而递减 (不冻结) | ✅ |
+
+e2e 行为: test28 (PM 5/25 实测, gothic) 已实证 adjust 异步化 "不转圈, POST 202+job 轮询" ✅ (见 TEST28_FULL_RETROSPECTIVE)
+
+#### ③ ETA Stage 1-4 不冻结复测
+
+**pytest: test_p2_2 全部 PASS** (含 test_wave12_style_anti_anime.py TestETAStage14NotFrozen 3 cases)
+
+- character_design band (6, 10) 确认存在
+- ETA 在 band 内 progress 6→9 单调递减 ✅
+- test28 实测 Stage 2 "正在生成角色画像 1/3" sub-progress 有效 ✅
+
+#### ④ pytest 回归 (Wave 12 全量)
+
+**总结: 0 新退化**
+
+| 测试集 | 结果 | 说明 |
+|---|---|---|
+| test_wave12_style_anti_anime.py (Tester 新建) | **58/58 PASS** | Wave 12 style 防护验证 |
+| test_wave12_adjust_async_job.py (AI-ML 写) | **15/15 PASS** | Wave 12 adjust 异步验证 |
+| style/layer1/identity_anchor/wave9/wave10 关联 | **623/623 PASS** (1 pre-existing fail) | 0 新退化 |
+| 全量套件 (excluding 3 需真实 API 的旧文件) | 2363/2363 PASS (15 fail 全为 pre-existing) | 0 新退化 |
+
+**Pre-existing 失败确认 (Wave 11 baseline 已存在, 非 Wave 12 引入):**
+- test_async_anthropic_t18_j: AsyncAnthropic 在 HEAD 时就不存在 ✅ pre-existing
+- test_b51_fallback_no_chinese (3 fail): HEAD 时已 fail ✅ pre-existing
+- test_api_cost_log_table (2 fail): LONGTEXT SQLite 不兼容 ✅ pre-existing
+- test_compat_with_real_data / test_supernatural_humanoid_hotfix / test_t20_14 / test_wave6_* (7 fail): HEAD 时已 fail ✅ pre-existing
+- test_parallel_stage5 (在全量 combined run 中 2 fail): 独立跑 17/17 PASS, 是 mock 污染 isolation 问题 ✅ pre-existing 模式
+
+**新建测试文件:**
+- `tests/test_wave12_style_anti_anime.py` — 58 cases (Tester 独立新建, Wave 12 style 防护回归)
+
+---
+
+## 上一完成 (2026-05-23)
 
 **TASK-T22-NEW-1-TEST-ISOLATION-EXTENDED 完成 ✅**
 

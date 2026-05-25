@@ -1,7 +1,84 @@
 # PM Agent - 当前任务
 
-> **最后更新**: 2026-05-23 17:30
-> **状态**: 🟢 Wave 10 全完成 (P0 Gemini key + P2 + P3 + L 全做) — 剩 L-3/L-4 Founder + 可选 VPS 第 3 次部署
+> **最后更新**: 2026-05-25 12:30 (Wave 13 内测前 FIXBATCH 规划中)
+> **状态**: 🟢 Wave 13 内测前 FIXBATCH — test28 回溯 11 项 (除#8) 内测前修
+
+## Wave 13 内测前 FIXBATCH (5/25, Founder 批准除#8全修)
+
+### test28 e2e 完成 + 全维度回溯 (Wave 12 修复全验证)
+- test28《午夜钟魂》gothic+object/灵魂: gothic画风修复✅ + adjust异步✅ + 3:4✅ + 20shots✅
+- 回溯详见 analysis/TEST28_FULL_RETROSPECTIVE_2026-05-25.md + 清单 handoffs/INTERNAL_BETA_READINESS_CHECKLIST_2026-05-25.md
+- 🔑 同源洞察: P2-1性能 + MySQL idle 都是本地公网MySQL(333ms), 生产VPS内网改善
+- 新 skill: full-retrospective
+
+### 4 波规划 (11 项除#8)
+| Wave | 任务 | 负责 | 状态 |
+|---|---|---|---|
+| 1 | #1 Wave12复测 + #5b schema 5type核实 | Tester + AI-ML | ⏳ 待 Founder 确认 spawn |
+| 2 | #2 VPS部署+DB迁移+实测基线 | DevOps | ⏳ |
+| 3 | #3 hydrate聚合 + #5d MySQL retry + #6 regenerate异步 (Backend) / #4 UX + #5 404 + #9 vitest (Frontend) | Backend + Frontend | ⏳ |
+| 4 | #10 CLAUDE.md git add + #10b test25 + e2e收官 | PM + Founder | ⏳ |
+
+副作用: #5d retry 直接改(无副作用) / #3 合并端点严格测(有回归风险) / #7 安全组 Founder 有权限待查
+
+---
+（以下为 Wave 12 历史）
+
+## Wave 12 FIXBATCH (5/24 22:30, Founder 批准)
+
+## Wave 12 FIXBATCH (5/24 22:30, Founder 批准)
+
+### test26《深夜小七》(cyberpunk + ai_entity) 全程跑通 + 全维度回溯
+- ✅ Pipeline 1-6 全过, 24/24 shots, ShotValidator 24 PASS/0 FAIL, Layer 1 ABC 四象限收官
+- 回溯挖出 8 问题 (详见 .team-brain/analysis/TEST26_FULL_RETROSPECTIVE_2026-05-24.md + STYLE_ANTI_ANIME_FORBIDDEN_GAP_2026-05-24.md)
+
+### 派工 (文件零冲突)
+| 任务 | 负责 | 模型 | Wave | 状态 |
+|---|---|---|---|---|
+| P1 style 画风漂移系统评估+分层修复 (style_enforcer.py) | AI-ML | Opus 4.7 xhigh | A | ✅ 审查通过 (只动3style/实测校准/275回归) |
+| P2-1 adjust 异步化 + P2-2 sub-progress (api/projects+pipeline_orchestrator) | Backend | Opus 4.7 xhigh | A | ✅ 审查通过 (fallback真保留/15测试/Ben gap PM代补§9.7) |
+| 前端跟进 (adjust loading+ETA插值+P3) | Frontend | Opus 4.7 xhigh | B | ✅ 审查通过 (契约三方对齐/ETA插值逻辑正确/越权0/tsc0) |
+| 跨 style + adjust/ETA 复测 | Tester | Sonnet 4.6 high | C | ⏳ 待 PM 先重启 backend (52534=旧代码) |
+
+### Wave B 审查 + Wave 12 收尾 (23:50)
+- Frontend ✅: adjust 轮询三方契约对齐 + ETA 插值逻辑人工审查正确 (测试跑不了用代码审查替代)
+- 🟡 useETA.test.ts 项目无 vitest (pre-existing), 记 P3 前端测试框架缺失
+- ⏳ Wave C 前置: 本地 backend PID 52534 (17:03) = Wave 12 前旧代码, Tester 复测前 PM 须重启加载
+
+### Wave A 审查结论 (23:00)
+- AI-ML ✅ + Backend ✅ 地毯式通过 (代码层验证 fallback 非注释 + sub-progress per-char + 实测图 + 回归)
+- Ben 维度: 共享DB边界✅ + frontend-impact✅, 🟡 DEC-030 adjust-jobs 契约 PM 代补 STATUS_API_CONTRACT v1.6 §9.7
+- AI-ML 实测校准纸面: pastel_dream🟡→🔴上调 / ink·watercolor·ukiyo_e🔴→🟢下调 (介质锚点已守住)
+
+协作点: adjust 异步契约 + progress 数据格式, PM 协调 (Backend 先定 Frontend 跟)。
+不在本轮: MySQL 2003 (Ben 安全组) / Invalid HTTP + Server Action x (良性)。
+
+---
+（以下为 Wave 11 历史）
+
+## Wave 11 收尾计划 (5/24)
+
+## Wave 11 收尾计划 (5/24)
+
+### 阶段 1: 清 P3 代码 ✅
+- Step 1 ✅ DEC-051 fallback 红线 CLAUDE.md 15-A (17b6e28)
+- Step 2 ✅ MySQL pool (3b8956b no-op 诊断, Wave 4 已配, VPS 部署修复)
+- Step 3 ✅ LP image LCP priority (648b81c, Showcase.tsx surgical)
+### 阶段 2: ✅ VPS 第 3 次部署 (5234707, c570c2d → 648b81c)
+- PM 6 维度地毯式审查通过 (含亲自 SSH VPS 独立复核 md5 100% 一致 + Ben 提醒逐条 + Wave10 const 8 + pool 3)
+- 🟡 唯一发现: DevOps completed.md 漏更, PM 代补归档
+- 5/23 MySQL 500 修复 (VPS pool_pre_ping 升级到位)
+### 阶段 3: 🟡 等 Founder — test26 e2e (cyberpunk ABC 收官, 服务最新不需重启只拉监控) + spot-check test25/26/27 + 内测启动
+
+### DEC-051 karpathy-guidelines 评估裁决 (5/24)
+- 不引入独立 skill (85% 已覆盖 + ETH 实验无提升)
+- 全局 CLAUDE.md 5/24 已加 Simplicity + Surgical 保留
+- 唯一补强 15-A fallback 红线 (禁 agent 借简化删 LLMFallbackChain/T20-14/ShotValidator/Layer1 兜底)
+- ⚠️ 发现 CLAUDE.md untracked (本地生效但没进 git, pre-existing 状态, 待 Founder 决定是否 git add)
+
+---
+
+## (历史) Wave 10 全完成 (5/23 14:30-17:30)
 > **下一步**: Founder 决策 — L-3/L-4 跑 test25/26 + spot-check test27 / DevOps 第 3 次部署 Wave 10 / 内测启动
 
 ## Wave 10 全完成 (5/23 14:30-17:30)

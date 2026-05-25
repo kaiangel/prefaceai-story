@@ -608,9 +608,25 @@ class Phase2PipelineOrchestrator:
                         _portrait_style.custom_enforcement = _SE.create_custom_enforcement(custom_style_analysis)
                     _char_list = characters.get("characters", [])
                     _portrait_updated = False
-                    for _char in _char_list:
+                    # P2-2 (Wave 12 / 2026-05-24): portrait 生成是 Stage 2 内部最耗时的子步骤
+                    # (每角色 ~30s, 6 角色 = ~180s), 原本全程 progress 冻结在 6%。
+                    # 现在每完成 1 个角色推一次 sub-progress, 让 progress 在 character_design
+                    # band (6-10) 内真递增 → 前端 ETA 不冻结。
+                    _n_chars = max(len(_char_list), 1)
+                    for _ci, _char in enumerate(_char_list):
                         _char_id = _char.get("id", "unknown")
                         _char_name = _char.get("name", _char_id)
+                        # P2-2: 子步骤进度 — 在 character_design band (6→10) 内按角色数线性分布
+                        if progress_callback:
+                            try:
+                                _sub_p = 6 + int((_ci / _n_chars) * 4)  # 6,7,8,9 across chars
+                                await progress_callback(
+                                    "character_design",
+                                    _sub_p,
+                                    f"正在生成角色画像 ({_ci + 1}/{_n_chars}: {_char_name})...",
+                                )
+                            except Exception as _sub_cb_e:
+                                logger.debug(f"[Pipeline] P2-2 portrait sub-progress 失败（非阻塞）: {_sub_cb_e}")
                         print(f"  生成 {_char_name} 肖像...", end=" ")
                         try:
                             _portrait_result = await _portrait_ref_manager.generate_character_reference(

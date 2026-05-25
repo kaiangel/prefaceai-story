@@ -1,7 +1,77 @@
 # Backend Agent - 当前任务
 
-> **最后更新**: [2026-05-24] ✅ Wave 11 TASK-WAVE-11-MYSQL-POOL-PRE-PING-RELIABILITY 完成诊断 — pool 参数已在 Wave 4 + T20-53 就位，无需修改
-> 66 PASS (database+status_authoritative), 0 退化, 0 越权
+> **最后更新**: [2026-05-24] ✅ Wave 12 P2-1 (adjust 异步化) + P2-2 (Stage 1-4 sub-progress) 完成 — 252 PASS 0 退化 (Opus 4.7 xhigh)
+
+---
+
+## ✅ 完成: Wave 12 P2-1 (adjust 异步化) + P2-2 (Stage 1-4 sub-progress) [2026-05-24, Opus 4.7 xhigh]
+
+### 任务背景 (test26 实证)
+- **P2-1**: `/characters/{char_id}/adjust` 同步阻塞 90s (LLM 重写 + portrait 重生 + fullbody 重生 串行) → 前端 fetch 死等转圈, POST 重试 3 次
+- **P2-2**: progress 只在 stage 边界更新, Stage 2 portrait loop (6 角色 × ~30s) 期间 progress 冻结在 6% → ETA 冻结
+
+### 改动文件 (3 改 + 2 新)
+| 文件 | 改动 |
+|------|------|
+| `app/services/adjust_job_manager.py` | 🆕 进程内 adjust/regenerate job 注册表 (in-memory, asyncio.Lock, TTL 清理) |
+| `app/api/projects.py` | adjust_character 改异步 (202+job_id) + 新增 GET adjust-jobs/{job_id} 轮询端点 + 后台 worker `_run_adjust_character_in_background` + 核心逻辑 `_adjust_character_core` |
+| `app/services/pipeline_orchestrator.py` | P2-2: Stage 2 portrait loop 每角色推 sub-progress (band 6→9) |
+| `tests/test_wave12_adjust_async_job.py` | 🆕 15 case (job manager 契约 + P2-2 公式) |
+
+### 架构决策 — P2-1 异步 job 存储用 in-memory (不新建 DB 表)
+- adjust 是短命 (~90s) UI 操作, 角色数据变更 (portrait_url/fullbody_url/outline/characters_json) 已由现有逻辑 DB 持久化, job 只跟踪瞬态 status/progress/result
+- 新建 DB 表 = Alembic migration = backend_Ben 领域 (DB/架构) + 跨团队协调, 对 90s UI 操作过重
+- 单 uvicorn worker (docker/Dockerfile.api 无 --workers), in-memory 可行 (与现有 start-generation asyncio.create_task 同进程假设一致)
+- 进程重启时未完成 job 丢失 → 用户重点一次即可 (角色当前状态已在 DB)
+
+### 异步契约 (Frontend Wave B 依赖)
+**POST** `/api/projects/{project_id}/characters/{char_id}/adjust` (status 202)
+- Body: `{ "adjustment": "想让他胖一点" }`
+- 立即返回: `{ "success": true, "job_id": "<uuid>", "status": "pending", "char_id": "char_002", "message": "..." }`
+- 快速校验仍同步返 404/400/500 (项目不存在/未生成大纲/角色不存在/无 ANTHROPIC_KEY)
+
+**GET** `/api/projects/{project_id}/characters/adjust-jobs/{job_id}` (轮询)
+- 返回:
+```json
+{
+  "job_id": "<uuid>", "char_id": "char_002", "kind": "adjust",
+  "status": "pending|processing|completed|failed",
+  "progress": 0-100,
+  "stage_message": "正在重新绘制肖像...",
+  "result": { "success": true, "character": {...}, "char_id": "char_002",
+              "portrait_url": "/static/.../char_002_portrait.png?v=123",
+              "fullbody_url": "/static/.../char_002_fullbody.png?v=123",
+              "message": "角色已调整" } | null,
+  "error": "AI 服务暂时不可用..." | null
+}
+```
+- `status=completed` → `result` 含最终角色数据 (与旧同步端点返回体一致, 字段名不变)
+- `status=failed` → `error` 含友好错误信息
+- job 不存在/过期/越权 → 404
+- progress 节点: 5 (分析) → 15 (重写) → 30 (保存) → 40 (重绘肖像) → 70 (重绘全身) → 100 (完成)
+
+### P2-2 progress 数据格式 (Frontend ETA 插值依赖)
+- progress 字段语义不变 (ChapterStatus.progress 0-100), 仅 Stage 2 内部新增递增节点
+- character_design band = (6,10): 现在每完成 1 个角色画像推一次 (6,7,8,9 across N chars)
+- stage_message 格式: `正在生成角色画像 (2/6: 苏晨)...`
+- Frontend 仍走现有 GET /chapters/{n}/status 轮询, `actual_elapsed_sec` 已存在可用于 stage 内插值
+- Stage 1 (outline) / Stage 3 (screenplay batch ≤8 scenes) 是单次 opaque LLM 调用, 后端无法诚实细分 → 由 Frontend 时间插值 (Wave B option ①) 兜底, 后端不造假进度
+
+### fallback 全保留 (DEC-051 红线, 0 删除)
+- ✅ LLMFallbackChain (Haiku→Gemini→Sonnet) via call_llm_with_fallback
+- ✅ B58-followup clothing dict fallback
+- ✅ B57 fullbody 同步重生 (用新 portrait 作参考)
+- ✅ portrait_ref RISK-T17-9 fix (传现有 portrait 锁 identity)
+- ✅ portrait + fullbody 非阻塞 except 兜底
+- 异步化只改「调用方式」, 逻辑从旧端点逐行迁移到 `_adjust_character_core`
+
+### pytest: 252 PASS, 0 退化
+- test_wave12_adjust_async_job (新) 15 + adjust_regen 14 + status_authoritative + eta_calculation + v3_eta + d2_eta + progress_per_shot + pipeline_failure + pipeline_fallback + character_designer_validate + llm_fallback_chain = 252 PASS / 2 skip
+
+### Ben 协议 5+1
+- 0 schema 改动 / 0 Alembic migration / 0 STATUS_API_CONTRACT 升级
+- ⚠️ **API 契约变更**: adjust 端点行为变 (同步→异步 202+job), Frontend 必须改 → `[frontend-impact: yes]`
+- 不碰 .env / app/database/ / .team-brain/team_ben / frontend / style_enforcer
 
 ---
 

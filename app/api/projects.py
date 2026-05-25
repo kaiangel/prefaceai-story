@@ -1130,7 +1130,7 @@ class CharacterAdjustRequest(BaseModel):
     adjustment: str  # 用户自然语言调整指令，如 "想让他胖一点"
 
 
-@router.post("/{project_id}/characters/{char_id}/adjust")
+@router.post("/{project_id}/characters/{char_id}/adjust", status_code=202)
 async def adjust_character(
     project_id: str,
     char_id: str,
@@ -1139,15 +1139,20 @@ async def adjust_character(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    RB-7: 角色调整 API — 用 Haiku 4.5 重写角色描述
+    RB-7 + Wave 12 P2-1 (2026-05-24): 角色调整 API — **异步化**。
+
+    原本同步阻塞 ~90s (LLM 重写 + portrait 重生 + fullbody 重生 串行)，前端 fetch 死等
+    转圈、超时重试 (test26 实证)。现改为:
+      - 本端点只做快速校验 (项目归属 / 大纲存在 / 角色存在)，立即创建 job 并返回 202 + job_id。
+      - 真正的 LLM 重写 + portrait/fullbody 重生在 asyncio 后台任务里跑，更新 job 进度。
+      - 前端轮询 GET /{project_id}/characters/adjust-jobs/{job_id} 获取进度/结果。
 
     请求体: { "adjustment": "想让他胖一点" }
-    返回: 更新后的角色数据（含新的 description、physical、clothing）
-    同时更新 chapter 表的 characters_json
-    """
-    # T22-NEW-4 (2026-05-22): 旧 `import anthropic as anthropic_module` 已删,
-    # LLM 调用改走 llm_fallback_chain.call_llm_with_fallback (Haiku → Gemini → Sonnet)
+    返回 (202): { "success": true, "job_id": "...", "status": "pending", "char_id": "..." }
 
+    所有 fallback 全保留 (DEC-051 红线): LLMFallbackChain (Haiku→Gemini→Sonnet) +
+    B57 同步重生 fullbody + portrait 重生 + 非阻塞 except 兜底 —— 异步化只改「调用方式」。
+    """
     # 1. 验证项目归属
     result = await db.execute(
         select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
@@ -1156,7 +1161,7 @@ async def adjust_character(
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
 
-    # 2. 读取大纲中的角色数据（从 confirmed_outline 或 raw_outline）
+    # 2. 读取大纲中的角色数据（从 confirmed_outline 或 raw_outline）— 快速校验
     outline_json = project.confirmed_outline_json or project.raw_outline_json
     if not outline_json:
         raise HTTPException(status_code=400, detail="项目尚未生成大纲")
@@ -1164,8 +1169,201 @@ async def adjust_character(
     outline = json.loads(outline_json)
     characters_overview = outline.get("characters_overview", [])
 
-    # 3. 查找指定角色
-    # char_id 格式: "char_001" → 按索引匹配 characters_overview
+    # 3. 查找指定角色 — char_id 格式: "char_001" → 按索引匹配 characters_overview
+    target_char = None
+    try:
+        idx = int(char_id.replace("char_", "")) - 1
+        if 0 <= idx < len(characters_overview):
+            target_char = characters_overview[idx]
+    except (ValueError, IndexError):
+        pass
+
+    if target_char is None:
+        raise HTTPException(status_code=404, detail=f"角色 {char_id} 不存在")
+
+    # 4. ANTHROPIC_API_KEY 校验提前到此 (快速失败, 不进后台才发现)
+    from app.config import settings as app_settings
+    if not app_settings.ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY 未配置")
+
+    # 5. 创建 job + 启动后台任务，立即返回 202
+    from app.services.adjust_job_manager import adjust_job_manager
+    job_id = await adjust_job_manager.create_job(
+        project_uuid=project_id,
+        char_id=char_id,
+        kind="adjust",
+        user_id=user_id,
+    )
+    asyncio.create_task(
+        _run_adjust_character_in_background(
+            job_id=job_id,
+            project_uuid=project_id,
+            char_id=char_id,
+            adjustment=req.adjustment,
+        )
+    )
+    logger.info(
+        f"[AdjustCharacter] Wave12 P2-1: job {job_id} 已创建并启动后台任务 "
+        f"(project={project_id}, char={char_id})"
+    )
+    return {
+        "success": True,
+        "job_id": job_id,
+        "status": "pending",
+        "char_id": char_id,
+        "message": "角色调整任务已创建，请轮询 job 状态",
+    }
+
+
+@router.get("/{project_id}/characters/adjust-jobs/{job_id}")
+async def get_adjust_job_status(
+    project_id: str,
+    job_id: str,
+    user_id: int = Depends(verify_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Wave 12 P2-1: 轮询 adjust / regenerate-portrait 异步任务状态。
+
+    返回:
+      {
+        "job_id": "...", "char_id": "char_002", "kind": "adjust",
+        "status": "pending|processing|completed|failed",
+        "progress": 0-100,
+        "stage_message": "正在重新绘制肖像...",
+        "result": { "character": {...}, "portrait_url": "...", "fullbody_url": "..." } | null,
+        "error": "..." | null
+      }
+
+    status=completed 时 result 字段含最终角色数据 (与旧同步端点返回体一致)。
+    status=failed 时 error 字段含友好错误信息。
+    """
+    # 验证项目归属 (防止越权读他人 job)
+    result = await db.execute(
+        select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    from app.services.adjust_job_manager import adjust_job_manager
+    job = await adjust_job_manager.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="任务不存在或已过期")
+
+    # 校验 job 归属当前 project + user (防越权)
+    if job.get("project_uuid") != project_id or job.get("user_id") != user_id:
+        raise HTTPException(status_code=404, detail="任务不存在或已过期")
+
+    return {
+        "job_id": job["job_id"],
+        "char_id": job["char_id"],
+        "kind": job["kind"],
+        "status": job["status"],
+        "progress": job["progress"],
+        "stage_message": job["stage_message"],
+        "result": job["result"],
+        "error": job["error"],
+    }
+
+
+async def _run_adjust_character_in_background(
+    job_id: str,
+    project_uuid: str,
+    char_id: str,
+    adjustment: str,
+) -> None:
+    """Wave 12 P2-1: adjust_character 的后台执行体。
+
+    用独立短生命周期 DB session (B-1 教训: 长任务不复用请求级 session，避免 MySQL 连接超时)。
+    全程更新 adjust_job_manager 的进度，任何阶段失败都把 job 标 failed (前端能看到)。
+
+    保留全部 fallback (DEC-051 红线):
+      - LLMFallbackChain (Haiku → Gemini → Sonnet)
+      - B57 同步重生 fullbody (用新 portrait 作参考)
+      - portrait 重生 + 非阻塞 except 兜底
+    """
+    from app.services.adjust_job_manager import (
+        adjust_job_manager,
+        JOB_STATUS_FAILED,
+    )
+
+    try:
+        async with async_session_maker() as db:
+            await _adjust_character_core(
+                db=db,
+                job_id=job_id,
+                project_uuid=project_uuid,
+                char_id=char_id,
+                adjustment=adjustment,
+            )
+    except _AdjustJobFailed as e:
+        # 业务失败 (LLM fallback 全失败 / 角色不存在等) — 已是友好信息
+        await adjust_job_manager.update(
+            job_id,
+            status=JOB_STATUS_FAILED,
+            error=str(e),
+            stage_message="角色调整失败",
+        )
+        logger.error(f"[AdjustCharacter] Wave12 P2-1: job {job_id} 业务失败: {e}")
+    except Exception as e:
+        # 系统异常兜底 — 永不让后台任务静默崩溃
+        await adjust_job_manager.update(
+            job_id,
+            status=JOB_STATUS_FAILED,
+            error=f"角色调整失败: {str(e)}",
+            stage_message="系统错误",
+        )
+        logger.exception(f"[AdjustCharacter] Wave12 P2-1: job {job_id} 系统异常: {e}")
+
+
+class _AdjustJobFailed(Exception):
+    """内部用: 携带友好错误信息，由后台 worker 翻译成 job.error。"""
+
+
+async def _adjust_character_core(
+    db: AsyncSession,
+    job_id: str,
+    project_uuid: str,
+    char_id: str,
+    adjustment: str,
+) -> None:
+    """adjust 的实际工作 (LLM 重写 + portrait/fullbody 重生)，在后台 worker 内调用。
+
+    这是从旧同步端点几乎逐行迁移过来的逻辑，差异仅在:
+      - project / 角色 重新从 DB load (后台 session)
+      - 各阶段调用 adjust_job_manager.update() 推进度
+      - 失败 raise _AdjustJobFailed (替代旧的 HTTPException)
+      - 成功把结果写进 job.result (替代旧的 return)
+    """
+    from app.services.adjust_job_manager import (
+        adjust_job_manager,
+        JOB_STATUS_PROCESSING,
+        JOB_STATUS_COMPLETED,
+    )
+
+    await adjust_job_manager.update(
+        job_id,
+        status=JOB_STATUS_PROCESSING,
+        progress=5,
+        stage_message="正在分析调整指令...",
+    )
+
+    # 重新 load project (后台独立 session)
+    result = await db.execute(
+        select(Project).where(Project.uuid == project_uuid)
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise _AdjustJobFailed("项目不存在")
+
+    outline_json = project.confirmed_outline_json or project.raw_outline_json
+    if not outline_json:
+        raise _AdjustJobFailed("项目尚未生成大纲")
+
+    outline = json.loads(outline_json)
+    characters_overview = outline.get("characters_overview", [])
+
     target_char = None
     char_index = None
     try:
@@ -1177,14 +1375,12 @@ async def adjust_character(
         pass
 
     if target_char is None:
-        raise HTTPException(status_code=404, detail=f"角色 {char_id} 不存在")
+        raise _AdjustJobFailed(f"角色 {char_id} 不存在")
+
+    req = CharacterAdjustRequest(adjustment=adjustment)
 
     # 4. 调用 Haiku 4.5 重写角色描述 — T22-NEW-4 (2026-05-22): 三层 fallback chain
     # Haiku → Gemini 3.1 Flash → Sonnet 4.6 (跨 provider 优先, KEY_LEARNINGS #55)
-    from app.config import settings as app_settings
-    if not app_settings.ANTHROPIC_API_KEY:
-        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY 未配置")
-
     from app.services.llm_fallback_chain import (
         call_llm_with_fallback as _call_llm_with_fallback,
         friendly_error_message as _friendly_err,
@@ -1229,6 +1425,10 @@ async def adjust_character(
 
 {CHARACTER_FIELD_PRESERVATION_RULES}"""
 
+    await adjust_job_manager.update(
+        job_id, progress=15, stage_message="正在重写角色描述..."
+    )
+
     try:
         # T22-NEW-4: 三层 fallback (Haiku → Gemini Flash → Sonnet)
         # call_llm_with_fallback 永不抛异常, 返 FallbackResult.success bool
@@ -1242,7 +1442,7 @@ async def adjust_character(
                 f"[AdjustCharacter] ❌ T22-NEW-4 fallback chain 全部失败: "
                 f"{fb_result.error} (尝试 {len(fb_result.attempts)} 次)"
             )
-            raise HTTPException(status_code=500, detail=_friendly_err(fb_result))
+            raise _AdjustJobFailed(_friendly_err(fb_result))
 
         content = fb_result.text.strip()
         logger.info(
@@ -1276,14 +1476,18 @@ async def adjust_character(
                     'style': ''
                 }
 
-    except HTTPException:
-        # T22-NEW-4: 上面 fallback 全失败抛的 HTTPException 直接重抛, 不被下面 catch
+    except _AdjustJobFailed:
+        # T22-NEW-4: 上面 fallback 全失败抛的失败直接重抛, 不被下面 catch
         raise
     except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="角色调整 LLM 返回格式异常")
+        raise _AdjustJobFailed("角色调整 LLM 返回格式异常")
     except Exception as e:
         logger.error(f"[AdjustCharacter] ❌ LLM 调用失败: {e}")
-        raise HTTPException(status_code=500, detail=f"角色调整失败: {str(e)}")
+        raise _AdjustJobFailed(f"角色调整失败: {str(e)}")
+
+    await adjust_job_manager.update(
+        job_id, progress=30, stage_message="描述已更新，正在保存..."
+    )
 
     # 5. 更新 outline 中的角色数据
     # P3-1 deep-merge (Wave 10): updated_char 优先，但保留 original 的 mandatory 字段作兜底
@@ -1322,8 +1526,13 @@ async def adjust_character(
 
     logger.info(f"[AdjustCharacter] ✅ 角色 {char_id} 已调整: {req.adjustment[:30]}...")
 
+    await adjust_job_manager.update(
+        job_id, progress=40, stage_message="正在重新绘制肖像..."
+    )
+
     # 7. P1-3 / R7-3: 角色描述更新后立即重生成 portrait，并写入 updated_at 时间戳
     portrait_url: str | None = None
+    fullbody_url: str | None = None
     try:
         from app.services.reference_image_manager import ReferenceImageManager as _RIM
         from app.models.style_config import ProjectStyleConfig as _PSC
@@ -1391,6 +1600,10 @@ async def adjust_character(
             db.add(project)
             await db.commit()
 
+            await adjust_job_manager.update(
+                job_id, progress=70, stage_message="肖像完成，正在重新绘制全身图..."
+            )
+
             # B57 cascade fix: adjust 后同步重生 fullbody（用新 portrait 作参考）
             # 原因: Stage 5 shot 用 fullbody 作参考，若 portrait 换红发但 fullbody 黑发 → cascade
             try:
@@ -1408,6 +1621,7 @@ async def adjust_character(
                     _fullbody_result["pil_image"].save(_fullbody_path)
                     # T21-NEW-4: fullbody_url 也加 cache-buster (复用同一 epoch _v_ts)
                     _fullbody_url = f"/static/outputs/{project.uuid}/character_refs/{char_id}_fullbody.png?v={_v_ts}"
+                    fullbody_url = _fullbody_url  # 外层 scope, 供 job.result 返回
                     logger.info(f"[AdjustCharacter] T21-NEW-4 B57: ✅ {char_id} fullbody 已重生成 → {_fullbody_path} (cache-buster v={_v_ts})")
                     # 更新 chapter.characters_json 中的 fullbody_url (带 ?v=)
                     if chapter and chapter.characters_json:
@@ -1432,13 +1646,22 @@ async def adjust_character(
     except Exception as _pe:
         logger.warning(f"[AdjustCharacter] R7-3: 肖像重生成异常（非阻塞）: {_pe}")
 
-    return {
-        "success": True,
-        "character": merged_char,  # P3-1: 返回 merged_char（含 mandatory 字段保护）
-        "char_id": char_id,
-        "portrait_url": portrait_url,
-        "message": "角色已调整",
-    }
+    # 完成: 把结果写进 job (前端轮询拿 result)
+    await adjust_job_manager.update(
+        job_id,
+        status=JOB_STATUS_COMPLETED,
+        progress=100,
+        stage_message="角色已调整",
+        result={
+            "success": True,
+            "character": merged_char,  # P3-1: merged_char（含 mandatory 字段保护）
+            "char_id": char_id,
+            "portrait_url": portrait_url,
+            "fullbody_url": fullbody_url,
+            "message": "角色已调整",
+        },
+    )
+    return  # _adjust_character_core 无返回值；结果在 job.result
 
 
 @router.post("/{project_id}/characters/{char_id}/regenerate-portrait")

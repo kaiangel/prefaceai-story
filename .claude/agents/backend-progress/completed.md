@@ -6,6 +6,25 @@
 
 ## 2026-05-24
 
+### Wave 12 P2-1 (adjust 异步化) + P2-2 (Stage 2 sub-progress) ✅ [2026-05-24 — Opus 4.7 xhigh]
+
+**任务**: test26 暴露 P2-1 adjust 同步阻塞 90s (前端转圈/重试) + P2-2 progress stage 边界粒度 (ETA 冻结)。
+
+**P2-1**: adjust 端点改异步 — 快速校验后返 202+job_id, asyncio.create_task 后台跑 LLM 重写+portrait+fullbody 重生, 前端轮询新 GET adjust-jobs/{job_id} 端点。
+- in-memory job 注册表 (`adjust_job_manager.py`), 不新建 DB 表 (避开 Alembic/Ben 域, adjust 是短命 UI 操作)
+- 单 uvicorn worker 假设 (Dockerfile.api 无 --workers)
+- 全部 fallback 保留 (DEC-051): LLMFallbackChain + B57 fullbody + portrait_ref + 非阻塞 except, 逻辑从旧端点逐行迁移到 `_adjust_character_core`
+
+**P2-2**: Stage 2 portrait loop 每角色推 sub-progress (character_design band 6→9), 让 progress 在 stage 内递增 → ETA 不冻结。Stage 4 已有 per-scene; Stage 1/3 单次 opaque LLM 不造假, 由前端时间插值兜底。
+
+**改动**: 🆕 adjust_job_manager.py + projects.py (异步+轮询+worker) + pipeline_orchestrator.py (Stage 2 sub-progress) + 🆕 test_wave12_adjust_async_job.py (15 case)
+
+**契约**: `[frontend-impact: yes]` — adjust 同步→异步, 完整契约见 context-for-others.md + TEAM_CHAT 2026-05-24 23:55。
+
+**pytest**: 252 PASS / 2 skip / 0 退化。Ben 协议: 0 schema / 0 Alembic / 0 STATUS_API 升级。
+
+---
+
 ### Wave 11 TASK-WAVE-11-MYSQL-POOL-PRE-PING-RELIABILITY 诊断完成 ✅ [2026-05-24 — Sonnet 4.6 xhigh, ~20min]
 
 **任务**: 调查 idle 1h 后 pymysql 2013 Lost connection 500

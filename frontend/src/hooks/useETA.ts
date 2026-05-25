@@ -203,6 +203,18 @@ export function useETA({ stage, progress, estimatedRemainingSeconds, shotsTotal,
   const shotTimestampsRef = useRef<number[]>([]); // timestamps when each shot completed
   const prevShotsCompletedRef = useRef<number | null>(null); // track increments
 
+  // P2-2 (Wave 12): time-interpolation of the backend authoritative ETA.
+  // Problem (test26): in Stage 1-4 the backend ETA `_calculate_eta_with_progress(stage, progress)`
+  // is FROZEN whenever stage/progress are frozen (single LLM call, no sub-progress). The display
+  // then sits at e.g. "30 分钟" for a long time → user thinks it's stuck.
+  // Fix: anchor the last backend value + the wall-clock time we first saw it, then interpolate
+  // downward by elapsed seconds between backend updates. When a NEW backend value arrives we
+  // recalibrate the anchor (handles both Stage 1-4 freeze and stage-transition jumps).
+  // This does NOT replace the backend-authoritative priority (T20-9) — it only smooths the
+  // *display* of that same value between polls so it ticks down instead of freezing.
+  const anchorBackendEtaRef = useRef<number | null>(null); // last raw backend value seen
+  const anchorBackendTsRef = useRef<number | null>(null);  // wall-clock ms when that value first appeared
+
   // Reset ETA state whenever stage changes
   const resetForStage = useCallback((newStage: string | null) => {
     stageStartTimeRef.current = Date.now();
@@ -210,6 +222,10 @@ export function useETA({ stage, progress, estimatedRemainingSeconds, shotsTotal,
     // T20-9.v3: reset shot timing window on stage transition
     shotTimestampsRef.current = [];
     prevShotsCompletedRef.current = null;
+    // P2-2: reset the backend-ETA interpolation anchor on stage transition so the next
+    // backend value re-anchors cleanly (a new stage's ETA may jump up legitimately).
+    anchorBackendEtaRef.current = null;
+    anchorBackendTsRef.current = null;
     // Bug 1: On stage transition, we DON'T reset prevEtaSecRef — we keep the last
     // displayed ETA so the sliding window can smoothly blend from it toward the new
     // stage budget. This prevents the hard-cut jump (e.g. 12 min → 8 min instantly).
@@ -302,10 +318,31 @@ export function useETA({ stage, progress, estimatedRemainingSeconds, shotsTotal,
   let isBackendAuthoritative = false;
 
   if (typeof estimatedRemainingSeconds === "number" && estimatedRemainingSeconds >= 0) {
-    // 1. Backend authoritative — dynamic estimate from actual shot count.
+    // 1. Backend authoritative — dynamic estimate from actual shot count / stage budget.
     //    Accepts >= 0 (zero = "almost done" is valid).
-    rawSec = estimatedRemainingSeconds;
     isBackendAuthoritative = true;
+
+    // P2-2: time-interpolation. If the backend value CHANGED since last render, re-anchor
+    // (handles Stage 1-4 freeze recalibration + stage-transition jumps). Otherwise interpolate
+    // downward from the anchor by wall-clock elapsed so a frozen backend value still ticks down.
+    const now = Date.now();
+    const anchorVal = anchorBackendEtaRef.current;
+    if (anchorVal === null || anchorVal !== estimatedRemainingSeconds) {
+      // New (or first) backend value → recalibrate the anchor.
+      anchorBackendEtaRef.current = estimatedRemainingSeconds;
+      anchorBackendTsRef.current = now;
+      rawSec = estimatedRemainingSeconds;
+    } else {
+      // Same backend value as before (frozen) → interpolate down by elapsed since anchor.
+      const elapsedSinceAnchorSec = anchorBackendTsRef.current !== null
+        ? (now - anchorBackendTsRef.current) / 1000
+        : 0;
+      const interpolated = estimatedRemainingSeconds - elapsedSinceAnchorSec;
+      // Floor at NEAR_ZERO_SEC so a frozen backend value can't prematurely show "即将完成"
+      // during Stage 1-4. Once the real backend value drops below NEAR_ZERO, that new (smaller)
+      // value re-anchors via the branch above and we honour it verbatim.
+      rawSec = Math.max(interpolated, Math.min(estimatedRemainingSeconds, NEAR_ZERO_SEC));
+    }
   } else if (
     stage === "image_generation" &&
     typeof shotsTotal === "number" &&

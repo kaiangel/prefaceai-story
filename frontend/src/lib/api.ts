@@ -61,9 +61,28 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}, token?: 
     response = await fetch(url, { ...init, headers });
   } catch (networkErr) {
     const elapsed = Date.now() - start;
-    // [API] Log #2 — network-level error (fetch itself threw — no response at all)
-    // eslint-disable-next-line no-console
-    console.error(`[API] ${method} ${path} NETWORK_ERROR ${elapsed}ms`, networkErr);
+    // P3-2 (Wave 12): an in-flight fetch can stay pending while the browser tab is
+    // backgrounded/suspended (e.g. laptop sleep). On resume the fetch rejects and the
+    // wall-clock `elapsed` includes the entire suspension window — test26 logged bogus
+    // "NETWORK_ERROR 5792945ms" (96 min). No real network request runs that long before
+    // the platform times it out, so a huge elapsed is a tab-suspension signal, NOT a true
+    // error. We flag it as such and downgrade to console.warn so it does not pollute
+    // error-level monitoring.
+    // Threshold: 2 min — well above any genuine request timeout, well below sleep gaps.
+    const SUSPEND_ELAPSED_MS = 120_000;
+    const wasHidden = typeof document !== "undefined" && document.visibilityState === "hidden";
+    const likelySuspension = elapsed > SUSPEND_ELAPSED_MS || wasHidden;
+    if (likelySuspension) {
+      // [API] Log #2a — tab-suspension transient (not a genuine network failure)
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[API] ${method} ${path} NETWORK_ERROR (tab suspended, elapsed unreliable: ${elapsed}ms) — transient, will retry on resume`
+      );
+    } else {
+      // [API] Log #2 — genuine network-level error (fetch threw, no response, plausible timing)
+      // eslint-disable-next-line no-console
+      console.error(`[API] ${method} ${path} NETWORK_ERROR ${elapsed}ms`, networkErr);
+    }
     throw networkErr;
   }
 

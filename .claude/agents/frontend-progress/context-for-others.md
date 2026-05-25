@@ -1,6 +1,33 @@
 # Frontend 状态速览（供其他Agent参考）
 
-> 更新时间: 2026-05-24 [TASK-WAVE-11-LP-IMAGE-LCP-PRIORITY] LP 首屏 LCP priority 修复完成
+> 更新时间: 2026-05-24 [TASK-TEST26-FRONTEND-4] adjust 异步轮询 + ETA 插值 + NETWORK_ERROR + 404 分级 完成
+
+## TASK-TEST26-FRONTEND-4 (2026-05-24) ✅
+
+**4 项前端修复完成 (5 文件改, build 0 errors, 0 越权)**
+
+### 给 @backend (adjust 异步 §9.7 对接确认)
+- Frontend `handleApplyAdjustment` (StageC.tsx) 已按 STATUS_API_CONTRACT §9.7 改异步轮询:
+  - POST `/projects/{id}/characters/{char_id}/adjust` → 读 `job_id` (期望 202)
+  - 轮询 GET `/projects/{id}/characters/adjust-jobs/{job_id}` 每 2s → 读 `status`/`progress`/`stage_message`/`result`/`error`
+  - completed → `result.portrait_url` + `result.character.description_zh` 刷新角色卡 (cache-buster)
+  - 404 = 过期/未注册 → 重试 (不当失败)
+- **依赖确认**: backend adjust 端点须真返 202+job_id, adjust-jobs 须真返 §9.7.2 字段名. 若字段名/路径有出入请同步 @frontend
+- reroll (adjust 留空) 仍走同步 `regenerate-portrait` (§9.7.3 本轮未异步化, 未动)
+
+### 给 @tester (e2e 验证点)
+1. 角色页填描述点"重新生成": loading 显 "AI 重绘中 X%" (不裸 spinner), 完成自动刷新头像, **POST adjust 只发 1 次** (旧 bug 发 3 次)
+2. adjust 失败: toast "调整失败：{error}"
+3. /generating Stage 1-4: ETA "预计还需约 N 分钟" 随时间递减 (不冻结)
+4. tab 挂起后看 client.log: 无 error-level "NETWORK_ERROR 96min" (改 warn)
+5. /outline 停留: pre-confirm 404 记 `level: 'routine-404'` (非 network/error)
+
+### 给 @devops (client.log Monitor 去噪)
+- layout.tsx fetch wrapper 新增 `level: 'routine-404'` bucket (pre-confirm chapter 404 专用)
+- api.ts NETWORK_ERROR: tab 挂起 (elapsed>120s 或 document.hidden) → console.warn; 真网络错 → console.error
+- Monitor 去噪可把 `routine-404` 视同 routine warn 过滤
+
+---
 
 ## T22-NEW-8 StageB confirm-outline wire 审查 (2026-05-22) ✅
 

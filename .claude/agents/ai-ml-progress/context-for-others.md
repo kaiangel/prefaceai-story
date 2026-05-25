@@ -1,7 +1,50 @@
 # AI-ML Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 AI-ML 的工作状态和 Prompt 约束
-> **最后更新**: 2026-05-23 (Wave 10 完成 — 6 项 P2/P3, 4 个新 const)
+> **最后更新**: 2026-05-25 (Wave 13 #5b — schema 5 type 核实)
+
+---
+
+# 🔴 [2026-05-25] Wave 13 #5b: schema 5 type 核实结论 (@backend @pm 必读)
+
+**核实结论 (实测, 非文档)**:
+1. **physical 维度: aquatic/object/plant/insect 已被 Wave 8 通用 fallback (`pipeline_schemas.validate_physical_by_type`) 根治 — 不会崩。** 这 4 type + 其余 11 非严格 type 走"路径 3": 含 humanoid 字段→PASS, 不含也只 `logger.warning` 永不 raise。memory "待修 Wave 4.5" 过时, PENDING "已根治" 对 (但仅 physical 维度)。
+
+2. **🔴 旁路崩溃点 (@backend 接力, 非我白名单)**: `character_designer._validate_characters` (`app/services/character_designer.py` L618-621) 对**所有 type** 一刀切要求 clothing 必有 `top/bottom/footwear/style`。真物件(钟)/真鱼/真植物/真昆虫天然没衣服, LLM 输出残缺 clothing → **Stage 2 raise**。
+   - 此校验在 `design()` L127, **在 LLM fallback try/except 之外** → Claude→Gemini 链兜不住
+   - orchestrator L580 调 `design()` **无 retry** → 直接冲垮 pipeline
+   - Stage 2 prompt `_build_prompt` (L404-412) 对 object/aquatic/plant/insect **零 clothing 指引**
+   - test28 "灵魂"是 `supernatural` 人形 (非真 object), **真 object/aquatic/plant/insect 从未跑过 pipeline** → 此路径生产未测
+
+**@backend 修复建议 (surgical, 不删 fallback DEC-051)**:
+- A (推荐): `_validate_characters` clothing 必填对非 human type 放宽 (非穿衣 type 缺字段降 warning 不 raise, 与现有 anthropomorphic_animal physical warning 降级同 pattern)
+- B (源头): `_build_prompt` 给 object/aquatic/plant/insect 加 clothing 指引 (无衣物填 "n/a"/装饰性外观)。AI-ML 可提供 prompt 文案
+- 两者都在 Pipeline 域 (`character_designer.py`), 需与 @backend 协商
+
+**@tester 注意**: `tests/test_supernatural_humanoid_hotfix.py::test_supernatural_missing_all_fields_fails` 是 Wave 4.5 旧测试, 断言 supernatural 无字段应 raise — **Wave 8 已改为 warn-not-raise**, 此测试过时需更新 (非我域, 1 failed)。
+
+---
+
+# 🔴 [2026-05-24] Wave 12 P1: StyleEnforcer 关键架构约束 (所有人必读)
+
+**核心铁律 (改任何 style forbidden/mandatory 必守)**:
+
+1. **Seedream payload 无 `negative_prompt` 字段** (`seedream_generator._build_payload` L361-384 只发 `prompt`)。
+   → `StyleEnforcer.build_style_negative_prompt()` (用全部 forbidden) **对 Seedream 完全无效**, 别指望它锁画风。
+2. forbidden/mandatory 影响 Seedream 的**唯一通道**是 prefix 的 `DO NOT USE` / `MUST INCLUDE` 行,
+   它们只取 **`forbidden_keywords[:8]` / `mandatory_keywords[:5]`** (`build_mandatory_prefix` + `extract_style_anchors` 同切片)。
+   → **anti-anime 词 / 渲染介质锚点必须排进前 8 / 前 5**, 排在后面 = Seedream 看不见。
+3. Seedream **shot 路径** (`image_generator` L1086/L1726 dispatch) **不传 full_prompt** → shot 用 Stage 4 LLM `image_prompt` 原文,
+   shot 本身**不过 StyleEnforcer.enforce_prompt**。forbidden/mandatory 真正生效靠: ① 参考图 portrait/fullbody (`RIM` L381/L621) ② 参考图/shot 的 **Layer 1 inject** (`_render_style_anchor_block` 用 top5/top8)。
+
+**Wave 12 改了哪 3 个 style (style_enforcer.py)**:
+- cyberpunk / pastel_dream / gothic — 补 anti-anime forbidden + 渲染介质 mandatory (实测漂移确认)。
+- **未动** ink/watercolor/ukiyo_e/pixel/noir (实测守住, 别画蛇添足)。
+- **零破坏** by-design 动漫/插画类 (cartoon/ghibli/manga/chibi/illustration/korean_webtoon/anime/slam_dunk)。
+
+**@Tester 复测**: test26 老周(写实)+陈明 同框统一 / pastel_dream 强动漫先验角色 e2e / watercolor watch 抽检。
+**@Backend**: 无接力需求 (本轮纯 style_enforcer.py, 0 API/0 schema/0 frontend)。
+详见 `.team-brain/analysis/STYLE_ANTI_ANIME_FORBIDDEN_GAP_2026-05-24.md` 第七章 + `scripts/style_drift_probe.py`。
 
 ---
 

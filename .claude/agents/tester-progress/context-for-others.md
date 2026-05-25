@@ -1,10 +1,56 @@
 # Tester Agent - 给其他Agent的上下文
 
-> **最后更新**: 2026-05-23 [Tester]
+> **最后更新**: 2026-05-25 [Tester]
 
 ---
 
-## 当前状态 (2026-05-23)
+## 当前状态 (2026-05-25)
+
+**TASK-WAVE12-INDEPENDENT-RETEST 完成 ✅**
+
+### Wave 12 独立复测结论 (给 @PM @AI-ML @Backend @Frontend)
+
+| 验收项 | 结论 |
+|---|---|
+| cyberpunk/pastel_dream/gothic style 防护配置 | ✅ PASS — mandatory[:5] 含渲染介质锚点, forbidden[:8] 含 anti-anime |
+| by-design 动漫类 style 零破坏 (8 style) | ✅ PASS — cartoon/ghibli/manga/chibi/anime/illustration/korean_webtoon/slam_dunk 全保留 |
+| 未修改 style 介质锚点保留 (ink/watercolor/ukiyo_e/pixel/noir) | ✅ PASS |
+| adjust 异步端到端 (AdjustJobManager 15 case) | ✅ PASS |
+| ETA Stage character_design 不冻结 | ✅ PASS — band (6,10) 正确, ETA 单调递减 |
+| pytest 全量 0 新退化 | ✅ PASS — 15 fail 全为 pre-existing (Wave 11 baseline 已存在) |
+
+### 新建测试文件 (Tester 独立)
+
+`tests/test_wave12_style_anti_anime.py` — 58 cases:
+- cyberpunk: 12 cases (mandatory/forbidden/prefix/回归)
+- pastel_dream: 14 cases (含验证不含 photorealistic)
+- gothic: 8 cases
+- by-design 动漫类零破坏: 16 cases (8 style × 2 验证维度)
+- 未修改 style: 5 cases
+- ETA band 验证: 3 cases
+
+### 视觉验证 (AI-ML probe 图)
+
+路径: `test_output/manualtest/style_drift_probe/`
+- cyberpunk_patched.png: 写实电影感, 雨夜霓虹, 真人面孔 ✅ (非动漫)
+- pastel_dream_patched.png: 柔光插画, 粉彩背景, 非硬动漫线稿 ✅
+- gothic_current.png / gothic_patched.png: 暗黑大教堂场景, 轻微 CG 平滑 (在 AI-ML 预期"mild"范围) ✅
+
+test28 (PM 5/25 实测): gothic 3 角色统一暗黑绘画风 (Wave 12 e2e 验证通过) ✅
+
+### 已知 Pre-existing 失败 (无需 @Backend 修复, 非 Wave 12 引入)
+
+| 文件 | 根因 | 状态 |
+|---|---|---|
+| test_async_anthropic_t18_j (2 fail) | chapters.py 已不用 AsyncAnthropic (架构变更) | pre-existing, Wave 11 基线 |
+| test_b51_fallback_no_chinese (3 fail) | "Character data:" 字符串不匹配现行 prompt 格式 | pre-existing, Wave 11 基线 |
+| test_api_cost_log_table (2 fail) | LONGTEXT SQLite 不兼容 | pre-existing |
+| test_parallel_stage5 (combined run 2 fail) | mock 污染 isolation — 单独跑 17/17 PASS | pre-existing isolation 问题 |
+| 其余 7 pre-existing fail | 各种历史原因 | Wave 11 基线时已存在 |
+
+---
+
+## 上一完成 (2026-05-23)
 
 **TASK-T22-NEW-1-TEST-ISOLATION-EXTENDED 完成 ✅**
 

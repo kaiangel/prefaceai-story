@@ -1,7 +1,7 @@
 # Status API Contract
 
 > **Wave 9 / DEC-030 落地 — Ben 方案 A "前后端纠验机制" 的核心契约文档**
-> **版本**: v1.5 (2026-05-22 T22-NEW-5 — scene_review ui_phase 移除 + R4-2 wait loop 移除) [frontend-impact: yes]
+> **版本**: v1.6 (2026-05-24 Wave 12 — §9.7 adjust 异步 job 端点新增, PM 代补 Backend gap) [frontend-impact: yes]
 > **生效**: 2026-05-13 (v1.0) / 2026-05-19 (v1.1 + v1.2) / 2026-05-20 (v1.3) / 2026-05-21 (v1.4) / 2026-05-22 (v1.5)
 > **基准代码**: Backend `app/api/chapters.py` L47-160 + `_compute_v3_eta` + `_derive_ui_phase` (8 状态机) / Frontend `frontend/src/lib/createUrl.ts` (Wave 8 #2 T22-NEW-5 Frontend 已同步 v1.5)
 
@@ -924,6 +924,53 @@ A: 不会。参考图并行化是 Stage 5 image_preparation 内部优化（async
 
 ---
 
+## 9.7 adjust 异步 job 端点 (Wave 12, 2026-05-24, [frontend-impact: yes])
+
+> Backend P2-1 把角色 adjust 从同步阻塞 90s 改为异步 job + 轮询 (test26 实证: 同步阻塞导致前端转圈+超时重试)。
+> 新增 status API, 按 DEC-030 0.3 规则入本契约 (PM 代补 — Backend agent 完成时漏更, 契约取自 Backend 完成通知)。
+
+### 9.7.1 POST adjust (发起, 异步)
+
+```
+POST /api/projects/{project_id}/characters/{char_id}/adjust
+Body: { "adjustment": "<用户调整描述>" }
+```
+**成功 → 202 Accepted** (不再同步等 90s):
+```json
+{ "success": true, "job_id": "<uuid>", "status": "pending", "char_id": "char_002", "message": "..." }
+```
+快速校验失败仍同步返回: 404 (项目/角色不存在) / 400 (大纲未确认等) / 500 (API key)。
+
+### 9.7.2 GET adjust job 轮询
+
+```
+GET /api/projects/{project_id}/characters/adjust-jobs/{job_id}
+```
+**Response**:
+```json
+{
+  "job_id": "<uuid>", "char_id": "char_002", "kind": "adjust",
+  "status": "pending|processing|completed|failed",
+  "progress": 0-100,            // 节点: 5→15→30→40→70→100
+  "stage_message": "<人类可读进度>",
+  "result": {                   // status=completed 时非 null, 字段与旧同步返回体一致
+    "success": true, "character": {...}, "char_id": "char_002",
+    "portrait_url": "...", "fullbody_url": "...", "message": "..."
+  } | null,
+  "error": "<失败原因>" | null   // status=failed 时非 null
+}
+```
+- job **404** = 不存在 / 过期 (in-memory TTL 1h) / 越权
+- **Frontend 派生规则** (DEC-030 backend authoritative): POST 拿 job_id → 轮询 GET 直到 status ∈ {completed, failed} → completed 读 result.portrait_url/fullbody_url 刷新角色卡 → failed 读 error 提示。**不本地猜测 90s 完成时间**, 按 progress + status 派生 loading UI。
+
+### 9.7.3 实现注意
+- in-memory job 注册表 (`app/services/adjust_job_manager.py`, asyncio.Lock + TTL), **0 DB schema / 0 Alembic** (短命 UI 操作, 角色数据变更仍由原逻辑 DB 持久化)
+- 单 uvicorn worker 假设 (与现有 asyncio.create_task 一致)
+- fallback 全保留 (DEC-051): LLMFallbackChain + B57 fullbody 重生 + RISK-T17-9 portrait_ref
+- ⚠️ `regenerate-portrait` 端点本轮**未异步化** (仍同步 ~60s, 同类问题待后续)
+
+---
+
 ## 10. 关联文档
 
 - **决策**: `.team-brain/decisions/DECISIONS.md` DEC-030 (Wave 9 方案 A 完整决策)
@@ -935,5 +982,5 @@ A: 不会。参考图并行化是 Stage 5 image_preparation 内部优化（async
 ---
 
 **契约文档维护人**: PM (序话Story Agent Team Lead)
-**最后更新**: 2026-05-13 21:35
+**最后更新**: 2026-05-24 22:50 (v1.6 §9.7 adjust 异步 job)
 **Founder 批准**: 2026-05-13 20:25（DEC-030 采纳 Ben 方案 A）

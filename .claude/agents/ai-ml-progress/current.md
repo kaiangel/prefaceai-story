@@ -1,7 +1,97 @@
 # AI-ML Engineer 当前任务
 
-> 更新时间: 2026-05-23 (Wave 10 完成 — 6 项 P2 + P3 内测后清理)
-> 状态: 🟢 Wave 10 完成, self-commit 已执行 (待执行), 等 PM 审查
+> 更新时间: 2026-05-25 (Wave 13 #5b 完成 — schema 5 type 核实)
+> 状态: 🟢 Wave 13 #5b 核实完成, 0 代码改动 (核实结论: physical 已根治; 发现 clothing 旁路崩溃点派 @backend)
+
+---
+
+## 🟢 Wave 13 #5b 完成 [2026-05-25] — schema character_type 5 type fallback 核实 (Opus 4.7 default)
+
+### 一句话结论
+**任务问的核心 (5 type 的 physical 字段校验) 已被 Wave 8 通用 fallback 根治, 内测用户选这些 type 不会因 physical 崩 — PENDING "已根治" 对, memory "待修 Wave 4.5" 过时。** 但地毯式追调用栈意外挖出一个**旁路崩溃点**: `character_designer._validate_characters` 对 clothing 强制要求 top/bottom/footwear/style 全有 — 真物件/真鱼/真植物/真昆虫天然没衣服, 若 LLM 输出残缺 clothing → Stage 2 直接 raise 且无 retry/fallback 兜住 → pipeline 死。此点在 `app/services/character_designer.py` (非我白名单), 已派 @backend 修。
+
+### 核实方法 (地毯式追完整 5 层调用栈, 不凭文档)
+- 生成层: `character_designer.design()` L127 调 `_validate_characters` (Layer 1)
+- 拼装层: `pipeline_orchestrator` L587 调 `validate_characters` → `CharacterSchema(**char)` (Layer 2, pipeline_schemas.py)
+- 校验逻辑层: `CharacterSchema.validate_physical_by_type` (Wave 8 通用 fallback 架构 L307-374)
+- 数据写入: 实测构造 5 type 真实数据跑两层校验
+- 数据消费: 检查 output/ 历史 LLM 真实 clothing 输出
+
+### ① physical 校验真实状态 (逐个, 实测证据)
+Wave 8 `validate_physical_by_type` 三路:
+- 路径 1 (精确规则, 仅 4 type): human / anthropomorphic_animal / animal / vehicle_character → 缺最小集才 raise
+- 路径 3 (通用 fallback, 其余 15 type 含 aquatic/object/plant/insect): 含 humanoid 字段→PASS; **不含也只 logger.warning, 永不 raise**
+
+| type | physical 含 humanoid? | physical 校验 | 会崩? |
+|---|---|---|---|
+| aquatic 水生 | 有/无均可 | 路径3 | ✅ 不崩 |
+| object 物件 | 有/无均可 | 路径3 | ✅ 不崩 |
+| plant 植物 | 有/无均可 | 路径3 | ✅ 不崩 |
+| insect 昆虫 | 有/无均可 | 路径3 | ✅ 不崩 |
+| anthropomorphic_animal | — | 路径1 | 仅缺 species 才崩 (已有 species 锁定) |
+
+实测 (静音 warning 只看 raise): 5 type 真非 humanoid 数据 (会说话的钟/鱼/向日葵/蚂蚁) physical 全 PASS。
+回归: `test_schema_generic_fallback_arch.py` 83 passed (含 5 type 有/无 humanoid 两种 case)。
+
+### ② 旁路崩溃点 (意外发现, 真风险, 已派 @backend)
+`character_designer._validate_characters` L618-621:
+```python
+clothing_required = ["top", "bottom", "footwear", "style"]
+clothing_missing = [f for f in clothing_required if f not in clothing]
+if clothing_missing: raise ValueError(...)  # 对所有 type 一刀切
+```
+实测: 真物件/鱼/植物/昆虫若 clothing 缺 top/bottom/footwear → **L1 RAISE**。
+- 此校验在 `design()` L127 生产路径, **在 LLM fallback try/except 之外** → 不被 Claude→Gemini 链兜住
+- orchestrator L580 调 `design()` **无 retry wrapper** → raise 直接冲垮整条 pipeline
+- Stage 2 prompt (`_build_prompt` L404-412) 对 human/动物/超自然有 clothing 指引, **对 object/aquatic/plant/insect 零指引** → LLM 给残缺 clothing 概率高
+- 为何 test28 没崩: test28 "灵魂"是 `supernatural` 人形 (78cb5ceb 实证), **非真 object** → 真 object/aquatic/plant/insect 从未跑过 pipeline, 此路径生产未测
+
+### ③ 矛盾澄清
+- memory `project_schema_humanoid_fallback_remaining` "aquatic/object/plant/insect 待修 Wave 4.5" → **过时** (Wave 8 通用 fallback 已根治 physical, 建议 PM 更新/归档)
+- PENDING L26/#5b 引用的 "Wave 8 已根治" → **physical 维度正确**
+- 但**两者都没覆盖 clothing 旁路崩溃点** — 这是核实新增发现
+
+### ④ 我是否改了代码: 没有 (0 改动)
+根因 (prompt 缺 clothing 指引) + 崩溃点 (`_validate_characters`) 均在 `character_designer.py` (`app/services/`, **非我白名单** `app/prompts/**`+`style_enforcer.py`)。按 stay-in-role, 派 @backend 修, 不越权。
+
+### 给 @backend 的修复建议 (surgical, 不删 fallback DEC-051)
+2 选 1 或都做:
+- **A (推荐, 校验层放宽)**: `_validate_characters` L618-621 clothing 必填字段对非 human type 放宽 — 非穿衣 type (object/aquatic/plant/insect/animal/elemental 等) 只要 clothing 是 dict 即可, 或缺字段降级 warning 不 raise (与 anthropomorphic_animal physical 已用的 warning 降级同 pattern)
+- **B (源头, prompt 补指引)**: `_build_prompt` 给 object/aquatic/plant/insect 加 clothing 说明 (无衣物时填 "n/a"/"none"/装饰性外观), 让 LLM 总输出合法 clothing
+- ⚠️ 两者都属 Pipeline 域 (`character_designer.py`), 与 @backend 协商; 我可提供 prompt 文案
+
+### 文件
+- 0 代码改动
+- 实测 harness: 内联脚本 (未落盘, 见 TEAM_CHAT 证据)
+- 文档: ai-ml-progress 三件套 + TEAM_CHAT
+
+---
+
+## 🟢 Wave 12 P1 完成 [2026-05-24] — style 画风漂移系统评估 + 分层补强 (Opus 4.7 xhigh)
+
+### 核心成果
+1. **架构根因定位**: Seedream payload **无 negative_prompt** → forbidden 只能经 prefix 的 `DO NOT USE` 行 (取 `forbidden[:8]`) 影响 Seedream; mandatory 同理取 `[:5]`。shot 路径甚至不过 StyleEnforcer (用 Stage 4 LLM image_prompt 原文), forbidden/mandatory 真正生效靠参考图路径 + Layer 1 inject 的 top5/top8。**铁律: anti-anime 词必须挤进 forbidden[:8] / mandatory[:5]**。
+2. **28 style 四维评估 + 实测校准** (强动漫先验角色 28岁帅哥, doubao-seedream 直生): 校准 PM 纸面初判 —
+   - 🔴 cyberpunk (实证) + **pastel_dream (纸面🟡→实测🔴, full anime)**
+   - 🟡 gothic (mild, 光面 CG idol)
+   - 🟢 **下调** ink/watercolor/ukiyo_e/pixel (实测守住 — mandatory 已有介质锚点) + noir (B&W 强锁)
+   - 根因模式: 漂移 ⟺ mandatory[:5] 只锁氛围不锁渲染介质 + forbidden[:8] 无 anti-anime
+3. **分层补强 style_enforcer.py (仅 3 style, 逐个甄别)**:
+   - cyberpunk: mandatory[:5] 加 photorealistic+cinematic / forbidden[:8] 加 anime/cartoon/manga/cel-shaded 等
+   - pastel_dream: mandatory[:5] 加 soft painterly illustration+airbrushed (不加 photorealistic) / forbidden[:8] 加 cel-shaded/hard anime lineart/manga
+   - gothic: mandatory dark romantic painting / forbidden[:8] 加 anime/cel-shaded/glossy idol render
+4. **零破坏 by-design 动漫类** (cartoon/ghibli/manga/chibi/illustration/korean_webtoon/anime/slam_dunk 0 改动, verify 0 自禁介质)
+5. **实测验证**: cyberpunk 强改善 (→真写实电影感, 与老周可同框) / pastel_dream 改善 (硬动漫→柔笔触插画) / gothic 轻横移
+6. **回归**: 377 PASS 0 FAIL 0 退化, 28/28 prefix 正常 render, DEC-051 0 删 fallback
+
+### 文件
+- 改: `app/services/style_enforcer.py` (3 style forbidden/mandatory)
+- 新: `scripts/style_drift_probe.py` (实测 harness, 复用 enforce_prompt 管道)
+- 文档: `.team-brain/analysis/STYLE_ANTI_ANIME_FORBIDDEN_GAP_2026-05-24.md` 第七章
+
+### 待 PM/Tester
+- @PM: 5+1 维度审查 + self-commit
+- @Tester: 重跑 test26 (老周+陈明同框) + pastel_dream 强动漫先验角色 e2e; watercolor 列 watch 抽检
 
 ---
 

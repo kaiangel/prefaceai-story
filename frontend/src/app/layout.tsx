@@ -184,8 +184,17 @@ const CLIENT_LOG_PROXY_SCRIPT = `
     }
     return origFetch.apply(window, arguments).then(function(response) {
       if (!response.ok && response.status >= 400) {
+        // P3-3 (Wave 12): the create flow polls chapter endpoints that return 404 BY DESIGN
+        // before the chapter exists (pre-confirm-outline) or before a stage's data is written
+        // (pre-generation). The application code catches these as routine (console.warn), but
+        // this global fetch wrapper would otherwise log every 404 as level:'network' — mixing
+        // expected 404s with genuine network failures. We classify by-design pre-confirm 404s
+        // as level:'routine-404' so monitoring de-noise treats them consistently.
+        // Endpoints: /chapters/{n}/status | /story | /storyboard | /bgm | /scene-references
+        var isRoutine404 = response.status === 404 &&
+          /\/chapters\/\d+\/(status|story|storyboard|bgm|scene-references)(\?|$)/.test(url);
         post({
-          level: 'network',
+          level: isRoutine404 ? 'routine-404' : 'network',
           ts: new Date().toISOString(),
           args: ['HTTP ' + response.status + ' ' + response.statusText + ' — ' + url],
           url: location.href,

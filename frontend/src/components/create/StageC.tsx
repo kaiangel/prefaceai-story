@@ -1318,6 +1318,10 @@ function CharacterPreview({
   const [adjustingId, setAdjustingId] = useState<string | null>(null);
   const [adjustInput, setAdjustInput] = useState("");
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
+  // P2-1 (Wave 12 / STATUS_API_CONTRACT §9.7): friendly loading text for the in-flight
+  // adjust job. Backend now returns 202 + job_id, then we poll adjust-jobs/{job_id}.
+  // We show stage_message + progress so the user sees "AI 重绘中…" rather than a frozen spinner.
+  const [adjustJobMsg, setAdjustJobMsg] = useState<string>("");
   // B26: track per-character portrait load failure (img onError → show error placeholder)
   const [portraitErrors, setPortraitErrors] = useState<Record<string, boolean>>({});
 
@@ -1469,44 +1473,144 @@ function CharacterPreview({
     setRegeneratingId(null);
   };
 
-  // RF-5: Real API for character adjustment with mock fallback
+  // RF-5 / P2-1 (Wave 12): Real API for character adjustment — now ASYNC + polling.
+  //
+  // STATUS_API_CONTRACT §9.7 (test26 实证: 旧同步阻塞 90s → 前端死等转圈 + 超时重发 3 次):
+  //   1. POST /characters/{char_id}/adjust → 202 Accepted + { job_id, status: "pending" }
+  //      (不再同步等 90s 才返回)
+  //   2. 轮询 GET /characters/adjust-jobs/{job_id} 每 2s, 直到 status ∈ {completed, failed}
+  //   3. completed → 读 result.portrait_url / fullbody_url 刷新角色卡 (cache-buster)
+  //   4. failed → 读 error 提示用户
+  //   轮询期间显示 progress + stage_message (友好提示, 不再死等转圈)
+  //
+  // DEC-030 backend authoritative: 前端只按 status + progress 派生 loading UI,
+  // 不本地猜测 90s 完成时间.
   const handleApplyAdjustment = async (charId: string) => {
     // B48: leave-empty = reroll (no prompt change, just new seed).
-    // This replaces the old right-corner RotateCcw button which called handleRegenerate directly.
+    // Reroll still goes through the (synchronous) regenerate-portrait endpoint, which
+    // §9.7.3 explicitly notes is NOT yet async-ified this round — left unchanged.
     if (!adjustInput.trim()) {
       setAdjustingId(null);
       await handleRegenerate(charId);
       return;
     }
 
-    setRegeneratingId(charId);
-
-    try {
-      // Try real API
-      // F-1 fix: Backend returns { success, character: { description, description_zh, physical, clothing, ... }, char_id, message }
-      const result = await apiFetch<{ success: boolean; character: { description?: string; description_zh?: string }; char_id: string; message: string }>(
-        `/projects/${projectId}/characters/${charId}/adjust`,
-        { method: "POST", body: JSON.stringify({ adjustment: adjustInput.trim() }) },
-        token
-      );
-      // Success: update character with new description from nested character object
-      const char = characters.find((c) => c.id === charId);
-      if (char) {
-        onUpdateCharacter(charId, {
-          description: result.character?.description_zh || result.character?.description || char.description,
-          adjustments: [...char.adjustments, adjustInput.trim()],
-        });
-      }
-    } catch {
-      // R4-2: Clear loading state on failure + show error toast
-      setRegeneratingId(null);
-      setAdjustingId(null);
+    if (!projectId || !token) {
       toast("error", "调整失败，请重试");
       return;
     }
 
-    setRegeneratingId(null);
-    setAdjustingId(null);
+    const adjustment = adjustInput.trim();
+    setRegeneratingId(charId);
+    setAdjustJobMsg("AI 重绘中，请稍候…");
+
+    // 1) Kick off the async job — backend returns 202 + job_id (does NOT block ~90s).
+    let jobId: string;
+    try {
+      const kickoff = await apiFetch<{ success: boolean; job_id: string; status: string; char_id: string; message?: string }>(
+        `/projects/${projectId}/characters/${charId}/adjust`,
+        { method: "POST", body: JSON.stringify({ adjustment }) },
+        token
+      );
+      if (!kickoff.job_id) throw new Error("missing job_id in adjust 202 response");
+      jobId = kickoff.job_id;
+    } catch {
+      // Fast-validation failure (404/400/500) — surface immediately, no polling.
+      setRegeneratingId(null);
+      setAdjustingId(null);
+      setAdjustJobMsg("");
+      toast("error", "调整失败，请重试");
+      return;
+    }
+
+    // 2) Poll the job until it reaches a terminal state. We DON'T guess a 90s timer —
+    //    the loading UI is purely derived from backend status + progress + stage_message.
+    interface AdjustJob {
+      job_id: string;
+      char_id: string;
+      status: "pending" | "processing" | "completed" | "failed";
+      progress?: number | null;
+      stage_message?: string | null;
+      result?: {
+        success?: boolean;
+        character?: { description?: string; description_zh?: string };
+        char_id?: string;
+        portrait_url?: string | null;
+        fullbody_url?: string | null;
+        message?: string;
+      } | null;
+      error?: string | null;
+    }
+
+    const POLL_INTERVAL_MS = 2000;
+    const MAX_POLLS = 120; // safety cap: 120 × 2s = 4 min (well past the ~90s backend job)
+
+    try {
+      let polls = 0;
+      // small initial delay so the job has a chance to register before first poll
+      await new Promise((r) => setTimeout(r, 800));
+      while (polls < MAX_POLLS) {
+        polls += 1;
+        let job: AdjustJob;
+        try {
+          job = await apiFetch<AdjustJob>(
+            `/projects/${projectId}/characters/adjust-jobs/${jobId}`,
+            {},
+            token,
+            { silentStatuses: [404] } // 404 = expired/not-yet-registered; retry a few times
+          );
+        } catch {
+          // Transient (e.g. job not yet registered, or brief network blip) — keep polling.
+          await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+          continue;
+        }
+
+        // Derive friendly loading text from backend stage_message + progress (§9.7.2).
+        const pct = typeof job.progress === "number" ? Math.max(0, Math.min(100, job.progress)) : null;
+        const stageMsg = job.stage_message || "AI 重绘中";
+        setAdjustJobMsg(pct !== null ? `${stageMsg} ${pct}%` : `${stageMsg}…`);
+
+        if (job.status === "completed") {
+          const char = characters.find((c) => c.id === charId);
+          const result = job.result || {};
+          // Cache-buster so the browser reloads the overwritten portrait/fullbody at the same path.
+          const bust = (u: string | null | undefined): string | null => {
+            const abs = toAbsoluteUrl(u);
+            if (!abs) return null;
+            return abs.includes("?") ? `${abs}&_=${Date.now()}` : `${abs}?_=${Date.now()}`;
+          };
+          const newPortrait = bust(result.portrait_url);
+          if (char) {
+            onUpdateCharacter(charId, {
+              description: result.character?.description_zh || result.character?.description || char.description,
+              ...(newPortrait ? { portraitUrl: newPortrait } : {}),
+              adjustments: [...char.adjustments, adjustment],
+            });
+          }
+          // Clear any stale img-error flag so the refreshed portrait shows.
+          setPortraitErrors((prev) => ({ ...prev, [charId]: false }));
+          toast("success", "角色已更新");
+          break;
+        }
+
+        if (job.status === "failed") {
+          // eslint-disable-next-line no-console
+          console.warn("[StageC] P2-1 adjust job failed:", job.error || "(no error message)");
+          toast("error", job.error ? `调整失败：${job.error}` : "调整失败，请重试");
+          break;
+        }
+
+        // pending / processing → wait then poll again
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+      }
+      if (polls >= MAX_POLLS) {
+        toast("error", "调整超时，请稍后重试");
+      }
+    } finally {
+      setRegeneratingId(null);
+      setAdjustingId(null);
+      setAdjustJobMsg("");
+    }
   };
 
   return (
@@ -1572,7 +1676,12 @@ function CharacterPreview({
                   img onError → mark portraitErrors[charId] = true → show error placeholder. */}
               <div className="relative aspect-[3/4] bg-bg-tertiary">
                 {regeneratingId === char.id ? (
-                  <div className="absolute inset-0 flex items-center justify-center"><Loader2 className="w-8 h-8 text-brand-primary animate-spin" /></div>
+                  // P2-1 (Wave 12 §9.7): friendly loading with backend stage_message + progress
+                  // instead of a bare spinner that looks frozen during the ~90s async job.
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-3 text-center">
+                    <Loader2 className="w-8 h-8 text-brand-primary animate-spin" />
+                    <span className="text-text-secondary text-xs leading-snug">{adjustJobMsg || "AI 重绘中，请稍候…"}</span>
+                  </div>
                 ) : charPortraitUrl && !portraitErrors[char.id] ? (
                   // P0-3: Use plain <img> with toAbsoluteUrl to avoid Next.js Image domain restrictions.
                   // B26: resolvePortraitUrl() also applies the static-URL fallback when portraitUrl is null.

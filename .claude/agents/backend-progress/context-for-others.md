@@ -1,6 +1,67 @@
 # Backend Agent - 给其他 Agent 的上下文
 
-> **最后更新**: [2026-05-24] ✅ Wave 11 TASK-WAVE-11-MYSQL-POOL-PRE-PING-RELIABILITY 诊断完成 — pool 参数已在 Wave 4+T20-53 就位，无需改代码；middleware retry 决策不加；66 PASS 0 退化
+> **最后更新**: [2026-05-24] ✅ Wave 12 P2-1 (adjust 异步化) + P2-2 (Stage 2 sub-progress) 完成 — 252 PASS 0 退化；**adjust API 契约变更 [frontend-impact: yes]**
+
+---
+
+## ✅ [Wave 12 P2-1 + P2-2] 完成 [2026-05-24] — **@frontend 必读 (API 契约变更)**
+
+### ⚠️ adjust API 从同步改异步 — Frontend 必须改调用方式
+
+**旧 (已废弃)**: `POST .../characters/{char_id}/adjust` 同步阻塞 ~90s 返回最终角色数据。
+**新 (Wave 12 P2-1)**: 端点立即返回 202 + job_id, Frontend 轮询新端点拿进度/结果。
+
+**① POST** `/api/projects/{project_id}/characters/{char_id}/adjust` → **202**
+```json
+// req body 不变: { "adjustment": "想让他胖一点" }
+// resp 202:
+{ "success": true, "job_id": "<uuid>", "status": "pending", "char_id": "char_002", "message": "角色调整任务已创建，请轮询 job 状态" }
+```
+快速校验仍同步返错: 404 (项目/角色不存在) / 400 (未生成大纲) / 500 (无 ANTHROPIC_KEY)。
+
+**② GET** `/api/projects/{project_id}/characters/adjust-jobs/{job_id}` → 轮询
+```json
+{
+  "job_id": "<uuid>", "char_id": "char_002", "kind": "adjust",
+  "status": "pending|processing|completed|failed",
+  "progress": 0-100,
+  "stage_message": "正在重新绘制肖像...",
+  "result": {  // status=completed 才非 null, 字段与旧同步返回体一致
+    "success": true, "character": {...}, "char_id": "char_002",
+    "portrait_url": "/static/.../char_002_portrait.png?v=123",
+    "fullbody_url": "/static/.../char_002_fullbody.png?v=123",
+    "message": "角色已调整"
+  },
+  "error": "AI 服务暂时不可用..."  // status=failed 才非 null
+}
+```
+- 建议轮询间隔 1-2s, 直到 status ∈ {completed, failed}
+- progress 节点: 5→15→30→40→70→100
+- job 404 = 不存在/过期(TTL 1h)/越权 → Frontend 视为失败, 提示重试
+- **regenerate-portrait 端点本轮未改** (仍同步, ~60s), 若 Frontend 也要异步化请告知 PM (同 pattern 可加)
+
+### P2-2: Stage 2 portrait sub-progress (Frontend ETA 插值参考)
+- progress 字段语义不变, Stage 2 内部新增递增节点 (character_design band 6→9)
+- stage_message: `正在生成角色画像 (2/6: 苏晨)...`
+- Frontend 仍走 GET /chapters/{n}/status, `actual_elapsed_sec` 可用于 stage 内时间插值
+- Stage 1 (outline) / Stage 3 (screenplay batch) 是单次 opaque LLM, 后端不造假 → Frontend 时间插值兜底 (Wave B option ①)
+
+### 改动文件
+- 🆕 `app/services/adjust_job_manager.py` (in-memory job 注册表)
+- `app/api/projects.py` (adjust 异步 + 轮询端点 + 后台 worker)
+- `app/services/pipeline_orchestrator.py` (Stage 2 portrait sub-progress)
+- 🆕 `tests/test_wave12_adjust_async_job.py` (15 case)
+
+### 给 @pm + @devops
+- **[frontend-impact: yes]** — adjust 契约变了, Frontend Wave B 依赖
+- 0 schema / 0 Alembic / 0 STATUS_API_CONTRACT 升级
+- in-memory job: 单 worker 假设 (Dockerfile.api 无 --workers), VPS 部署只需 rebuild api, 无 DB 迁移
+- 全部 fallback 保留 (DEC-051): LLMFallbackChain + B57 fullbody + portrait_ref + 非阻塞 except
+
+### ⚠️ @tester (Wave C): 1 个 e2e 脚本需更新
+- `tests/test_wave6_round1_b52_cascade.py` 是**live e2e 脚本** (打 localhost:8000), L165-169 直接读 `adjust_resp.get("portrait_url")` — adjust 改异步后 202 响应不再直接带 portrait_url, 需改成: POST 拿 job_id → 轮询 GET adjust-jobs/{job_id} 到 completed → 从 `result.portrait_url` 读
+- 该脚本不在 unit CI (需 live server + Gemini key), 单测 344 PASS 0 退化不受影响
+- Wave C "adjust/ETA 复测" 时一并更新此脚本
 
 ---
 

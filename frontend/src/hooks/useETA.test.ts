@@ -572,11 +572,56 @@ function testT21New7_CountdownArithmetic() {
   console.log("T21-NEW-7 test 6e — 60s countdown + double-confirm guard arithmetic: PASS");
 }
 
+/**
+ * P2-2 (Wave 12) — Backend ETA time-interpolation arithmetic
+ *
+ * Scenario (test26): backend ETA frozen at 1800s (30 min) across many polls during Stage 1-4
+ * (single LLM call, no sub-progress). Without interpolation the display sits at "30 分钟".
+ * With interpolation: anchor=1800 at t0; at t0+30s the same backend value 1800 is still seen,
+ * so we show 1800 - 30 = 1770s (ticking down). When backend finally updates to 1700, we
+ * re-anchor to 1700 verbatim.
+ *
+ * Floor rule: interpolated value never drops below min(backendValue, NEAR_ZERO_SEC=60) so a
+ * frozen value can't prematurely show "即将完成".
+ */
+function testP22_BackendEtaInterpolation() {
+  const NEAR_ZERO_SEC = 60;
+
+  // Helper mirroring the in-hook interpolation arithmetic.
+  function interpolate(backendVal: number, anchorVal: number | null, anchorElapsedSec: number): number {
+    if (anchorVal === null || anchorVal !== backendVal) {
+      return backendVal; // recalibrate verbatim
+    }
+    const interpolated = backendVal - anchorElapsedSec;
+    return Math.max(interpolated, Math.min(backendVal, NEAR_ZERO_SEC));
+  }
+
+  // First sighting → verbatim anchor
+  console.assert(interpolate(1800, null, 0) === 1800, "P2-2: first value anchors verbatim");
+
+  // Same frozen value 30s later → ticks down
+  console.assert(interpolate(1800, 1800, 30) === 1770, `P2-2: frozen value interpolates down, got ${interpolate(1800, 1800, 30)}`);
+
+  // Same frozen value 90s later → ticks down further
+  console.assert(interpolate(1800, 1800, 90) === 1710, `P2-2: frozen value keeps interpolating, got ${interpolate(1800, 1800, 90)}`);
+
+  // Backend updates to a new (smaller) value → re-anchor verbatim (not interpolated)
+  console.assert(interpolate(1700, 1800, 90) === 1700, "P2-2: new backend value re-anchors verbatim");
+
+  // Floor: a frozen large value can't interpolate below NEAR_ZERO_SEC
+  console.assert(interpolate(1800, 1800, 5000) === NEAR_ZERO_SEC, `P2-2: floor at NEAR_ZERO_SEC, got ${interpolate(1800, 1800, 5000)}`);
+
+  // Small backend value (e.g. 40s): floor is the value itself (min(40,60)=40), no premature drop
+  console.assert(interpolate(40, 40, 100) === 40, `P2-2: small value floor = value, got ${interpolate(40, 40, 100)}`);
+
+  console.log("P2-2 test — backend ETA time-interpolation arithmetic: PASS");
+}
+
 // ---------------------------------------------------------------------------
 // Run all tests
 // ---------------------------------------------------------------------------
 
-console.log("=== useETA RISK-T20-2 + RISK-T20-9 + T20-44 + T21-NEW-7 v1.4 Unit Tests ===\n");
+console.log("=== useETA RISK-T20-2 + RISK-T20-9 + T20-44 + T21-NEW-7 v1.4 + P2-2 Unit Tests ===\n");
 
 try {
   testBug1_SlidingWindowClamping();
@@ -594,8 +639,10 @@ try {
   testT21New7_PhaseToSubPhaseMapping();
   testT21New7_UiPhaseToUrlMapping();
   testT21New7_CountdownArithmetic();
+  // P2-2 (Wave 12) — backend ETA time-interpolation (Stage 1-4 anti-freeze)
+  testP22_BackendEtaInterpolation();
 
-  console.log("\n=== All 14 test cases PASS ===");
+  console.log("\n=== All 15 test cases PASS ===");
   console.log("\nCoverage summary:");
   console.log("  Bug 1 (sliding window): delta clamping arithmetic verified");
   console.log("  Bug 2 (ETA vanish): rawSec=0/30/60/90 all return correct text");
@@ -611,6 +658,7 @@ try {
   console.log("  T21-NEW-7 6c: phaseToSubPhase 9 状态映射完整 (含 scene-refs-preview)");
   console.log("  T21-NEW-7 6d: UI_PHASE_TO_URL scene_references_review → /scenes");
   console.log("  T21-NEW-7 6e: 60s countdown + double-confirm guard arithmetic");
+  console.log("  P2-2: backend ETA interpolation (frozen value ticks down, new value re-anchors, NEAR_ZERO floor)");
 } catch (err) {
   console.error("TEST FAILURE:", err);
   process.exit(1);

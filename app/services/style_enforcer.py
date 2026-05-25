@@ -283,11 +283,21 @@ class StyleEnforcer:
         "cyberpunk": StyleEnforcement(
             style_name="cyberpunk",
             style_display_name="Cyberpunk Aesthetic",
+            # P1 Wave 12 (test26 实证): cyberpunk 原本 mandatory 只锁场景氛围
+            # (neon/futuristic city), 不锁渲染介质 → Seedream 对"年轻帅哥+cyberpunk"
+            # 走动漫先验 (二次元帅哥)。这里把 photorealistic + cinematic 提到前 5,
+            # 让 extract_style_anchors()[:5] / build_mandatory_prefix()[:5] 真带上
+            # 写实电影感锚点 (对齐 style_description 的 Blade Runner / 攻壳机动队 真人电影基调)。
             mandatory_keywords=[
-                "cyberpunk", "neon lights", "futuristic city", "dark atmosphere",
-                "high tech low life", "blade runner aesthetic"
+                "cyberpunk", "photorealistic", "cinematic film still", "neon lights",
+                "futuristic city", "dark atmosphere", "high tech low life",
+                "blade runner aesthetic", "realistic skin texture"
             ],
+            # anti-anime 条目放进前 8 (extract_style_anchors / mandatory prefix 只取 [:8])
+            # — 否则 Seedream 看不到。场景排除条目保留在后面。
             forbidden_keywords=[
+                "anime", "cartoon", "manga", "cel-shaded", "2D illustration",
+                "stylized digital painting", "glossy idol render", "chibi",
                 "pastoral", "rural", "ancient", "medieval",
                 "bright daylight", "nature scene"
             ],
@@ -544,15 +554,27 @@ class StyleEnforcer:
         "pastel_dream": StyleEnforcement(
             style_name="pastel_dream",
             style_display_name="Pastel Dreamscape",
+            # P1 Wave 12 (实测): pastel_dream 原 mandatory 只锁色调/氛围
+            # (pastel/dreamy/ethereal) 不锁渲染介质 → 年轻角色被 Seedream 渲成
+            # 硬边 cel-shaded 二次元美少年 (实测 full anime 漂移)。
+            # 这里把 "soft painterly illustration" 软笔触介质锚点提到前 5,
+            # 引导向气笔/水彩感梦境插画, 而非锋利动漫线稿。注意: pastel_dream
+            # 本质是柔光插画 (非写实), 故 **不加 photorealistic** (与既有 forbidden 冲突)。
             mandatory_keywords=[
-                "pastel color palette", "dreamy soft aesthetic", "ethereal atmosphere",
+                "soft painterly illustration", "pastel color palette", "dreamy soft aesthetic",
+                "airbrushed soft shading", "ethereal atmosphere",
                 "soft pink and lavender tones", "gentle gradient lighting",
                 "whimsical fairy tale", "cotton candy colors", "soft focus dreamy"
             ],
+            # 把 anti-(硬动漫) 条目提进前 8 (extract_style_anchors / prefix 只取 [:8])。
+            # 禁的是产生锋利二次元观感的 cel-shaded / 硬动漫线稿 / manga，
+            # 而非泛禁所有插画 (pastel_dream 本身是柔光插画)。
             forbidden_keywords=[
-                "dark", "gritty", "noir", "horror", "harsh shadows",
-                "cyberpunk", "industrial", "photorealistic", "desaturated",
-                "monochrome", "black and white", "gothic", "violent", "bold contrast"
+                "cel-shaded", "hard anime lineart", "manga", "sharp ink outlines",
+                "glossy idol render", "photorealistic", "dark", "gritty",
+                "noir", "horror", "harsh shadows", "cyberpunk", "industrial",
+                "desaturated", "monochrome", "black and white", "gothic",
+                "violent", "bold contrast"
             ],
             style_description="You are painting in the tradition of pastel dreamscape artists — creators who build worlds from spun sugar and morning mist, where every color arrives pre-softened and every edge dissolves into reverie. Light suffuses everything with gentle warmth: no harsh source, no hard shadow, just an omnipresent luminous glow as if the entire world is lit from within by rose-gold dawn that never quite becomes full day. Colors exist exclusively in their most tender register — powder pink, baby blue, lavender, mint cream, peach, and soft coral — each further softened by the addition of white until they feel like tinted air rather than pigment, gradients transitioning so gently between hues that boundaries disappear into chromatic whispers. Every surface feels impossibly soft: clouds that look like they would yield to a finger's touch, petals with translucent edges, fabrics that drift and float as if gravity itself has been gentled, and backgrounds that fade into luminous fog at their edges. Characters are delicate and idealized — smooth skin with the faintest blush, large gentle eyes that shimmer with reflected pastel light, hair that flows in soft waves catching pink and lavender highlights, and expressions that lean toward wonder, tenderness, and quiet joy. Each composition creates floating sanctuary: subjects surrounded by generous breathing space of soft gradient, decorative elements — butterflies, petals, sparkles, bubbles — drifting through the air like visual poetry, and an overall sense that the frame captures a moment existing somewhere between waking and the sweetest possible dream.",
             quality_keywords=["beautiful pastel art", "ethereal illustration quality", "professional dreamy aesthetic", "soft luminous coloring", "delicate atmospheric art"],
@@ -563,12 +585,17 @@ class StyleEnforcer:
         "gothic": StyleEnforcement(
             style_name="gothic",
             style_display_name="Gothic Dark Romantic",
+            # P1 Wave 12 (实测 mild drift): gothic 年轻角色被渲成光面 CG idol 照,
+            # 偏离 style_description 的暗黑浪漫油画/绘画基调。加 "dark romantic painting"
+            # 绘画介质锚点 (进前 5), 引导向 Beksinski/古典绘画质感。
             mandatory_keywords=[
-                "gothic art style", "dark romantic aesthetic", "cathedral architecture",
+                "gothic art style", "dark romantic painting", "cathedral architecture",
                 "ornate dark details", "dramatic chiaroscuro", "Victorian gothic",
                 "ravens and roses", "stained glass", "dark elegance"
             ],
+            # 把 anti-anime + anti-(光面偶像渲染) 提进前 8 (prefix/extract 只取 [:8])。
             forbidden_keywords=[
+                "anime", "cel-shaded", "manga", "glossy idol render",
                 "bright cheerful", "kawaii", "chibi", "pastel", "pop art",
                 "cartoon comedy", "pixel art", "minimalist", "flat design",
                 "children's style", "sunny", "beach", "tropical"

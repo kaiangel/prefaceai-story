@@ -4,6 +4,46 @@
 
 ---
 
+## TASK-TEST26-FRONTEND-4 — adjust 异步轮询 + ETA 插值 + NETWORK_ERROR 计时 + 404 分级 (2026-05-24)
+
+**模型**: Opus 4.7 xhigh
+**背景**: test26 (cyberpunk + ai_entity) 全维度回溯暴露 4 前端问题 (TEST26_FULL_RETROSPECTIVE_2026-05-24)
+**文件改动 (5, 0 越权)**: StageC.tsx / useETA.ts / useETA.test.ts / api.ts / layout.tsx
+
+### ① P2-1 adjust 改异步轮询 (修陈明转圈) — StageC.tsx
+- `handleApplyAdjustment` 重写: POST `/adjust` → 拿 `job_id` (202) → 轮询 GET `/characters/adjust-jobs/{job_id}` 每 2s, status ∈ {completed,failed} 停
+- 严格按 §9.7 字段名: job_id / status / progress / stage_message / result(.portrait_url/.character.description_zh) / error
+- completed → cache-buster 刷 portraitUrl + 清 portraitErrors + toast success
+- failed → console.warn + toast "调整失败：{error}"
+- 404 (poll) = 过期/未注册 → 重试 (silentStatuses=[404]); MAX_POLLS=120 (4min 安全上限)
+- 加 `adjustJobMsg` state; loading UI 显 "AI 重绘中 {stage_message} X%" (不裸 spinner)
+- DEC-030: 前端只按 status+progress 派生, 不本地猜 90s
+- reroll (留空) 仍走同步 regenerate-portrait (§9.7.3 本轮未异步化)
+
+### ② P2-2 ETA 时间插值 — useETA.ts + useETA.test.ts
+- P1 backend authoritative 分支加 anchor (anchorBackendEtaRef + anchorBackendTsRef)
+- 同 backend 值冻结 → 按 elapsed 平滑递减; 新值 → re-anchor verbatim; resetForStage 重置 anchor
+- floor = min(backendVal, NEAR_ZERO_SEC=60) 防 Stage 1-4 误显"即将完成"
+- 不破坏 T20-9 优先级链 + isBackendAuthoritative bypass smoothing
+- 新增 testP22_BackendEtaInterpolation (15/15 PASS)
+
+### ③ P3-2 NETWORK_ERROR 计时修正 — api.ts
+- elapsed>120s 或 document.hidden → 判 tab 挂起, 降级 console.error→console.warn + "elapsed unreliable" 标注
+- 真网络错 (<2min + tab 可见, 如 MySQL 1.25min transient) 仍 console.error
+- 根因: in-flight fetch 跨 tab 挂起, 唤醒后 Date.now()-start 含挂起时长 → 96min 假象
+
+### ④ P3-3 404 日志分级统一 — layout.tsx
+- fetch wrapper 对 `/chapters/{n}/(status|story|storyboard|bgm|scene-references)` 的 404 改记 `level: 'routine-404'` (原全记 level:'network')
+- 根因: silentStatuses 只压 api.ts 内部 warn, layout 全局 fetch wrapper 独立记每个非 ok → pre-confirm 404 混进 network bucket
+
+### 验证
+- ✅ tsc 0 / build 20 routes 0 errors / useETA 15/15 PASS / lint 0 新增 (5 文件)
+- ✅ 0 越权 (仅 frontend/src)
+
+### 等 Founder e2e 实测 (重点: 陈明转圈消失 + POST adjust 只发 1 次)
+
+---
+
 ## TASK-WAVE-11-LP-IMAGE-LCP-PRIORITY LP 首屏 LCP 图 priority (2026-05-24)
 
 **模型**: Sonnet 4.6
