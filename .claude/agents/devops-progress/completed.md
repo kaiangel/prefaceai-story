@@ -1,7 +1,30 @@
 # DevOps Agent - 已完成任务
 
 > 按时间倒序记录已完成的工作
-> **2026-05-24 更新**: TASK-WAVE-11-DEPLOY-VPS 第 3 次部署完成 (c570c2d → 648b81c).
+> **2026-05-25 更新**: TASK-WAVE12-DEPLOY-VPS 第 4 次部署完成 (648b81c → d4541c4) + 生产性能基线实测.
+
+---
+
+### TASK-WAVE12-DEPLOY-VPS ✅ (2026-05-25, DevOps Sonnet 4.6 effort high 全程自执行)
+
+**任务**: VPS 第 4 次部署 — Wave 12 (style_enforcer画风 + adjust异步 + sub-progress + 前端), 648b81c → d4541c4, 含生产性能基线实测
+
+**执行**:
+- commit d4541c4 (32 files, [frontend-impact: yes]) + push GitHub
+- rsync app/services/ + app/api/ + frontend/src/ (trailing slash 正确) — md5 5/5 一致
+- Docker rebuild api sha256:052228cb + frontend sha256:a95369a8 --no-cache + force-recreate
+- alembic current = 006 (head), DB 3 列 projects.aspect_ratio/raw_outline_json/confirmed_outline_json = EXISTS
+
+**生产性能基线 (P2-1 #3 关键判断)**:
+- VPS 内网 MySQL TCP connect: 42-65ms avg 51ms (vs 本地公网 333-684ms)
+- VPS 内网 SELECT 1: 41.8-42.1ms avg 42ms (极稳定)
+- 改善: ~8x。Backend 聚合端点仍有价值 (减并发 round-trip)，不需紧急大改
+
+**verify**:
+- api(healthy) + frontend(Up) + redis(healthy)
+- /api/health 200 + 主页 200 + Wave 12 代码 grep 全在
+
+**Ben 协议 5+1**: 0 schema / 0 Alembic / STATUS_API v1.6 / [frontend-impact: yes] / 0 .env / 0 越权
 
 ---
 

@@ -1,10 +1,45 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-05-24 — TASK-WAVE-11-DEPLOY-VPS 完成 (DevOps Sonnet 4.6 effort high 全程自执行)
-> **状态**: 🟢 VPS 第 3 次部署完成 (c570c2d → 648b81c), 全 verify 通过
+> **最后更新**: 2026-05-25 — TASK-WAVE12-DEPLOY-VPS 完成 (DevOps Sonnet 4.6 effort high 全程自执行)
+> **状态**: 🟢 VPS 第 4 次部署完成 (648b81c → d4541c4), 全 verify 通过 + 生产性能基线实测完成
 > **当前空闲**, 等待 PM 下一任务
 >
 > SECRET-LEAK 历史: Step 6 (key rotation) 5/22 跳过 (Founder 决策 Google 控制台限额兜底)
+
+---
+
+## TASK-WAVE12-DEPLOY-VPS [2026-05-25 开工 / 完成] (DevOps Sonnet 4.6 effort high 全程自执行)
+
+**背景**: VPS 跑 648b81c (Wave 10+11)，升级到 d4541c4 (Wave 12: style_enforcer 画风 + adjust 异步 + sub-progress + 前端)。含生产性能基线实测 (P2-1 #3)。
+
+**执行摘要**:
+
+| Step | 内容 | 状态 |
+|------|------|------|
+| 0 | git status verify: 26 modified + 6 untracked (Wave 12 改动确认) | ✅ |
+| 1 | git add 32 files + commit d4541c4 + push (5234707→d4541c4) | ✅ |
+| 2 | rsync app/services/ + app/api/ + frontend/src/ — md5 5/5 一致 | ✅ |
+| 3 | Docker rebuild api sha256:052228cb + frontend sha256:a95369a8 --no-cache | ✅ |
+| 4 | force-recreate api + frontend — api(healthy) + frontend(Up) | ✅ |
+| 5a | /health: {"status":"healthy"} + /api/health 200 + 主页 200 | ✅ |
+| 5b | alembic current: 006_t21new7_scene_refs (head) 已是最新 | ✅ |
+| 5c | DB 3 列: aspect_ratio(varchar) + raw_outline_json(text) + confirmed_outline_json(text) = EXISTS | ✅ |
+| 5d | Wave 12 代码 grep: anti-anime(22处) + adjust-jobs(2处) + adjust_job_manager.py | ✅ |
+| 5e | 生产性能基线实测 (关键, 定 #3): VPS内网 42ms avg vs 本地333ms — 见下方 | ✅ |
+| 6 | devops-progress 三件套 + TEAM_CHAT + self-commit + push | ✅ |
+
+**生产性能基线 (Step 5e — 定 #3 的关键数据)**:
+
+| 指标 | 本地公网 (TEST28) | 生产 VPS 内网 (本次实测) | 改善 |
+|------|------|------|------|
+| MySQL TCP connect | 333-684ms | 42-65ms avg 51ms | **~8x** |
+| MySQL SELECT 1 | ~300-600ms | 41.8-42.1ms avg 42ms | **~8x 极稳定** |
+
+**判断**: P2-1 hydrate 在生产 VPS 已大幅改善 (333ms→42ms)。但 hydrate 仍有 5 并发 × 42ms/query × 多次查询 = 可测量延迟。Backend 聚合端点 (#3②) 仍有价值 (减并发 round-trip，内网省几百ms)。**不需要紧急大改，但聚合仍是体验提升点**。
+
+**#5d MySQL idle 观察**: pool_recycle=1800s, pool_pre_ping=True 在 VPS 已生效。idle 2013 在内网 <30min 连接时不出现。留观察，不强制等待。
+
+**Ben 协议 5+1**: 0 schema 改动 / 0 Alembic 新 revision / STATUS_API v1.6 (adjust-jobs契约) / [frontend-impact: yes] / 0 .env 改动 / 0 越权
 
 ---
 

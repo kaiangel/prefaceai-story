@@ -2,6 +2,45 @@
 
 > 类似微信群的异步沟通记录。每条消息需注明时间、发言人、@对象。
 
+## [2026-05-25] DevOps — TASK-WAVE12-DEPLOY-VPS 完成 + 生产性能基线实测 @PM
+
+### VPS 第 4 次部署完成 (648b81c → d4541c4)
+
+**部署范围**: Wave 12 (style_enforcer画风 + adjust异步 + sub-progress + 前端)
+
+**verify 全通过**:
+
+| 检查项 | 结果 |
+|--------|------|
+| commit d4541c4 + push GitHub | ✅ (5234707→d4541c4, 32 files) |
+| rsync md5 5 文件 | 100% 一致 ✅ |
+| api image | sha256:052228cb (--no-cache) ✅ |
+| frontend image | sha256:a95369a8 (--no-cache) ✅ |
+| 容器状态 | api(healthy) + frontend(Up) + redis(healthy) ✅ |
+| 容器内 /health | {"status":"healthy"} ✅ |
+| /api/health | HTTP 200 ✅ |
+| 主页 prefaceai.mov | HTTP 200 ✅ |
+| Wave 12 代码 | anti-anime(22处) + adjust-jobs(2处) + adjust_job_manager.py ✅ |
+| DB 3 列 | aspect_ratio + raw_outline_json + confirmed_outline_json = EXISTS ✅ |
+| alembic current | 006_t21new7_scene_refs (head) ✅ |
+
+**生产性能基线 (#3 关键判断)**:
+
+| 指标 | 本地公网 (TEST28) | 生产 VPS 内网 (本次实测) | 改善 |
+|------|------|------|------|
+| MySQL TCP connect | 333-684ms | 42-65ms avg 51ms | ~8x |
+| MySQL SELECT 1 | ~300-600ms | 41.8-42.1ms avg 42ms | ~8x 极稳定 |
+
+**判断**: P2-1 hydrate 在生产已大幅改善。5 并发 × 42ms × 多次查询仍有延迟，但量级从"330ms/请求"降至"42ms/请求"。Backend 聚合端点 (#3②) 仍有价值但不是紧急大改。内测前 Backend 聚合端点是体验提升，不是 P0 阻塞。
+
+**#5d MySQL idle**: pool_recycle=1800s + pool_pre_ping=True 在 VPS 生效。留观察，不强制等待。
+
+**Ben 协议 5+1**: 0 schema / 0 Alembic / STATUS_API v1.6 / [frontend-impact: yes] / 0 .env / 0 越权
+
+@PM: TASK-WAVE12-DEPLOY-VPS 完成。devops-progress 三件套已更新。push 后请转告 Founder 通知 Ben (Ben 协议)。
+
+---
+
 ## [2026-05-25] Tester — TASK-WAVE12-INDEPENDENT-RETEST 完成 ✅ @PM
 
 ### Wave 12 独立复测结论 (Wave 13 #1)

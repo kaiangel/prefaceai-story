@@ -5,23 +5,33 @@
 
 ---
 
-## 当前状态速览（2026-05-24 VPS 第 3 次部署完成）
+## 当前状态速览（2026-05-25 VPS 第 4 次部署完成 — Wave 12）
 
-**DevOps 状态**: 🟢 空闲 — TASK-WAVE-11-DEPLOY-VPS 完成
+**DevOps 状态**: 🟢 空闲 — TASK-WAVE12-DEPLOY-VPS 完成 + 生产性能基线实测完成
 
-**VPS 当前版本**: 648b81c (Wave 10 AI-ML + Wave 10 Backend + Wave 11 Frontend)
+**VPS 当前版本**: d4541c4 (Wave 12: style_enforcer + adjust异步 + sub-progress + 前端)
 
-**5/24 VPS 第 3 次部署（TASK-WAVE-11-DEPLOY-VPS）**:
-- rsync 5 个目录/文件: app/services/ + app/api/ + app/prompts/ + app/database.py + frontend/src/ — md5 100% 一致
-- Docker rebuild api (sha256:47ed6871) + frontend (sha256:3a17b649) --no-cache
+**5/25 VPS 第 4 次部署（TASK-WAVE12-DEPLOY-VPS）**:
+- rsync 3 个目录: app/services/ + app/api/ + frontend/src/ — md5 5/5 一致
+- Docker rebuild api (sha256:052228cb) + frontend (sha256:a95369a8) --no-cache
 - force-recreate api + frontend
-- 全 verify 通过: /api/health 200 + 主页 200 + 容器 healthy + Wave 10 const × 4 + pool_pre_ping ✅
-- 5/23 MySQL 500 (pool 死连接) 根因：VPS 版本滞后，此次升级后 pool_pre_ping=True 已在容器内生效
+- DB 3 列确认: projects.aspect_ratio + raw_outline_json + confirmed_outline_json = EXISTS
+- 全 verify 通过: /api/health 200 + 主页 200 + 容器 api(healthy) + Wave12 代码(anti-anime/adjust-jobs/adjust_job_manager) ✅
+
+**生产性能基线 (2026-05-25 实测, 关键)**:
+- VPS 内网 MySQL round-trip (TCP connect): 42-65ms, avg 51ms
+- VPS 内网 SELECT 1 实测: 41.8-42.1ms, avg 41.9ms (极稳定)
+- 本地公网 MySQL (测试环境): 333-684ms (TEST28实测)
+- **改善比: 333ms → 42ms = 8x 改善** (内网 vs 公网)
+- 判断: P2-1 hydrate 在生产仍慢 (5 并发 × 42ms/query + 多次query = 可测量延迟), 但已比本地公网大幅改善。Backend 聚合端点 (#3 ②) 仍有价值 (减并发 round-trip)
+
+**#5d MySQL idle 观察**: pool_recycle=1800s (30min), pool_pre_ping=True 已在 VPS。idle 2013 风险在内网 <30min 连接时不出现。观察 1h+ idle 后第1次操作。
 
 **VPS 部署历史**:
-- 第 1 次 (2026-05-22 ~19:45): Wave 8 初次部署 (f9987b0 → f9987b0)
+- 第 1 次 (2026-05-22 ~19:45): Wave 8 初次部署 (f9987b0)
 - 第 2 次 (2026-05-22 19:50): Wave 9+9.1+Tester (→ c570c2d, PM 代 Docker rebuild)
 - 第 3 次 (2026-05-24): Wave 10+11 (→ 648b81c)
+- 第 4 次 (2026-05-25): Wave 12 (→ d4541c4, DevOps 全程自执行)
 
 ---
 
