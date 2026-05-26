@@ -1198,17 +1198,25 @@ export default function StageC() {
           </div>
         )}
 
-        {/* RISK-T15-1 fix (original): "后台生成" button was ONLY during shot-gen.
-            RISK-T17-7 upgrade (Founder 5/15 clarification): button should appear as soon as
-            user enters /generating (after scene confirm), staying visible through storyboard_running
-            + shot_generating + bgm stages. Hidden only at completed / error.
-            - storyboard stage (text-gen subPhase + currentStage="storyboard"): show — user already
-              confirmed characters + scenes, no review action needed, safe to leave.
-            - shot-gen subPhase (image_preparation / image_generation / bgm): show — existing behaviour.
-            - text-gen stages before storyboard (story_generation, character_design, screenplay): hidden
-              — user may still need to confirm characters or scenes. */}
-        {((state.generationSubPhase === "shot-gen") ||
-          (state.generationSubPhase === "text-gen" && currentStage === "storyboard")) &&
+        {/* Wave 13 #4B (P2-3 fix): "后台生成" button visibility — fix the "忽有忽无" flicker.
+            The button used to show during storyboard (text-gen + currentStage="storyboard") AND
+            during shot-gen. But storyboard happens BEFORE scene confirmation (R4-3), so the button
+            appeared at storyboard → disappeared at scene_image_preparation → reappeared after scene
+            confirm = flickering, confusing.
+
+            ROOT CAUSE: the old RISK-T17-7 assumption "at storyboard the user already confirmed
+            scenes" was wrong — scene confirmation (scenesConfirmed) only fires at R4-3 (after
+            scene_references_ready), which is AFTER storyboard.
+
+            FIX (single source of truth = scenesConfirmed): hide the button through the ENTIRE
+            pre-scene-confirm flow (story_generation / character_design / screenplay / storyboard /
+            scene_image_preparation) and show it consistently ONLY after scenes are confirmed
+            (image_preparation / image_generation / bgm / music — all shot-gen subPhase). This
+            mirrors STAGE_SUBTITLE which only says "可以选择后台生成" for those same post-confirm
+            stages. scenesConfirmed is backend-authoritative (hydrated from scenes_confirmed) so it
+            survives page re-entry mid-generation. */}
+        {state.scenesConfirmed &&
+          state.generationSubPhase === "shot-gen" &&
           !isError && (
           <button
             onClick={handleBackgroundGenerate}
@@ -1450,27 +1458,140 @@ function CharacterPreview({
     setAdjustInput("");
   };
 
-  // F-2: Call real regenerate-portrait API (Agent A P1-3 endpoint)
-  // POST /api/projects/{projectId}/characters/{charId}/regenerate-portrait
-  // Response: { portrait_url: string } with new portrait URL
-  const handleRegenerate = async (charId: string) => {
-    setRegeneratingId(charId);
-    if (projectId && token) {
+  // Wave 12 + Wave 13 #6: shared async job shape for character adjust + regenerate-portrait.
+  // STATUS_API_CONTRACT §9.7.2 (poll endpoint) + §9.7.4 (regenerate-portrait async):
+  // both kinds use the SAME GET /characters/adjust-jobs/{job_id} poller, distinguished by `kind`.
+  interface CharacterJob {
+    job_id: string;
+    char_id: string;
+    kind?: "adjust" | "regenerate_portrait";
+    status: "pending" | "processing" | "completed" | "failed";
+    progress?: number | null;
+    stage_message?: string | null;
+    result?: {
+      success?: boolean;
+      character?: { description?: string; description_zh?: string };
+      char_id?: string;
+      portrait_url?: string | null;
+      fullbody_url?: string | null;
+      message?: string;
+    } | null;
+    error?: string | null;
+  }
+
+  // Wave 12 + Wave 13 #6: shared poller for the async character job endpoint.
+  // Polls GET /characters/adjust-jobs/{job_id} until status ∈ {completed, failed}.
+  // Used by BOTH handleApplyAdjustment (adjust, kind="adjust") and handleRegenerate
+  // (reroll, kind="regenerate_portrait") — same endpoint, derive UI purely from
+  // backend status + progress + stage_message (DEC-030 backend authoritative, no local guess).
+  //
+  // onComplete receives the job.result so callers can apply kind-specific updates
+  // (adjust records the adjustment text; reroll just swaps the portrait).
+  const pollCharacterJob = async (
+    jobId: string,
+    charId: string,
+    onComplete: (result: NonNullable<CharacterJob["result"]>) => void
+  ): Promise<void> => {
+    const POLL_INTERVAL_MS = 2000;
+    const MAX_POLLS = 120; // safety cap: 120 × 2s = 4 min (well past the ~60-90s backend job)
+    let polls = 0;
+    // small initial delay so the job has a chance to register before first poll
+    await new Promise((r) => setTimeout(r, 800));
+    while (polls < MAX_POLLS) {
+      polls += 1;
+      let job: CharacterJob;
       try {
-        const result = await apiFetch<{ portrait_url: string; success: boolean }>(
-          `/projects/${projectId}/characters/${charId}/regenerate-portrait`,
-          { method: "POST", body: JSON.stringify({}) },
-          token
+        job = await apiFetch<CharacterJob>(
+          `/projects/${projectId}/characters/adjust-jobs/${jobId}`,
+          {},
+          token,
+          { silentStatuses: [404] } // 404 = expired/not-yet-registered; retry a few times
         );
-        if (result.portrait_url) {
-          onUpdateCharacter(charId, { portraitUrl: result.portrait_url });
-        }
       } catch {
-        // Non-fatal: silently fail, portrait stays as-is
-        toast("error", "重新生成失败，请稍后重试");
+        // Transient (e.g. job not yet registered, or brief network blip) — keep polling.
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        continue;
       }
+
+      // Derive friendly loading text from backend stage_message + progress (§9.7.2/§9.7.4).
+      const pct = typeof job.progress === "number" ? Math.max(0, Math.min(100, job.progress)) : null;
+      const stageMsg = job.stage_message || "AI 重绘中";
+      setAdjustJobMsg(pct !== null ? `${stageMsg} ${pct}%` : `${stageMsg}…`);
+
+      if (job.status === "completed") {
+        onComplete(job.result || {});
+        return;
+      }
+
+      if (job.status === "failed") {
+        // eslint-disable-next-line no-console
+        console.warn("[StageC] character job failed:", job.error || "(no error message)");
+        toast("error", job.error ? `操作失败：${job.error}` : "操作失败，请重试");
+        return;
+      }
+
+      // pending / processing → wait then poll again
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
     }
-    setRegeneratingId(null);
+    toast("error", "操作超时，请稍后重试");
+  };
+
+  // Cache-buster so the browser reloads the overwritten portrait/fullbody at the same path.
+  const bustUrl = (u: string | null | undefined): string | null => {
+    const abs = toAbsoluteUrl(u);
+    if (!abs) return null;
+    return abs.includes("?") ? `${abs}&_=${Date.now()}` : `${abs}?_=${Date.now()}`;
+  };
+
+  // F-2 + Wave 13 #6: regenerate-portrait (reroll) — now ASYNC + polling.
+  // STATUS_API_CONTRACT §9.7.4 (Backend Wave 13 #6 changed this endpoint to async):
+  //   1. POST /characters/{char_id}/regenerate-portrait → 202 Accepted + { job_id, status }
+  //      (no longer 200 + { portrait_url } — old synchronous behavior would break here)
+  //   2. poll GET /characters/adjust-jobs/{job_id} (kind="regenerate_portrait") until terminal
+  //   3. completed → read result.portrait_url (cache-buster) to refresh the character card
+  // Reuses pollCharacterJob — identical poller as adjust, only the POST endpoint + completion
+  // handling differ (reroll just swaps the portrait, records no adjustment text).
+  const handleRegenerate = async (charId: string) => {
+    if (!projectId || !token) {
+      toast("error", "重新生成失败，请稍后重试");
+      return;
+    }
+    setRegeneratingId(charId);
+    setAdjustJobMsg("AI 重绘中，请稍候…");
+
+    // 1) Kick off the async job — backend returns 202 + job_id (does NOT block ~60s).
+    let jobId: string;
+    try {
+      const kickoff = await apiFetch<{ success: boolean; job_id: string; status: string; char_id: string; message?: string }>(
+        `/projects/${projectId}/characters/${charId}/regenerate-portrait`,
+        { method: "POST", body: JSON.stringify({}) },
+        token
+      );
+      if (!kickoff.job_id) throw new Error("missing job_id in regenerate-portrait 202 response");
+      jobId = kickoff.job_id;
+    } catch {
+      // Fast-validation failure (404/400) — surface immediately, no polling.
+      setRegeneratingId(null);
+      setAdjustJobMsg("");
+      toast("error", "重新生成失败，请稍后重试");
+      return;
+    }
+
+    // 2) Poll until terminal. Reroll just swaps the portrait on completion.
+    try {
+      await pollCharacterJob(jobId, charId, (result) => {
+        const newPortrait = bustUrl(result.portrait_url);
+        if (newPortrait) {
+          onUpdateCharacter(charId, { portraitUrl: newPortrait });
+        }
+        // Clear any stale img-error flag so the refreshed portrait shows.
+        setPortraitErrors((prev) => ({ ...prev, [charId]: false }));
+        toast("success", "已重新生成");
+      });
+    } finally {
+      setRegeneratingId(null);
+      setAdjustJobMsg("");
+    }
   };
 
   // RF-5 / P2-1 (Wave 12): Real API for character adjustment — now ASYNC + polling.
@@ -1487,8 +1608,8 @@ function CharacterPreview({
   // 不本地猜测 90s 完成时间.
   const handleApplyAdjustment = async (charId: string) => {
     // B48: leave-empty = reroll (no prompt change, just new seed).
-    // Reroll still goes through the (synchronous) regenerate-portrait endpoint, which
-    // §9.7.3 explicitly notes is NOT yet async-ified this round — left unchanged.
+    // Wave 13 #6: reroll now goes through the ASYNC regenerate-portrait endpoint
+    // (§9.7.4) — handleRegenerate kicks off the 202 job + polls, same as adjust.
     if (!adjustInput.trim()) {
       setAdjustingId(null);
       await handleRegenerate(charId);
@@ -1523,89 +1644,24 @@ function CharacterPreview({
       return;
     }
 
-    // 2) Poll the job until it reaches a terminal state. We DON'T guess a 90s timer —
+    // 2) Poll until terminal via the shared poller (§9.7.2). We DON'T guess a 90s timer —
     //    the loading UI is purely derived from backend status + progress + stage_message.
-    interface AdjustJob {
-      job_id: string;
-      char_id: string;
-      status: "pending" | "processing" | "completed" | "failed";
-      progress?: number | null;
-      stage_message?: string | null;
-      result?: {
-        success?: boolean;
-        character?: { description?: string; description_zh?: string };
-        char_id?: string;
-        portrait_url?: string | null;
-        fullbody_url?: string | null;
-        message?: string;
-      } | null;
-      error?: string | null;
-    }
-
-    const POLL_INTERVAL_MS = 2000;
-    const MAX_POLLS = 120; // safety cap: 120 × 2s = 4 min (well past the ~90s backend job)
-
+    //    On completion, adjust ALSO records the adjustment text + updated description.
     try {
-      let polls = 0;
-      // small initial delay so the job has a chance to register before first poll
-      await new Promise((r) => setTimeout(r, 800));
-      while (polls < MAX_POLLS) {
-        polls += 1;
-        let job: AdjustJob;
-        try {
-          job = await apiFetch<AdjustJob>(
-            `/projects/${projectId}/characters/adjust-jobs/${jobId}`,
-            {},
-            token,
-            { silentStatuses: [404] } // 404 = expired/not-yet-registered; retry a few times
-          );
-        } catch {
-          // Transient (e.g. job not yet registered, or brief network blip) — keep polling.
-          await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-          continue;
+      await pollCharacterJob(jobId, charId, (result) => {
+        const char = characters.find((c) => c.id === charId);
+        const newPortrait = bustUrl(result.portrait_url);
+        if (char) {
+          onUpdateCharacter(charId, {
+            description: result.character?.description_zh || result.character?.description || char.description,
+            ...(newPortrait ? { portraitUrl: newPortrait } : {}),
+            adjustments: [...char.adjustments, adjustment],
+          });
         }
-
-        // Derive friendly loading text from backend stage_message + progress (§9.7.2).
-        const pct = typeof job.progress === "number" ? Math.max(0, Math.min(100, job.progress)) : null;
-        const stageMsg = job.stage_message || "AI 重绘中";
-        setAdjustJobMsg(pct !== null ? `${stageMsg} ${pct}%` : `${stageMsg}…`);
-
-        if (job.status === "completed") {
-          const char = characters.find((c) => c.id === charId);
-          const result = job.result || {};
-          // Cache-buster so the browser reloads the overwritten portrait/fullbody at the same path.
-          const bust = (u: string | null | undefined): string | null => {
-            const abs = toAbsoluteUrl(u);
-            if (!abs) return null;
-            return abs.includes("?") ? `${abs}&_=${Date.now()}` : `${abs}?_=${Date.now()}`;
-          };
-          const newPortrait = bust(result.portrait_url);
-          if (char) {
-            onUpdateCharacter(charId, {
-              description: result.character?.description_zh || result.character?.description || char.description,
-              ...(newPortrait ? { portraitUrl: newPortrait } : {}),
-              adjustments: [...char.adjustments, adjustment],
-            });
-          }
-          // Clear any stale img-error flag so the refreshed portrait shows.
-          setPortraitErrors((prev) => ({ ...prev, [charId]: false }));
-          toast("success", "角色已更新");
-          break;
-        }
-
-        if (job.status === "failed") {
-          // eslint-disable-next-line no-console
-          console.warn("[StageC] P2-1 adjust job failed:", job.error || "(no error message)");
-          toast("error", job.error ? `调整失败：${job.error}` : "调整失败，请重试");
-          break;
-        }
-
-        // pending / processing → wait then poll again
-        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-      }
-      if (polls >= MAX_POLLS) {
-        toast("error", "调整超时，请稍后重试");
-      }
+        // Clear any stale img-error flag so the refreshed portrait shows.
+        setPortraitErrors((prev) => ({ ...prev, [charId]: false }));
+        toast("success", "角色已更新");
+      });
     } finally {
       setRegeneratingId(null);
       setAdjustingId(null);

@@ -619,47 +619,33 @@ function testP22_BackendEtaInterpolation() {
 
 // ---------------------------------------------------------------------------
 // Run all tests
+//
+// Wave 13 #9: this file used to run as a top-level IIFE with console.assert (which
+// never throws) + process.exit(1). That meant a failed assertion silently "passed"
+// and process.exit would kill any test runner. We now drive the 15 white-box test
+// functions through vitest `it()` blocks. The vitest setup (vitest.setup.ts) overrides
+// console.assert to THROW on a falsy condition, so each assertion is a real pass/fail.
+// The 15 test function bodies above are unchanged — only the runner harness moved here.
 // ---------------------------------------------------------------------------
 
-console.log("=== useETA RISK-T20-2 + RISK-T20-9 + T20-44 + T21-NEW-7 v1.4 + P2-2 Unit Tests ===\n");
+import { describe, it } from "vitest";
 
-try {
-  testBug1_SlidingWindowClamping();
-  testBug2_NearZeroText();
-  testBug3_WrappingUpDetection();
-  testBug2_MonotonicityDrivesZero();
-  testT209_PriorityUsesEstimatedRemainingWhenPresent();
-  testT209_FallbackToLegacyWhenEstimatedNull();
-  testT209_ZeroEstimatedRemainingAccepted();
-  testT2044_BackendAuthoritativeBypassesSmoothing();
-  testT209_NoJitterWithConsistentBackendValues();
+describe("useETA — RISK-T20-2 + RISK-T20-9 + T20-44 + T21-NEW-7 v1.4 + P2-2", () => {
+  it("Bug 1 — sliding window delta clamping", testBug1_SlidingWindowClamping);
+  it("Bug 2 — near-zero ETA text", testBug2_NearZeroText);
+  it("Bug 3 — stage+progress wrapping-up detection", testBug3_WrappingUpDetection);
+  it("Bug 2 — monotonicity drives to 0 → '即将完成'", testBug2_MonotonicityDrivesZero);
+  it("T20-9 #1 — priority uses estimatedRemainingSeconds", testT209_PriorityUsesEstimatedRemainingWhenPresent);
+  it("T20-9 #2 — fallback to legacy backendEtaSec when null", testT209_FallbackToLegacyWhenEstimatedNull);
+  it("T20-9 #3 — estimatedRemainingSeconds=0 accepted", testT209_ZeroEstimatedRemainingAccepted);
+  it("T20-44 #4 — backend authoritative bypasses smoothing", testT2044_BackendAuthoritativeBypassesSmoothing);
+  it("T20-9 #5 — no jitter with consistent backend values", testT209_NoJitterWithConsistentBackendValues);
   // T21-NEW-7 v1.4 (2026-05-21 DEC-047) — Stage 4.5 + R4-3 + 9 状态机
-  testT21New7_SceneImagePreparationBudget();
-  testT21New7_SceneReferencesReadyIsReviewStage();
-  testT21New7_PhaseToSubPhaseMapping();
-  testT21New7_UiPhaseToUrlMapping();
-  testT21New7_CountdownArithmetic();
+  it("T21-NEW-7 6a — scene_image_preparation budget + scene_references_ready", testT21New7_SceneImagePreparationBudget);
+  it("T21-NEW-7 6b — scene_references_ready is REVIEW_STAGES", testT21New7_SceneReferencesReadyIsReviewStage);
+  it("T21-NEW-7 6c — phaseToSubPhase 9-state mapping complete", testT21New7_PhaseToSubPhaseMapping);
+  it("T21-NEW-7 6d — UI_PHASE_TO_URL scene_references_review → /scenes", testT21New7_UiPhaseToUrlMapping);
+  it("T21-NEW-7 6e — 60s countdown + double-confirm guard", testT21New7_CountdownArithmetic);
   // P2-2 (Wave 12) — backend ETA time-interpolation (Stage 1-4 anti-freeze)
-  testP22_BackendEtaInterpolation();
-
-  console.log("\n=== All 15 test cases PASS ===");
-  console.log("\nCoverage summary:");
-  console.log("  Bug 1 (sliding window): delta clamping arithmetic verified");
-  console.log("  Bug 2 (ETA vanish): rawSec=0/30/60/90 all return correct text");
-  console.log("  Bug 2 (monotonicity→0): 40-cycle simulation confirms '即将完成'");
-  console.log("  Bug 3 (收尾 trigger): 5 scenarios including test18 false-positive");
-  console.log("  T20-9 test 1: estimatedRemainingSeconds top priority over backendEtaSec");
-  console.log("  T20-9 test 2: fallback to legacy backendEtaSec when estimatedRemainingSeconds=null");
-  console.log("  T20-9 test 3: estimatedRemainingSeconds=0 accepted (≥0), backendEtaSec=0 ignored (>0)");
-  console.log("  T20-44 test 4: backend authoritative bypasses smoothing (790s not clamped to 3min)");
-  console.log("  T20-9 test 5: no jitter with consistent backend countdown values");
-  console.log("  T21-NEW-7 6a: scene_image_preparation budget=180s + scene_references_ready=0s");
-  console.log("  T21-NEW-7 6b: scene_references_ready is REVIEW_STAGES (ETA hidden during R4-3)");
-  console.log("  T21-NEW-7 6c: phaseToSubPhase 9 状态映射完整 (含 scene-refs-preview)");
-  console.log("  T21-NEW-7 6d: UI_PHASE_TO_URL scene_references_review → /scenes");
-  console.log("  T21-NEW-7 6e: 60s countdown + double-confirm guard arithmetic");
-  console.log("  P2-2: backend ETA interpolation (frozen value ticks down, new value re-anchors, NEAR_ZERO floor)");
-} catch (err) {
-  console.error("TEST FAILURE:", err);
-  process.exit(1);
-}
+  it("P2-2 — backend ETA time-interpolation", testP22_BackendEtaInterpolation);
+});

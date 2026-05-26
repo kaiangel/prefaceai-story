@@ -28,9 +28,14 @@ export const metadata: Metadata = {
 // JSON.stringify ensures proper quoting + escaping of the value before injection into the IIFE string.
 // The browser IIFE never sees process.env — it only sees the already-resolved string value.
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
+// Wave 13 #5: bump this when the proxy script changes so we can confirm in logs which
+// version a browser actually loaded (test28 lesson: code审查≠实测生效 — old script ran in a
+// stale tab so the routine-404 classification never fired). The version is POSTed once on load.
+const CLIENT_LOG_PROXY_VERSION = "w13-404-v2";
 const CLIENT_LOG_PROXY_SCRIPT = `
 (function() {
   var ENDPOINT = ${JSON.stringify(API_BASE)} + '/_client_log';
+  var PROXY_VERSION = ${JSON.stringify(CLIENT_LOG_PROXY_VERSION)};
 
   function serializeArg(a) {
     if (a === null) return 'null';
@@ -191,8 +196,29 @@ const CLIENT_LOG_PROXY_SCRIPT = `
         // expected 404s with genuine network failures. We classify by-design pre-confirm 404s
         // as level:'routine-404' so monitoring de-noise treats them consistently.
         // Endpoints: /chapters/{n}/status | /story | /storyboard | /bgm | /scene-references
-        var isRoutine404 = response.status === 404 &&
-          /\/chapters\/\d+\/(status|story|storyboard|bgm|scene-references)(\?|$)/.test(url);
+        //
+        // Wave 13 #5 ROOT CAUSE FIX: this used to be a regex literal that tested the url. But
+        // CLIENT_LOG_PROXY_SCRIPT is a JS template literal, so every backslash in that regex was
+        // consumed by template-string escaping at construction time (backslash-d becomes d,
+        // backslash-slash becomes slash, etc). The emitted browser script started with a double
+        // slash which turned the whole assignment into a line comment, leaving isRoutine404
+        // undefined so ALL chapter 404s were logged as network. That is exactly why test28 showed
+        // 0 routine-404 + 18 network despite the Wave B fix.
+        // Rewritten with backslash-free plain-string checks (no regex literal, nothing to mangle).
+        var isRoutine404 = false;
+        if (response.status === 404 && url.indexOf('/chapters/') !== -1) {
+          var routineSuffixes = ['/status', '/story', '/storyboard', '/bgm', '/scene-references'];
+          // strip query string so '/status?x=1' still matches the '/status' suffix
+          var qIdx = url.indexOf('?');
+          var pathOnly = qIdx === -1 ? url : url.slice(0, qIdx);
+          for (var ri = 0; ri < routineSuffixes.length; ri++) {
+            var suf = routineSuffixes[ri];
+            if (pathOnly.length >= suf.length && pathOnly.slice(pathOnly.length - suf.length) === suf) {
+              isRoutine404 = true;
+              break;
+            }
+          }
+        }
         post({
           level: isRoutine404 ? 'routine-404' : 'network',
           ts: new Date().toISOString(),
@@ -213,6 +239,15 @@ const CLIENT_LOG_PROXY_SCRIPT = `
       throw err;
     });
   };
+
+  // Wave 13 #5: announce which proxy version loaded — lets us confirm in client.log that a
+  // browser is running the routine-404 build (not a stale tab). Fires once per page load.
+  post({
+    level: 'proxy-init',
+    ts: new Date().toISOString(),
+    args: ['client-log-proxy loaded version=' + PROXY_VERSION],
+    url: location.href
+  });
 })();
 `;
 

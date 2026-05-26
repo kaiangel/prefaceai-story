@@ -1581,6 +1581,36 @@ export default function CreateContent({ urlProjectUuid, urlStage }: CreateConten
     router,
   ]);
 
+  // Wave 13 #4A (P2-2 fix): during the CONFIRMATION FLOW (urlStage ∈ outline/characters/scenes)
+  // a hydrate timeout must NOT dump the user to "返回工作台" — they still have to come back and
+  // confirm characters/scenes, so leaving would break the flow. Instead we auto-retry the page a
+  // few times (the story keeps generating server-side) before falling back to a manual refresh.
+  // Pure generation / preview / delivery stages keep "返回工作台" (safe to leave — nothing to confirm).
+  const inConfirmationFlow =
+    urlStage === "outline" || urlStage === "characters" || urlStage === "scenes";
+  const isHydrateTimeout = !!hydrateError && hydrateError.includes("服务器正忙");
+
+  useEffect(() => {
+    // Auto-retry only while in the confirmation flow on a timeout. Bounded by a per-project
+    // sessionStorage counter so we never loop forever if the backend stays down — after the cap
+    // we stop auto-retrying and leave the user with the manual "刷新页面，继续等待" button.
+    if (!isHydrateTimeout || !inConfirmationFlow || !urlProjectUuid) return;
+    if (typeof window === "undefined") return;
+
+    const KEY = `hydrate_autoretry_${urlProjectUuid}`;
+    const MAX_AUTO_RETRIES = 3;
+    const count = Number(window.sessionStorage.getItem(KEY) || "0");
+    if (count >= MAX_AUTO_RETRIES) return; // give up auto-retry, user can still refresh manually
+
+    const timer = setTimeout(() => {
+      window.sessionStorage.setItem(KEY, String(count + 1));
+      // eslint-disable-next-line no-console
+      console.log(`[#4A] confirmation-flow hydrate timeout — auto-retry ${count + 1}/${MAX_AUTO_RETRIES}`);
+      window.location.reload();
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [isHydrateTimeout, inConfirmationFlow, urlProjectUuid]);
+
   // ──────────────────────────────────────────────────────────────────────────
   // Render
   // ──────────────────────────────────────────────────────────────────────────
@@ -1609,7 +1639,7 @@ export default function CreateContent({ urlProjectUuid, urlStage }: CreateConten
   if (urlProjectUuid && hydrateError) {
     // B28: Distinguish timeout ("AI still working") from genuine 404 ("project gone").
     // Timeout should offer a retry path — NOT auto-redirect to /outline.
-    const isTimeout = hydrateError.includes("服务器正忙");
+    const isTimeout = isHydrateTimeout;
     return (
       <div className="min-h-screen bg-bg-primary">
         <CreateHeader />
@@ -1619,10 +1649,20 @@ export default function CreateContent({ urlProjectUuid, urlStage }: CreateConten
               <>
                 <Loader2 className="w-10 h-10 text-brand-primary mx-auto mb-4 animate-spin" />
                 <h2 className="text-lg font-semibold text-text-primary mb-2">AI 正在努力创作中</h2>
-                <p className="text-text-secondary text-sm mb-6">
-                  服务器繁忙或 AI 创作耗时较长，请稍后重试。<br />
-                  你的故事正在后台继续生成，不需要重新开始。
-                </p>
+                {/* Wave 13 #4A: in the confirmation flow, reassure + auto-retry, do NOT offer
+                    "返回工作台" (would interrupt — user still needs to confirm characters/scenes).
+                    In pure generation/preview/delivery, keep "返回工作台" (safe to leave). */}
+                {inConfirmationFlow ? (
+                  <p className="text-text-secondary text-sm mb-6">
+                    服务器繁忙或 AI 创作耗时较长，正在自动为你重试…<br />
+                    你正在创作流程中，请稍候——确认环节马上回来，不需要重新开始。
+                  </p>
+                ) : (
+                  <p className="text-text-secondary text-sm mb-6">
+                    服务器繁忙或 AI 创作耗时较长，请稍后重试。<br />
+                    你的故事正在后台继续生成，不需要重新开始。
+                  </p>
+                )}
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <button
                     onClick={() => {
@@ -1634,15 +1674,20 @@ export default function CreateContent({ urlProjectUuid, urlStage }: CreateConten
                   >
                     刷新页面，继续等待
                   </button>
-                  <button
-                    onClick={() => router.replace("/dashboard")}
-                    className="px-6 py-2 rounded-lg border border-white/20 text-text-secondary hover:bg-white/5 transition-colors text-sm font-medium"
-                  >
-                    返回工作台
-                  </button>
+                  {/* #4A: "返回工作台" only outside the confirmation flow */}
+                  {!inConfirmationFlow && (
+                    <button
+                      onClick={() => router.replace("/dashboard")}
+                      className="px-6 py-2 rounded-lg border border-white/20 text-text-secondary hover:bg-white/5 transition-colors text-sm font-medium"
+                    >
+                      返回工作台
+                    </button>
+                  )}
                 </div>
                 <p className="text-text-muted text-xs mt-4">
-                  也可以关闭页面——完成后在工作台中查看
+                  {inConfirmationFlow
+                    ? "页面会自动重试，请保持打开"
+                    : "也可以关闭页面——完成后在工作台中查看"}
                 </p>
               </>
             ) : (
