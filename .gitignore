@@ -59,6 +59,12 @@ assets/*.mov
 
 # --- 个人文件 ---
 team-members/
+team-members-bp/
+
+# --- 运行日志 / 测试数据（防 BP/简历/日志误入库） ---
+logs/
+storyrefs/
 
 # --- 其他 ---
 *.log
+*.log.*
