@@ -4,6 +4,26 @@
 
 ---
 
+## 2026-05-26 — test29 非人类消费层专项 #5+#6+#7 ✅ (Opus 4.7 xhigh)
+
+**背景**: test29《荷塘渡》(金鲤 aquatic + 菖蒲 plant + 荷塘 concept, 成片 90 分) 系统性暴露"数据层(Stage 2)已把所有 type 属性写进 physical, 消费层仍假设角色=类人"的假设链。横扫 3 个消费层缺口。
+
+**#5 非人类结构化外观字段错配 (golden 丢)** — 追调用栈发现**两个独立漏点**(retro 只点了第二个):
+- #5a [生产 shot 主漏点] `identity_anchor_prompts._CHARACTER_TYPE_PRIMARY_COLOR_FIELDS`: 16 非 human type 只列 hair_color → 真鱼/真草 primary_color='' → 锚点块不渲染色 → golden 在喂给 Seedream 的 shot prompt 里丢。修: 每 type 列真实色字段(scale_color/leaf_color/exoskeleton_color/color_scheme/energy_color/skin_color/body_color)在前 + hair_color tail fallback。
+- #5b [参考图层] `character_prompt_builder`: 18 builder 从 `character[type]` 读空 → fallback "An aquatic creature"。加 `_type_attrs()` = `character[type] or physical` 字段级 fallback。human path 0 改动。
+
+**#7 Seedream 融合非人类角色** — `identity_anchor_injector._render_character_anchors_block` ≥2 角色注入 MULTI-SUBJECT SEPARATION (DO NOT MERGE) 指令, 2+ 非人类升 CRITICAL no-chimera; `shot_validator` anatomy 段加 SUBJECT FUSION 诊断(log-only 不升 severe, 避免 #6 重试浪费)。
+
+**#6 ShotValidator 非人类计数判 0** — `shot_validator.VALIDATION_PROMPT_BASE` 计数问题从 "human characters" → "FEATURED characters (humans AND non-human)" + 显式 "fish+reed=2 not 0"; anatomy 段对非人形不套人类肢体计数。选 prompt 通用化(非 validator 跳过)保留数量保护。
+
+**回归**: 426 (anchor/identity/cross-genre/validator/layer1/species) + 58 (shot_validator) PASS, 0 FAIL 0 退化。DEC-051 0 删 fallback, 图像 prompt 全英文, 单一模型 dispatch 未碰, 未碰 db_retry.py。
+
+**改的文件**: `app/prompts/identity_anchor_prompts.py` / `app/services/identity_anchor_injector.py` / `app/services/character_prompt_builder.py` / `app/services/shot_validator.py`
+
+**待**: @tester e2e 复测(非人类多角色: golden 不丢/不融合/不再重试浪费 + human 不退化) + 角色一致性回归。
+
+---
+
 ## 2026-05-24 — Wave 12 P1: style 画风漂移系统评估 + 分层修复 ✅ (Opus 4.7 xhigh)
 
 **背景**: test26《深夜小七》cyberpunk + ai_entity 实测老周(写实)/陈明(动漫)画风分叉。PM 发现 cyberpunk 是 28 style 唯一「0 画风锁定」。任务: 全 28 style 四维评估 + 高风险实测 + 分层补强 + 不破坏 by-design 动漫类。

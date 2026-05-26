@@ -4,6 +4,26 @@
 
 ---
 
+## Wave 13 #6 前端 — regenerate-portrait (reroll) 改异步轮询 (2026-05-25)
+
+**模型**: Opus 4.7 xhigh
+**背景**: PM 地毯式审查抓到前后端契约 gap — Backend Wave 13 #6 把 `regenerate-portrait` 改异步 (202 + job_id, 复用 adjust_job_manager kind=`regenerate_portrait`), 但前端 `handleRegenerate` 还是同步调用 (期待 200 + `{portrait_url}`) → reroll (留空调整框) 功能会断
+**文件改动 (1, 0 越权)**: `src/components/create/StageC.tsx`
+
+### 改法 (最大复用 Wave 12 adjust 轮询)
+- 抽取共享 `pollCharacterJob(jobId, charId, onComplete)` + `bustUrl` helper — adjust + reroll 共用同一 GET `/characters/adjust-jobs/{job_id}` 轮询端点
+- `CharacterJob` interface 加 `kind?: "adjust" | "regenerate_portrait"` (§9.7.4), 提到组件作用域共享
+- `handleRegenerate`: 同步 → POST 202+job_id → `pollCharacterJob` → completed 读 `result.portrait_url` (cache-buster) 刷新 + 清 portraitErrors + toast / failed → error
+- `handleApplyAdjustment`: 内联 88 行轮询循环 → 复用 `pollCharacterJob`, completion 回调额外记 adjustment + description (adjust 专属), 行为 1:1 不变
+- loading 显 backend stage_message + progress% (不裸转圈), DEC-030 backend authoritative 不本地猜 60s
+
+### 验证
+- tsc 0 / build 20 routes 0 errors / eslint StageC 0 / npm test 15/15 PASS
+- 不破坏 adjust (Wave 12): adjust 路径逻辑完全保留, 仅抽共享 helper
+- [frontend-impact: n/a — 纯对接 Backend 已改异步端点, 0 自己改 API/schema/契约]
+
+---
+
 ## TASK-TEST26-FRONTEND-4 — adjust 异步轮询 + ETA 插值 + NETWORK_ERROR 计时 + 404 分级 (2026-05-24)
 
 **模型**: Opus 4.7 xhigh

@@ -2174,3 +2174,73 @@ loc_001 underwater_palace: bioluminescent coral, soft blue-green ambient light
 ### 关联
 
 DEC-048 (Layer 1 Framework) + TASK-T22-NEW-10 + KEY_LEARNINGS #57 (跨路径 wire 一致性)
+
+---
+
+## [2026-05-25] DEC-052 Wave 13 内测前 FIXBATCH — PM 地毯式审查通过 (集成关口第一道绿灯)
+
+> Wave 13 内测前 FIXBATCH 代码全部写完仍在工作区未 commit (HEAD=68e4211=Wave12)。PM 5+1 Ben 协议 + 完整调用栈地毯式审查全部改动, 逐项 verdict。Tester 并行独立复测 (第二道)。
+
+### 审查范围 + verdict (5 改 + 3 新测 + 1 新 middleware + 2 新 vitest 配置)
+
+| 项 | 文件 | verdict |
+|---|---|---|
+| **Backend #5d** MySQL retry middleware | db_retry.py(新) + main.py(wire) + database.py(recycle 1800→600s) | ✅ 通过 |
+| **Backend #6** regenerate-portrait 异步化 | api/projects.py | ✅ 通过 (含 §9.7.4 三方契约对齐) |
+| **Backend #5e** clothing 旁路防崩 | character_designer.py | ✅ 通过 |
+| **Frontend #4A** 确认流程 hydrate 超时守卫 | CreateContent.tsx | ✅ 通过 |
+| **Frontend #4B** 后台生成按钮守卫 | StageC.tsx | ✅ 通过 |
+| **Frontend #5** 404 分级真根因 | layout.tsx | ✅ 通过 (源码层根治, 部署后验 client.log proxy-init) |
+| **Frontend #6** reroll 异步轮询 | StageC.tsx | ✅ 通过 |
+| **Frontend #9** vitest 测试基建 | vitest.config/setup + package.json + useETA.test.ts | ✅ 通过 |
+| **AI-ML #5b** schema 5 type 核实 | 0 代码改动 | ✅ 通过 (核实结论可信) |
+
+### 🔑 §9.7.4 regenerate-portrait 三方契约对齐 (Ben 纠验机制核心) — ✅ 逐字段一致
+
+| 字段 | Backend return | Frontend 读 | 契约 §9.7.4 |
+|---|---|---|---|
+| POST 202: success/job_id/status/char_id/message | ✓ | kickoff 读 job_id ✓ | ✓ |
+| GET job 顶层: job_id/char_id/kind/status/progress/stage_message/result/error | ✓ | CharacterJob interface 逐一 ✓ | ✓ |
+| result: success/char_id/portrait_url/fullbody_url/message | ✓ | result.portrait_url(bustUrl)/fullbody_url ✓ | ✓ |
+| kind="regenerate_portrait" 区分 adjust | ✓ create_job(kind=) | kind?:"adjust"\|"regenerate_portrait" ✓ | ✓ |
+
+四者字段名完全一致, 无断裂。STATUS_API_CONTRACT §9.7.4 已落地 (上一会话 PM 代补 v1.6)。
+
+### 关键调用栈验证 (非 grep 反推)
+
+- **#5d 4 重约束代码可证**: ① `_is_transient_connection_error` 走完整异常链 (__cause__/__context__) 只认 OperationalError/InterfaceError/DBAPIError(2013/2006/2003/connection_invalidated)+OSError(ETIMEDOUT/ECONNRESET/ECONNREFUSED/EPIPE), 业务错不重试 ② `_IDEMPOTENT_METHODS={GET,HEAD}` 非幂等直接放行 ③ `_MAX_RETRIES=1` ④ 非 transient/重试后失败原样 raise。main.py wire 顺序正确: add_middleware(retry) 先 → add_middleware(CORS) 后 → CORS 最外层 (重抛错误仍带 CORS 头)。
+- **#5e 崩溃点确认**: design() 内 LLM fallback try/except 在 L99-134 (Claude→Gemini), `_validate_characters` 在 L144 调用确在 fallback **之外**; orchestrator 调 design() 无 retry → 放宽前非穿衣 type 残缺 clothing 在 L144 raise 冲垮 pipeline。放宽后: `char_type_val=char.get("character_type","human")` (L647, 默认 human 走严格 raise 安全), 非穿衣 7 type 降 warning, 穿衣 type (human/anthropomorphic_animal/超自然人形/robot/alien) 仍 raise。崩溃点消除, 0 删 fallback (DEC-051)。
+  - 注: AI-ML #5b / Backend 注释引用旧行号 (L82-118/L127), 实际 L99-134/L144 — 仅注释行号陈旧, 逻辑结论正确, 非 blocker。
+- **#5 真根因**: CLIENT_LOG_PROXY_SCRIPT 是模板字符串, 旧 regex 字面量反斜杠构造时被吃掉 (`\d`→d/`\/`→/) → 开头 `//` 变行注释 → isRoutine404 永远 undefined → test28 0 routine-404+18 network。修法纯字符串 indexOf+suffix 匹配, 模板字符串无反斜杠可吃 → 源码层根治。
+
+### Ben 协议 5+1
+- API 契约变更: regenerate-portrait 同步→异步 (§9.7.4 已入契约 v1.6, frontend-impact: yes 已标) ✅
+- 0 schema 改动 / 0 Alembic migration (#5d 仅 pool 参数 / #5e 仅校验放宽 / job 仍 in-memory) ✅
+- 0 越权 (各 agent 严守白名单) ✅
+- DEC-051 fallback 0 删 (#6 B57 fullbody 重生+非阻塞兜底 / #5e 0 删) ✅
+
+### 结论
+**PM 审查全绿, 无 blocker。** Wave 13 待 Tester 第二道 (pytest 30 新 + vitest 15 + 回归 0 退化 + 独立核对 §9.7.4) 双绿后 → DevOps commit + push + VPS 第 5 次部署。
+
+### 关联
+DEC-030 (前后端纠验机制) + DEC-051 (fallback 红线) + STATUS_API_CONTRACT v1.6 §9.7.4 + INTERNAL_BETA_READINESS_CHECKLIST #5d/#5e/#6 + PENDING #4/#5/#9
+
+---
+
+## [2026-05-26] DEC-053 非人类角色支持 — 消费层去人类中心 (test29 触发, AI-ML 专项)
+
+**背景**: test29《荷塘渡》(红锦鲤金爷 aquatic + 菖蒲小蒲 plant + 荷塘 concept_personified) e2e 暴露 —— Stage 2 CharacterDesigner 数据层已把所有 type 属性写进 `physical` (通用化), 但**消费层全部假设"角色=类人结构"**, 形成「非人类人类中心假设链」5 缺口。Founder 90 分但发现金爷红(应金色)+鱼草融合。
+
+**决策 (Founder 全派内测前修, 信任单测直接 commit+部署)**:
+1. **#5 结构化外观字段从 `physical` 读** (双层): ① 锚点层 `identity_anchor_prompts.py _CHARACTER_TYPE_PRIMARY_COLOR_FIELDS` 每非人类 type 列真实色字段在前(scale_color/leaf_color/exoskeleton_color...)+hair_color 尾部 fallback(半人形); ② 参考图层 `character_prompt_builder.py` 各非人类 builder `character[type] or physical` 字段级 fallback。**锚点层是喂 Seedream 每张 shot 的真颜色源** (比 builder 层更关键, 回溯漏点, AI-ML 补挖)。
+2. **#7 多角色 shot 强制分离**: `identity_anchor_injector.py` ≥2 角色注入 MULTI-SUBJECT SEPARATION (DO NOT MERGE), 2+ 非人类升级 CRITICAL no-chimera; `shot_validator.py` 自然度检查对"该分离却融合"不洗白成"故意超现实"(保持 log-only 不升 severe, 避免触发 #6 重试浪费)。
+3. **#6 ShotValidator 计数通用化**: 计数问题 "human characters" → "FEATURED characters (humans AND non-human)", 不对非人类判 0 (取舍: 通用化而非跳过, 保留数量保护)。
+4. **#4 (Backend, DB-infra)**: db_retry 加认 "packet sequence number wrong" 握手腐败为 transient。
+5. **#8 BGM 默认 human + 画风误归类 → 内测后** (P3 低影响)。
+6. **结局 uncast 人类旁观者 → 内测后评估** (疑 by-design 叙事框架)。
+
+**验证**: PM 地毯式审查 (追调用链 + 亲跑 db_retry 21 + AI-ML 域 499 pytest + 越权 + Ben 维度) 全过, 0 修复轮次。#5/#7 视觉真证待 e2e (Founder 选不复测先信任单测)。
+
+**Ben 维度**: test29 改动零前端/契约表面 (DEC-030 无 frontend-impact), 不碰 DB 边界; #4 是 DB-infra → 部署前 Founder 知会 Ben。
+
+**关联**: 落地 memory `project_schema_humanoid_fallback_remaining` (aquatic 等 5 type prompt 层) + 回溯 `analysis/TEST29_FULL_RETROSPECTIVE_2026-05-26.md` + DEC-051 (0 删 fallback)。**长期**: 通用性是产品灵魂, 非人类多角色互动是核心场景, 后续消费层 (BGM/旁白/场景) 持续去人类中心。

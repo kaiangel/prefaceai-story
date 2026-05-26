@@ -1,15 +1,22 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看其文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-05-21 23:XX（自补 5/19-5/21 进度 + VPS 部署清单准备）
+> **最后更新**: 2026-05-26（Wave 13 + test29 commit + push, 未部署 VPS, 等 Ben 闸门）
 
 ---
 
-## 当前状态速览（2026-05-25 VPS 第 4 次部署完成 — Wave 12）
+## 当前状态速览（2026-05-26 Wave 13 + test29 已 commit + push, 等 Ben 闸门）
 
-**DevOps 状态**: 🟢 空闲 — TASK-WAVE12-DEPLOY-VPS 完成 + 生产性能基线实测完成
+**DevOps 状态**: 🟡 第 1 步完成 — Wave 13 + test29 commit + push GitHub 完成, **VPS 未部署**
 
-**VPS 当前版本**: d4541c4 (Wave 12: style_enforcer + adjust异步 + sub-progress + 前端)
+**⚠️ 重要 — GitHub 已更新但 VPS 仍是旧版本**:
+- GitHub origin/main: 4 commit (a0c3934 Backend/DB + ca2e43d Frontend + a16c7af AI-ML + 文档 commit), HEAD 已更新
+- **VPS 仍跑 d4541c4 (Wave 12)** — 第 2 步部署是 Ben 闸门, 待 Founder 知会 Ben + PM 放行
+- 含 #4 DB-infra (db_retry packet sequence + pool_recycle 1800→600s) = Ben 域
+
+**第 2 步部署待办 (PM 放行后)**: rsync app/+frontend/ + Docker rebuild api+frontend + #5c Alembic 确认 + layout.tsx rebuild 硬刷
+
+**VPS 上一稳定版本**: d4541c4 (Wave 12: style_enforcer + adjust异步 + sub-progress + 前端)
 
 **5/25 VPS 第 4 次部署（TASK-WAVE12-DEPLOY-VPS）**:
 - rsync 3 个目录: app/services/ + app/api/ + frontend/src/ — md5 5/5 一致

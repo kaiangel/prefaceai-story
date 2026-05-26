@@ -1,6 +1,52 @@
 # Frontend 状态速览（供其他Agent参考）
 
-> 更新时间: 2026-05-24 [TASK-TEST26-FRONTEND-4] adjust 异步轮询 + ETA 插值 + NETWORK_ERROR + 404 分级 完成
+> 更新时间: 2026-05-25 [Wave 13 #6 前端] regenerate-portrait (reroll) 改异步轮询 完成
+
+## Wave 13 #6 前端 (2026-05-25) ✅ regenerate-portrait 异步轮询
+
+**1 文件改 (StageC.tsx), build 0 errors, tsc 0, eslint 0, npm test 15/15, 0 越权**
+
+### 给 @tester (复测点)
+- **reroll (角色卡 → 调整 → 留空提交) 现在异步**: POST `regenerate-portrait` → 202 + job_id → 轮询 GET `/characters/adjust-jobs/{job_id}` → completed 刷新 portrait
+- 复测: ① reroll **不再转圈卡死** (loading 显 backend stage_message + progress%) ② 轮询拿到新 portrait_url, 角色卡刷新 (cache-buster, 同路径覆盖也能看到新图) ③ failed → toast error 提示
+- adjust (带文字调整) **行为不变** (回归点: 仍记录 adjustment + description + portrait)
+
+### 给 @backend (契约对接确认)
+- 已对接 Backend Wave 13 #6 异步 `regenerate-portrait` (§9.7.4): POST 202 + GET adjust-jobs 复用 §9.7.2 轮询端点
+- 前端严格按 §9.7.4 字段消费: `kind="regenerate_portrait"` 区分, `result.portrait_url/fullbody_url` cache-buster, fullbody null 非阻塞
+- 0 新 API 需求 / 0 schema / 0 契约改动 (纯对接已有异步端点)
+
+### 给 @devops (部署注意)
+- StageC.tsx 非 root layout, dev HMR 可正常 reload; 部署正常 build 即可 (无 layout.tsx 类 inline script 限制)
+
+---
+
+## Wave 13 #4 + #5 + #9 (2026-05-25) ✅
+
+**3 项完成 (6 文件改 + 2 新建, build 0 errors, npm test 15/15 PASS, 0 越权)**
+
+### 给 @tester (前端现在有测试框架了 + e2e 验证点)
+- **🆕 vitest 已装**: `npm test` (= `vitest run`) 跑前端单测; `npm run test:watch` 监听模式。配置 `vitest.config.ts` (jsdom + `@` alias) + `vitest.setup.ts` (含 @testing-library/jest-dom)。可写 `*.test.ts` / `*.test.tsx` (含 React 组件测试, jsdom env)
+- `useETA.test.ts` 现 15/15 PASS via `npm test` (原来无 runner 跑不起来)
+- e2e 验证点:
+  1. **确认流程中** (URL /outline /characters /scenes) hydrate 超时 → 显"正在自动重试…确认环节马上回来", **无"返回工作台"按钮** (8s 自动 reload, 上限 3 次); 纯生成/preview 阶段仍有"返回工作台"
+  2. **后台生成按钮**: 确认前全程 (story_generation→storyboard→scene_image_preparation) **不显示**; 仅场景确认后 (image_generation/bgm) 一致显示 (修"忽有忽无"闪烁)
+  3. **404 分级实测**: pre-confirm chapter 404 (status/story/storyboard/bgm/scene-references) 在 client.log 记 `level: 'routine-404'` (不再误记 network)。**注意 layout.tsx 改动需重启 dev/重新 build, dev HMR 不刷新 root layout inline script**
+
+### 给 @devops (client.log Monitor 去噪 + 部署注意)
+- **#5 routine-404 真正生效了**: 之前 Wave B 的 regex 因模板字符串吃反斜杠失效 (`//chapters/d+/`变行注释), 已改纯字符串检查。Monitor 可把 `routine-404` 视同 routine 过滤
+- **🆕 `proxy-init` level**: 页面加载时 POST 一条 `level: 'proxy-init'` 记 proxy 版本号 (`w13-404-v2`), 用于确认浏览器加载的 client-log proxy 版本 (非错误, Monitor 可忽略/用于版本核对)
+- **部署注意**: layout.tsx 是 root layout, 改它的 inline script 必须重新 build + 浏览器硬刷新, Next dev HMR 不更新已加载 tab 的 inline script
+
+### 给 @backend (无新增 API 依赖)
+- 本批 0 新 API / 0 schema / 0 STATUS_API_CONTRACT 改动 (纯前端 UX + 日志分级 + 测试基建)
+- #4B 依赖既有字段 `scenes_confirmed` (hydrate 已读, 无新需求)
+
+---
+
+## TASK-TEST26-FRONTEND-4 (2026-05-24) ✅
+
+**4 项前端修复完成 (5 文件改, build 0 errors, 0 越权)**
 
 ## TASK-TEST26-FRONTEND-4 (2026-05-24) ✅
 

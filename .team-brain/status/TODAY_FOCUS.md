@@ -1,8 +1,47 @@
 # Today's Focus
 
-> **Updated**: 2026-05-22 19:45 (PM)
+> **Updated**: 2026-05-26 17:55 (PM — test29 e2e 90分 + 非人类专项修复审查通过)
 
-## 当前阶段: DevOps 第 2 次部署 (内测启动倒计时)
+## 当前阶段: test29 后 — 非人类通用性专项修复 (待 e2e 视觉验证 + 部署)
+
+### 今日 (5/26) 最重要的三件事
+
+1. **test29《荷塘渡》e2e 跑通, Founder 90 分** — Wave 13 全修复实测生效 (#5e/#6/#4A/#4B/#5-404/B52/ETA/T17/条漫文字/画幅3:4)。全维度回溯 `analysis/TEST29_FULL_RETROSPECTIVE_2026-05-26.md`。
+2. **炸出「非人类人类中心假设链」5 缺口 + 当场修复 4 个** — Backend #4(Packet retry) + AI-ML #5/#6/#7(非人类消费层专项, 含补挖的 #5a 锚点层)。PM 地毯式审查 + Ben 维度全过, db_retry 21 + AI-ML 域 499 pytest passed。#8(BGM)内测后。
+3. **待最终验收** — #5/#7 视觉真证 (golden 真出金色/鱼草不融合/人类不退化) 需 Founder e2e 复测(test30)。Wave13+test29 全未 commit, 禁 destructive git。
+
+### 待 Founder 决策
+e2e 复测(test30) vs 直接 commit+部署 vs 先 commit Wave13。#4 是 DB-infra→部署前知会 Ben。
+
+---
+
+## (历史) Wave 13 内测前 FIXBATCH — 集成关口 (内测启动倒计时)
+
+### 今日产品层面最重要的三件事 (5/25)
+
+1. **Wave 13 集成关口双绿** — PM 第一道审查 ✅ 全绿无 blocker (DEC-052); 等 Tester 第二道 (pytest 30新+vitest 15+回归) → DevOps 第 5 次部署。内测启动前最后一道代码关。
+2. **§9.7.4 前后端契约对齐确认** — regenerate-portrait 同步→异步, Backend 202+job_id ⟺ Frontend pollCharacterJob ⟺ 契约逐字段一致 ✅ (Ben 纠验机制核心, 最易断裂处已核对无误)。
+3. **clothing 旁路 P1 防崩** — 内测用户选 object/aquatic/plant/insect 等非穿衣 type 角色不再冲垮 pipeline (#5e), 守护通用性生命线。
+
+### Wave 13 各项 PM verdict
+
+| 项 | 负责 | verdict |
+|---|---|---|
+| #5d MySQL retry middleware | Backend | ✅ 4 重约束代码可证 |
+| #6 regenerate-portrait 异步 | Backend | ✅ §9.7.4 三方对齐 |
+| #5e clothing 旁路防崩 | Backend | ✅ 崩溃点消除 0 删 fallback |
+| #4A 确认流程超时守卫 | Frontend | ✅ |
+| #4B 后台按钮 scenesConfirmed | Frontend | ✅ |
+| #5 404 真根因 (吃反斜杠) | Frontend | ✅ 源码层根治 |
+| #6 reroll 异步轮询 | Frontend | ✅ |
+| #9 vitest 基建 | Frontend | ✅ |
+| #5b schema 5 type 核实 | AI-ML | ✅ 0 代码改动 |
+
+**下一步**: Tester 双绿 → DevOps commit 3 组 (见 PENDING) + push + VPS 第 5 次部署 (layout.tsx 须 rebuild+硬刷新)。
+
+---
+
+## (历史) 当前阶段: DevOps 第 2 次部署 (内测启动倒计时)
 
 ### 今日 (5/22) 全程战果
 

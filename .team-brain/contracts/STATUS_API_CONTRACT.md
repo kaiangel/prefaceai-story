@@ -967,11 +967,25 @@ GET /api/projects/{project_id}/characters/adjust-jobs/{job_id}
 - in-memory job 注册表 (`app/services/adjust_job_manager.py`, asyncio.Lock + TTL), **0 DB schema / 0 Alembic** (短命 UI 操作, 角色数据变更仍由原逻辑 DB 持久化)
 - 单 uvicorn worker 假设 (与现有 asyncio.create_task 一致)
 - fallback 全保留 (DEC-051): LLMFallbackChain + B57 fullbody 重生 + RISK-T17-9 portrait_ref
-- ⚠️ `regenerate-portrait` 端点本轮**未异步化** (仍同步 ~60s, 同类问题待后续)
 
----
+### 9.7.4 regenerate-portrait 异步 (Wave 13 #6, 2026-05-25, [frontend-impact: yes])
 
-## 10. 关联文档
+> Backend #6 把 regenerate-portrait (reroll, 留空调整框) 也改异步, 复用 adjust job 模式。
+> ⚠️ 前端 reroll 调用必须配合改轮询 (Wave 13 #6前端, 否则拿到 202+job_id 而非旧 200+结果 → reroll 断)。
+
+```
+POST /api/projects/{project_id}/characters/{char_id}/regenerate-portrait
+  → 202 { success:true, job_id, status:"pending", char_id, message }
+  → 同步错误: 404(项目/角色不存在) / 400(未生成大纲)
+GET  /api/projects/{project_id}/characters/adjust-jobs/{job_id}  (复用 §9.7.2 adjust 轮询端点)
+  → 200 { job_id, char_id, kind:"regenerate_portrait", status, progress, stage_message,
+          result:{success,char_id,portrait_url,fullbody_url,message}|null, error|null }
+  - kind 字段区分 adjust vs regenerate_portrait (前端复用同一轮询逻辑)
+  - portrait_url/fullbody_url 带 ?v={epoch} cache-buster; fullbody 失败时 null(非阻塞)
+```
+**前端派生规则** (DEC-030): reroll POST 拿 job_id → 轮询 GET adjust-jobs → completed 读 result.portrait_url 刷新 → 与 adjust 同 pattern, 仅 kind 不同。
+
+### 9.7.5 实现注意
 
 - **决策**: `.team-brain/decisions/DECISIONS.md` DEC-030 (Wave 9 方案 A 完整决策)
 - **审查报告**: `.team-brain/analysis/TEST15_DEEP_AUDIT_2026-05-13.md` (test15 5 维度根因 + Ben 建议价值)

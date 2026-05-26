@@ -4,6 +4,16 @@
 
 ---
 
+## 2026-05-26 — test29《荷塘渡》e2e + 全维度回溯 + 非人类专项派活审查
+
+- **test29 e2e 全程守护**: 干净重启(restart-monitors skill, 5 Monitor 含浏览器 console)+ 实时监控全 5 阶段, Founder 成片 **90 分**。Wave 13 全修复实测生效 (#5e/#6/#4A/#4B/#5-404/B52/ETA/T17/条漫文字/画幅3:4)。
+- **full-retrospective skill 6 步全维度回溯**: `analysis/TEST29_FULL_RETROSPECTIVE_2026-05-26.md`。像素级看图**纠正纸面**: #7 融合从"P1 最毁画面"校准为"真缺陷但视觉中等(水彩柔化, 仅 8/22 同框 shot)"。炸出非人类人类中心假设链 5 缺口。
+- **xhteam 派活 + 地毯式审查**: Backend(#4) + AI-ML(#5/#6/#7, 含补挖 #5a 锚点层) 并行修复, PM 追调用链 + 亲跑回归 (db_retry 21 + AI-ML 域 499) + 越权 + **Ben 维度** 审查全过, 0 修复轮次。
+- **完成的子任务**: ✅ reroll 异步实测验证 (adjust job+轮询不转圈) / ✅ stale 文档补齐 (TEAM_CHAT/PENDING/PM三件套/PROJECT_STATUS/TODAY_FOCUS, 补 5/23-26 空白)。
+- **决策**: Founder B 方案 (信任单测, commit+部署), #8 BGM 内测后, DEC-053 非人类支持。
+
+---
+
 ## 2026-05-22 13:25-15:25 — e2e test22 实测 + Wave 7+8 全闭环 (内测启动倒计时)
 
 ### e2e test22 美人鱼 (13:25-13:57, 31.5 min)

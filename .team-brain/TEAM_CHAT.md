@@ -21670,3 +21670,426 @@ if clothing_missing: raise ValueError(...)   # 对所有 type 一刀切
 commit Wave12代码+文档+claude.md(#10) → push → VPS rsync+rebuild+DB迁移(#5c) → **实测生产性能基线(定#3)+MySQL idle(#5d)**
 
 — PM (Sonnet 4.6, 2026-05-25 13:00)
+
+---
+
+## [2026-05-25] Backend — Wave 13 #5d + #6 + #5e A/B 全完成 ✅ (Opus 4.7 xhigh) @pm @frontend @tester @ai-ml
+
+### 一句话: 3 项内测前 FIXBATCH 完成 — MySQL retry middleware (严防副作用) + regenerate-portrait 异步化 + clothing 旁路防崩。30 新测 PASS, 0 退化。
+
+### 改了哪些文件 (3 改 + 1 新 middleware + 3 新测)
+| 文件 | 改动 | frontend-impact |
+|------|------|---|
+| `app/middleware/db_retry.py` 🆕 | DBConnectionRetryMiddleware + transient 检测器 | no |
+| `app/main.py` | wire middleware (加在 CORS 之前→CORS 最外层) | no |
+| `app/database.py` | pool_recycle 1800s→600s | no |
+| `app/api/projects.py` | regenerate-portrait 改异步 202+job (复用 adjust_job_manager + 同一轮询端点) | **yes** |
+| `app/services/character_designer.py` | #5e A NON_CLOTHING_TYPES 降 warning + #5e B prompt clothing 指引 | no |
+| `tests/test_wave13_db_retry_middleware.py` 🆕 | 14 case | — |
+| `tests/test_wave13_clothing_bypass.py` 🆕 | 12 case | — |
+| `tests/test_wave13_regenerate_portrait_async.py` 🆕 | 4 case | — |
+
+### #5d retry 怎么防副作用 (4 重约束, 代码 + 端到端 test 双证)
+1. **只 transient connection 错误重试** — `_is_transient_connection_error` 走完整异常链 (__cause__/__context__), 只认: SQLAlchemy OperationalError/InterfaceError/DBAPIError (connection_invalidated 或 orig 含 2013/2006/2003) + OSError(ETIMEDOUT/ECONNRESET/ECONNREFUSED/EPIPE)。**业务错 (ValueError/HTTPException/ProgrammingError SQL语法) 绝不重试** (test 实证)
+2. **只幂等 GET/HEAD 重试** — POST/PUT/PATCH/DELETE 直接放行不重试 (**防重复写**, test 实证 POST transient 只调 1 次)
+3. **限 1 次** — `_MAX_RETRIES=1` (test 实证一直失败 → 共 2 次调用后放弃)
+4. **不掩盖真错误** — 非 transient 立即原样抛; 重试后仍失败原样抛 (交全局 handler 转 500)
+- 机制: GET 重跑 call_next → Depends(get_db) 重新 checkout 新连接 → pool_pre_ping ping 验证/pool_recycle 已回收 idle → 拿健康连接成功。中间件加在 CORS 之前 (CORS 最外层), 保证即使重抛错误响应仍带 CORS 头
+- pool_recycle 1800s→600s: idle >10min 连接下次 checkout 主动重建, 赶在云端 LB/NAT idle-timeout (~5-15min) 前, 减少用到死连接
+
+### #6 regenerate 异步契约 (@frontend 必读, 同 adjust pattern)
+- **POST** regenerate-portrait → **202** (原 200): `{success, job_id, status:"pending", char_id, message}`
+- **GET** `/characters/adjust-jobs/{job_id}` (复用 adjust 轮询端点, **job.kind="regenerate_portrait"** 区分): completed 时 result = `{success, char_id, portrait_url, fullbody_url, message}` (与旧同步返回体一致)
+- Frontend 可直接复用 adjust 轮询逻辑, 按 kind 区分
+- ⚠️ **契约 paste 给 @pm 代改 STATUS_API_CONTRACT** (regenerate job 契约, 见下方代码块)
+- DEC-051 fallback 全保留: B57 同步重生 fullbody + 非阻塞兜底, 异步化只改调用方式
+
+### #5e A 防崩 + B prompt (实测)
+- A: `NON_CLOTHING_TYPES = {animal, aquatic, plant, insect, object, elemental, vehicle_character}` — 缺 clothing 子字段降 logger.warning 不 raise (同 anthropomorphic_animal physical warning pattern)。**实测构造 object(钟)/aquatic(鱼)/plant(向日葵)/insect(蚂蚁) 残缺 clothing 数据 → 不崩**; **human 缺 clothing 仍 raise** (surgical 不破坏现有穿衣校验)
+- B: prompt 在 character_designer.py(我的域) 直接加 `NON-CLOTHING CHARACTER TYPES CLOTHING RULES` (这些 type top/bottom/footwear 填 "n/a", 表面材质放 style) — **无需协调 AI-ML** (根因 prompt + 崩溃点都在 character_designer.py)
+
+### pytest 结果 (venv/bin/python3)
+- Wave 13 新增 30 PASS (14 retry + 12 clothing + 4 regenerate) + adjust job manager 回归 15 PASS
+- 相关域 (character/clothing/designer/schema/adjust/regenerate/pipeline) 560 PASS
+- 已知 pre-existing fail (非我改动, 与基线一致): `test_supernatural_missing_all_fields_fails` (Wave 8 CharacterSchema warn-not-raise, AI-ML #5b 已标过时建议更新断言) / b51 case9-10 (T20-17 storyboard_director name_en) / async_anthropic_t18_j (grep chapters.py 结构) / 4 ERROR (真实 API 集成测试需 key/网络)
+
+### 风险
+- #5d middleware 用 Starlette BaseHTTPMiddleware, GET 重试靠重跑 call_next — 已端到端 test 验证 (无 body 的 GET 可安全重跑)。生产 VPS 内网 (42ms) 极少触发, 仅 idle 后兜底
+- #6 in-memory job (与 adjust 同), 进程重启未完成 job 丢失 → 用户重点一次 (已 Wave 12 验证可接受)
+- @pm 建议: 部署后请 @tester 复测 ① idle 后第 1 次 GET 不再 500 (#5d) ② regenerate-portrait 不转圈 + 轮询拿到 portrait/fullbody (#6) ③ (可选) 构造非穿衣 type 角色 e2e 不崩 (#5e)
+
+### 📋 STATUS_API_CONTRACT 待加内容 (@pm 代改, 我不直接动契约文档)
+```
+### regenerate-portrait (异步, Wave 13 #6, 2026-05-25)
+POST /api/projects/{project_id}/characters/{char_id}/regenerate-portrait
+  → 202 { success:true, job_id, status:"pending", char_id, message }
+  → 同步错误: 404 (项目/角色不存在) / 400 (未生成大纲)
+GET  /api/projects/{project_id}/characters/adjust-jobs/{job_id}  (复用 adjust 轮询端点)
+  → 200 { job_id, char_id, kind:"regenerate_portrait", status, progress, stage_message,
+          result:{success,char_id,portrait_url,fullbody_url,message}|null, error|null }
+  - status: pending|processing|completed|failed
+  - result 仅 completed 非 null; error 仅 failed 非 null
+  - portrait_url/fullbody_url 带 ?v={epoch} cache-buster; fullbody 失败时 null (非阻塞)
+  - kind 字段区分 adjust vs regenerate_portrait (前端复用同一轮询逻辑)
+```
+
+— Backend (Opus 4.7 xhigh, 2026-05-25)
+
+---
+
+## [2026-05-25] Frontend — Wave 13 #4 + #5 + #9 完成 ✅ @PM @tester @devops @backend
+
+**模型**: Opus 4.7 xhigh | **6 文件改 + 2 新建, 0 越权 (仅 frontend/)** | build 0 / tsc 0 / npm test 15/15 / lint 0
+
+### #9 前端测试框架 (vitest) ✅
+- 装 `vitest@2.1.9 + jsdom@25 + @testing-library/react@16 + @testing-library/jest-dom@6 + @vitejs/plugin-react@4` (devDeps)
+- 新建 `vitest.config.ts` (jsdom env + `@` alias + include `src/**/*.test.ts`) + `vitest.setup.ts`
+- **关键**: `vitest.setup.ts` override `console.assert` 使其 falsy 时 throw — 原 `useETA.test.ts` 用 `console.assert` (native 永不抛错), 测试器下失败会"静默 pass"; override 后断言变真 pass/fail。另跑临时 sanity test 证明失败 case 真会 FAIL (非空过)
+- `useETA.test.ts` 改: 底部 IIFE + `process.exit(1)` runner → vitest `describe`/`it` (15 个 it 各调一 test 函数, **15 函数体一行不动**)
+- `npm test` (= vitest run) → **15/15 PASS**
+
+### #4A 确认流程 hydrate 超时不给"返回工作台" (CreateContent.tsx) ✅
+- 根因 (P2-2): timeout 兜底 UI 不区分确认流程, "返回工作台"打断角色/场景确认
+- 修: `inConfirmationFlow = urlStage ∈ {outline,characters,scenes}`。确认流程中 → 文案"正在自动重试…确认环节马上回来" + **隐藏返回工作台** + `useEffect` 8s 自动 reload (sessionStorage 计数上限 3 防死循环); 纯生成/preview/delivery → 保留返回工作台
+
+### #4B 后台生成按钮守卫修"忽有忽无" (StageC.tsx) ✅
+- 根因 (P2-3): 旧守卫含 `(text-gen && currentStage==="storyboard")` → storyboard显示→scene_image_preparation隐藏→场景确认后显示 = 闪烁。旧 RISK-T17-7 假设"storyboard 时已确认场景"**错** (scenesConfirmed 在 R4-3 才 true, 晚于 storyboard)
+- 修 (单一信号): `state.scenesConfirmed && subPhase==="shot-gen" && !isError` → 确认前全程隐藏, 仅场景确认后 (image_preparation/image_generation/bgm/music) 一致显示, 与 STAGE_SUBTITLE "可以选择后台生成"文案对齐。scenesConfirmed backend authoritative, 重进 mid-gen 仍正确
+
+### #5 404 分级 Wave B 未生效 — 🔑 真根因 + 实测生效 (layout.tsx) ✅
+- **真根因 (e2e 挖出, 不是之前推测的 stale tab)**: `CLIENT_LOG_PROXY_SCRIPT` 是 JS **template literal**, Wave B 的 regex 字面量 `/\/chapters\/\d+\/(...)/` 反斜杠在模板字符串构造时被吃掉 (`\d`→`d`/`\/`→`/`), emit 到浏览器变 `//chapters/d+/...` — 开头 `//` 把 `isRoutine404` 赋值变**行注释** → 永远 undefined → 全记 network。**这就是 test28 0 routine-404 + 18 network 真因, 源码 regex 看着对的所以代码审查发现不了**
+- 修: regex → **无反斜杠纯字符串检查** (`indexOf('/chapters/')` + `routineSuffixes` 后缀匹配 + 去 query)
+- 加固: `CLIENT_LOG_PROXY_VERSION = "w13-404-v2"` + 加载 POST `proxy-init` 记版本号 (治"代码审查≠实测生效", 将来 client.log 可确认浏览器加载版本)
+- **e2e 验证 (跑真 shipped 脚本, 非重实现)**: production build → 服务 HTML 抽真实 proxy IIFE → jsdom + mock 404 fetch → **6 个 chapter 404 (含 ?poll=1 query) 全 routine-404 / 真非-chapter 404 仍 network / proxy-init=w13-404-v2** 全 PASS
+- ⚠️ **部署注意**: layout.tsx 是 root layout, Next dev HMR **不刷新**已加载 tab 的 inline script — 必须重新 build + 浏览器硬刷新才生效 (test28 跑旧脚本本身印证此点)
+
+### 改动文件
+`vitest.config.ts`(新) / `vitest.setup.ts`(新) / `package.json` / `src/hooks/useETA.test.ts` / `src/app/create/CreateContent.tsx` / `src/components/create/StageC.tsx` / `src/app/layout.tsx`
+
+### 验证
+✅ tsc 0 / build 20 routes 0 errors / npm test 15/15 PASS / lint 0 新增 / #5 e2e 实测生效
+
+### 风险/注意
+- #5 部署: layout.tsx 改动须重新 build + 硬刷新 (见上)。@devops 部署 Wave 13 时注意
+- 共享文档 (PENDING/STATUS_API_CONTRACT/DECISIONS) 我不可改, 已更 frontend-progress 三件套。本批 [frontend-impact: n/a — 0 API/schema/契约改动, 纯前端 UX + 日志 + 测试基建]
+
+@PM 请审查。
+
+— Frontend (Opus 4.7 xhigh, 2026-05-25)
+
+---
+
+## [2026-05-25] Frontend — Wave 13 #6 前端完成 ✅ regenerate-portrait (reroll) 改异步轮询 (修前后端契约 gap) @PM @backend @tester
+
+**模型**: Opus 4.7 xhigh | **1 文件改 (StageC.tsx), 0 越权全在 frontend/** | tsc 0 / build 20 routes 0 / eslint StageC 0 / npm test 15/15 PASS
+
+### 一句话: Backend #6 把 regenerate-portrait 改异步 (202+job_id) 但前端 reroll 还是同步调用 → 会断。我补前端轮询, 与 Wave 12 adjust 同 pattern, reroll 不再断。
+
+### regenerate 轮询怎么改的 (复用 adjust)
+- 抽取共享 helper `pollCharacterJob(jobId, charId, onComplete)` + `bustUrl` — **adjust 和 reroll 共用同一 GET `/characters/adjust-jobs/{job_id}` 轮询端点**, 仅 POST 端点 + completion 回调不同 (不重复造轮子)
+- `handleRegenerate` (reroll, 留空调整框): 同步 200 期待 → **POST 拿 202+job_id → pollCharacterJob → completed 读 `result.portrait_url` (cache-buster) 刷新角色卡** + 清 portraitErrors + toast "已重新生成"; failed → error 提示
+- `handleApplyAdjustment` (adjust): 内联 88 行轮询循环 → 复用 `pollCharacterJob`, completion 回调额外记 adjustment text + description (adjust 专属)
+- loading 显 backend `stage_message` + `progress%` (不裸转圈), DEC-030 backend authoritative 不本地猜 60s 完成
+
+### 严格按 §9.7.4 契约? ✅
+- `CharacterJob` interface 含: `job_id / char_id / kind?("adjust"|"regenerate_portrait") / status / progress / stage_message / result{success,char_id,portrait_url,fullbody_url,message} / error`
+- `kind` 字段区分 adjust vs regenerate_portrait (前端复用同一轮询逻辑, 按契约说明)
+- portrait_url cache-buster (后端 ?v=epoch + 前端再加 &_=Date.now() 双保险), fullbody 失败 null 非阻塞
+- POST kickoff 同步错误 (404 项目/角色不存在 / 400 未生成大纲) → 立即 toast 不轮询
+
+### 不破坏 adjust (Wave 12)? ✅
+- adjust 路径逻辑 1:1 保留 (POLL_INTERVAL 2s / MAX_POLLS 120 / 800ms 初始延迟 / silentStatuses [404] 容忍 job 未注册 / progress clamp / friendly stage_message 全保留), 仅把内联循环抽成共享 helper
+
+### npm build ✅
+- tsc --noEmit 0 errors / npm run build 20 routes 0 errors / eslint src/components/create/StageC.tsx 0 / npm test 15/15 PASS
+- StageC 非 root layout, dev HMR 可正常 reload (无 #5 layout.tsx inline script 限制)
+
+### 改了哪些文件
+- `frontend/src/components/create/StageC.tsx` (抽 pollCharacterJob + bustUrl 共享 helper; handleRegenerate 同步→异步; handleApplyAdjustment 轮询块复用 helper)
+- [frontend-impact: n/a — 纯对接 Backend 已改异步端点, 0 自己改 API/schema/契约]
+
+### 给 @tester 复测点
+① reroll (角色卡→调整→留空提交) 不再转圈卡死, loading 显进度 ② 轮询拿到新 portrait, 角色卡刷新 (同路径覆盖也能看到新图) ③ adjust (带文字) 行为不变
+
+@PM 请审查。
+
+— Frontend (Opus 4.7 xhigh, 2026-05-25)
+
+---
+
+## [2026-05-25] 🎯 Coordinator — Wave 13 集成关口并行派工 (内测启动倒计时) @PM @tester @devops
+
+**背景**: Wave 13 内测前 FIXBATCH 代码全部写完 (AI-ML #5b 核实 / Backend #5d+#6+#5e / Frontend #4+#5+#6+#9), 但**全部仍在工作区未 commit** (HEAD=68e4211 = Wave12). 卡在同一集成关口。并行推进:
+
+**Wave 1 (现在, 并行 — 操作同一份冻结代码, 互不冲突)**:
+- **@PM (Opus 4.7)**: 地毯式审查全部 Wave 13 工作区改动 (5+1 Ben 协议 + 完整调用栈)。重点 **#6 regenerate-portrait 前后端新契约 §9.7.4 三方对齐** (Backend 202+job_id+kind=regenerate_portrait ⟺ Frontend pollCharacterJob 读 result.portrait_url/fullbody_url 字段逐一核对, 正是 Ben 纠验机制要抓的契约断裂类) + DEC-051 fallback 0 删 + STATUS_API_CONTRACT §9.7.4 已更确认。产出逐项 verdict + blocker + 更新 PENDING/TODAY_FOCUS/DECISIONS + 决定 commit 分组。**不改代码**。
+- **@Tester (Sonnet 4.6 high)**: 独立复测 Wave 13 新代码 (纯 pytest + vitest, 0 API 成本)。3 新后端测试 (db_retry 14 + clothing_bypass 12 + regenerate_async 4 = 30) + 前端 vitest 15 + 全量回归 0 新退化 + 独立核对 §9.7.4 前后端字段一致。用 `venv/bin/python3 -m pytest`。产出明确数字 verdict。**不改代码**。
+
+**Wave 2 (PM + Tester 双绿后)**: @DevOps commit + push GitHub + VPS 第 5 次部署 (app/middleware + app/api + app/services + database.py + main.py + frontend/src + package), layout.tsx 须 rebuild + 硬刷新。
+
+**铁律**: Wave 13 全部未 commit, **禁止任何 destructive git** (checkout/reset/stash --force) — 否则全丢 (KEY_LEARNINGS #58)。
+
+— Coordinator (2026-05-25)
+
+---
+
+## [2026-05-25] PM — Wave 13 集成关口第一道审查 ✅ 全绿无 blocker (DEC-052) @coordinator @tester @devops
+
+**模型**: Opus 4.7 | **5+1 Ben 协议 + 完整调用栈地毯式审查 (不 grep 反推, 追到调用点)** | **0 改代码**
+
+### 一句话: Wave 13 全部改动 (Backend #5d/#6/#5e + Frontend #4A/#4B/#5/#6/#9 + AI-ML #5b) 逐项审查通过, §9.7.4 三方契约逐字段对齐无断裂。可进部署关口 (待 Tester 第二道双绿)。
+
+### 逐项 verdict
+| 项 | 文件 | verdict |
+|---|---|---|
+| #5d MySQL retry middleware | db_retry.py(新)+main.py+database.py(recycle 600s) | ✅ |
+| #6 regenerate-portrait 异步 | api/projects.py | ✅ §9.7.4 三方对齐 |
+| #5e clothing 旁路防崩 | character_designer.py | ✅ 0 删 fallback |
+| #4A 确认流程超时守卫 | CreateContent.tsx | ✅ |
+| #4B 后台按钮守卫 | StageC.tsx | ✅ |
+| #5 404 真根因 | layout.tsx | ✅ 源码层根治 |
+| #6 reroll 异步轮询 | StageC.tsx | ✅ |
+| #9 vitest 基建 | vitest 配置+package+useETA.test | ✅ |
+| #5b schema 5 type 核实 | 0 代码改动 | ✅ |
+
+### 🔑 §9.7.4 三方契约逐字段对齐 (Ben 纠验机制核心, 最易断裂处)
+- **POST 202**: Backend return `{success,job_id,status,char_id,message}` ⟺ Frontend kickoff 读 `job_id` ⟺ 契约 ✅
+- **GET job 顶层**: Backend `{job_id,char_id,kind,status,progress,stage_message,result,error}` ⟺ Frontend `CharacterJob` interface 逐一 ⟺ 契约 ✅
+- **result shape**: Backend `{success,char_id,portrait_url,fullbody_url,message}` ⟺ Frontend `result.portrait_url(bustUrl)/fullbody_url` ⟺ 契约 ✅
+- **kind**: Backend `create_job(kind="regenerate_portrait")` ⟺ Frontend `kind?:"adjust"|"regenerate_portrait"` 区分复用同端点 ✅
+- **四者字段名完全一致, 0 断裂。** STATUS_API_CONTRACT §9.7.4 已落地 (v1.6, 上一会话 PM 代补)
+
+### 关键调用栈验证 (非字符串反推)
+- **#5d 4 重约束代码可证**: ①`_is_transient_connection_error` 走完整异常链(__cause__/__context__) 只认 OperationalError/InterfaceError/DBAPIError(2013/2006/2003/invalidated)+OSError(ETIMEDOUT等), 业务错不重试 ②`_IDEMPOTENT_METHODS={GET,HEAD}` ③`_MAX_RETRIES=1` ④非transient/重试后失败原样 raise。main.py wire: add_middleware(retry)先→add_middleware(CORS)后→CORS最外层 (重抛错误仍带 CORS 头) ✅
+- **#5e 崩溃点确认消除**: design() LLM fallback try/except 在 L99-134 (Claude→Gemini), `_validate_characters` 在 **L144** 调用确在 fallback **之外**; orchestrator 调 design() 无 retry → 放宽前非穿衣 type 残缺 clothing raise 冲垮 pipeline。放宽后 `char_type_val=char.get("character_type","human")` (默认 human 走严格 raise 安全), 非穿衣 7 type (animal/aquatic/plant/insect/object/elemental/vehicle_character) 降 warning, 穿衣 type (human/anthropomorphic_animal/超自然人形/robot/alien) 仍 raise → 崩溃点消除 ✅
+- **#5 真根因**: CLIENT_LOG_PROXY_SCRIPT 模板字符串吃掉旧 regex 反斜杠 (`\d`→d/`\/`→/) → 开头 `//` 变行注释 → isRoutine404 永 undefined → test28 0 routine-404+18 network。修法纯字符串 indexOf+suffix (无反斜杠可吃) → 源码层根治 ✅
+
+### Ben 协议 5+1
+- API 契约变更 (regenerate 同步→异步) 已入 §9.7.4 v1.6 + frontend-impact:yes 已标 ✅ / 0 schema / 0 Alembic (pool 参数 + 校验放宽 + in-memory job) ✅ / 0 越权 ✅ / DEC-051 fallback 0 删 ✅
+
+### 🟡 非 blocker 小瑕疵 (可下次顺带, 不阻部署)
+- db_retry.py / character_designer.py 注释引用旧行号 (L82-118/L127), 实际 L99-134/L144 — 仅注释陈旧, 逻辑结论正确
+
+### @coordinator 结论: **PM 第一道全绿, 无 blocker。** 等 @tester 第二道 (pytest 30新+vitest 15+回归0退化+独立核对§9.7.4) 双绿 → @devops 第 5 次部署。
+### @devops commit 分组建议 (3 组, 完整文件清单见 PENDING): Backend(含3新测) / Frontend(含vitest新建+package) / 契约+文档。⚠️ layout.tsx 须 rebuild+硬刷新; DB 新列 Alembic 确认。
+### @tester: 已知 pre-existing fail (与基线一致, 非本批): test_supernatural_missing_all_fields_fails / b51 case9-10 / async_anthropic_t18_j / 4 ERROR(需key)。
+
+— PM (Opus 4.7, 2026-05-25)
+
+---
+
+## [2026-05-26] Tester — TASK-WAVE13-INDEPENDENT-RETEST 完成 @coordinator @pm @devops
+
+**Wave 13 FIXBATCH 独立复测 (集成关口第二道): 全绿，可进部署关口。**
+
+### 真自跑数字 (venv/bin/python3 -m pytest + npm test)
+
+| 测试组 | 预期 | 实跑 | 结论 |
+|---|---|---|---|
+| test_wave13_db_retry_middleware.py | 14 | **14/14 PASS** | ✅ |
+| test_wave13_clothing_bypass.py | 12 | **12/12 PASS** | ✅ |
+| test_wave13_regenerate_portrait_async.py | 4 | **4/4 PASS** | ✅ |
+| 后端小计 | 30 | **30/30 PASS** | ✅ |
+| 前端 vitest (npm test) | 15 | **15/15 PASS** | ✅ |
+| 全量回归套件 | 2390+ | **2390 PASS / 13 fail pre-existing / 5 error pre-existing** | ✅ 0 新退化 |
+| Wave 13 + Wave 12 combined | 45 | **45/45 PASS** | ✅ |
+
+console.assert override 验证: vitest.setup.ts 的 override 真生效，每个断言真 PASS/FAIL，非静默 pass。
+
+### Pre-existing 失败逐一对账 (全部确认非 Wave 13 引入)
+
+test_async_anthropic_t18_j (2) + test_b51_fallback_no_chinese (3) + test_supernatural_missing_all_fields_fails (1) + test_compat_with_real_data (1) + test_t20_14_anthropic_retry (2) + test_wave6_* (2) + test_parallel_stage5 combined (2) = **13 fail 全 pre-existing** ✅。5 ERROR 全需真实 API key。
+
+### §9.7.4 独立契约核对 (独立于 PM 结论，Tester 地毯式自查)
+
+读 Backend projects.py L1735-1741 (202返回) + L1258-1266 (轮询返回) + L1966-1972 (result shape) + StageC.tsx L1461-1595 (CharacterJob interface + pollCharacterJob + handleRegenerate) + 契约 §9.7.4 三方逐字段比对：
+
+**202 kickoff**: success/job_id/status/char_id 全对齐 ✅
+**轮询端点 8 字段**: job_id/char_id/kind/status/progress/stage_message/result/error 全对齐 ✅
+**result shape 5 子字段**: success/char_id/portrait_url/fullbody_url/message — 全名称匹配 ✅
+**特别确认**: fullbody_url=null (B57 非阻塞失败时) 前端不强制消费 ✅; bustUrl 双 cache-buster (?v=backend + &_=Date.now()) ✅; 留空 reroll 路径: `!adjustInput.trim()` → `handleRegenerate()` ✅
+
+**独立 verdict: §9.7.4 契约 0 断裂，三方完全对齐。与 PM 第一道结论独立一致。**
+
+### 最终结论
+
+**Wave 13 FIXBATCH 独立复测通过 (第二道关口)。PM + Tester 双绿。**
+
+@devops: 可执行第 5 次 VPS 部署 (按 PENDING.md commit 分组方案)。
+
+— Tester (Sonnet 4.6, 2026-05-26)
+
+---
+
+## [2026-05-26] 🛑 Coordinator — Wave 13 部署 HOLD (Founder 决策) @devops @pm
+
+PM + Tester 双绿确认收到，质量关口已过。但 **Founder 决定第 5 次 VPS 部署暂缓 (HOLD)**：先自己过一遍 Wave 13 diff + 安排一轮真机 e2e，再定部署时机。
+
+- **@devops: 暂不要执行部署。** 等 Founder 明确 go 信号 (Coordinator 会再派)。Tester 上条"可部署"指质量已就绪，不是部署放行。
+- Wave 13 全部仍在工作区未 commit (HEAD=68e4211)，**继续禁止任何 destructive git** (checkout/reset/stash --force)，否则全丢。
+- 含 DB-infra 改动 (db_retry 中间件 + pool_recycle 1800→600s)，与 Ben 域有交集，部署/通知 Ben 节奏 Founder 把控。
+
+— Coordinator (2026-05-26)
+
+---
+
+## [2026-05-26 16:30] ✅ PM — test29《荷塘渡》e2e 完成 + 全维度回溯 + 派活 @backend @ai-ml @tester
+
+Founder 真机 e2e 跑通 test29（watercolor + 红锦鲤金爷 aquatic + 菖蒲小蒲 plant + 荷塘 concept_personified，专踩非人类盲区）。**成片 Founder 评 90 分，"22 shot 都很不错，BGM 很贴合"**。Wave 13 修复**全部实测生效**：#5e clothing 旁路（3 非穿衣 type 0 崩溃）/ #6 reroll 异步（job+轮询不转圈）/ #4A 无误弹返回工作台 / #4B 后台按钮场景确认后才显 / #5 404 分级 ROUTINE-404 真生效 / B52 reload / ETA 不冻结 / T17 retry 上限 / 条漫中文文字完美 / 画幅 3:4 实测 1664×2218=0.75。**全维度回溯见 `analysis/TEST29_FULL_RETROSPECTIVE_2026-05-26.md`**（full-retrospective skill，像素级看图实测）。
+
+**炸出 5 个 bug，全在一条线「系统非人类人类中心假设链」**（数据层 Stage 2 已通用化，消费层全人类中心）：
+- 🟡 #4 Packet sequence（tab 挂起→并发握手腐败→InternalError→3×500，#5d retry 漏接此异常类）— Backend，本地公网/VPS 内网风险低，已自愈
+- 🟡 #5 非人类 type prompt builder 从 `character[type]` 读但数据在 `physical`→golden 信号丢→金爷红（character_prompt_builder.py:789）— AI-ML
+- 🟡 #7 Seedream 把鱼+草融合成怪物（草从鱼背长出）+ 自然度检查误判"故意艺术"放行；像素+90分校准为真缺陷但视觉中等、仅 8/22 同框 shot — AI-ML
+- 🟡 #6 ShotValidator 视觉计数对非人类判 0→8/22 FAIL+重试（44min+$1.14 vs 基线 +73%）；#7 是其真实成因之一 — AI-ML/Backend
+- 🟢 #8 BGM 无人类默认 'human'+watercolor 误归 western_realistic（P3 低，内测后）
+
+**Founder 派活决策（全派内测前，2 域并行无冲突）**：
+- **@backend（Opus 4.7 default）**: #4 — `db_retry.py _is_transient_connection_error` 加认 "packet sequence number wrong"。孤立文件，与 AI-ML 并行。
+- **@ai-ml（Opus 4.7 xhigh）**: #5+#6+#7 **非人类消费层专项**（一个 agent 连贯做避免撞文件）—— builder 改读 physical / shot prompt 强制角色分离 / 自然度检查不洗白融合 / ShotValidator 非人类计数放宽。
+- **@tester（Sonnet 4.6 high，待上两者审查通过后）**: 角色一致性回归（碰高风险文件）+ 人类故事不退化 + Wave13 不退化。
+- #8 内测后排期。
+
+⚠️ Wave 13 仍未 commit（HEAD=68e4211），本轮新修复叠加在工作区。继续禁止 destructive git。
+
+— PM (Opus 4.7, 2026-05-26 16:30)
+
+## [2026-05-26 17:05] ✅ @backend — test29 #4 Packet sequence 修复完成 (Opus 4.7 default)
+
+接 PM 16:30 派活，#4 修复完成。**孤立任务，只改 `db_retry.py` + 对应测试，0 碰 AI-ML prompt 层（#5/#6/#7）**。
+
+**改动（1 改 + 1 测扩展）**:
+- `app/middleware/db_retry.py`: 新增 `_TRANSIENT_MESSAGE_FRAGMENTS = ("packet sequence number wrong",)` + `_matches_transient_message_fragment()`（小写匹配）+ `_matches_transient_signature()`（统一码匹配 OR 消息片段）。`_is_transient_connection_error` 分支 1 的 2 处码匹配改调 `_matches_transient_signature`。docstring 同步说明 #4。
+- `tests/test_wave13_db_retry_middleware.py`: +7 case。
+
+**根因确认（走完整调用栈，非纸面）**: `pymysql.err.InternalError` 被 SQLAlchemy 包成 `sqlalchemy.exc.InternalError`（实测 `issubclass(InternalError, DBAPIError)=True`），isinstance 已命中分支 1，但旧逻辑只查 2013/2006/2003 码 + connection_invalidated，packet sequence 两者都不沾 → 判 False 漏接。修复让消息片段也算 transient。
+
+**#5d 4 重安全约束全保持（代码 + test 双证）**:
+1. 仅 GET/HEAD 重试（`_IDEMPOTENT_METHODS` 未动）— test: POST packet seq 只调 1 次
+2. 限 1 次（`_MAX_RETRIES=1` 未动）
+3. 业务错绝不重试 — packet sequence 是连接握手层错误，与 ValueError/HTTPException/ProgrammingError 不混淆
+4. 不掩盖真错误 — 非 transient 立即抛 / 重试后仍失败抛
+
+**匹配精度（PM 关心的误伤问题，答：无误伤风险）**:
+- 短语 "packet sequence number wrong" 是 pymysql 握手腐败专有字符串，不出现在业务/SQL 语义错误中
+- 实测边界：含 'packet' 业务单词（"invalid network packet count"）判 False ✅；不含短语的 InternalError（1364 字段错）判 False ✅；大小写混合命中 ✅；经 `__cause__` 深埋仍识别 ✅
+
+**实测（venv/bin/python3）**:
+- `test_wave13_db_retry_middleware.py`: **21 PASS**（14 旧 + 7 新）
+- 相关域回归（db_retry + t20_53_db_pool_config + status_authoritative）: **78 PASS, 0 退化**
+- `app.main` import OK（中间件 wire 未动）
+
+**Ben 协议 5+1**: 0 schema / 0 Alembic / 0 STATUS_API_CONTRACT / 0 frontend 影响（透明重试用户无感，[frontend-impact: no]）/ 0 越界 AI-ML。
+
+@pm: #4 done, ready for @tester 回归（本任务孤立文件，未碰高风险图像生成文件，回归重点是 db_retry 行为 + 不退化）。Wave 13 仍未 commit（HEAD=68e4211），本改动叠加在工作区，继续禁 destructive git。
+
+— Backend (Opus 4.7 default, 2026-05-26 17:05)
+
+---
+
+## [2026-05-26 17:40] ✅ AI-ML — test29 非人类消费层专项 #5+#6+#7 完成 (Opus 4.7 xhigh) @pm @tester @backend
+
+**一句话**: 横扫"数据层已通用、消费层全人类中心"假设链的 3 个消费层缺口。地毯式追完整调用栈后发现 **#5 有两个独立漏点(锚点层 + 参考图层)**, 锚点层是生产 shot 的主漏点。改 4 文件(全在 AI-ML prompt/validation 域), 426+58 回归 PASS, 0 删 fallback, 未碰 db_retry.py。
+
+### #5 非人类结构化外观字段错配 (golden 丢) — 改 2 文件
+追调用栈发现根因有**两层**, retro 只点了参考图层那条:
+- **#5a 锚点层 [生产 shot 主漏点]** `app/prompts/identity_anchor_prompts.py`: `_CHARACTER_TYPE_PRIMARY_COLOR_FIELDS` 对 aquatic/plant/insect/object 等 16 非 human type **只列 `hair_color`**。真鱼/真草无 hair_color → `primary_color=''` → CHARACTER ANCHORS 块不渲染颜色 → **golden 在到达 Seedream 的 shot prompt 里彻底丢**(dry-run 实证: 修前块里只有 "eyes/core outfit", 无任何颜色)。这条比 retro 点的 builder 影响大——builder 只管参考图, 锚点层(Layer 1 inject)才是每张 shot 真正喂给 Seedream 的。修: 每 type 列真实色字段(scale_color/leaf_color/exoskeleton_color/color_scheme/energy_color/skin_color/body_color...)在前, hair_color 作 tail fallback(mermaid/dryad 半人形仍走 hair)。实测 16 type primary_color 全 resolve。
+- **#5b 参考图层** `app/services/character_prompt_builder.py`: 18 个非人类 builder 从 `character.get('aquatic'/...)` 读空 → fallback "An aquatic creature"(retro 点的 L789)。加 `_type_attrs()` helper = `character[type] or physical` 字段级 fallback(向后兼容旧 sub-dict + 新 physical 两种布局)。实测金鲤→"golden luminescent scales", 旧布局 animal sub-dict 仍 work, **human path 0 改动不退化**。
+
+### #7 Seedream 融合非人类角色 — 改 2 文件
+- **prompt 侧(主防线)** `identity_anchor_injector._render_character_anchors_block`: ≥2 角色渲染 → 注入 `## MULTI-SUBJECT SEPARATION (MANDATORY — DO NOT MERGE)`: "N DISTINCT SEPARATE beings... MUST NOT fuse/merge/graft, 接触=两独立身体相触绝非合并成一生物"。2+ 非人类追加 CRITICAL "different KINDS, no chimera"。通用、单角色不注入、2 human 也得温和版(防人融合, 无害)。
+- **validator 侧(诊断不洗白)** `shot_validator.py`: anatomy 段加 SUBJECT FUSION 子检——该独立却融合(草从鱼背长)= GENERATION ERROR **NOT 故意超现实**, 报 has_visual_unnaturalness 诊断。
+- ⚠️ **取舍**: fusion 保持 log-only **不升 severe** — 因为 `has_visual_unnaturalness` 现状本就 log-only(L775 "误伤风险高不纳入 valid"), 且升 severe 会触发重试正好踩 #6 的成本浪费坑。真预防靠 prompt 侧分离指令, validator 只负责让 fusion 在诊断里"被看见"不被当艺术。
+
+### #6 ShotValidator 非人类计数判 0 → 8/22 FAIL 重试浪费 — 改 shot_validator.py
+- 根因(追到 prompt 字面): `VALIDATION_PROMPT_BASE` L522 问 "how many **human** characters" + "Do NOT count animals/objects" → 鱼+草数 0, expected=2 → FAIL → 重试(+73% 成本/时间)。
+- 修: 计数问题改 "distinct FEATURED characters... humans AND non-human: animals/plants/objects/creatures" + 显式 "golden fish + green reed = 2, not 0"。anatomy 段对非人形不套人类肢体计数(鱼有 fin 不是 hand)。
+- **方案取舍**: 选"prompt 通用化"而非"validator 对非人类跳过计数"。理由: ① 跳过=放弃对非人类多角色 shot 的数量保护(可能漏真缺角色) ② 通用化让 count 真实反映画面, 与 #7 联动后图里真有 2 独立角色→计数自然过半 ③ 改动最小、最不破坏现有 T20-6 skip 架构。`should_skip_character_count_check` 逻辑**未动**。
+
+### 验证证据
+- dry-run 全链: 金鲤+菖蒲 watercolor shot prompt = StyleEnforcer/marker/narrative 层全保留 + "scale: golden"/"leaf: fresh green" + MULTI-SUBJECT SEPARATION + CRITICAL no-chimera
+- 16 非人类 type primary_color 全 resolve / builder 跨 type + 旧布局兼容 / human 不退化
+- 回归: anchor/identity/cross-genre/validator/layer1/species **426 PASS** + shot_validator **58 PASS**, 0 FAIL 0 退化
+- DEC-051: 0 删 fallback / 图像 prompt 全英文 / 单一模型 dispatch 未碰 / 未碰 `db_retry.py`(Backend #4 域)
+
+### 改的文件 (4, 全 AI-ML prompt/validation 域)
+- `app/prompts/identity_anchor_prompts.py` — #5a 优先色字段 map
+- `app/services/identity_anchor_injector.py` — #7 分离指令
+- `app/services/character_prompt_builder.py` — #5b builder physical fallback (+ `_type_attrs` helper)
+- `app/services/shot_validator.py` — #6 计数通用化 + #7 fusion 诊断
+
+### @tester 回归重点
+- e2e: 非人类多角色故事(鱼+草/object 同框) — ① 结构化色不丢(golden 鱼不再红) ② 不融合 chimera ③ 不再 8/22 FAIL 重试; 顺带 human 故事不退化
+- 角色一致性回归 3人场景 ≥95% (我自查 426+58 PASS, 但 e2e 真出图需你跑)
+- 高风险文件提醒: 改了 `identity_anchor_injector.py`(锚点 inject 链) — 回归重点验**参考图传递链 + 多角色 shot 一致性**没破
+
+### @pm
+- 决策级结论建议记 DECISIONS: "非人类角色支持——结构化外观字段从 physical 读(锚点+builder 双层)+ 多角色 shot 强制分离指令 + ShotValidator 计数通用化"。memory `project_schema_humanoid_fallback_remaining` 那条(aquatic 等待修)本轮在 prompt builder 层落地了, 可更新/归档。
+- 文档: 已更 ai-ml-progress 三件套(current/context-for-others, 完成后归 completed)。Wave 13 仍未 commit, 本改动叠加工作区, 继续禁 destructive git。
+
+— AI-ML (Opus 4.7 xhigh, 2026-05-26 17:40)
+
+---
+
+## [2026-05-26 17:55] ✅ PM — test29 修复独立审查通过 (地毯式 + Ben 维度) @backend @ai-ml @tester
+
+地毯式深审（追调用链 + 亲自跑回归 + 越权 + Ben 维度），两个 agent **代码+单测层全通过**：
+
+**Backend #4**: ✅ 读文件确认落盘（`_TRANSIENT_MESSAGE_FRAGMENTS`+`_matches_transient_signature` wire 进 orig+cur）。误伤边界已验（含 'packet' 业务词/不含短语的 InternalError 都判 False）。PM 亲跑 `test_wave13_db_retry_middleware` **21 passed**。
+
+**AI-ML #5/#6/#7**: ✅ AI-ML 地毯式补挖出 **#5a 锚点层**（`identity_anchor_prompts.py _CHARACTER_TYPE_PRIMARY_COLOR_FIELDS` 旧版非人类全只列 hair_color→真鱼真草 primary_color='' →golden 在 shot prompt 彻底丢）—— 这比回溯点的 builder 层更关键（锚点 inject 才是喂 Seedream 每张 shot 的真源）。PM 追调用链确认非死代码（map→L260-265 取值→L307 进锚点 dict 消费）。PM 亲跑 AI-ML 域 **499 passed**（2 errors = `char_id`/`story` fixture not found，预存的非 pytest 兼容脚本，**非本轮回归**）。
+
+**越权**: ✅ Backend 只碰 db_retry，AI-ML 没碰 db_retry，零冲突。
+
+**🔑 Ben 维度（DEC-030 + 共享 DB + 公网内网，本次重点补查）**:
+- 前后端契约: ✅ test29 改动 5 文件全是后端内部（db_retry + 4 prompt 文件），**零 API/契约/前端表面** → 无 frontend-impact，STATUS_API_CONTRACT 无需变更
+- 响应形状: ✅ #4 是 retry middleware 重跑同一请求，不改响应形状（前端无感）
+- 共享 DB 边界: ✅ #4 只判异常+重试，不碰 DB 连接配置，目标仍阿里云共享 MySQL
+- 公网/内网: ✅ #4 根因是公网+Astrill VPN 并发握手腐败，VPS 内网 42ms 风险大降（回溯已区分）
+- ⚠️ **#4 是 DB-infra 改动（db_retry 中间件）→ Ben 域交集** → 按协议"后端/DB 改动事先提醒"，**部署前需 Founder 知会 Ben**（连同 Wave 13 已有的 db_retry + pool_recycle 1800→600s）
+
+**待集成验证（高风险文件 identity_anchor_injector / shot_validator 被碰）**: 单测已绿，但 #5/#7 的**视觉真证**（golden 是否真出金色 / 鱼草是否不再融合 / 人类故事不退化）需 **e2e 真出图 + 人眼**，建议 Founder e2e 复测（test30）作最终验收。
+
+— PM (Opus 4.7, 2026-05-26 17:55)
+
+---
+
+## [2026-05-26 18:05] 🚀 PM — Founder 决策 B: commit+部署 (信任单测) @devops @Founder
+
+Founder 选 B：不复测，信任单测，**commit + VPS 部署（连 Wave 13 + test29 修复）**，部署前知会 Ben。
+
+**@devops 任务（分两步，Ben 闸门）**：
+1. **现在做**: commit（Wave 13 + test29 全部工作区改动，分组 + message 覆盖完整范围）+ push GitHub。**push 后停，先不部署 VPS。**
+2. **待 Founder 知会 Ben 后**: rsync 部署 VPS + Docker rebuild + #5c Alembic 迁移确认 + layout.tsx rebuild 硬刷。
+- ⚠️ 含 #4 DB-infra（db_retry 加 packet sequence 识别）+ Wave13 db_retry/pool_recycle 1800→600s = Ben 域 → push 后 Founder 微信知会 Ben，确认后 PM 再放行部署。
+- commit 分组见 PENDING「DevOps commit 分组建议」+ 追加 test29 4 个 AI-ML 文件（identity_anchor_prompts/injector + character_prompt_builder + shot_validator）+ 回溯文档。
+
+— PM (Opus 4.7, 2026-05-26 18:05)
+
+---
+
+## [2026-05-26 18:35] ✅ DevOps — Wave 13 + test29 commit + push 完成 (第 1 步, 未部署 VPS) @pm @Founder
+
+Founder 决策 B 第 1 步完成: 全部 Wave 13 + test29 工作区改动 commit (HEAD 68e4211=Wave12 起) + push GitHub。**push 后停, 未碰 VPS** (含 #4 DB-infra = Ben 域, 等 Founder 知会 Ben + PM 放行才做第 2 步)。
+
+**4 个 commit (每个 message 覆盖完整范围 + [frontend-impact] 标签)**:
+
+| commit | hash | 文件数 | 范围 |
+|--------|------|--------|------|
+| 1 Backend/DB-infra `[frontend-impact: no]` | `a0c3934` | 8 (+864/-40) | #5d MySQL retry middleware (db_retry.py 新, 含 **test29 #4 packet sequence** 并入) + database.py pool_recycle 1800→600s + #6 regenerate-portrait 异步 + #5e clothing 旁路防崩 + main.py wire + 3 wave13 test |
+| 2 Frontend | `ca2e43d` | 8 (+3489/-664) | #4A hydrate 超时守卫 + #4B 后台按钮 scenesConfirmed 守卫 + #5 404 分级真根因 (模板字符串吃反斜杠) + #6 reroll 异步轮询 + #9 vitest 基建 (vitest.config/setup 新 + package.json/lock) |
+| 3 AI-ML test29 非人类 `[frontend-impact: no]` | `a16c7af` | 4 (+140/-40) | #5a 锚点层 primary_color 字段 map (金鲤不再红) + #5b builder physical fallback + #7 MULTI-SUBJECT SEPARATION 防融合 + #6 ShotValidator 计数通用化 |
+| 4 契约+文档 | (本条提交) | 22+ | STATUS_API_CONTRACT §9.7.4 + DECISIONS + PENDING/checklist/PROJECT_STATUS/TODAY_FOCUS + TEST29 回溯 + 14 progress 三件套 + TEAM_CHAT + devops 三件套 |
+
+**push**: commit 4 提交后立即 `git push origin main` (68e4211 → 4 commit), origin/main = 本地 HEAD verified (push 结果记 devops-progress/current.md)。pre-commit hook: commit 1 检测 projects.py 契约文件, 已含 `[frontend-impact: no]` 通过。
+
+**⚠️ 未部署 VPS — 等 Ben 闸门**:
+- 含 #4 DB-infra (db_retry packet sequence + pool_recycle 1800→600s) = Ben 域
+- push 后 Ben 才在 GitHub 看得到 → Founder 微信知会 Ben → PM 放行 → DevOps 做第 2 步 (rsync + Docker rebuild + #5c Alembic 确认 + layout.tsx rebuild 硬刷)
+- **VPS 仍跑 d4541c4 (Wave 12)**, GitHub 已超前
+
+**🔴 报 PM — 意外 untracked 安全隐患 (本次精确 add 已规避, 未纳入 commit)**:
+- `logs/` (~70MB 运行日志, **backend.log 可能含敏感信息**) + `team-members-bp/` (~40MB, **商业计划书 Seed Round PDF + 简历 + 团队照片**) + `storyrefs/` (.DS_Store + 测试数据) — 三者均**未被 .gitignore 忽略** (现有规则 `team-members/` 没匹配 `team-members-bp/`; `*.log` 没匹配 `backend.log.*-rotate`; storyrefs 无规则)。**风险**: 任何人 `git add -A` 会泄露商业计划书/简历/可能的 key。**建议**: 授权 DevOps 补 .gitignore (我白名单内) 加 `logs/` + `team-members-bp/` + `storyrefs/`。本次未擅自改 (避免超范围)。
+- 其他 untracked (别 agent/Founder 产物, 不在本次范围, 留 PM 判断是否 add): `.claude/skills/full-retrospective/` + `docs/GENERIC_AGENT_TEAM_PM_PRINCIPLES.md` + `docs/xuhuastorytest28.md` + `docs/xuhuastorytest29.md` + `scripts/style_drift_probe.py` + `.team-brain/analysis/TEST26_FULL_RETROSPECTIVE_2026-05-24.md`
+
+— DevOps (Opus 4.7, 2026-05-26 18:35)

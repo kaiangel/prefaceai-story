@@ -4,6 +4,33 @@
 
 ---
 
+## 2026-05-26
+
+### test29 #4 — Packet sequence 握手腐败漏接修复 ✅ [2026-05-26 — Opus 4.7 default]
+
+**任务背景**: 浏览器 tab 恢复后突发并发轮询，MySQL 认证握手被截断 → `pymysql.err.InternalError: Packet sequence number wrong - got N expected M` → 3 次 500。旧 `_is_transient_connection_error` 走分支 1 (DBAPIError 子类) 但既无 `connection_invalidated` 也不含 2013/2006/2003 码 → 判 False → 不重试 → 500 漏接。
+
+**改动文件 (1 改 + 1 测扩展)**:
+
+| 文件 | 改动 |
+|------|------|
+| `app/middleware/db_retry.py` | 新增 `_TRANSIENT_MESSAGE_FRAGMENTS = ("packet sequence number wrong",)` 常量 + `_matches_transient_message_fragment()` (小写匹配) + `_matches_transient_signature()` (统一码匹配 OR 消息片段)。分支 1 的 2 处 `_matches_transient_code` 改调 `_matches_transient_signature`。docstring 同步 |
+| `tests/test_wave13_db_retry_middleware.py` | +7 case: packet seq 判 transient / 大小写不敏感 / 经 __cause__ 链 / InternalError 不含短语不误伤 / 业务错含 'packet' 单词不误伤 / GET 重试 1 次自愈 / POST 不重试 |
+
+**#5d 4 重安全约束全保持 (0 破坏)**:
+1. 仅幂等 GET/HEAD 重试 — `_IDEMPOTENT_METHODS` 未动，POST/PUT/PATCH/DELETE 不重试
+2. 限 1 次 — `_MAX_RETRIES=1` 未动
+3. 业务错绝不重试 — 短语 "packet sequence number wrong" 是握手层专有字符串，业务消息含单词 'packet' 不命中（test 实证）
+4. 不掩盖真错误 — 非 transient 立即原样抛；重试后仍失败原样抛
+
+**误伤边界已验**: 含 'packet' 业务单词 (`"invalid network packet count"`) + 不含短语的 InternalError (1364 字段错) 均判 False。
+
+**pytest**: `test_wave13_db_retry_middleware.py` **21 PASS** (14 旧 + 7 新)；相关域回归 (db_retry + t20_53_db_pool_config + status_authoritative) **78 PASS，0 退化**。
+
+**PM 审查**: 通过。[frontend-impact: no] 透明重试用户无感，0 Ben 协议越界。
+
+---
+
 ## 2026-05-24
 
 ### Wave 12 P2-1 (adjust 异步化) + P2-2 (Stage 2 sub-progress) ✅ [2026-05-24 — Opus 4.7 xhigh]

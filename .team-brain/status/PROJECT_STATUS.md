@@ -1,6 +1,8 @@
 # Project Status
 
-> **Updated**: 2026-05-22 14:30 (PM)
+> **Updated**: 2026-05-26 17:55 (PM — test29 e2e 90分 + 非人类专项修复)
+>
+> **5/23-5/26 进展补记**: Wave 13 内测前 FIXBATCH 全修复 (5/25) → test29《荷塘渡》e2e 跑通 Founder 90分 (5/26), Wave 13 全部实测生效 → 炸出「非人类人类中心假设链」5缺口, 当场修 #4(Packet retry, Backend)+#5/#6/#7(非人类消费层专项, AI-ML, 含补挖 #5a 锚点层), PM 地毯式+Ben维度审查通过, #8(BGM)内测后。**Wave13+test29 全未 commit (HEAD=68e4211), 待 e2e 视觉复测(test30) + commit + VPS 部署(知会 Ben)。** 详见 `analysis/TEST29_FULL_RETROSPECTIVE_2026-05-26.md`。
 
 ## Phase 状态
 

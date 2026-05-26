@@ -5,6 +5,19 @@
 
 ---
 
+## ✅ Wave 13 FIXBATCH PM 审查通过 (2026-05-25, 集成关口第一道, DEC-052)
+
+代码全部写完待 commit (HEAD=68e4211)。PM 5+1 Ben 协议 + 完整调用栈地毯式审查全部改动 → **全绿无 blocker**:
+- **#5d** MySQL retry middleware (db_retry.py + main.py wire + database.py recycle 600s): ✅ 4 重约束代码可证 (transient-only / 幂等 GET-only / 限1次 / 不掩盖真错误), wire 顺序 CORS 最外层正确
+- **#6** regenerate-portrait 异步化: ✅ **§9.7.4 三方契约逐字段对齐** (Backend return ⟺ Frontend pollCharacterJob ⟺ 契约), kind="regenerate_portrait" 区分, DEC-051 fallback 全保留
+- **#5e** clothing 旁路防崩: ✅ 非穿衣 7 type 降 warning, 穿衣 type 仍 raise, 崩溃点 (design() L144 在 LLM fallback 之外) 消除, 0 删 fallback
+- **#5b** schema 5 type 核实: ✅ 0 代码改动, physical 已根治 (memory 待更), clothing 旁路交 #5e 修
+- **#4A/#4B/#5/#9** (Frontend): ✅ 确认流程超时守卫 / 后台按钮 scenesConfirmed 单信号 / 404 真根因 (模板字符串吃反斜杠) 源码层根治 / vitest 基建
+- 待 Tester 第二道 (pytest 30新+vitest 15+回归0退化+独立核对§9.7.4) 双绿 → DevOps 第 5 次部署
+- 详见 DECISIONS DEC-052
+
+---
+
 ## 🔴 第一批: Wave 12 收尾 (代码已改完审查通过, 待上线验证) — 阻塞内测
 
 | # | 任务 | 派 | 工作量 | 状态 |

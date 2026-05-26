@@ -1,6 +1,94 @@
 # Backend Agent - 当前任务
 
-> **最后更新**: [2026-05-24] ✅ Wave 12 P2-1 (adjust 异步化) + P2-2 (Stage 1-4 sub-progress) 完成 — 252 PASS 0 退化 (Opus 4.7 xhigh)
+> **最后更新**: [2026-05-26] ✅ test29 #4 Packet sequence 修复 — `db_retry.py` 加认 "packet sequence number wrong" 为 transient — 21 测 PASS (14 旧 + 7 新), 78 相关域 PASS, 0 退化 (Opus 4.7 default)
+
+---
+
+## ✅ 完成: test29 回溯 #4 — Packet sequence 握手腐败漏接修复 [2026-05-26, Opus 4.7 default]
+
+### 任务背景 (test29 回溯 #4, analysis/TEST29_FULL_RETROSPECTIVE_2026-05-26.md)
+- 浏览器 tab 挂起→恢复时突发并发轮询 `chapters/N/status`, 连接池被迫同时新建多条连接, 每条走 MySQL 认证握手 (aiomysql/connection.py:844 `_request_authentication`→:629 `_read_packet`)
+- 公网+Astrill VPN 并发握手被截断 → `pymysql.err.InternalError: Packet sequence number wrong - got N expected M` → 3 次 500 (15:46:00/31/44), 前端 retry-on-resume 自愈
+- **#5d retry 为何漏接**: 此 `InternalError` 虽是 `DBAPIError` 子类 (isinstance 命中分支 1), 但既无 `connection_invalidated` 也不含 2013/2006/2003 码 → `_is_transient_connection_error` 判 False → 不重试 → 500
+
+### 改动文件 (1 改 + 1 测扩展, 孤立, 0 越界 AI-ML prompt 层)
+| 文件 | 改动 |
+|------|------|
+| `app/middleware/db_retry.py` | 新增 `_TRANSIENT_MESSAGE_FRAGMENTS = ("packet sequence number wrong",)` 常量 + `_matches_transient_message_fragment()` (小写匹配) + `_matches_transient_signature()` (统一码匹配 OR 消息片段)。分支 1 的 2 处 `_matches_transient_code` 改调 `_matches_transient_signature`。docstring 同步说明 #4 |
+| `tests/test_wave13_db_retry_middleware.py` | +7 case: packet seq 判 transient / 大小写不敏感 / 经 __cause__ 链 / InternalError 不含短语不误伤 / 业务错含 'packet' 单词不误伤 / GET 重试 1 次自愈 / POST 不重试 |
+
+### #5d 4 重安全约束全保持 (0 破坏)
+1. **仅幂等 GET/HEAD 重试** — `_IDEMPOTENT_METHODS` 未动, POST/PUT/PATCH/DELETE 仍直接放行 (test: POST packet seq 只调 1 次)
+2. **限 1 次** — `_MAX_RETRIES=1` 未动
+3. **业务错绝不重试** — packet sequence 是连接握手层错误 (aiomysql 认证阶段), 不与 ValueError/HTTPException/SQL 语法 ProgrammingError 混淆; 片段足够具体 (完整短语 "packet sequence number wrong"), 业务消息含单词 'packet' 不命中 (test 证)
+4. **不掩盖真错误** — 非 transient 立即原样抛; 重试后仍失败原样抛
+- retry 自愈机制: GET 重跑 `call_next` → `Depends(get_db)` 重新 checkout 干净连接 → 重做握手大概率成功 (test29 15:46:44 后 0 错误已证)
+
+### 匹配精度判断 (无误伤风险)
+- 短语 "packet sequence number wrong" 是 pymysql 握手腐败的**专有错误字符串**, 不出现在任何业务/SQL 语义错误中
+- 小写匹配处理大小写差异 (pymysql 输出 "Packet sequence number wrong")
+- 走完整异常链 `__cause__`/`__context__`, 深埋时仍识别
+- 实测: 含 'packet' 业务单词 (`"invalid network packet count"`) + 不含短语的 InternalError (1364 字段错) 均判 False
+
+### 测试 (venv/bin/python3)
+- `test_wave13_db_retry_middleware.py`: **21 PASS** (14 旧 + 7 新)
+- 相关域回归 (db_retry + t20_53_db_pool_config + status_authoritative): **78 PASS, 0 退化**
+- `app.main` import OK (中间件 wire 未动)
+
+### Ben 协议 5+1
+- 0 schema 改动 / 0 Alembic migration / 0 STATUS_API_CONTRACT 升级 / 0 frontend 影响 ([frontend-impact: no], 透明重试用户无感)
+- 不碰 AI-ML prompt 层 (character_prompt_builder/ShotValidator/image_generator 一律没动 — #5/#6/#7 是 AI-ML 域)
+
+---
+
+## ✅ 完成: Wave 13 内测前 FIXBATCH #5d + #6 + #5e [2026-05-25, Opus 4.7 xhigh]
+
+### 任务背景 (test28 回溯 + VPS 实测)
+- **#5d**: idle 后阿里云 MySQL 2013 lost connection, 用户离开看片再回来第 1 次操作 500。pool_pre_ping 在公网 + ping 超时 (Errno60) 没完全防住
+- **#6**: regenerate-portrait 端点仍同步 ~60s 转圈 (adjust 已 Wave 12 异步, regenerate 同类问题)
+- **#5e**: `_validate_characters` (character_designer.py L619) clothing 必填对【所有 type 一刀切】, 真 object/aquatic/plant/insect 天然没衣服 → Stage 2 raise, 在 LLM fallback 之外 + orchestrator 无 retry → 冲垮 pipeline (AI-ML #5b 挖出, PM verify 属实)
+
+### 改动文件 (3 改 + 2 新测 + 1 新 middleware)
+| 文件 | 改动 |
+|------|------|
+| `app/middleware/db_retry.py` | 🆕 `DBConnectionRetryMiddleware` — transient MySQL connection 错误自动重试 (仅幂等 GET/HEAD, 限 1 次) + `_is_transient_connection_error` 检测器 |
+| `app/main.py` | wire DBConnectionRetryMiddleware (加在 CORS 之前 → CORS 在最外层, 保证重抛错误仍带 CORS 头) |
+| `app/database.py` | pool_recycle 1800s → 600s (主动回收 idle 连接, 赶在云端 idle-timeout 前重建) |
+| `app/api/projects.py` | regenerate-portrait 改异步 (202+job_id, 复用 adjust_job_manager kind="regenerate_portrait" + 同一轮询端点) + 后台 worker `_run_regenerate_portrait_in_background` + core `_regenerate_portrait_core` |
+| `app/services/character_designer.py` | #5e A: `NON_CLOTHING_TYPES` 常量 + `_validate_characters` 对非穿衣 type clothing 缺字段降 warning 不 raise (同 anthropomorphic_animal physical warning pattern); #5e B: `_build_prompt` 加 NON-CLOTHING CHARACTER TYPES CLOTHING RULES 指引 (object/aquatic/plant/insect 等填 n/a) |
+| `tests/test_wave13_db_retry_middleware.py` | 🆕 14 case (transient 检测 + 端到端中间件: GET 重试1次/POST不重试/业务错不重试/限1次) |
+| `tests/test_wave13_clothing_bypass.py` | 🆕 12 case (非穿衣 type 不崩 + human 仍 raise surgical) |
+| `tests/test_wave13_regenerate_portrait_async.py` | 🆕 4 case (端点 202 + 后台函数存在 + job 生命周期) |
+
+### #5d retry 如何防副作用 (4 重约束, 代码可证)
+1. **只 transient connection 错误**: `_is_transient_connection_error()` 走完整异常链, 只认 SQLAlchemy OperationalError/InterfaceError/DBAPIError (connection_invalidated 或 orig 含 2013/2006/2003) + OSError(ETIMEDOUT/ECONNRESET/ECONNREFUSED/EPIPE)。业务错 (ValueError/HTTPException/ProgrammingError SQL语法) 绝不重试 (实测 test 证)
+2. **只幂等 GET/HEAD**: `_IDEMPOTENT_METHODS = {GET, HEAD}`, POST/PUT/PATCH/DELETE 直接放行不重试 (防重复写, 实测 POST transient 只调 1 次)
+3. **限 1 次**: `_MAX_RETRIES = 1` (实测一直 transient 失败 → 共 2 次调用后放弃)
+4. **不掩盖真错误**: 非 transient 立即原样抛; 重试后仍失败原样抛 (交全局 handler 转 500)
+- 重试机制: GET 重跑 `call_next` → `Depends(get_db)` 重新 checkout 新连接 → pool_pre_ping ping 验证 / pool_recycle 已回收 idle → 拿健康连接成功
+
+### #6 regenerate 异步契约 (Frontend 依赖, 同 adjust pattern)
+**POST** `/api/projects/{project_id}/characters/{char_id}/regenerate-portrait` (status **202**, 原 200 同步)
+- 立即返回: `{ "success": true, "job_id": "<uuid>", "status": "pending", "char_id": "char_001", "message": "..." }`
+- 快速校验仍同步返 404/400 (项目不存在/未生成大纲/角色不存在)
+**GET** `/api/projects/{project_id}/characters/adjust-jobs/{job_id}` (复用 adjust 轮询端点, job.kind="regenerate_portrait")
+- result 完成时含 `{ success, char_id, portrait_url, fullbody_url, message }` (与旧同步返回体一致)
+- ⚠️ 契约已 paste 给 PM 代改 STATUS_API_CONTRACT (regenerate job 契约)
+
+### #5e A 防崩范围
+- `NON_CLOTHING_TYPES = {animal, aquatic, plant, insect, object, elemental, vehicle_character}` — 缺 clothing 子字段降 warning 不 raise
+- 不含 human / anthropomorphic_animal / 超自然人形 (supernatural/undead/mythological/fantasy_creature) / robot / alien 等穿衣 type → 仍严格校验 (surgical, 不破坏现有)
+- #5e B prompt 在 character_designer.py (我的域) 直接加, 无需协调 AI-ML
+
+### fallback 红线 (DEC-051) 全保留
+- #6 regenerate: B57 同步重生 fullbody + 非阻塞 except 兜底全保留, 异步化只改调用方式
+- #5e A: 只放宽非穿衣 type 的 clothing 校验, 0 删 fallback
+
+### 测试 (venv/bin/python3)
+- 新增 30 case 全 PASS (14 retry + 12 clothing + 4 regenerate)
+- adjust job manager 回归 15 PASS
+- 相关域 (character/clothing/designer/schema/adjust/regenerate/pipeline) 560 PASS
+- ⚠️ 已知 pre-existing fail (非我改动): `test_supernatural_missing_all_fields_fails` (Wave 8 CharacterSchema warn-not-raise, AI-ML 已标过时建议更新断言) / b51 case9-10 (T20-17 storyboard_director name_en) / async_anthropic_t18_j (grep chapters.py 结构) / 4 ERROR (真实 API 集成测试需 key/网络)
 
 ---
 

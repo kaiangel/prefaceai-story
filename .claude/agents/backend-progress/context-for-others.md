@@ -1,6 +1,60 @@
 # Backend Agent - 给其他 Agent 的上下文
 
-> **最后更新**: [2026-05-24] ✅ Wave 12 P2-1 (adjust 异步化) + P2-2 (Stage 2 sub-progress) 完成 — 252 PASS 0 退化；**adjust API 契约变更 [frontend-impact: yes]**
+> **最后更新**: [2026-05-26] ✅ test29 #4 Packet sequence — `db_retry.py` retry 中间件扩展认 "packet sequence number wrong" 握手腐败为 transient — 21 测 PASS, 0 退化, **透明无前端契约变更 [frontend-impact: no]**
+
+---
+
+## ✅ [test29 #4] Packet sequence 握手腐败纳入 retry [2026-05-26] — 透明, 无前端契约变更 [frontend-impact: no]
+
+- tab 挂起→恢复突发并发→连接池新建多连接→MySQL 认证握手包序号错位→`InternalError: Packet sequence number wrong`→3×500。这是 #5d retry 中间件**漏接**的一类 transient (它不含 2013/2006/2003 码也无 connection_invalidated)
+- 修复: `db_retry.py` 加 `_TRANSIENT_MESSAGE_FRAGMENTS = ("packet sequence number wrong",)` + 小写匹配, 幂等 GET/HEAD 命中后自动重试 1 次重 checkout 干净连接, 用户无感
+- @tester: tab 挂起恢复时 `GET chapters/N/status` / `GET /projects/{uuid}` 突发并发不再 500 (自动重试拿新连接握手)。POST 仍不重试 (防重复写), 业务错仍不重试 (4 重约束全保持)
+- @frontend: 无契约变更, 行为同 #5d (透明兜底层)
+
+---
+
+## ✅ [Wave 13 #6] regenerate-portrait 异步化 [2026-05-25] — **@frontend 必读 (API 契约变更)**
+
+### ⚠️ regenerate-portrait 从同步改异步 — Frontend 必须改调用方式 (与 adjust 同 pattern)
+
+**旧 (已废弃)**: `POST .../characters/{char_id}/regenerate-portrait` 同步阻塞 ~60s 返回 portrait/fullbody URL。
+**新 (Wave 13 #6)**: 端点立即返回 **202** + job_id, Frontend 轮询【与 adjust 同一个】job 端点拿进度/结果。
+
+**① POST** `/api/projects/{project_id}/characters/{char_id}/regenerate-portrait` → **202** (原 200)
+```json
+// 无 req body
+// resp 202:
+{ "success": true, "job_id": "<uuid>", "status": "pending", "char_id": "char_001", "message": "肖像重生成任务已创建，请轮询 job 状态" }
+```
+快速校验仍同步返错: 404 (项目/角色不存在) / 400 (未生成大纲)。
+
+**② GET** `/api/projects/{project_id}/characters/adjust-jobs/{job_id}` → 轮询 (复用 adjust 轮询端点)
+```json
+{
+  "job_id": "<uuid>", "char_id": "char_001", "kind": "regenerate_portrait",  // ← kind 区分
+  "status": "pending|processing|completed|failed",
+  "progress": 0-100,
+  "stage_message": "正在重新绘制肖像... / 肖像完成，正在重新绘制全身图... / 肖像已重新生成",
+  "result": {  // status=completed 才非 null, 字段与旧同步返回体一致
+    "success": true, "char_id": "char_001",
+    "portrait_url": "/static/.../char_001_portrait.png?v=<epoch>",
+    "fullbody_url": "/static/.../char_001_fullbody.png?v=<epoch>",  // B57 重生, 失败时 null
+    "message": "肖像和全身图已重新生成"
+  },
+  "error": "..."  // status=failed 才非 null, 友好中文
+}
+```
+- Frontend 可直接复用 adjust 的轮询逻辑 (kind 字段区分 adjust vs regenerate_portrait)。
+- ⚠️ 进程重启时未完成 job 丢失 → 用户重点一次即可 (角色当前状态已在 DB)。
+
+### #5d MySQL retry middleware (透明, 无前端契约变更 [frontend-impact: no])
+- 幂等 GET/HEAD 命中 transient MySQL connection 错误 (2013/2003/Errno60 等) → 自动重试 1 次, 用户无感
+- POST/PUT/DELETE 不重试 (防重复写), 业务错误不重试 (不掩盖)
+- @tester: idle 后第 1 次 GET (如 hydrate `GET /projects/{uuid}`) 不再 500, 自动重试拿新连接
+
+### #5e clothing 旁路防崩 (无前端契约变更 [frontend-impact: no])
+- @ai-ml / @tester: 内测用户选 object/aquatic/plant/insect/elemental/vehicle_character/animal type 角色, clothing 缺字段不再冲垮 pipeline (降 warning)
+- character_designer prompt 已加 NON-CLOTHING CLOTHING RULES (这些 type 填 n/a), 源头减少残缺 clothing
 
 ---
 

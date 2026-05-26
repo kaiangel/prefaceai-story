@@ -1,10 +1,39 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-05-25 — TASK-WAVE12-DEPLOY-VPS 完成 (DevOps Sonnet 4.6 effort high 全程自执行)
-> **状态**: 🟢 VPS 第 4 次部署完成 (648b81c → d4541c4), 全 verify 通过 + 生产性能基线实测完成
-> **当前空闲**, 等待 PM 下一任务
+> **最后更新**: 2026-05-26 — TASK-WAVE13-TEST29-COMMIT 第 1 步完成 (commit + push, 未部署 VPS)
+> **状态**: 🟡 Wave 13 + test29 已 commit + push GitHub (68e4211 → 4 commit), **等 Ben 闸门** (Founder 知会 Ben → PM 放行 → 第 2 步 VPS 部署)
+> **当前**: 第 1 步完成停手, 绝不部署 VPS (含 #4 DB-infra = Ben 域)
 >
 > SECRET-LEAK 历史: Step 6 (key rotation) 5/22 跳过 (Founder 决策 Google 控制台限额兜底)
+
+---
+
+## TASK-WAVE13-TEST29-COMMIT [2026-05-26 开工 / 第 1 步完成] (DevOps Opus 4.7, Founder 决策 B)
+
+**背景**: Founder 决策 B (信任单测, commit+部署)。分两步, 第 2 步是 Ben 闸门。本轮只做第 1 步: commit + push GitHub, push 后停, 绝不部署 VPS。
+
+**第 1 步执行摘要 (HEAD 68e4211=Wave12 起, 4 commit)**:
+
+| commit | hash | 文件数 | 范围 | label |
+|--------|------|--------|------|-------|
+| 1 Backend/DB-infra | `a0c3934` | 8 (+864/-40) | #5d MySQL retry middleware (db_retry.py 新, 含 test29 #4 packet sequence) + pool_recycle 1800→600s + #6 regenerate-portrait 异步 + #5e clothing 旁路防崩 + 3 wave13 test | [frontend-impact: no] |
+| 2 Frontend | `ca2e43d` | 8 (+3489/-664) | #4A hydrate 超时守卫 + #4B 后台按钮 scenesConfirmed 守卫 + #5 404 分级真根因 + #6 reroll 异步轮询 + #9 vitest 基建 | (前端) |
+| 3 AI-ML test29 非人类 | `a16c7af` | 4 (+140/-40) | #5a 锚点层 primary_color 字段 map + #5b builder physical fallback + #7 MULTI-SUBJECT SEPARATION + #6 ShotValidator 计数通用化 | [frontend-impact: no] |
+| 4 契约+文档 | (见下方提交后补) | 22+ | STATUS_API_CONTRACT §9.7.4 + DECISIONS DEC-052/053 + PENDING/checklist/PROJECT_STATUS/TODAY_FOCUS + TEST29 回溯 + 14 progress + TEAM_CHAT + devops 三件套 | (文档) |
+
+**push**: `git push origin main` (68e4211 → commit4 HEAD), origin/main = 本地 HEAD verified
+
+**⚠️ 第 1 步做完即停, 未碰 VPS**:
+- 含 #4 DB-infra (db_retry packet sequence + pool_recycle 1800→600s) = Ben 域 → 须 Founder 先微信知会 Ben (push 后 Ben 才在 GitHub 看得到), PM 放行后才做第 2 步
+
+**第 2 步 (待 PM 放行另行指令)**:
+- rsync app/ + frontend/ → VPS + Docker rebuild (api+frontend)
+- #5c Alembic 迁移确认 (projects 表 3 列)
+- ⚠️ layout.tsx rebuild + 浏览器硬刷新 (root layout inline script HMR 不刷新)
+
+**意外 untracked 文件 (未纳入任何 commit, 报 PM)**:
+- 🔴 安全隐患: `logs/` (~70MB 运行日志, 可能含敏感信息) + `team-members-bp/` (~40MB, 商业计划书 PDF + 简历 + 团队照片) + `storyrefs/` (.DS_Store + 测试数据) — 应补 .gitignore, 本次未擅自改 (避免超范围), 精确 add 已规避
+- 其他 (别 agent/Founder 产物, 不在本次范围): `.claude/skills/full-retrospective/` + `docs/GENERIC_AGENT_TEAM_PM_PRINCIPLES.md` + `docs/xuhuastorytest28.md` + `docs/xuhuastorytest29.md` + `scripts/style_drift_probe.py` + `.team-brain/analysis/TEST26_FULL_RETROSPECTIVE_2026-05-24.md`
 
 ---
 

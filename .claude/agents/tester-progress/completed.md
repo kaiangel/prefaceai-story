@@ -4,6 +4,19 @@
 
 ---
 
+## 2026-05-26 — TASK-WAVE13-INDEPENDENT-RETEST ✅ (30+15=45 new PASS, 0 退化)
+
+**任务**: Wave 13 FIXBATCH 集成关口第二道独立复测 (db_retry / clothing_bypass / regenerate_portrait 异步 + 前端 vitest + 全量回归 + §9.7.4 契约核对)
+
+**核心结论**:
+- 后端 3 组新测试: 30/30 PASS (14+12+4)
+- 前端 vitest: 15/15 PASS，console.assert override 真生效
+- 全量回归: 2390 PASS，0 新退化，13 fail/5 error 全为 pre-existing
+- §9.7.4 契约: 8 字段全对齐，0 断裂点
+- 可进入部署关口
+
+---
+
 ## 2026-05-25 — TASK-WAVE12-INDEPENDENT-RETEST ✅ (58+15=73 new PASS, 0 退化)
 
 **任务**: Wave 13 #1 — Wave 12 三项改动独立复测 (style 画风 / adjust 异步 / ETA 不冻结)

@@ -1,6 +1,99 @@
 # Frontend 当前任务进度
 
-> 更新时间: 2026-05-24 [TASK-TEST26-FRONTEND-4] 完成 — adjust 异步轮询 + ETA 插值 + NETWORK_ERROR 计时 + 404 分级
+> 更新时间: 2026-05-25 [Wave 13 #6 前端] 完成 — regenerate-portrait (reroll) 改异步轮询 (修前后端契约 gap)
+> 状态: ✅ 完成 (1 文件改 StageC.tsx, build 20 routes 0 errors, tsc 0, eslint 0, npm test 15/15 PASS)
+> 模型: Opus 4.7 xhigh
+> 下一步: 等 PM 审查 + @tester 复测 reroll 不转圈 + 轮询拿 portrait
+
+## 最新完成: Wave 13 #6 前端 (2026-05-25, 修前后端契约 gap)
+
+### 背景 (前后端契约断裂, PM 地毯式审查抓到)
+- Backend Wave 13 #6 把 `regenerate-portrait` 改异步 (返 **202 + job_id**, 复用 adjust_job_manager kind=`regenerate_portrait`)
+- 但前端 StageC `handleRegenerate` 还是**同步调用** (期待 200 + `{portrait_url}`), 拿到 202+job_id 不是期待结果 → **reroll (留空调整框) 功能会断**
+- 我补前端轮询, 与 Wave 12 adjust 异步 pattern 一致
+
+### 改法 (最大复用 adjust 轮询, 不重复造轮子)
+- 抽取共享轮询 helper `pollCharacterJob(jobId, charId, onComplete)` — adjust 和 reroll **共用同一 GET `/characters/adjust-jobs/{job_id}` 轮询端点**
+- `CharacterJob` interface 加 `kind?: "adjust" | "regenerate_portrait"` 字段 (严格按 §9.7.4 契约), 提到组件作用域共享
+- `handleRegenerate` (reroll): POST 拿 202+job_id → `pollCharacterJob` → completed 读 `result.portrait_url` (cache-buster `bustUrl`) 刷新角色卡 + 清 portraitErrors + toast "已重新生成" / failed → error 提示
+- `handleApplyAdjustment` (adjust): 内联轮询循环 (88 行) 替换为调 `pollCharacterJob`, completion 回调额外记录 adjustment text + description (adjust 专属), **行为不变**
+- POST kickoff 失败 (404 项目/角色不存在 / 400 未生成大纲) → 立即 toast 不轮询
+- loading 显 `adjustJobMsg` = backend `stage_message` + `progress%` (不裸转圈), DEC-030 backend authoritative 不本地猜 60s 完成时间
+
+### 严格按 §9.7.4 契约字段
+- `job_id / char_id / kind("regenerate_portrait") / status(pending|processing|completed|failed) / progress / stage_message / result{success,char_id,portrait_url,fullbody_url,message} / error`
+- portrait_url 带 ?v={epoch} cache-buster (后端) + 前端再加 `&_={Date.now()}` 双保险; fullbody 失败时 null 非阻塞
+
+### 不破坏 adjust (Wave 12)
+- adjust 路径完全保留: 仍 POST `/adjust` 202 → 轮询同端点 → completed 记 adjustment + description + portrait
+- 仅把 adjust 内联的 88 行轮询循环抽成共享 helper, 逻辑 1:1 迁移 (POLL_INTERVAL 2s / MAX_POLLS 120 / 800ms 初始延迟 / silentStatuses [404] / progress clamp / friendly stage_message 全保留)
+
+### 验证
+- ✅ tsc 0 / build 20 routes 0 errors / eslint StageC 0 / npm test 15/15 PASS
+- ⚠️ dev HMR: StageC 非 root layout, HMR 可 reload; 改完已 npm build verify
+
+### 改动文件 (1 改, 0 越权全在 frontend/)
+| 文件 | 改动 |
+|------|------|
+| `src/components/create/StageC.tsx` | 抽 `pollCharacterJob` + `bustUrl` 共享 helper; `handleRegenerate` 同步→异步轮询; `handleApplyAdjustment` 轮询块复用 helper |
+
+[frontend-impact: n/a — 纯前端对接 Backend 已改的异步端点, 0 自己改 API/schema/契约]
+
+---
+
+## 上一批完成: Wave 13 #4 + #5 + #9 (2026-05-25, 内测前 FIXBATCH)
+
+## 最新完成: Wave 13 #4 + #5 + #9 (2026-05-25, 内测前 FIXBATCH)
+
+### #9 前端测试框架 (vitest)
+- 装 `vitest@2.1.9` + `jsdom@25` + `@testing-library/react@16` + `@testing-library/jest-dom@6` + `@vitejs/plugin-react@4` (全 devDependencies)
+- 新建 `vitest.config.ts` (jsdom env + `@` alias + setupFiles + include `src/**/*.test.ts`)
+- 新建 `vitest.setup.ts`: **override `console.assert` 在 falsy 时 throw** (原 useETA.test.ts 用 console.assert, native 永不抛错 → 测试器下失败会"静默 pass"; override 后每条断言变真 pass/fail)
+- `package.json` 加 `test: vitest run` + `test:watch: vitest`
+- `useETA.test.ts` 改: 底部 IIFE + `process.exit(1)` runner → vitest `describe`/`it` (15 个 it 各调一个 test 函数; **15 个 test 函数体完全不动**, 仅换 runner harness)
+- **验证**: `npm test` → 15/15 PASS; 另跑临时 sanity test 证明 console.assert override 真能让失败 case FAIL (非空过)
+
+### #4A 确认流程 hydrate 超时不给"返回工作台" (CreateContent.tsx)
+- 根因 (P2-2): hydrate 超时兜底 UI (L1609 timeout branch) 不区分"确认流程中"。确认流程还要确认角色+场景, 此时"返回工作台"打断流程
+- 修: 加 `inConfirmationFlow = urlStage ∈ {outline,characters,scenes}`。timeout branch:
+  - 确认流程中 → 文案改"正在自动重试…确认环节马上回来", **隐藏"返回工作台"**, 加 `useEffect` 自动重试 (8s 后 reload, sessionStorage 计数上限 3 次防死循环)
+  - 纯生成/preview/delivery → 保留"返回工作台" (无确认动作, 离开安全)
+
+### #4B 后台生成按钮守卫 — 修"忽有忽无" (StageC.tsx)
+- 根因 (P2-3): 旧守卫 `subPhase==="shot-gen" || (text-gen && currentStage==="storyboard")` → storyboard(显示)→scene_image_preparation(隐藏)→场景确认后(显示) = 闪烁
+- 旧 RISK-T17-7 假设"storyboard 时已确认场景"**错** — 场景确认 (scenesConfirmed) 在 R4-3 (scene_references_ready 之后), 晚于 storyboard
+- 修 (单一信号 = `state.scenesConfirmed`): `state.scenesConfirmed && subPhase==="shot-gen" && !isError` → 确认前全程隐藏, 仅场景确认后 (image_preparation/image_generation/bgm/music) 一致显示, 与 STAGE_SUBTITLE "可以选择后台生成"文案逻辑对齐
+- `scenesConfirmed` 是 backend authoritative (hydrate 自 scenes_confirmed), 页面重进 mid-gen 仍正确
+
+### #5 404 分级 Wave B 未生效 — 🔑 真根因找到 + 实测生效 (layout.tsx)
+- **真根因 (e2e 挖出, 非之前推测的"stale tab")**: `CLIENT_LOG_PROXY_SCRIPT` 是 JS **template literal**, Wave B 写的 regex 字面量 `/\/chapters\/\d+\/(...)/` 里的反斜杠在模板字符串构造时被吃掉 (`\d`→`d` / `\/`→`/`), emit 到浏览器的脚本变成 `//chapters/d+/...` — 开头 `//` 把整个 `isRoutine404` 赋值变成**行注释** → isRoutine404 永远 undefined → 全部记 network。**这就是 test28 0 routine-404 + 18 network 的真因 (代码审查看不出, 因为源码 regex 看着对的)**
+- 修: regex 字面量 → **无反斜杠纯字符串检查** (`url.indexOf('/chapters/')` + `routineSuffixes` 后缀匹配 + 去 query string), 模板字符串无任何可被吃掉的转义
+- 加固: `CLIENT_LOG_PROXY_VERSION = "w13-404-v2"` + 加载时 POST `proxy-init` 记版本号 (将来可在 client.log 确认浏览器加载的是新版, 治"代码审查≠实测生效")
+- **e2e 验证 (跑真 shipped 脚本, 非重实现)**: 从 production build 服务的 HTML 抽出真实 proxy IIFE, jsdom + mock fetch 跑 → 6 个 chapter 404 (含 `?poll=1` query) **全 routine-404** ✅ / 真非-chapter 404 仍 network ✅ / proxy-init 版本标记 w13-404-v2 ✅
+- ⚠️ 部署注意: layout.tsx 改动 Next.js dev HMR **不刷新** root layout inline script — dev server 必须重启浏览器才拿到新版 (这本身印证 test28 教训: 改 layout 不重启 = 浏览器跑旧脚本)
+
+### 改动文件 (6 改 + 2 新建, 0 越权全在 frontend/)
+| 文件 | 任务 | 改动 |
+|------|------|------|
+| `vitest.config.ts` (新) | #9 | vitest 配置 (jsdom + alias + setup) |
+| `vitest.setup.ts` (新) | #9 | console.assert override throw + jest-dom |
+| `package.json` | #9 | devDeps + test script |
+| `src/hooks/useETA.test.ts` | #9 | runner IIFE → vitest describe/it (15 函数体不动) |
+| `src/app/create/CreateContent.tsx` | #4A | inConfirmationFlow 守卫 + 自动重试 effect + 隐藏返回工作台 |
+| `src/components/create/StageC.tsx` | #4B | 后台生成按钮守卫改 scenesConfirmed && shot-gen |
+| `src/app/layout.tsx` | #5 | regex→纯字符串 routine-404 + 版本标记 proxy-init |
+
+### 验证
+- ✅ `npx tsc --noEmit` 0 errors
+- ✅ `npm run build` 20 routes 0 errors
+- ✅ `npm test` (vitest) 15/15 PASS
+- ✅ `npx next lint` 改动文件 0 warnings/errors
+- ✅ #5 e2e: 真 shipped 脚本 jsdom 实测 routine-404 生效 (6/6 chapter 404, 0 误记 network)
+
+---
+
+## 历史完成: TASK-TEST26-FRONTEND-4 (2026-05-24, test26 4 前端问题)
+
 > 状态: ✅ 4 项完成 (5 文件改, npm run build 20 routes 0 errors, tsc 0, useETA 15/15 PASS, lint 0 新增)
 > 模型: Opus 4.7 xhigh
 > 下一步: 等 PM 审查 + Founder e2e 实测 (重点验"陈明转圈"消失)

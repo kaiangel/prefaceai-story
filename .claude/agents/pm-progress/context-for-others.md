@@ -1,7 +1,47 @@
 # PM Agent - 给其他 Agent 的信息
 
-> **最后更新**: 2026-05-23 17:30
-> **当前阶段**: Wave 10 全完成 (P0+P2+P3+L) — 剩 L-3/L-4 Founder + 可选 VPS 第 3 次部署
+> **最后更新**: 2026-05-26 18:10 (test29 e2e 90分 + 非人类专项修复审查通过 + B 方案部署中)
+> **当前阶段**: test29 修复 (#4/#5/#6/#7) 审查通过 → DevOps commit+push (Ben 闸门) → 部署
+
+## 🚀 test29 修复 + Wave 13 一起部署 (5/26, Founder B 方案)
+
+test29《荷塘渡》e2e 90分, Wave 13 全实测生效。炸出非人类人类中心假设链 5 缺口, 当场修 #4/#5/#6/#7 (PM 地毯式+Ben维度审查通过), #8 内测后。回溯 `analysis/TEST29_FULL_RETROSPECTIVE_2026-05-26.md`。
+
+### 给各 agent 的状态
+- **@DevOps**: Founder B 方案 — commit (Wave13+test29 全部, 分组+message 全覆盖) + push GitHub **先停**; Founder 知会 Ben 后 PM 放行 → rsync VPS + Docker rebuild + #5c Alembic + layout.tsx rebuild 硬刷。⚠️ 含 #4 DB-infra = Ben 域。
+- **@Backend**: #4 Packet retry 审查通过 (21 pytest)。⚠️ **你的 completed.md 漏更 #4, 请补**。
+- **@AI-ML**: #5(含补挖 #5a 锚点层)/#6/#7 审查通过 (499 pytest)。非人类消费层专项落地, memory `project_schema_humanoid_fallback_remaining` prompt 层已解。
+- **@Tester**: 本轮单测已 PM 亲跑 (db_retry 21 + AI-ML 域 499)。#5/#7 视觉真证待 Founder e2e 复测 (test30, 可选, Founder 选了不复测先信任单测)。
+- **全体**: Wave13+test29 全未 commit, DevOps commit 前继续禁 destructive git。
+
+### 非人类支持关键认知 (改图像/角色/校验/BGM 的 agent 必读)
+数据层 Stage 2 把所有 type 属性写 `physical`, 消费层须从 `physical` 读 (非 `character[type]`)。多角色 shot 须强制角色分离 (no fusion)。ShotValidator 计数已通用化 (含非人类)。见 DEC-053。
+
+---
+（以下为 Wave 13 历史）
+
+> **(历史) 最后更新**: 2026-05-25 (Wave 13 集成关口第一道 ✅)
+> **(历史) 当前阶段**: Wave 13 FIXBATCH PM 审查全绿 (DEC-052) — 待 Tester 双绿 + DevOps 第 5 次部署
+
+## 🟢 Wave 13 内测前 FIXBATCH — PM 审查通过 (5/25, DEC-052)
+
+代码全部写完仍在工作区未 commit (HEAD=68e4211)。**PM 5+1 Ben 协议 + 完整调用栈审查全绿无 blocker**。
+
+### 给各 agent 的状态
+- **@Tester**: 第二道复测进行中 — pytest 30 新 (db_retry 14 + clothing_bypass 12 + regenerate_async 4) + vitest 15 + 全量回归 0 退化 + 独立核对 §9.7.4 前后端字段。用 `venv/bin/python3 -m pytest`。已知 pre-existing fail (非本批): test_supernatural_missing_all_fields_fails (Wave 8 warn-not-raise) / b51 case9-10 / async_anthropic_t18_j / 4 ERROR (需 key)
+- **@DevOps**: 双绿后 commit 3 组 (Backend / Frontend / 契约+文档, 见 PENDING 完整文件清单) + push + VPS 第 5 次部署。⚠️ layout.tsx root layout inline script HMR 不刷新, 须 rebuild + 浏览器硬刷新; DB 新列 Alembic (#5c) 确认
+- **@Backend**: #5d/#6/#5e 审查通过, §9.7.4 三方契约对齐无误。注: db_retry.py / character_designer.py 注释引用旧行号 (L82-118/L127), 实际 L99-134/L144 — 仅注释陈旧逻辑对, 非 blocker, 可下次顺带订正
+- **@Frontend**: #4A/#4B/#5/#6/#9 审查通过。#5 404 真根因 (模板字符串吃反斜杠) 源码层根治, 部署后须在 client.log 确认 proxy-init version=w13-404-v2 (真实浏览器加载新版)
+- **@AI-ML**: #5b 核实通过 (0 代码改动)。clothing 旁路已由 Backend #5e 修
+
+### 关键契约提醒 (§9.7.4, 所有改 regenerate/adjust 的 agent 必读)
+regenerate-portrait 已异步 (同步→202+job_id), 复用 adjust 轮询端点 GET /characters/adjust-jobs/{job_id}, 用 `kind` 字段区分 (adjust | regenerate_portrait)。result shape: {success, char_id, portrait_url, fullbody_url, message}。STATUS_API_CONTRACT v1.6 §9.7.4 已落地。
+
+---
+（以下为 Wave 10 历史）
+
+> **(历史) 最后更新**: 2026-05-23 17:30
+> **(历史) 当前阶段**: Wave 10 全完成 (P0+P2+P3+L) — 剩 L-3/L-4 Founder + 可选 VPS 第 3 次部署
 
 ## Wave 10 完成数据 (5/23 14:30-17:30, 3h)
 

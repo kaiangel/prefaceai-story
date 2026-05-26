@@ -5,6 +5,45 @@
 
 ---
 
+## 🔧 test29 派活中 — 非人类通用性专项 + Packet retry (5/26, Founder 全派内测前)
+
+来源: test29《荷塘渡》e2e (90分) 全维度回溯 `analysis/TEST29_FULL_RETROSPECTIVE_2026-05-26.md`。**核心主题: 数据层 Stage 2 已通用化, 消费层全人类中心**。Founder 决策全派内测前, Backend(#4) ‖ AI-ML(#5/#6/#7) 并行无冲突。
+
+- 🟡 **#4 [Backend, Opus default, 内测前]**: Packet sequence — `app/middleware/db_retry.py` `_is_transient_connection_error` 加认 "packet sequence number wrong"(连接握手腐败)。根因: tab挂起→突发并发→新建连接 aiomysql 认证握手(connection.py:844)被公网/VPN截断→`pymysql.err.InternalError`, #5d 只认 2013/2006/2003+OSError 漏接。方案A 外科式(GET幂等已gated+retry重checkout干净连接+自愈已证)。次要可选: 前端 tab-resume serialize 轮询。孤立文件零冲突。
+- 🟡 **#5 [AI-ML, Opus xhigh, 内测前]**: 非人类 type prompt builder 字段错配 — `character_prompt_builder.py:787 _build_aquatic_description`(及 _build_plant/insect/object 等) 从 `character['aquatic']` 读但 Stage 2 数据在 `physical`→空→golden 丢→金爷红。修: 各非人类 type builder 改读 `physical`(或 `character.get(type) or physical` fallback)。落地记忆 `project_schema_humanoid_fallback_remaining` 那条"5 type 待修"。
+- 🟡 **#7 [AI-ML, Opus xhigh, 内测前]**: Seedream 融合非人类角色 — 金爷(鱼)+小蒲(草)焊成一只(草从鱼背长出, shot 10/15 像素确认), 自然度检查误判"intentional surrealist"放行。仅 8/22 同框 shot 受影响, 水彩柔化→90分。修: 多角色 shot prompt 强制"two SEPARATE distinct beings, NOT fused" + 自然度检查对非预期融合不洗白。
+- 🟡 **#6 [AI-ML/Backend, 与#7联动]**: ShotValidator 视觉计数对非人类判 0→8/22 FAIL+重试(总耗时 44min/$1.14, vs 基线 +73%)。**#7 是真实成因之一**(确实没2独立角色)。修: 先修#7→图里真有2角色→计数过半; ShotValidator 计数对非人类 type 放宽/跳过(类 T20-6 environmental)。
+- 🟢 **#8 [AI-ML/Backend, 内测后]**: BGM 提取器无人类时 `character_dominant_type` 默认 'human' + watercolor 误归 western_realistic。P3 低影响(仅微调 BGM 基调)。
+- 📌 **新观察 [内测后评估]**: 结局 shot 出现剧本未设定的人类旁观者(撑船老人+第三人称旁白), 疑 by-design 叙事框架。
+
+**验收红线**: #5 修后人类既有故事不退化; #7 修后非人类双角色 mini 验证不融合; 碰 storyboard_prompts.py/image_generator.py 必过角色一致性回归(@tester)。**Wave 13 仍未 commit, 本轮叠加工作区, 禁 destructive git**。
+
+---
+
+## 🟢 Wave 13 内测前 FIXBATCH — PM 审查通过, 待 Tester + DevOps (5/25, DEC-052)
+
+代码全部写完仍在工作区未 commit (HEAD=68e4211=Wave12)。**PM 地毯式审查全绿无 blocker** (5+1 Ben 协议 + 完整调用栈):
+- Backend #5d (MySQL retry middleware) + #6 (regenerate-portrait 异步) + #5e (clothing 旁路防崩) ✅
+- Frontend #4A/#4B (确认流程 UX) + #5 (404 真根因) + #6 (reroll 异步轮询) + #9 (vitest 基建) ✅
+- AI-ML #5b (schema 5 type 核实, 0 代码改动) ✅
+- 🔑 §9.7.4 regenerate-portrait 三方契约逐字段对齐 (Backend ⟺ Frontend ⟺ 契约 v1.6) ✅
+- 详见 DECISIONS DEC-052 + INTERNAL_BETA_READINESS_CHECKLIST_2026-05-25.md 顶部
+
+**下一步**:
+1. ⏳ **Tester 第二道** (并行进行中): pytest 30 新 (db_retry 14 + clothing_bypass 12 + regenerate_async 4) + vitest 15 + 全量回归 0 退化 + 独立核对 §9.7.4 字段
+2. ⏳ **DevOps Wave 2** (双绿后): commit 分组 (见下) + push GitHub + VPS 第 5 次部署。⚠️ layout.tsx 须 rebuild + 浏览器硬刷新 (root layout inline script HMR 不刷新)
+3. 📌 **PM 待办**: 更新 memory `project_schema_humanoid_fallback_remaining` 状态 (physical 维度 Wave 8 已根治, 5 type 不会因 physical 崩 — #5b 核实结论)
+
+**DevOps commit 分组建议** (commit message scope 教训, 覆盖完整范围):
+- **commit 1 (Backend, frontend-impact API 变更)**: `app/middleware/db_retry.py`(新) + `app/main.py` + `app/database.py` + `app/api/projects.py` + `app/services/character_designer.py` + `tests/test_wave13_db_retry_middleware.py` + `tests/test_wave13_clothing_bypass.py` + `tests/test_wave13_regenerate_portrait_async.py`
+  - msg 覆盖: #5d MySQL retry middleware + pool_recycle 600s / #6 regenerate-portrait 异步化 (202+job) / #5e clothing 旁路防崩 (非穿衣 type 降 warning) + prompt 指引
+- **commit 2 (Frontend)**: `frontend/src/app/create/CreateContent.tsx` + `frontend/src/app/layout.tsx` + `frontend/src/components/create/StageC.tsx` + `frontend/src/hooks/useETA.test.ts` + `frontend/vitest.config.ts`(新) + `frontend/vitest.setup.ts`(新) + `frontend/package.json` + `frontend/package-lock.json`
+  - msg 覆盖: #4A 确认流程 hydrate 超时守卫 / #4B 后台生成按钮 scenesConfirmed 守卫 / #5 404 分级真根因 (模板字符串吃反斜杠) / #6 reroll 异步轮询 / #9 vitest 基建
+- **commit 3 (契约+文档)**: `.team-brain/contracts/STATUS_API_CONTRACT.md` (§9.7.4) + 各 progress 三件套 + PENDING/DECISIONS/checklist/TEAM_CHAT
+  - ⚠️ VPS 部署须含 DB 新列 Alembic (#5c, projects 表 3 列) — 与之前部署一致确认
+
+---
+
 ## 📊 Wave 11 收尾计划 (5/24 update)
 
 ### 阶段 1: 清 P3 代码 ✅ 全完成

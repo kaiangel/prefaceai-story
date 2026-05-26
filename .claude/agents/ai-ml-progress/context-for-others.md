@@ -1,7 +1,39 @@
 # AI-ML Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 AI-ML 的工作状态和 Prompt 约束
-> **最后更新**: 2026-05-25 (Wave 13 #5b — schema 5 type 核实)
+> **最后更新**: 2026-05-26 (test29 非人类消费层专项 #5/#6/#7)
+
+---
+
+# 🔴 [2026-05-26] test29 非人类角色支持: 新 Prompt/Validation 约束 (@backend @tester 必读)
+
+**主题**: 数据层(Stage 2)把所有 type 属性写进 `physical`, 消费层之前假设"角色=类人结构"。本轮修了 3 个消费层缺口。
+
+### 关键架构约束 (改相关文件必守)
+
+1. **非人类角色的"主色"不在 hair_color** — 在 `physical.scale_color`(鱼) / `leaf_color`(植物) / `exoskeleton_color`(昆虫) / `color_scheme`(物件/机器人/奇幻) / `energy_color`(元素) / `skin_color`(外星/巨人/超自然) / `body_color`(载具) 等。
+   - **锚点层 (`identity_anchor_prompts._CHARACTER_TYPE_PRIMARY_COLOR_FIELDS`)** 现按 type 列真实色字段在前, hair_color 作 tail fallback。**新增非人类 type 或改这个 map 时, 必须把该 type 的真实结构化色字段排进 list, 否则颜色丢失 → 出图跑色**。
+   - **参考图层 (`character_prompt_builder._type_attrs`)** 现走 `character[type] or physical` 字段级 fallback。新加 type builder 必须用 `self._type_attrs(character, 'TYPE_KEY')` 读, 不要直接 `character.get('TYPE_KEY', {})`。
+
+2. **多角色 shot 自动注入 MULTI-SUBJECT SEPARATION 指令** (`identity_anchor_injector._render_character_anchors_block`):
+   - ≥2 角色渲染时, 锚点块末尾追加 "DISTINCT SEPARATE beings, DO NOT MERGE/fuse/graft" 指令; 2+ 非人类时升级 CRITICAL "no chimera"。
+   - 通用(不 hardcode 故事类型), 单角色 shot 不注入。Backend/Tester 看到 shot prompt 多这段是预期的。
+
+3. **ShotValidator 计数已通用化** (`shot_validator.VALIDATION_PROMPT_BASE`):
+   - 计数问题从 "human characters" → "FEATURED characters (humans AND animals/plants/objects/creatures)"。
+   - anatomy 段对非人形不套人类肢体计数; 加 SUBJECT FUSION 诊断(log-only, 不升 severe, 不强制重试)。
+   - `should_skip_character_count_check` 逻辑**未改** (T20-6 environmental skip 不变)。
+
+### @tester 复测重点
+- e2e: 非人类多角色故事(鱼+草/object 同框) — ① 结构化色不丢(golden 鱼不再红) ② 不融合成 chimera ③ 不再 8/22 FAIL 重试(+73% 成本)
+- 回归: 角色一致性 3人场景 ≥95% (human 故事不退化) + anchor/identity/validator baseline (我跑了 426+58 PASS)
+
+### @backend 联动 (非本轮, 视 e2e 结果定)
+- 若非人类多角色 count 仍偶发 mismatch, 可议 validator 对纯非人类 shot 放宽容差; 先看 prompt 通用化 + #7 分离指令的 e2e 效果。
+- **本轮未碰 `db_retry.py`** (你的 #4 域) / 未碰 `character_designer.py`。
+
+### 改的文件 (全在 AI-ML prompt/validation 域)
+`identity_anchor_prompts.py` / `identity_anchor_injector.py` / `character_prompt_builder.py` / `shot_validator.py`
 
 ---
 

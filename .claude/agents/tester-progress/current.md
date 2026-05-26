@@ -1,13 +1,97 @@
 # Tester Agent - 当前任务
 
-> **最后更新**: 2026-05-25 [Tester]
-> **状态**: TASK-WAVE12-INDEPENDENT-RETEST 完成 ✅ — Wave 12 三项改动独立复测通过
+> **最后更新**: 2026-05-26 [Tester]
+> **状态**: TASK-WAVE13-INDEPENDENT-RETEST 完成 ✅ — Wave 13 FIXBATCH 独立复测通过，可进入部署关口
 
 ---
 
-## 当前状态 (2026-05-25)
+## 当前状态 (2026-05-26)
 
-**TASK-WAVE12-INDEPENDENT-RETEST 完成 ✅**
+**TASK-WAVE13-INDEPENDENT-RETEST 完成 ✅**
+
+### Wave 13 FIXBATCH 独立复测结论 (集成关口第二道)
+
+#### 后端新测试 (3 组, venv/bin/python3 -m pytest 真自跑)
+
+| 测试文件 | 预期 | 实跑 | 结论 |
+|---|---|---|---|
+| test_wave13_db_retry_middleware.py | 14 | **14/14 PASS** | ✅ PASS |
+| test_wave13_clothing_bypass.py | 12 | **12/12 PASS** | ✅ PASS |
+| test_wave13_regenerate_portrait_async.py | 4 | **4/4 PASS** | ✅ PASS |
+| **后端小计** | **30** | **30/30 PASS** | ✅ ALL PASS |
+
+#### 前端 vitest (npm test)
+
+| 测试文件 | 预期 | 实跑 | 结论 |
+|---|---|---|---|
+| src/hooks/useETA.test.ts | 15 | **15/15 PASS** | ✅ PASS |
+
+console.assert override 验证: vitest.setup.ts 的 override 真生效 — 所有 PASS 输出均来自每个 it() 内的 console.assert 断言（真 PASS 不是静默 pass），Wave 13 #9 机制正确。
+
+#### 全量回归 (确认 0 新退化)
+
+| 范围 | 数字 | 说明 |
+|---|---|---|
+| 全量套件 (排除 3 个真实 API 文件 + api_cost_log_table) | **2390 PASS / 13 fail / 5 error** | 0 新退化 |
+| Wave 13 + Wave 12 combined | **45/45 PASS** | 0 退化 |
+
+Pre-existing 失败逐一确认 (全为 Wave 11 baseline 已存在，非 Wave 13 引入):
+- test_async_anthropic_t18_j (2 fail): AsyncAnthropic 结构变更 — pre-existing ✅
+- test_b51_fallback_no_chinese (3 fail): "Character data:" 字符串不匹配 — pre-existing ✅
+- test_supernatural_missing_all_fields_fails (1 fail): Wave 8 warn-not-raise — pre-existing ✅
+- test_compat_with_real_data (1 fail): AttributeError — pre-existing ✅
+- test_t20_14_anthropic_retry (2 fail): chapters.py 结构 — pre-existing ✅
+- test_wave6_full_regression / test_wave6_round1_b52_cascade (2 fail): 旧版回归 — pre-existing ✅
+- test_parallel_stage5 (2 fail): mock 污染隔离 — pre-existing ✅
+- 5 ERROR: 真实 API 集成测试需 key/网络 — pre-existing ✅
+
+**结论: 0 新退化，Wave 13 代码未破坏任何现有测试**
+
+#### §9.7.4 前后端契约独立核对 (regenerate-portrait 异步)
+
+三方逐一字段比对: Backend projects.py + Frontend StageC.tsx + STATUS_API_CONTRACT §9.7.4
+
+**202 kickoff 返回体 (POST regenerate-portrait)**
+
+| 字段 | 契约 §9.7.4 | Backend 实际 (L1735-1741) | Frontend 读取 (L1565-1571) | 对齐 |
+|---|---|---|---|---|
+| success | true | `"success": True` | `kickoff.success` (不强制读) | ✅ |
+| job_id | uuid | `"job_id": job_id` | `kickoff.job_id` | ✅ |
+| status | "pending" | `"status": "pending"` | `kickoff.status` (不强制读) | ✅ |
+| char_id | char_id | `"char_id": char_id` | `kickoff.char_id` (不强制读) | ✅ |
+| message | (可选) | `"message": "..."` | 不读 (不需要) | ✅ |
+
+**轮询端点返回体 (GET adjust-jobs/{job_id})**
+
+| 字段 | 契约 §9.7.2/§9.7.4 | Backend 实际 (L1258-1266) | Frontend CharacterJob interface (L1464-1480) | 对齐 |
+|---|---|---|---|---|
+| job_id | string | `job["job_id"]` | `job_id: string` | ✅ |
+| char_id | string | `job["char_id"]` | `char_id: string` | ✅ |
+| kind | "adjust"\|"regenerate_portrait" | `job["kind"]` | `kind?: "adjust" \| "regenerate_portrait"` | ✅ |
+| status | pending\|processing\|completed\|failed | `job["status"]` | `status: "pending"\|"processing"\|"completed"\|"failed"` | ✅ |
+| progress | 0-100 | `job["progress"]` | `progress?: number \| null` | ✅ |
+| stage_message | string | `job["stage_message"]` | `stage_message?: string \| null` | ✅ |
+| result | {success,char_id,portrait_url,fullbody_url,message} | `job["result"]` (见 _regenerate_portrait_core L1966-1972) | `result?.{success,char_id,portrait_url,fullbody_url,message}` | ✅ |
+| error | string\|null | `job["error"]` | `error?: string \| null` | ✅ |
+
+**result shape 精确比对** (backend `_regenerate_portrait_core` L1966-1972 vs frontend CharacterJob.result):
+
+| result 子字段 | 契约 | Backend 写入 | Frontend 读取 | 对齐 |
+|---|---|---|---|---|
+| success | true | `"success": True` | `result?.success` | ✅ |
+| char_id | char_id | `"char_id": char_id` | `result?.char_id` (不强制读) | ✅ |
+| portrait_url | "/static/...?v={epoch}" | `portrait_url` 带 `?v={_v_ts}` | `result.portrait_url` → `bustUrl()` 再加 `&_={Date.now()}` | ✅ |
+| fullbody_url | "/static/...?v={epoch}" 或 null | `fullbody_url` (B57 非阻塞, 失败时 None) | `result?.fullbody_url` (不强制消费) | ✅ |
+| message | string | `"肖像和全身图已重新生成"` 或类似 | 不读 (只读 portrait_url) | ✅ |
+
+**独立 verdict: §9.7.4 前后端契约完全对齐，0 字段名不匹配，0 缺字段，0 类型歧义。**
+
+Frontend reroll 路径: 读 `result.portrait_url` → bustUrl → `onUpdateCharacter(charId, { portraitUrl })` — 正确。
+adjust fallback 路径 (留空调整框): `!adjustInput.trim()` → 直接调 `handleRegenerate(charId)` — 正确，两路统一。
+
+---
+
+## 上一完成 (2026-05-25)
 
 ### Wave 13 #1 — Wave 12 独立复测结论
 

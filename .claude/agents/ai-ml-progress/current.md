@@ -1,7 +1,49 @@
 # AI-ML Engineer 当前任务
 
-> 更新时间: 2026-05-25 (Wave 13 #5b 完成 — schema 5 type 核实)
-> 状态: 🟢 Wave 13 #5b 核实完成, 0 代码改动 (核实结论: physical 已根治; 发现 clothing 旁路崩溃点派 @backend)
+> 更新时间: 2026-05-26 (test29 非人类消费层专项 #5+#6+#7 完成)
+> 状态: 🟢 test29 #5/#6/#7 全完成, 3 文件改, 426+ 回归 PASS, 待 @tester 回归 + e2e 复测
+
+---
+
+## 🟢 test29 非人类消费层专项 [2026-05-26] — #5 + #6 + #7 (Opus 4.7 xhigh)
+
+### 一句话
+test29《荷塘渡》(金鲤 aquatic + 菖蒲 plant + 荷塘 concept) 炸出"数据层已通用、消费层全人类中心"假设链。本轮横扫 3 个消费层缺口: **prompt builder 字段错配(#5) / Seedream 角色融合(#7) / ShotValidator 非人类计数判 0(#6)**。
+
+### #5 非人类 type 结构化外观字段错配 → golden 丢 (改 2 文件)
+**根因**: Stage 2 把所有 type 属性写进 `physical`, 但消费层从 `character[type名]` 读。**两个独立层都中招**:
+- **#5a 锚点层 (最影响成片, 改 `app/prompts/identity_anchor_prompts.py`)**: `_CHARACTER_TYPE_PRIMARY_COLOR_FIELDS` 对 aquatic/plant/insect/object 等 16 个非 human type **只列 `hair_color`** → 真鱼/真草无 hair_color → `primary_color=''` → CHARACTER ANCHORS 块**不渲染颜色** → golden 在到达 Seedream 的 shot prompt 里彻底丢失。**这是生产 shot 的主要漏点**(builder 那条只管参考图)。修: 每 type 列其真实结构化色字段(scale_color/leaf_color/exoskeleton_color/color_scheme/energy_color/skin_color/body_color...)在前, `hair_color` 作 tail fallback (mermaid/dryad 等半人形仍走 hair)。
+- **#5b 参考图层 (改 `app/services/character_prompt_builder.py`)**: 18 个非人类 builder 从 `character.get('aquatic'/'plant'/...)` 读 → 空 → fallback "An aquatic creature"。加 `_type_attrs()` helper: `character[type] or physical` 字段级 fallback (向后兼容旧 sub-dict 布局 + 新 physical 布局)。
+- ✅ 人类 path 0 改动 (未碰 `_build_human_description`/`_build_anthropomorphic_animal_description`)。实测 16 type primary_color 全resolve, 金鲤 "scale: golden" 进 prompt。
+
+### #7 Seedream 融合非人类角色 (改 `app/services/identity_anchor_injector.py` + `shot_validator.py`)
+- **prompt 侧 (主防线)**: `_render_character_anchors_block` 末尾, 当 ≥2 角色渲染 → 注入 `## MULTI-SUBJECT SEPARATION (MANDATORY — DO NOT MERGE)`: "N DISTINCT SEPARATE beings... MUST NOT fuse/merge/graft... 接触=两个独立身体相触, 绝非合并成一个生物"。2+ 非人类时追加 CRITICAL "different KINDS, no chimera" 行。通用(任何 type), 单角色 shot 不注入。
+- **validator 侧 (诊断, 不洗白)**: anatomy 段加 "SUBJECT FUSION" 子检——两个该独立的角色被融成一体(草从鱼背长出)= GENERATION ERROR, **NOT 故意超现实**, 报 `has_visual_unnaturalness` 诊断。⚠️ 保持 log-only (不升 severe), 避免 #6 的重试浪费; 真预防靠 prompt 侧分离指令。
+
+### #6 ShotValidator 非人类角色计数判 0 → 8/22 FAIL 重试浪费 (改 `shot_validator.py`)
+- 根因: vision prompt L522 问 "how many **human** characters" + "Do NOT count animals/objects" → 鱼+草数成 0, 但 expected=2 → FAIL → 重试(+73% 成本/时间)。
+- 修: 计数问题改 "distinct FEATURED characters... includes humans AND non-human: animals/plants/objects/creatures" + 显式 "golden fish + green reed = 2, not 0"。anatomy 段对非人形不套人类肢体计数(鱼有 fin 不是 hand)。
+- 与 #7 联动: #7 修好图里真有 2 独立角色 → 计数自然过半 + 本 prompt 让模型把鱼/草算进 count → 双管齐下。
+
+### 验证证据
+- dry-run: 金鲤 shot prompt 含 "scale: golden" + MULTI-SUBJECT SEPARATION + 不丢 StyleEnforcer/marker/narrative 层
+- 16 type primary_color 全 resolve (scale/leaf/exoskeleton/color_scheme...)
+- builder 跨 type + 旧布局向后兼容 + human path 不退化
+- 回归: 426 PASS (anchor/identity/cross-genre/validator/layer1/species) + shot_validator 58 PASS, 0 FAIL 0 退化
+- 0 删 fallback (DEC-051) / 图像 prompt 全英文 / 单一模型 dispatch 未碰 / 未碰 db_retry.py
+
+### 改的文件
+- `app/prompts/identity_anchor_prompts.py` (#5a 优先色字段 map)
+- `app/services/identity_anchor_injector.py` (#7 分离指令)
+- `app/services/character_prompt_builder.py` (#5b builder physical fallback)
+- `app/services/shot_validator.py` (#6 计数通用化 + #7 fusion 诊断)
+
+### 待 @tester
+- 回归: 上述 426+58 + 角色一致性回归 (3人场景 ≥95%)
+- e2e 复测: 非人类多角色故事 (鱼+草/object 同框) — 验 golden 不丢 + 不融合 + 不再 8/22 FAIL 重试; 顺带 human 故事不退化
+
+### 待 @backend (联动, 非本轮)
+- #6 重试浪费的另一半: 若 e2e 仍偶发非人类 count mismatch, 可考虑 validator 计数对纯非人类多角色 shot 放宽容差 (与 T20-6 skip 同 pattern), 但建议先看 prompt 通用化 + #7 分离指令的 e2e 效果再定。
 
 ---
 
