@@ -174,29 +174,42 @@ time continuity) before the prompt reaches the image generator.
 # Centralized dispatch — maps character_type to the "primary identity color"
 # field (analog of hair_color for non-humanoid types). This is what the anchor
 # block presents as the "hair" line for that character.
+#
+# test29 fix (#5, 2026-05-26): Stage 2 CharacterDesigner writes ALL type-specific
+# attributes into `physical` (not a `character[type]` sub-dict). For a REAL non-human
+# creature (golden koi fish, sunflower, ant, talking clock) the identity color lives
+# in scale_color / flower_color / exoskeleton_color / color_scheme — NOT hair_color.
+# The old map assumed every non-human was a SEMI-humanoid variant (mermaid / dryad /
+# butterfly fairy) and only listed hair_color → real creatures lost their primary
+# color → "golden koi" rendered red (only `description` free-text survived, which
+# conflicted with the species prior). Fix: each type lists its REAL structured color
+# field(s) FIRST, with hair_color kept as a TAIL fallback so semi-humanoid variants
+# (mermaid with hair, dryad with leaf-hair) still resolve. Field names match the
+# Stage 2 schema consumed by character_prompt_builder.py.
 _CHARACTER_TYPE_PRIMARY_COLOR_FIELDS: Dict[str, List[str]] = {
     # Humanoid types — hair_color is primary
     "human":                ["hair_color"],
-    "supernatural":         ["hair_color"],
-    "undead":               ["hair_color"],
-    "mythological":         ["hair_color"],
-    "fantasy_creature":     ["hair_color"],
-    "digital_virtual":      ["hair_color"],
-    "robot":                ["hair_color"],
-    "hybrid":               ["hair_color"],
-    "alien":                ["hair_color"],
-    "elemental":            ["hair_color"],
-    "concept_personified":  ["hair_color"],
-    "giant":                ["hair_color"],
-    "miniature":            ["hair_color"],
-    "aquatic":              ["hair_color"],        # mermaid upper body
-    "object":               ["hair_color"],        # Olaf-like personification
-    "plant":                ["hair_color"],        # dryad/flower nymph
-    "insect":               ["hair_color"],        # butterfly fairy
+    # Semi/non-humanoid — real color field first, hair_color as semi-humanoid fallback
+    "supernatural":         ["skin_color", "aura_color", "ghostly_color", "hair_color"],
+    "undead":               ["ghostly_color", "glow_color", "skin_color", "hair_color"],
+    "mythological":         ["color_scheme", "scale_color", "skin_type", "hair_color"],
+    "fantasy_creature":     ["color_scheme", "scale_color", "skin_texture", "hair_color"],
+    "digital_virtual":      ["primary_color", "hologram_color", "accent_color", "hair_color"],
+    "robot":                ["color_scheme", "primary_color", "hair_color"],
+    "hybrid":               ["color_scheme", "primary_color", "hair_color"],
+    "alien":                ["skin_color", "color_scheme", "hair_color"],
+    "elemental":            ["energy_color", "secondary_color", "color_scheme", "hair_color"],
+    "concept_personified":  ["color_symbolism", "color_scheme", "hair_color"],
+    "giant":                ["skin_color", "color_scheme", "hair_color"],
+    "miniature":            ["hair_color", "skin_color"],   # usually a tiny humanoid
+    "aquatic":              ["scale_color", "fin_color", "skin_color", "hair_color"],  # real fish vs mermaid
+    "object":               ["color_scheme", "primary_color", "hair_color"],  # talking clock vs Olaf
+    "plant":                ["leaf_color", "flower_color", "bark_color", "hair_color"],  # foliage-dominant; flower as fallback
+    "insect":               ["exoskeleton_color", "wing_color", "hair_color"],  # ant vs butterfly fairy
     # Non-humanoid types — primary color is fur/feather/scale/skin
     "anthropomorphic_animal": ["fur_color", "feather_color", "plumage_color", "coat_color", "scale_color", "hair_color"],
     "animal":               ["fur_color", "feather_color", "plumage_color", "scale_color", "skin_color", "chitin_color"],
-    "vehicle_character":    [],  # no biological color; rare type
+    "vehicle_character":    ["body_color", "color_scheme", "secondary_color"],  # paint, not biological
 }
 
 

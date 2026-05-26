@@ -82,6 +82,40 @@ class CharacterPromptBuilder:
         print(f"  ⚠️ [CharacterPromptBuilder] 角色 '{char_name}' 缺少 character_type 字段，请检查 story.json")
         return 'unknown'
 
+    @staticmethod
+    def _type_attrs(character: Dict[str, Any], type_key: str) -> Dict[str, Any]:
+        """读取某 type 的属性子字典 — 向后兼容两种布局。
+
+        test29 修复 (#5, 2026-05-26): Stage 2 CharacterDesigner 把所有 type 的
+        视觉属性统一写进 `physical`（数据层已通用化），但各非人类 type builder
+        仍从 `character[type_key]`（如 'aquatic'/'plant'/'insect'）读 → 该 key
+        不存在 → 空字典 → scale_color/species 等结构化字段全丢 → 只剩 description
+        兜底 → 金色锦鲤被渲染成红橙（物种强先验胜出）。
+
+        返回策略（向后兼容，不破坏旧格式）：
+        - 若存在 `character[type_key]` 子字典（旧布局）→ 以它为基底
+        - 用 `physical`（Stage 2 实际写入位置）补齐缺失字段
+        - 任一字段在子字典缺失时回落到 physical → 两种布局都能取到值
+
+        Args:
+            character: 完整角色 dict
+            type_key: type 子字典的 key（如 'aquatic', 'plant', 'object_personified'）
+
+        Returns:
+            合并后的属性 dict（physical 作为字段级 fallback）
+        """
+        physical = character.get('physical')
+        physical = physical if isinstance(physical, dict) else {}
+        sub = character.get(type_key)
+        sub = sub if isinstance(sub, dict) else {}
+        if not sub:
+            # 新布局（无 type 子字典）→ 直接用 physical
+            return physical
+        # 旧布局 → 子字典优先，physical 字段级补齐
+        merged = dict(physical)
+        merged.update({k: v for k, v in sub.items() if v not in (None, '', [])})
+        return merged
+
     # ================================================================
     # 基础类型构建方法
     # ================================================================
@@ -262,7 +296,7 @@ class CharacterPromptBuilder:
 
     def _build_animal_description(self, character: Dict[str, Any]) -> str:
         """构建动物角色描述"""
-        a = character.get('animal', {})
+        a = self._type_attrs(character, 'animal')
         parts = []
 
         species = a.get('species', '')
@@ -587,7 +621,7 @@ class CharacterPromptBuilder:
 
     def _build_fantasy_description(self, character: Dict[str, Any]) -> str:
         """构建奇幻生物描述"""
-        f = character.get('fantasy_creature', {})
+        f = self._type_attrs(character, 'fantasy_creature')
         parts = []
 
         creature_type = f.get('creature_type', '')
@@ -623,7 +657,7 @@ class CharacterPromptBuilder:
 
     def _build_robot_description(self, character: Dict[str, Any]) -> str:
         """构建机器人角色描述"""
-        r = character.get('robot', {})
+        r = self._type_attrs(character, 'robot')
         parts = []
 
         robot_type = r.get('robot_type', '')
@@ -654,10 +688,12 @@ class CharacterPromptBuilder:
 
     def _build_object_description(self, character: Dict[str, Any]) -> str:
         """构建拟人化物品描述"""
-        o = character.get('object_personified', {})
-        if not o and character.get('object'):
+        if not character.get('object_personified') and character.get('object'):
             print(f"⚠️ [COMPAT WARNING] 使用了旧字段 'object' 而非 'object_personified': {character.get('name', 'Unknown')}")
-            o = character.get('object', {})
+            o = self._type_attrs(character, 'object')
+        else:
+            # #5 fix: physical fallback (Stage 2 写 physical, 无 object_personified key)
+            o = self._type_attrs(character, 'object_personified')
         parts = []
 
         object_type = o.get('object_type', '')
@@ -695,7 +731,7 @@ class CharacterPromptBuilder:
 
     def _build_hybrid_description(self, character: Dict[str, Any]) -> str:
         """构建混合类型描述"""
-        h = character.get('hybrid', {})
+        h = self._type_attrs(character, 'hybrid')
         parts = []
 
         primary = h.get('primary_type', '')
@@ -734,7 +770,7 @@ class CharacterPromptBuilder:
 
     def _build_insect_description(self, character: Dict[str, Any]) -> str:
         """构建昆虫角色描述"""
-        i = character.get('insect', {})
+        i = self._type_attrs(character, 'insect')
         parts = []
 
         species = i.get('species', '')
@@ -786,7 +822,7 @@ class CharacterPromptBuilder:
 
     def _build_aquatic_description(self, character: Dict[str, Any]) -> str:
         """构建水生生物描述"""
-        a = character.get('aquatic', {})
+        a = self._type_attrs(character, 'aquatic')
         parts = []
 
         species = a.get('species', '')
@@ -843,7 +879,7 @@ class CharacterPromptBuilder:
 
     def _build_plant_description(self, character: Dict[str, Any]) -> str:
         """构建植物角色描述"""
-        p = character.get('plant', {})
+        p = self._type_attrs(character, 'plant')
         parts = []
 
         plant_type = p.get('plant_type', '')
@@ -906,7 +942,7 @@ class CharacterPromptBuilder:
 
     def _build_mythological_description(self, character: Dict[str, Any]) -> str:
         """构建神话生物描述"""
-        m = character.get('mythological', {})
+        m = self._type_attrs(character, 'mythological')
         parts = []
 
         creature_type = m.get('creature_type', '')
@@ -968,7 +1004,7 @@ class CharacterPromptBuilder:
 
     def _build_supernatural_description(self, character: Dict[str, Any]) -> str:
         """构建超自然存在描述"""
-        s = character.get('supernatural', {})
+        s = self._type_attrs(character, 'supernatural')
         parts = []
 
         being_type = s.get('being_type', '')
@@ -1030,7 +1066,7 @@ class CharacterPromptBuilder:
 
     def _build_undead_description(self, character: Dict[str, Any]) -> str:
         """构建亡灵角色描述"""
-        u = character.get('undead', {})
+        u = self._type_attrs(character, 'undead')
         parts = []
 
         undead_type = u.get('undead_type', '')
@@ -1082,7 +1118,7 @@ class CharacterPromptBuilder:
 
     def _build_elemental_description(self, character: Dict[str, Any]) -> str:
         """构建元素生物描述"""
-        e = character.get('elemental', {})
+        e = self._type_attrs(character, 'elemental')
         parts = []
 
         element_type = e.get('element_type', '')
@@ -1136,7 +1172,7 @@ class CharacterPromptBuilder:
 
     def _build_alien_description(self, character: Dict[str, Any]) -> str:
         """构建外星生物描述"""
-        a = character.get('alien', {})
+        a = self._type_attrs(character, 'alien')
         parts = []
 
         home_planet_type = a.get('home_planet_type', '')
@@ -1194,7 +1230,7 @@ class CharacterPromptBuilder:
 
     def _build_vehicle_description(self, character: Dict[str, Any]) -> str:
         """构建载具角色描述（汽车总动员风格）"""
-        v = character.get('vehicle_character', {})
+        v = self._type_attrs(character, 'vehicle_character')
         parts = []
 
         vehicle_type = v.get('vehicle_type', '')
@@ -1251,7 +1287,7 @@ class CharacterPromptBuilder:
 
     def _build_digital_description(self, character: Dict[str, Any]) -> str:
         """构建数字/虚拟角色描述"""
-        d = character.get('digital_virtual', {})
+        d = self._type_attrs(character, 'digital_virtual')
         parts = []
 
         digital_type = d.get('digital_type', '')
@@ -1311,7 +1347,7 @@ class CharacterPromptBuilder:
 
     def _build_concept_description(self, character: Dict[str, Any]) -> str:
         """构建概念拟人描述"""
-        c = character.get('concept_personified', {})
+        c = self._type_attrs(character, 'concept_personified')
         parts = []
 
         concept_type = c.get('concept_type', '')
@@ -1370,7 +1406,7 @@ class CharacterPromptBuilder:
 
     def _build_miniature_description(self, character: Dict[str, Any]) -> str:
         """构建微型角色描述"""
-        m = character.get('miniature', {})
+        m = self._type_attrs(character, 'miniature')
         parts = []
 
         base_type = m.get('base_type', '')
@@ -1423,7 +1459,7 @@ class CharacterPromptBuilder:
 
     def _build_giant_description(self, character: Dict[str, Any]) -> str:
         """构建巨型角色描述"""
-        g = character.get('giant', {})
+        g = self._type_attrs(character, 'giant')
         parts = []
 
         giant_type = g.get('giant_type', '')

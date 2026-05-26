@@ -519,13 +519,13 @@ def _sanitize_prop_probe(raw: str) -> str:
 
 VALIDATION_PROMPT_BASE = """Analyze this comic panel image precisely:
 
-1. How many distinct human characters are visible in this image who appear to be NAMED/FEATURED subjects of the scene? Count carefully — include partially visible characters (e.g., only face or upper body shown) who are positioned as scene subjects with distinct, deliberate clothing/appearance. Do NOT count: animals, objects, decorative background figures, unnamed bystanders, passersby, crowd members, or ambient human figures who are clearly NOT the focus of the scene. FOCUS on characters with intentional styling who are central to the composition.
+1. How many distinct FEATURED characters are visible in this image who appear to be NAMED/MAIN subjects of the scene? A "character" is ANY being that the story centers on — this includes humans AND non-human characters: animals (a fish, a dog), plants (a personified flower/reed), objects (a talking clock), creatures, robots, spirits, etc. Count carefully — include partially visible subjects (e.g., only a head, fin, or upper body shown) who are positioned as scene subjects with distinct, deliberate appearance. Do NOT count: decorative background figures, unnamed bystanders, passersby, crowd members, generic ambient flora/props/wildlife, or background elements that are clearly NOT the focus of the scene. FOCUS on the central, intentional subjects of the composition — whatever KIND of being they are. (test29 #6: a story may have zero humans; a golden fish and a green reed plant are its two characters — count them as 2, not 0.)
 
 2. (RESERVED — duplicate bubble detection removed in T20-6 v2; field still included in response for backward compatibility, always report has_duplicate_bubbles=false.)
 
 3. ANATOMY CHECK (CRITICAL — image generation models like Stable Diffusion / Seedream / NB2 frequently produce extra limbs/hands/faces; this is the highest-priority bug to detect).
 
-   For EACH human character in the image, count their anatomical parts and report any SEVERE deviation:
+   For EACH HUMAN or humanoid character in the image (humans, anthropomorphic/upright figures with a human-like body plan), count their anatomical parts and report any SEVERE deviation:
    - hands_count: how many hands does this character have? (Normal: 2 — humans have 2 hands. Flag SEVERE if 3+)
    - arms_count: how many arms? (Normal: 2. Flag SEVERE if 3+)
    - legs_count: how many legs? (Normal: 2. Flag SEVERE if 3+)
@@ -534,9 +534,23 @@ VALIDATION_PROMPT_BASE = """Analyze this comic panel image precisely:
    - finger_anomaly: are fingers count clearly wrong (e.g., 6+ fingers on one hand, or 2 fingers)? Flag SEVERE if grossly wrong.
    - extra_limbs_floating: are there hands/arms/limbs that don't connect to any visible body? Flag SEVERE.
 
+   For NON-HUMANOID characters (a real fish, plant, animal, object, insect, etc.), do NOT apply the human limb counts above — a fish has fins not hands, a plant has leaves/stems not arms. Only flag anatomy as SEVERE for these if the body plan is grossly broken for their OWN kind (e.g. a fish with two heads, a clock with a melted face) or if they have been fused with another being (see subject fusion below).
+
    Also check:
    a) PHYSICS: people or objects defying gravity without any support or fantasy context, body poses that are physically impossible for a human skeleton (NOT severe unless extremely obvious)
    b) SPATIAL: major scale inconsistencies (e.g., an adult rendered the same height as a small child) — only flag if extreme
+   c) SUBJECT FUSION (test29 #7): when the scene is supposed to show TWO OR MORE
+      SEPARATE beings (e.g. a fish AND a plant, an animal AND an object), check
+      whether they have been wrongly MERGED into a single combined organism —
+      e.g. a plant growing directly out of an animal's back, two creatures sharing
+      one body, one being's limbs/parts grafted onto another. Report this in
+      has_visual_unnaturalness=true with unnaturalness_details describing the
+      fusion (e.g. "plant growing from fish's back — should be two separate
+      beings"). This is a GENERATION ERROR, NOT an intentional artistic choice —
+      do NOT dismiss it as surrealism. (It is reported for diagnostics; it does
+      not by itself force a regenerate.) Two distinct bodies merely TOUCHING or
+      overlapping in space is NORMAL — only flag actual anatomical fusion into
+      one organism.
 
    Severity classification:
    - "severe" = clear image generation failure that any viewer would notice (3+ hands, third arm growing from torso, two faces on one head, floating disembodied limb, 6+ fingers on one hand)

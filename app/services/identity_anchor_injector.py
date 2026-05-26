@@ -157,6 +157,13 @@ def _render_character_anchors_block(char_anchors: List[Dict[str, Any]]) -> str:
         return ""
 
     entries: List[str] = []
+    # #7 (test29, 2026-05-26): track per-character (label, type) to build an
+    # anti-fusion separation directive for multi-character shots. Seedream over-
+    # literalizes "vines wrap around the fish" → fuses fish+plant into one chimera
+    # (plant growing from fish back). Especially severe for 2+ NON-HUMAN beings
+    # (no human silhouette prior to keep them apart).
+    char_labels: List[str] = []
+    char_types: List[str] = []
     for anchor in char_anchors:
         if not isinstance(anchor, dict):
             continue
@@ -235,11 +242,41 @@ def _render_character_anchors_block(char_anchors: List[Dict[str, Any]]) -> str:
         # Only emit entry if it has at least one body line beyond header
         if len(lines) > 1:
             entries.append("\n".join(lines))
+            # #7: track for anti-fusion directive (label = readable being noun)
+            being_noun = type_extras[0] if type_extras else (char_type if char_type != "human" else "person")
+            char_labels.append(f"{header_name} (the {being_noun})")
+            char_types.append(char_type)
 
     if not entries:
         return ""
 
-    return "\n## CHARACTER ANCHORS (each visible character)\n\n" + "\n\n".join(entries) + "\n"
+    block = "\n## CHARACTER ANCHORS (each visible character)\n\n" + "\n\n".join(entries) + "\n"
+
+    # #7 (test29): multi-character anti-fusion separation directive.
+    # Only when 2+ characters actually rendered. Stronger wording when 2+ are
+    # non-human (highest fusion risk — no human-silhouette prior to keep apart).
+    if len(char_labels) >= 2:
+        non_human_count = sum(1 for t in char_types if t != "human")
+        joined = " AND ".join(char_labels)
+        directive_lines = [
+            "\n## MULTI-SUBJECT SEPARATION (MANDATORY — DO NOT MERGE)",
+            f"This image contains {len(char_labels)} DISTINCT SEPARATE beings: {joined}.",
+            "Render each as its OWN complete, anatomically independent entity with "
+            "clear physical space between them.",
+            "MUST NOT fuse, merge, graft, or grow one being out of another's body. "
+            "Even if the narrative says they touch, intertwine, or wrap around each "
+            "other, keep every being a SEPARATE creature — depict contact as two "
+            "distinct bodies touching, never as one combined organism.",
+        ]
+        if non_human_count >= 2:
+            directive_lines.append(
+                "CRITICAL: these are different KINDS of beings (e.g. an animal and a "
+                "plant, or an object and a creature). Do NOT blend their forms into a "
+                "single hybrid/chimera. Each keeps its own species body plan."
+            )
+        block += "\n".join(directive_lines) + "\n"
+
+    return block
 
 
 def _render_style_anchor_block(style_anchor: Optional[Dict[str, Any]]) -> str:
