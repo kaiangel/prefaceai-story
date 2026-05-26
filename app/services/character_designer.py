@@ -29,6 +29,23 @@ class CharacterDesigner:
     模型优先级: Claude Sonnet 4.6 (主) → Gemini 3 Flash (备用)
     """
 
+    # Wave 13 #5e A (2026-05-25): 天然不穿人类衣物的 character_type。
+    # 这些 type 的角色 (会说话的钟 / 鱼 / 向日葵 / 蚂蚁 / 火焰 / 车 等) 没有 top/bottom/
+    # footwear 概念, LLM 给残缺 clothing 是合理的 → _validate_characters 对它们缺 clothing
+    # 子字段降 warning 不 raise (防冲垮 pipeline)。
+    # 不含 human / anthropomorphic_animal (穿衣) / 超自然人形 (supernatural/undead/
+    # mythological/fantasy_creature 常人形穿衣) / robot / alien / giant / hybrid /
+    # miniature / concept_personified / digital_virtual — 这些仍走严格 clothing 校验。
+    NON_CLOTHING_TYPES: frozenset[str] = frozenset({
+        "animal",            # 真实动物 (四足, 无服装)
+        "aquatic",           # 水生 (鱼/章鱼等)
+        "plant",             # 植物
+        "insect",            # 昆虫
+        "object",            # 物件 (钟/灯/书等)
+        "elemental",         # 元素体 (火/水/风等)
+        "vehicle_character",  # 载具角色 (车/船等)
+    })
+
     def __init__(self):
         # 主模型: Claude Sonnet 4.6
         self.claude_client = None
@@ -449,6 +466,40 @@ If any answer is NO — revise that character's description before outputting.
 ```
 **严禁将 hair_color / skin_tone / face_shape / body_type 作为 anthropomorphic_animal 的主要外貌字段 — 这会导致 AI 把动物角色画成人类！**
 
+## NON-CLOTHING CHARACTER TYPES — CLOTHING FIELD RULES (#5e — MANDATORY)
+
+When `character_type` is one of: `object` / `aquatic` / `plant` / `insect` / `animal` / `elemental` / `vehicle_character`,
+the character has NO human clothing (a clock / fish / sunflower / ant / flame / car does not wear a top/pants/shoes).
+
+You MUST STILL output a complete `clothing` object with ALL required keys (top, bottom, footwear, style) —
+NEVER omit the clothing field or its sub-keys (an incomplete clothing field can break the pipeline).
+For these types, fill each clothing key with `"n/a"` OR a short SURFACE-APPEARANCE description instead of a garment:
+
+```
+// object (会说话的落地钟):
+"clothing": {{
+    "top": "n/a (object — described via surface_appearance)",
+    "bottom": "n/a",
+    "footwear": "n/a",
+    "outerwear": null,
+    "accessories": ["brass pendulum", "carved oak case"],
+    "style": "antique mahogany grandfather clock with patina",
+    "condition": "aged with hairline cracks"
+}}
+
+// aquatic (clownfish):
+"clothing": {{
+    "top": "n/a (fish — described via scale pattern)",
+    "bottom": "n/a",
+    "footwear": "n/a",
+    "accessories": [],
+    "style": "vivid orange body with three white bands and black edging"
+}}
+```
+
+RULE: surface/material/pattern goes into `style` (and optionally `accessories`); the literal garment
+keys (top/bottom/footwear) get `"n/a"`. This guarantees a schema-valid clothing dict for every type.
+
 {style_infusion_block}
 
 ## SUPERNATURAL HUMANOID FIELDS RULES (T20-43 — MANDATORY HARD CONSTRAINTS)
@@ -614,11 +665,27 @@ This ensures Seedream renders them as visually different from the human cast.
             # 由 pipeline_orchestrator.py validate_characters() 负责 (T20-10 已覆盖 19 types)
 
             # 验证clothing
+            # Wave 13 #5e A (2026-05-25): 非穿衣 type 缺 clothing 子字段降 warning 不 raise。
+            # 根因: 此处对【所有 type 一刀切】要求 top/bottom/footwear/style, 但真物件(钟)/
+            # 鱼/植物/昆虫等天然没衣服, LLM 给残缺 clothing → raise。而本校验在 design()
+            # L127 调, 在 LLM fallback try/except (L82-118) 【之外】, orchestrator 调 design()
+            # 又【无 retry】→ 一次 raise 直接冲垮整条 pipeline (内测用户选这些 type 角色必崩)。
+            # 修法: 与上方 anthropomorphic_animal physical 缺字段降级 (L603-612) 同 pattern —
+            # 穿衣 type (human/超自然人形等) 仍严格 raise; 非穿衣 type 降 warning, pipeline 继续。
             clothing = char.get("clothing", {})
             clothing_required = ["top", "bottom", "footwear", "style"]
             clothing_missing = [f for f in clothing_required if f not in clothing]
             if clothing_missing:
-                raise ValueError(f"角色 {char_id} clothing缺少字段: {clothing_missing}")
+                if char_type_val in self.NON_CLOTHING_TYPES:
+                    # 非穿衣 type: 残缺 clothing 是天然合理 (物件/鱼/植物/昆虫等无人类衣物)
+                    logger.warning(
+                        f"[CharacterDesigner] #5e A: 非穿衣 type '{char_type_val}' 角色 {char_id} "
+                        f"clothing 缺字段 {clothing_missing} — 降级为警告不 raise (天然无衣物), "
+                        f"pipeline 继续。下游 _build_character_description 兜底处理。"
+                    )
+                else:
+                    # 穿衣 type (human / 超自然人形 / 机器人 等): 仍严格要求, 缺字段是真问题
+                    raise ValueError(f"角色 {char_id} clothing缺少字段: {clothing_missing}")
 
             # B56: description 字段缺失时自动 fallback 生成（确保 Stage 4 有字段可读）
             if not char.get("description", "").strip():

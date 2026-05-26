@@ -14,19 +14,26 @@ _db_url = settings.DATABASE_URL
 if "charset=" not in _db_url:
     _db_url += ("&" if "?" in _db_url else "?") + "charset=utf8mb4"
 
-logger.info(f"[DB] Creating async engine: pool_pre_ping=True, pool_recycle=1800s, pool_size=10, max_overflow=20")
+logger.info(f"[DB] Creating async engine: pool_pre_ping=True, pool_recycle=600s, pool_size=10, max_overflow=20")
 
 # Create async engine
 # A1 — BUG-T13-MYSQL-STALE-CONNECTION + BUG-T13-DB-POOL-EXHAUSTION-CASCADE (2026-05-12)
 # pool_pre_ping: 每次 checkout 前 ping，stale connection 自动重建，防止 OperationalError 2013
-# pool_recycle: 30min 主动回收，必须 < MySQL wait_timeout (28800s) 且 < 内网 TCP idle timeout (~30-60min)
+# pool_recycle: 主动回收 idle 连接，必须 < MySQL wait_timeout (28800s) 且 < TCP idle timeout
 # pool_size: 扩大基础池（原默认 5 太小，并发生图阶段多请求同时需要连接）
 # max_overflow: overflow 扩大（原默认 10），与 pool_size 共同容纳 30 并发请求
+#
+# Wave 13 #5d (2026-05-25): pool_recycle 1800s → 600s。
+#   原因: 5/25 12:13 VPS 实测复现 idle 后第 1 次操作 2013 lost connection。pool_pre_ping
+#   在公网 + ping 本身超时 (Errno60) 场景没完全防住。把 recycle 从 30min 收到 10min →
+#   连接 idle >10min 在下次 checkout 时主动重建，赶在大多数云 LB/NAT idle-timeout 窗口
+#   (常见 ~5-15min) 之前，减少用到死连接的概率。与 app/main.py 的 connection-level retry
+#   middleware (仅幂等 GET / 限 1 次) 双层兜底。生产 VPS 内网延迟低 (42ms)，churn 影响可忽略。
 engine = create_async_engine(
     _db_url,
     echo=settings.DEBUG,
     pool_pre_ping=True,       # 每次使用前 ping 验证连接存活，断了自动重连
-    pool_recycle=1800,         # 30 分钟回收连接，防止 MySQL 服务器关闭长空闲连接
+    pool_recycle=600,          # Wave 13 #5d: 10 分钟主动回收 idle 连接（原 1800s），赶在云端 idle-timeout 前重建
     pool_size=10,              # 扩大池（原默认 5 → 10）
     max_overflow=20,           # overflow 扩大（原默认 10 → 20）
     pool_timeout=30,           # T20-53: checkout 等待超时 30s，避免请求无限阻塞

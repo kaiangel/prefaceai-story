@@ -1664,7 +1664,7 @@ async def _adjust_character_core(
     return  # _adjust_character_core 无返回值；结果在 job.result
 
 
-@router.post("/{project_id}/characters/{char_id}/regenerate-portrait")
+@router.post("/{project_id}/characters/{char_id}/regenerate-portrait", status_code=202)
 async def regenerate_portrait(
     project_id: str,
     char_id: str,
@@ -1672,20 +1672,20 @@ async def regenerate_portrait(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    P1-3 / R7-3: 手动重生成指定角色的 portrait。
+    P1-3 / R7-3 + Wave 13 #6 (2026-05-25): 手动重生成指定角色的 portrait — **异步化**。
 
-    触发场景：用户在角色确认界面点击"重绘头像"按钮。
-    - 读取项目当前角色数据
-    - 调用 ReferenceImageManager.generate_character_reference()（portrait 类型）
-    - 保存到 character_refs/{char_id}_portrait.png
-    - 更新 characters_json 中的 portrait_url 和 updated_at
-    返回: { success, portrait_url, char_id }
+    原本同步阻塞 ~60s (portrait 重生 + B57 fullbody 重生 串行)，前端 fetch 死等转圈
+    (test28 同 adjust 同类问题)。现镜像 adjust 端点的 job 模式:
+      - 本端点只做快速校验 (项目归属 / 大纲存在 / 角色存在)，立即创建 job 返回 202 + job_id。
+      - 真正的 portrait/fullbody 重生在 asyncio 后台任务里跑，更新 job 进度。
+      - 前端轮询 GET /{project_id}/characters/adjust-jobs/{job_id} 获取进度/结果
+        (与 adjust 共用同一轮询端点，job.kind="regenerate_portrait")。
+
+    返回 (202): { "success": true, "job_id": "...", "status": "pending", "char_id": "..." }
+
+    所有 fallback 全保留 (DEC-051 红线): B57 同步重生 fullbody (用新 portrait 作参考) +
+    portrait 生图 + 非阻塞 except 兜底 —— 异步化只改「调用方式」。
     """
-    from app.services.reference_image_manager import ReferenceImageManager as _RIM
-    from app.models.style_config import ProjectStyleConfig as _PSC
-    from app.services.image_generator import ImageGenerator as _IG
-    from datetime import datetime as _dt
-
     # 1. 验证项目归属
     result = await db.execute(
         select(Project).where(Project.uuid == project_id, Project.user_id == user_id)
@@ -1694,10 +1694,135 @@ async def regenerate_portrait(
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
 
-    # 2. 读取角色数据
+    # 2. 读取角色数据 — 快速校验
     outline_json = project.confirmed_outline_json or project.raw_outline_json
     if not outline_json:
         raise HTTPException(status_code=400, detail="项目尚未生成大纲")
+
+    outline = json.loads(outline_json)
+    characters_overview = outline.get("characters_overview", [])
+
+    target_char = None
+    try:
+        idx = int(char_id.replace("char_", "")) - 1
+        if 0 <= idx < len(characters_overview):
+            target_char = characters_overview[idx]
+    except (ValueError, IndexError):
+        pass
+
+    if target_char is None:
+        raise HTTPException(status_code=404, detail=f"角色 {char_id} 不存在")
+
+    # 3. 创建 job (kind=regenerate_portrait) + 启动后台任务，立即返回 202
+    from app.services.adjust_job_manager import adjust_job_manager
+    job_id = await adjust_job_manager.create_job(
+        project_uuid=project_id,
+        char_id=char_id,
+        kind="regenerate_portrait",
+        user_id=user_id,
+    )
+    asyncio.create_task(
+        _run_regenerate_portrait_in_background(
+            job_id=job_id,
+            project_uuid=project_id,
+            char_id=char_id,
+        )
+    )
+    logger.info(
+        f"[RegeneratePortrait] Wave13 #6: job {job_id} 已创建并启动后台任务 "
+        f"(project={project_id}, char={char_id})"
+    )
+    return {
+        "success": True,
+        "job_id": job_id,
+        "status": "pending",
+        "char_id": char_id,
+        "message": "肖像重生成任务已创建，请轮询 job 状态",
+    }
+
+
+async def _run_regenerate_portrait_in_background(
+    job_id: str,
+    project_uuid: str,
+    char_id: str,
+) -> None:
+    """Wave 13 #6: regenerate_portrait 的后台执行体 (镜像 _run_adjust_character_in_background)。
+
+    用独立短生命周期 DB session (B-1 教训: 长任务不复用请求级 session，避免 MySQL 连接超时)。
+    全程更新 adjust_job_manager 进度，任何阶段失败都把 job 标 failed (前端能看到)。
+
+    保留全部 fallback (DEC-051 红线): B57 同步重生 fullbody + portrait 重生 + 非阻塞兜底。
+    """
+    from app.services.adjust_job_manager import (
+        adjust_job_manager,
+        JOB_STATUS_FAILED,
+    )
+
+    try:
+        async with async_session_maker() as db:
+            await _regenerate_portrait_core(
+                db=db,
+                job_id=job_id,
+                project_uuid=project_uuid,
+                char_id=char_id,
+            )
+    except _AdjustJobFailed as e:
+        await adjust_job_manager.update(
+            job_id,
+            status=JOB_STATUS_FAILED,
+            error=str(e),
+            stage_message="肖像重生成失败",
+        )
+        logger.error(f"[RegeneratePortrait] Wave13 #6: job {job_id} 业务失败: {e}")
+    except Exception as e:
+        await adjust_job_manager.update(
+            job_id,
+            status=JOB_STATUS_FAILED,
+            error=f"肖像重生成失败: {str(e)}",
+            stage_message="系统错误",
+        )
+        logger.exception(f"[RegeneratePortrait] Wave13 #6: job {job_id} 系统异常: {e}")
+
+
+async def _regenerate_portrait_core(
+    db: AsyncSession,
+    job_id: str,
+    project_uuid: str,
+    char_id: str,
+) -> None:
+    """regenerate-portrait 的实际工作 (portrait + B57 fullbody 重生)，后台 worker 内调用。
+
+    从旧同步端点几乎逐行迁移，差异仅在: 后台独立 session 重新 load project / 各阶段
+    update job 进度 / 校验失败 raise _AdjustJobFailed / 成功写 job.result。
+    """
+    from app.services.adjust_job_manager import (
+        adjust_job_manager,
+        JOB_STATUS_PROCESSING,
+        JOB_STATUS_COMPLETED,
+    )
+    from app.services.reference_image_manager import ReferenceImageManager as _RIM
+    from app.models.style_config import ProjectStyleConfig as _PSC
+    from app.services.image_generator import ImageGenerator as _IG
+    from datetime import datetime as _dt
+
+    await adjust_job_manager.update(
+        job_id,
+        status=JOB_STATUS_PROCESSING,
+        progress=5,
+        stage_message="正在准备重新绘制肖像...",
+    )
+
+    # 重新 load project (后台独立 session)
+    result = await db.execute(
+        select(Project).where(Project.uuid == project_uuid)
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise _AdjustJobFailed("项目不存在")
+
+    outline_json = project.confirmed_outline_json or project.raw_outline_json
+    if not outline_json:
+        raise _AdjustJobFailed("项目尚未生成大纲")
 
     outline = json.loads(outline_json)
     characters_overview = outline.get("characters_overview", [])
@@ -1713,28 +1838,28 @@ async def regenerate_portrait(
         pass
 
     if target_char is None:
-        raise HTTPException(status_code=404, detail=f"角色 {char_id} 不存在")
+        raise _AdjustJobFailed(f"角色 {char_id} 不存在")
 
-    # 3. 生成新 portrait
+    # 生成新 portrait
     _ref_manager = _RIM()
     _project_style = _PSC(style_preset=project.style_preset or "realistic")
     _image_gen = _IG()
 
-    try:
-        _portrait_result = await _ref_manager.generate_character_reference(
-            character=target_char,
-            project_style=_project_style,
-            image_generator=_image_gen,
-            ref_type="portrait",
-        )
-    except Exception as e:
-        logger.error(f"[RegeneratePortrait] ❌ {char_id} 生图失败: {e}")
-        raise HTTPException(status_code=500, detail=f"肖像生成失败: {str(e)}")
+    await adjust_job_manager.update(
+        job_id, progress=20, stage_message="正在重新绘制肖像..."
+    )
+
+    _portrait_result = await _ref_manager.generate_character_reference(
+        character=target_char,
+        project_style=_project_style,
+        image_generator=_image_gen,
+        ref_type="portrait",
+    )
 
     if not (_portrait_result.get("success") and _portrait_result.get("pil_image")):
-        raise HTTPException(status_code=500, detail=f"肖像生成失败: {_portrait_result.get('error', '未知错误')}")
+        raise _AdjustJobFailed(f"肖像生成失败: {_portrait_result.get('error', '未知错误')}")
 
-    # 4. 保存图片
+    # 保存图片
     _outputs_root = os.path.abspath("output")
     _char_refs_dir = os.path.join(_outputs_root, str(project.uuid), "character_refs")
     os.makedirs(_char_refs_dir, exist_ok=True)
@@ -1775,6 +1900,10 @@ async def regenerate_portrait(
 
     db.add(project)
     await db.commit()
+
+    await adjust_job_manager.update(
+        job_id, progress=70, stage_message="肖像完成，正在重新绘制全身图..."
+    )
 
     # B57 fix: portrait 重生成后必须同步重生 fullbody（用新 portrait 作参考保证角色一致性）
     # 原因: Stage 5 shot 用 fullbody 作参考。若 portrait 换了红发但 fullbody 还是黑发 → cascade 黑发 shot
@@ -1828,13 +1957,21 @@ async def regenerate_portrait(
     except Exception as _fb_e:
         logger.warning(f"[RegeneratePortrait] B57: fullbody 重生成异常（非阻塞）: {_fb_e}")
 
-    return {
-        "success": True,
-        "char_id": char_id,
-        "portrait_url": portrait_url,
-        "fullbody_url": fullbody_url,
-        "message": "肖像和全身图已重新生成" if fullbody_url else "肖像已重新生成（全身图更新失败）",
-    }
+    # 完成: 把结果写进 job (前端轮询拿 result) — 与旧同步返回体一致
+    await adjust_job_manager.update(
+        job_id,
+        status=JOB_STATUS_COMPLETED,
+        progress=100,
+        stage_message="肖像已重新生成",
+        result={
+            "success": True,
+            "char_id": char_id,
+            "portrait_url": portrait_url,
+            "fullbody_url": fullbody_url,
+            "message": "肖像和全身图已重新生成" if fullbody_url else "肖像已重新生成（全身图更新失败）",
+        },
+    )
+    return  # 结果在 job.result
 
 
 # ---------------------------------------------------------------------------
