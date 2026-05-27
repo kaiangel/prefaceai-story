@@ -1,6 +1,107 @@
 # Backend Agent - 当前任务
 
-> **最后更新**: [2026-05-26] ✅ test29 #4 Packet sequence 修复 — `db_retry.py` 加认 "packet sequence number wrong" 为 transient — 21 测 PASS (14 旧 + 7 新), 78 相关域 PASS, 0 退化 (Opus 4.7 default)
+> **最后更新**: [2026-05-27] ✅ 第3轮完成: #2 P0修复(SA2.0.50) + #3 dev/prod parity(pin pymysql==1.1.2 + asyncmy 0.2.11) — 已归档 completed.md, 见下方
+
+---
+
+## ✅ 完成: #2 P0修复 + #3 dev/prod parity [2026-05-27, Opus 4.7 1M]
+
+接 PM 19:00 派活定案 (Ben批#2+#3, 驱动方向=asyncmy)。改 requirements.txt + 隔离venv实证 + pytest回归。
+
+### requirements.txt 改动 (3 行, 前→后)
+| 行 | 前 | 后 | 理由 |
+|---|---|---|---|
+| sqlalchemy | `==2.0.36` | `==2.0.50` | **本次 P0 真修**: #13306 do_ping/async-adapter ping 签名 |
+| asyncmy | `==0.2.10` | `==0.2.11` | parity 统一 async 驱动 + 带 #86 _auth_plugin_name bugfix (非本次P0) |
+| pymysql | `>=1.1.0` (无上界=分裂源) | `==1.1.2` | 精确 pin 广泛验证版, 防 VPS 拉到 1.2.0 (5/19刚发布) 触发 ping bug |
+
+### pymysql 版本选择 = 1.1.2 (不是 1.2.0)
+- 上游事实(PyPI/gh 实查): 1.1.2=2025-08-24(验证 9 个月, 本地当前跑的就是它); 1.2.0=**2026-05-19 一周前刚发**, PR #1241 "deprecate reconnect in Connection.ping()" 正是签名变更源 + 还带 TLS PREFERRED/REQUIRED 行为变更 + executemany regex 变更
+- SA2.0.50 两个都修(矩阵C证1.2.0也PASS), 但精确 pin 目的=确定性 → 选广泛验证的 1.1.2, 不一次性引入 1.2.0 多项行为变更
+
+### 实证 (隔离 venv py3.11.3 镜像项目/VPS, 连阿里云 8.0.35, 已清理)
+- canonical 栈(SA2.0.50+asyncmy0.2.11+pymysql1.1.2) + mysql+asyncmy + pool_pre_ping=True → 二/三次 checkout 触发 do_ping → **0 TypeError, RESULT PASS**
+- ⚠️ 首次隔离 venv 误用系统 python3=3.14 (fastapi 静默装失败), 已纠正重建为项目 Python 3.11.3 (= VPS, parity 精神)
+
+### pytest 回归 (升级前后逐一对照, 0 退化)
+| 范围 | 项目原venv(SA2.0.36+aiomysql+pymysql1.1.2) | canonical(SA2.0.50+asyncmy0.2.11+pymysql1.1.2) |
+|---|---|---|
+| DB/pool/retry/status (3 文件) | 78 passed | 78 passed |
+| 广泛抽样 (8 文件) | 194 passed | 194 passed |
+| **合计** | **272 passed** | **272 passed, 0 退化** |
+- canonical 首跑 4 fail+27 err 全因 .env scheme=aiomysql 与 canonical(只装asyncmy)不匹配 → DATABASE_URL 环境变量覆盖成 asyncmy 后**全清零**, 非代码退化 (恰印证#3本地分裂)
+
+### config.py — 不改 (已符合要求)
+- L98 默认拼装 scheme 已是 `mysql+asyncmy://`; L109 同时支持 asyncmy/aiomysql(保留兼容但默认 asyncmy)。统一方向无需动。
+
+### 本地对齐需 PM 做 (我不动项目venv/.env/不重启)
+1. `pip install -r requirements.txt`(或精确 reinstall SA2.0.50 + asyncmy0.2.11, 顺带 uninstall aiomysql 或保留无害)
+2. `.env` `DATABASE_URL` scheme `mysql+aiomysql` → `mysql+asyncmy`(消除本地 aiomysql 分裂)
+3. 不带 --reload 重启本地 standby (memory: --reload+远程MySQL=metadata lock 死锁)
+
+### Ben 协议 5+1
+- 0 schema / 0 Alembic / 0 STATUS_API_CONTRACT / 0 frontend([frontend-impact: no]) / 0 阿里云操作(纯客户端依赖版本)
+- 依赖版本属架构层 → 已 @PM(Founder 已批 Ben 批 #2+#3)
+
+### 不部署 VPS (DevOps 做) / 不改本地 .env / 不动项目 venv / 不重启本地 / 0 dump 凭据
+
+---
+
+## 🔬 第2轮实证: P0 DB 驱动 pre_ping TypeError — 真根因坐实 + 首轮修正 [2026-05-27, Opus 4.7 1M, 只读]
+
+### 任务背景
+首轮诊断 2 处错，PM 拉 VPS 最深层 traceback 定案真根因后派第2轮：隔离 venv 实证复现 + 定案真修复。
+
+### 🎯 核心结论（实证坐实，PM 真根因 100% 正确）
+- **真根因（坐实）**: SQLAlchemy 2.0.36 的 asyncmy/aiomysql 方言**都继承** `MySQLDialect_pymysql.do_ping`，后者据 `_send_false_to_ping` 决定调 `ping(False)`(带参) 还是 `ping()`(无参)。`_send_false_to_ping` **inspect 的是 PyMySQL 同步驱动的 ping 签名**。装了 **PyMySQL 1.2.0**(`ping(self,reconnect=False)`，默认 False) → `_send_false_to_ping=False` → 走无参 `ping()` → 但 async 适配器 `ping(self, reconnect)` 无默认 → **TypeError**。
+- **决定因素是 PyMySQL 版本，不是 async 驱动**（重大 premise 修正）：asyncmy 和 aiomysql 适配器 ping 签名完全相同，都不 override do_ping，谁装 PyMySQL 1.2.0 谁崩。
+- **本地为何不崩**: 本地 venv 装 **PyMySQL 1.1.2**(`ping(reconnect=True)`，默认 True) → `_send_false_to_ping=True` → 走带参 `ping(False)` → 安全。
+- **上游定案**: SQLAlchemy **#13306**，**2.0.50 已修**（适配器 ping 改 `ping(self, reconnect: bool=False)` 带默认）。
+
+### 实证矩阵（隔离 venv 连阿里云 ECS MySQL 8.0.35，pool_pre_ping=True 二次 checkout 触发）
+| 组合 | asyncmy | aiomysql |
+|------|------|------|
+| **A** SQLAlchemy 2.0.36 + PyMySQL 1.1.2 (reconnect=True, =本地) | **PASS** | **PASS** |
+| **B** SQLAlchemy 2.0.36 + PyMySQL 1.2.0 (reconnect=False, =崩溃VPS) | **TypeError** | **TypeError** |
+| **C** SQLAlchemy 2.0.50 + PyMySQL 1.2.0 (#13306 修复) | **PASS** | **PASS** |
+
+Matrix B 输出逐字匹配 VPS traceback:
+```
+File "sqlalchemy/dialects/mysql/pymysql.py", line 109, in do_ping
+    dbapi_connection.ping()
+TypeError: AsyncAdapt_asyncmy_connection.ping() missing 1 required positional argument: 'reconnect'
+```
+
+### 三个验证点结论
+1. asyncmy 0.2.10 复现 TypeError: ✓（仅 PyMySQL=1.2.0 条件下）
+2. asyncmy 0.2.11 是否修: ✗ **不修**（同条件升 0.2.11，TypeError 逐字仍在 → 坐实首轮荐升无效）
+3. aiomysql 是否零报错: **非无条件** — Matrix B 下 aiomysql 同样 TypeError；只 Matrix A（PyMySQL 1.1.2）才 PASS
+
+### 定案推荐（改动面排序）
+1. **首选**: requirements.txt `sqlalchemy==2.0.36` → `sqlalchemy>=2.0.50`（一行，根治，两方言都修，与 PyMySQL 解耦）
+2. **次选止血**: `pymysql>=1.1.0` → `pymysql>=1.1.0,<1.2.0`（钉安全同步驱动；治标）
+3. **不推荐**: asyncmy 0.2.11（实测无效）/ 换 async 驱动（两者同病）
+
+### Ben 是否需操作
+0 阿里云/DB 操作（纯客户端依赖版本）。改 requirements.txt 一行 + DevOps Docker rebuild。但依赖版本属架构层 → 按 feedback_backend_change_reminder.md 建议 @PM 先报 Founder 知会 Ben。
+
+### 首轮修正的 2 处
+1. ❌查 asyncmy 自己的 Connection.ping → ✅真错在 SQLAlchemy 适配器 AsyncAdapt_*_connection.ping + 继承的 pymysql do_ping
+2. ❌荐升 asyncmy 0.2.11 修 `_auth_plugin_name`（VPS 无此）→ ✅实测 0.2.11 不修；真修 SQLAlchemy≥2.0.50 / 钉 pymysql<1.2.0
+
+### 唯一事实缺口（不猜）
+VPS 容器实际 PyMySQL 版本未直连确认。强推断=1.2.0/等价 `reconnect=False`（`pymysql>=1.1.0` 无上界 + 复现完全吻合）。建议 DevOps 在 VPS 容器跑 `pip show pymysql` + ping 签名打印临门坐实。
+
+### 证据采集（只读）
+隔离 venv（/tmp，已清理）装 SQLAlchemy 2.0.36/2.0.50 × asyncmy 0.2.10/0.2.11 × aiomysql 0.3.2 × PyMySQL 1.1.2/1.2.0 多组合实跑；阅 SQLAlchemy 源码 pymysql.py/asyncmy.py/aiomysql.py do_ping/ping；WebFetch SQLAlchemy 2.0 changelog 确认 #13306/2.0.50。**0 改代码/DB/部署，项目 venv/requirements 未动。**
+
+### 产出去向
+完整结论追加 `.team-brain/TEAM_CHAT.md` [2026-05-27 18:30]。
+
+---
+
+## 历史: 第1轮 P0 DB 驱动诊断（2处错，已被第2轮修正）[2026-05-27, Opus 4.7 1M]
+> 已归档 completed.md。服务端事实（ECS 自建 8.0.35 / root@% native_password / 不强制 SSL / aiomysql caching_sha2 坑不适用）**保留正确**；但①查错了 ping 类 ②荐升 asyncmy 0.2.11 修 `_auth_plugin_name` **错误**，第2轮实证已修正（真修=SQLAlchemy≥2.0.50 / 钉 pymysql<1.2.0）。
 
 ---
 

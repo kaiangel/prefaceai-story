@@ -5,6 +5,22 @@
 
 ---
 
+## 🔴 P0 派活中 — VPS DB ping bug 根治(#2) + dev/prod parity(#3) (5/27, Ben已批)
+
+**现象**: VPS prefaceai.mov 登录+工作台(GET /api/projects/)间歇 500, `TypeError: AsyncAdapt_asyncmy_connection.ping() missing 1 required positional argument: 'reconnect'`。Founder VPS 真机测试时炸出。
+
+**真根因(Backend 真阿里云MySQL实证矩阵定案)**: SQLAlchemy 2.0.36 `do_ping`(pymysql.py:105 `_send_false_to_ping` inspect PyMySQL同步ping签名) + **PyMySQL 1.2.0**(VPS, ping默认 reconnect=False)→ 调无参 `ping()` → async适配器 ping(self,reconnect) 无默认 → TypeError。**真凶=PyMySQL版本非async驱动**(asyncmy/aiomysql 同病)。本地安全仅因 PyMySQL 1.1.2。SQLAlchemy官方#13306, 2.0.50修。矩阵: A(SA2.0.36+PyMySQL1.1.2)PASS / B(SA2.0.36+1.2.0)TypeError / C(SA2.0.50+1.2.0)PASS。
+**3次诊断纠偏**: ①升asyncmy0.2.11→实测不修 ②换aiomysql→实测同样崩 ③真修=SQLAlchemy≥2.0.50。
+
+**派活(Ben批2+3, 驱动方向=asyncmy尊重Ben既有选择)**:
+- 🔴 **#2 P0修复 [Backend]**: `requirements.txt` `sqlalchemy==2.0.36`→`==2.0.50`。修ping bug(两驱动两pymysql都修)。
+- 🟡 **#3 dev/prod parity [Backend+DevOps+PM]**: pin `pymysql`精确版本 + 统一async驱动 asyncmy(bump 0.2.10→0.2.11 修_auth_plugin_name) + **对齐本地到asyncmy**(本地现跑aiomysql+pymysql1.1.2=分裂源) + 文档化标准DB栈。让本地真镜像VPS, 根治"本地测不出VPS bug"。
+- **执行链**: Backend改requirements+跑回归(确认SA小版本升级0退化) → PM对齐本地(切asyncmy+reinstall+重启standby) → DevOps VPS rebuild+部署+验证(ping bug消失) → PM审查。
+- **Ben**: 已批; 阿里云零操作(纯客户端依赖版本)。
+- 详见 task #10。
+
+---
+
 ## ✅ test29 非人类专项 + Packet retry — 已修复+审查+部署 (5/26, Founder B 方案) + 剩余持久待办
 
 来源: test29《荷塘渡》e2e (90分) 全维度回溯 `analysis/TEST29_FULL_RETROSPECTIVE_2026-05-26.md` + DEC-053。**核心主题: 数据层 Stage 2 已通用化, 消费层全人类中心**。

@@ -4,9 +4,14 @@ uvicorn[standard]==0.32.1
 python-multipart==0.0.17
 
 # Database
-sqlalchemy==2.0.36
+# sqlalchemy 2.0.50: 修 #13306 pymysql do_ping/async-adapter ping 签名 bug
+#   (PyMySQL 1.2.0 起 ping() 默认 reconnect=False → 旧 SA do_ping 走无参 ping()
+#    → async 适配器 ping(self, reconnect) 无默认 → TypeError → pool_pre_ping 触发即 500)
+sqlalchemy==2.0.50
 aiosqlite==0.20.0
-asyncmy==0.2.10
+# asyncmy 0.2.11: dev/prod parity 统一 async 驱动 + 带上游 _auth_plugin_name(#86) bugfix
+#   (本次 P0 真修在 sqlalchemy 2.0.50, 非 asyncmy 版本)
+asyncmy==0.2.11
 greenlet>=3.0.0
 
 # Google Gemini (new official SDK)
@@ -32,8 +37,12 @@ Pillow>=10.0.0
 aiohttp>=3.9.0
 
 # Database migrations (pymysql used as synchronous driver for alembic CLI)
+# pymysql 精确 pin 1.1.2 (2025-08-24, 广泛验证 9 个月) 防止 dev/prod 分裂:
+#   原 pymysql>=1.1.0 无上界 → VPS 重建镜像时拉到刚发布(2026-05-19)的 1.2.0
+#   → 触发 #13306 ping bug。本地仍是 1.1.2 → "本地测不出 VPS bug" 分裂源。
+#   不选 1.2.0(一周前发布, 带 ping reconnect deprecation + TLS 行为变更, 变量太多)。
 alembic>=1.13.0
-pymysql>=1.1.0
+pymysql==1.1.2
 
 # Testing
 pytest==8.3.4

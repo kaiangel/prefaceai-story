@@ -1,9 +1,17 @@
 # PM Agent - 当前任务
 
-> **最后更新**: 2026-05-27 13:15 (BGM #8 审查通过 + #9 完成, 待 DevOps commit+部署 BGM #8)
-> **状态**: 🚀 #8 BGM 路径B 审查通过 → 待 DevOps commit+部署 (Founder go); #9 已完成
+> **最后更新**: 2026-05-27 (P0 VPS DB ping bug 根治派活中, Ben已批2+3)
+> **状态**: 🔴 P0 根治: #2 升SQLAlchemy2.0.50 + #3 dev/prod parity, 派 Backend 中
 
-## 5/27 进展: BGM #8 路径B + #9 docker-compose 清理
+## 5/27 晚: P0 VPS DB ping bug 根治 (#2+#3, Ben已批)
+
+- **P0**: VPS 登录+工作台 GET /api/projects/ 间歇500 (`AsyncAdapt_asyncmy_connection.ping() missing reconnect` TypeError)。Founder VPS 真机测试炸出, VPS监控即时捕。
+- **真根因(Backend实证矩阵定案)**: SQLAlchemy 2.0.36 do_ping + PyMySQL 1.2.0(VPS) → 无参ping()→async适配器TypeError。真凶=PyMySQL版本非驱动(asyncmy/aiomysql同病)。本地安全仅因PyMySQL1.1.2。SQLAlchemy#13306, 2.0.50修。
+- **PM地毯式审查抓出3次诊断纠偏**: Backend升asyncmy0.2.11(修错bug_auth_plugin_name)→PM核traceback推翻; PM自己推断换aiomysql→Backend round2实测推翻(aiomysql同崩); 最终实证矩阵定案=升SQLAlchemy≥2.0.50。**铁律省了2次错误部署。**
+- **派活(Ben批2+3)**: #2 升SQLAlchemy2.0.50 + #3 parity(pin pymysql+统一asyncmy0.2.11+对齐本地+文档化栈)。Backend改requirements+回归→PM对齐本地→DevOps部署验证。
+- **待办**: spawn Backend → 审查 → 本地对齐 → VPS部署 → 验证ping bug消失。
+
+## (历史) 5/27 进展: BGM #8 路径B + #9 docker-compose 清理
 
 - ✅ **#8 BGM 路径B** (升级内测前): AI-ML 改 story_music_extractor.py (文化识别 universal 信号 + character_type 降软提示不默认 human)。**PM 地毯式审查通过**: 调用链非死代码(_detect_chinese_cultural L218→734→292消费) + PM 亲跑 395 pytest 0退化 + dry-run 实证荷塘渡→chinese_traditional/非人类→animal + 越权0 + Ben维度(纯数据提取零契约/DB表面)。真听感待 Founder e2e。**代码在工作区待 commit+部署。**
 - ✅ **#9 docker-compose mysql 删除**: Ben 确认→DevOps commit 83a576b+VPS同步→PM 独立核实 0 mysql+容器健康。完成。

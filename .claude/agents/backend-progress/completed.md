@@ -4,6 +4,51 @@
 
 ---
 
+## 2026-05-27
+
+### 🔧 P0 #2 修复 + #3 dev/prod parity（第3轮, 改 requirements + 实证 + 回归）✅ [2026-05-27 — Opus 4.7 1M]
+
+**任务**: 接 PM 19:00 派活定案 (Ben 批 #2+#3, 驱动方向=asyncmy)。
+
+**requirements.txt (3 行)**: `sqlalchemy 2.0.36→2.0.50` (本次 P0 真修 #13306) / `asyncmy 0.2.10→0.2.11` (parity + #86 bugfix, 非本次P0) / `pymysql >=1.1.0→==1.1.2` (精确 pin 防 1.2.0 ping bug)。
+
+**pymysql 选 1.1.2 不选 1.2.0**: 1.2.0 是 2026-05-19 一周前刚发 (PR #1241 deprecate reconnect in ping = 签名变更源 + TLS/regex 行为变更), 1.1.2 是 2025-08-24 验证 9 个月且本地当前在用。精确 pin 求确定性 → 选广泛验证版。
+
+**config.py 不改**: L98 默认 scheme 已是 mysql+asyncmy; L109 兼容 asyncmy/aiomysql 但默认 asyncmy。
+
+**实证 (隔离 venv py3.11.3 镜像项目/VPS, 连阿里云 8.0.35, 已清理)**: canonical 栈 + pool_pre_ping 二/三次 checkout → do_ping 0 TypeError, PASS。(首次误用系统 py3.14 fastapi 装失败 → 纠正重建 3.11.3)
+
+**pytest 回归 (升级前后对照, 0 退化)**: 项目原 venv(SA2.0.36+aiomysql) 78+194=272 passed = canonical(SA2.0.50+asyncmy0.2.11) 272 passed。canonical 首跑 4f+27e 全因 .env scheme=aiomysql 与 canonical(只装asyncmy)不匹配, DATABASE_URL 覆盖 asyncmy 后全清零 (非退化, 恰证 #3 分裂)。
+
+**未动**: 项目 venv / .env / 不重启 / 不部署 VPS / 0 dump 凭据。**本地对齐交 PM** (reinstall + .env scheme→asyncmy + 不带 --reload 重启)。**VPS 部署交 DevOps**。
+
+**Ben 协议**: 0 schema/Alembic/契约/frontend([frontend-impact: no])/阿里云操作。完整结论 TEAM_CHAT [2026-05-27 当前轮]。
+
+---
+
+### 🔬 P0 DB pre_ping TypeError 诊断（第2轮实证定案）✅ [2026-05-27 — Opus 4.7 1M, 只读]
+
+**任务**: 首轮 2 处诊断错（PM 拉 VPS 完整 traceback 抓出），第2轮隔离 venv 实证复现 + 定案真修复。
+
+**真根因（实证坐实）**: SQLAlchemy 2.0.36 asyncmy/aiomysql 方言都继承 `MySQLDialect_pymysql.do_ping`，该方法据 `_send_false_to_ping`（inspect **PyMySQL 同步驱动** ping 签名）决定带参/无参调用。装 **PyMySQL 1.2.0**(`ping(reconnect=False)`) → `_send_false_to_ping=False` → 无参 `ping()` → async 适配器 `ping(self,reconnect)` 无默认 → **TypeError**。**决定因素是 PyMySQL 版本不是 async 驱动**。
+
+**实证矩阵**（隔离 venv 连阿里云 ECS MySQL 8.0.35 + pool_pre_ping）:
+| 组合 | asyncmy | aiomysql |
+|------|------|------|
+| SQLAlchemy 2.0.36 + PyMySQL 1.1.2 (reconnect=True) | PASS | PASS |
+| SQLAlchemy 2.0.36 + PyMySQL 1.2.0 (reconnect=False) | TypeError | TypeError |
+| SQLAlchemy 2.0.50 + PyMySQL 1.2.0 (#13306 修复) | PASS | PASS |
+
+**3 验证点**: asyncmy 0.2.10 复现✓ / 0.2.11 不修✗(逐字相同) / aiomysql 非无条件零报错(Matrix B 同崩，仅 PyMySQL 1.1.2 才安全)。
+
+**定案推荐**: ①首选 `sqlalchemy>=2.0.50`（一行根治，#13306）②次选止血 `pymysql>=1.1.0,<1.2.0` ③不推荐升 asyncmy 0.2.11(实测无效)/换 async 驱动(同病)。Ben 0 阿里云操作；requirements 属架构层，@PM 先报 Founder 知会 Ben。
+
+**首轮修正**: ①查错 ping 类(asyncmy 自身 vs SQLAlchemy 适配器+pymysql do_ping) ②荐升 0.2.11 修 `_auth_plugin_name` 错误(VPS 无此，0.2.11 实测不修)。
+
+**产出**: TEAM_CHAT [2026-05-27 18:30]。0 改代码/DB/部署，隔离 venv 已清理，项目 venv/requirements 未动。
+
+---
+
 ## 2026-05-26
 
 ### test29 #4 — Packet sequence 握手腐败漏接修复 ✅ [2026-05-26 — Opus 4.7 default]
