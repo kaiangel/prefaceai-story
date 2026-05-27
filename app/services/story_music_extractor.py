@@ -183,40 +183,128 @@ _BGM_MATRIX_COLUMNS: list[str] = [
 ]
 
 
-def _derive_style_category(style_preset: str, setting_period: str = "") -> str:
+# ──────────────────────────────────────────────────────────────────────────
+# #8 (2026-05-27) — 中式文化符号识别（universal 信号，非堆 type 规则）
+# ──────────────────────────────────────────────────────────────────────────
+#
+# 问题：《荷塘渡》(荷塘/锦鲤/莲/菖蒲) 是强中式文化/审美故事，但既非"古代朝代"
+#   (无皇宫/江湖/汉服) 也非"现代都市"，旧 ancient_china_keywords 偏 wuxia/朝代
+#   → 判 generic → watercolor 停在 western_realistic → 错过中式配乐基调。
+#
+# 路径 B 思路：中式审美是一个**和时代轴正交**的信号。一个故事可以是
+#   "中式 + 不特定时代"(荷塘渡)。所以单独抽出"中式文化符号"检测，让它能在
+#   setting_period=generic 时仍把 BGM style_category 拉向 chinese_traditional。
+#   这是 universal 改进（任何中式题材故事都受益），不是给某个 type/style 堆专属规则。
+#
+# 关键词原则：选**中式专属、跨时代**的自然/民俗/审美意象（荷塘/锦鲤/水墨/古琴…）
+#   + 复用 ancient_china 的朝代/武侠词。避免单字误匹配（用 ≥2 字组合或专属名词）。
+_CHINESE_CULTURAL_KEYWORDS: list[str] = [
+    # 中式自然/园林意象（荷塘渡核心）
+    "荷塘", "荷花", "莲花", "莲蓬", "莲子", "锦鲤", "鲤鱼", "菖蒲", "芦苇",
+    "水墨", "丹青", "宣纸", "竹林", "梅兰竹菊", "青瓦", "白墙", "亭台", "楼阁",
+    "庭院", "园林", "假山", "回廊", "石桥", "乌篷船", "灯笼", "团扇", "折扇",
+    # 中式器物/民俗
+    "茶道", "茶艺", "古琴", "琵琶", "二胡", "笛子", "箫", "古筝", "书法",
+    "对联", "春联", "宣笔", "印章", "瓷器", "青花", "刺绣", "剪纸",
+    # 中式节庆/神话
+    "中秋", "端午", "重阳", "上元", "嫦娥", "龙王", "仙鹤", "凤凰", "麒麟",
+    "山水", "禅意", "禅院", "古寺", "道观", "仙侠", "修仙",
+    # 英文中式标记（用户可能英文 idea）
+    "lotus pond", "koi", "chinese ink", "ink wash", "guqin", "pavilion",
+    "jade", "lantern festival", "calligraphy", "zen garden",
+]
+
+
+def _detect_chinese_cultural(outline: dict) -> bool:
+    """
+    #8 — 扫描 outline 全文判断是否为强中式文化/审美故事。
+
+    与 _derive_setting_period 共享文本来源（title/summary/plot/location/character），
+    但只判"是否中式"这一个布尔信号，和时代轴(ancient/modern/future)解耦。
+
+    Returns:
+        True 当命中任意中式文化符号；用于把 BGM style_category 拉向 chinese_traditional。
+    """
+    title = str(outline.get("title", ""))
+    summary = str(outline.get("summary", "")) + str(outline.get("logline", ""))
+    plot_text = " ".join(
+        str(p.get("description", "")) + " " + str(p.get("beat", ""))
+        for p in outline.get("plot_points", []) if isinstance(p, dict)
+    )
+
+    locs = outline.get("unique_locations", [])
+    loc_parts: list[str] = []
+    if isinstance(locs, list):
+        for l in locs:
+            if not isinstance(l, dict):
+                continue
+            loc_parts.append(str(l.get("description_zh", "")))
+            loc_parts.append(str(l.get("description", "")))
+            loc_parts.append(str(l.get("display_name", "")))
+            kve = l.get("key_visual_elements", [])
+            if isinstance(kve, list):
+                loc_parts.append(" ".join(str(e) for e in kve))
+            elif isinstance(kve, str):
+                loc_parts.append(kve)
+    loc_text = " ".join(loc_parts)
+
+    chars = outline.get("characters_overview", []) or outline.get("characters", [])
+    char_text = ""
+    if isinstance(chars, list):
+        char_text = " ".join(
+            str(c.get("description", "")) for c in chars if isinstance(c, dict)
+        )
+
+    full = f"{title} {summary} {plot_text} {loc_text} {char_text}".lower()
+    return any(kw.lower() in full for kw in _CHINESE_CULTURAL_KEYWORDS)
+
+
+def _derive_style_category(
+    style_preset: str,
+    setting_period: str = "",
+    is_chinese_cultural: bool = False,
+) -> str:
     """
     根据 style_preset id 推导 BGM 一级分类。
 
-    setting_period 用作 fallback / override 信号：
-      - 当 style_preset = "watercolor" 且 setting_period 含"古代中国" → 升级为 chinese_traditional
-      - 当 style_preset 未知（用户自定义）时，按 setting_period 兜底
+    setting_period / is_chinese_cultural 用作 fallback / override 信号：
+      - 当 style_preset = "watercolor" 且 setting_period 含"古代中国" → chinese_traditional
+      - 当视觉风格中性(western_realistic/generic) 且 is_chinese_cultural=True → chinese_traditional
+        （#8: 荷塘渡这类"中式但不特定时代"的故事，靠文化符号信号而非朝代词触发）
+      - 当 style_preset 未知（用户自定义）时，按 setting / 文化信号兜底
 
     Args:
         style_preset: 来自 project.style_preset 的 id
         setting_period: 时代背景字符串（从 outline 推断）
+        is_chinese_cultural: 是否检测到强中式文化符号（#8，与时代轴解耦）
 
     Returns:
         BGM style_category 之一: chinese_traditional / western_realistic / sci_fi /
         japanese_anime / fantasy_children / cartoon_humor / ink_painting / generic
     """
+    setting_is_ancient_china = "古代中国" in setting_period or "ancient_china" in setting_period
+    setting_is_future = (
+        "future" in setting_period or "sci_fi" in setting_period or "未来" in setting_period
+    )
+
     if not style_preset:
-        # 完全无 style_preset 信号 — 按 setting 兜底
-        if "中国" in setting_period or "ancient_china" in setting_period:
+        # 完全无 style_preset 信号 — 按 setting / 文化信号兜底
+        if setting_is_ancient_china or is_chinese_cultural:
             return "chinese_traditional"
         return "generic"
 
     base_category = _STYLE_PRESET_TO_CATEGORY.get(style_preset, "generic")
 
-    # setting 覆盖规则 — 视觉风格中性时（如水彩/油画/插画），故事 setting 起决定作用
-    if base_category == "western_realistic" and (
-        "古代中国" in setting_period or "ancient_china" in setting_period
+    # 覆盖规则 — 视觉风格中性时（如水彩/油画/插画/generic），故事内容起决定作用
+    #   ① setting 是古代中国 → chinese_traditional
+    #   ② #8: 中式文化符号 → chinese_traditional（哪怕 setting=generic，如荷塘渡）
+    if base_category in ("western_realistic", "generic") and (
+        setting_is_ancient_china or is_chinese_cultural
     ):
         return "chinese_traditional"
 
     # 反向 — 中漫 style_preset 但故事 setting 是现代/赛博 → 不能套古风
-    if base_category == "chinese_traditional" and (
-        "future" in setting_period or "sci_fi" in setting_period or "未来" in setting_period
-    ):
+    if base_category == "chinese_traditional" and setting_is_future:
         return "sci_fi"
 
     return base_category
@@ -233,21 +321,48 @@ def _derive_setting_period(outline: dict) -> str:
     """
     title = str(outline.get("title", ""))
     summary = str(outline.get("summary", "")) + str(outline.get("logline", ""))
+    # #8: 加 isinstance(p, dict) 守卫 — plot_points 偶尔被 LLM 输出成 str（与
+    #     T19-5/T19-9 同类 dict/str 防御），旧版会 AttributeError 冲垮提取。
+    _pp = outline.get("plot_points", [])
     plot_text = " ".join(
         str(p.get("description", "")) + " " + str(p.get("beat", ""))
-        for p in outline.get("plot_points", [])
+        for p in (_pp if isinstance(_pp, list) else [])
+        if isinstance(p, dict)
     )
     # 也吃 unique_locations 描述
+    # ⚠️ 真实 outline 的 location 字段名是 description_zh / display_name /
+    #    key_visual_elements（不是 description）—— 旧版只读 description 导致
+    #    荷塘/锦鲤/莲 等文化符号所在的场景文本完全没被扫到（#8 修复）。
     locs = outline.get("unique_locations", [])
     if isinstance(locs, list):
-        loc_text = " ".join(
-            str(l.get("description", "")) + " " + str(l.get("location_type", ""))
-            for l in locs if isinstance(l, dict)
-        )
+        loc_parts: list[str] = []
+        for l in locs:
+            if not isinstance(l, dict):
+                continue
+            loc_parts.append(str(l.get("description_zh", "")))
+            loc_parts.append(str(l.get("description", "")))   # 向后兼容旧字段名
+            loc_parts.append(str(l.get("display_name", "")))
+            loc_parts.append(str(l.get("location_type", "")))
+            kve = l.get("key_visual_elements", [])
+            if isinstance(kve, list):
+                loc_parts.append(" ".join(str(e) for e in kve))
+            elif isinstance(kve, str):
+                loc_parts.append(kve)
+        loc_text = " ".join(loc_parts)
     else:
         loc_text = ""
 
-    full = f"{title} {summary} {plot_text} {loc_text}".lower()
+    # 也吃角色描述（非人类主角的物种线索：锦鲤/菖蒲 等常写在 character.description）
+    chars = outline.get("characters_overview", []) or outline.get("characters", [])
+    if isinstance(chars, list):
+        char_text = " ".join(
+            str(c.get("description", "")) + " " + str(c.get("name_suggestion", c.get("name", "")))
+            for c in chars if isinstance(c, dict)
+        )
+    else:
+        char_text = ""
+
+    full = f"{title} {summary} {plot_text} {loc_text} {char_text}".lower()
 
     # 古代中国信号
     # 注意：单字关键词（"明"/"清"/"宋"等朝代单字）容易误匹配 "明天"/"清晨"/"宋词"等
@@ -268,10 +383,13 @@ def _derive_setting_period(outline: dict) -> str:
         return "ancient_china"
 
     # sci-fi / 未来信号
+    # ⚠️ #8: 移除单独的 "霓虹"/"neon" — 现代都市夜景普遍有霓虹，单独命中会把
+    #    现代爱情/外卖等都市故事误判为 future（实测案例②③），错误叠加电子化修饰。
+    #    赛博朋克故事仍可由 赛博/cyber/全息/hologram 等无歧义词命中。
     future_keywords = [
-        "未来", "赛博", "霓虹", "全息", "机器人", "人工智能", "ai 客服",
+        "未来", "赛博", "全息", "机器人", "人工智能", "ai 客服",
         "太空", "星舰", "外星", "克隆", "脑机", "VR", "元宇宙",
-        "cyber", "futuristic", "robot", "android", "neon", "hologram",
+        "cyber", "futuristic", "robot", "android", "hologram",
         "spaceship", "alien",
     ]
     if any(kw in full for kw in future_keywords):
@@ -300,18 +418,72 @@ def _derive_setting_period(outline: dict) -> str:
     return "generic"
 
 
+# #8 (2026-05-27) — 19 个系统 character_type → BGM 4 桶映射
+#
+# meta-prompt 只认 4 个值 {human / animal / fantasy / robot}，且明确说此维度
+# "通常不影响 BGM"（仅 robot 时轻度电子化）—— 是个**弱信号**。所以这里的目标不是
+# 精确分类 19 种 type（那是路径 A 的无底洞），而是：
+#   ① 无人类时绝不默认 human（旧版 bug：鱼/草/物件全落 human → log 误导）
+#   ② 把 19 type 就近映射到 meta-prompt 认识的 4 桶，给一个**诚实**的弱信号
+#
+# 就近映射原则（按 BGM 听感影响，不按生物学）：
+#   - 真生物非人类(animal/aquatic/insect/anthropomorphic_animal) → animal
+#   - 机械(robot/digital_virtual/vehicle_character) → robot（唯一会触发电子化的桶）
+#   - 奇幻/超自然/概念(fantasy_creature/mythological/elemental/alien/supernatural/
+#     concept_personified/plant/object/giant/hybrid…) → fantasy
+#   - 类人(human/miniature 小人) → human
+_CHARACTER_TYPE_TO_BGM_BUCKET: dict[str, str] = {
+    # 类人
+    "human": "human",
+    "person": "human", "girl": "human", "boy": "human", "man": "human",
+    "woman": "human", "adult": "human", "child": "human",
+    "miniature": "human",   # 通常是缩小的类人
+    # 真生物非人类 → animal
+    "animal": "animal",
+    "anthropomorphic_animal": "animal",
+    "aquatic": "animal",    # 真鱼/锦鲤
+    "insect": "animal",
+    "dog": "animal", "cat": "animal", "bird": "animal",
+    "creature": "animal", "beast": "animal", "pet": "animal",
+    # 机械 → robot（meta-prompt 唯一据此轻度电子化的桶）
+    "robot": "robot",
+    "digital_virtual": "robot",
+    "vehicle_character": "robot",
+    "ai": "robot", "android": "robot", "cyborg": "robot", "machine": "robot",
+    # 奇幻/超自然/概念/植物/物件 → fantasy（梦幻/超现实质感，安全弱信号）
+    "fantasy_creature": "fantasy",
+    "mythological": "fantasy",
+    "elemental": "fantasy",
+    "alien": "fantasy",
+    "supernatural": "fantasy",
+    "concept_personified": "fantasy",
+    "plant": "fantasy",     # 菖蒲等拟人植物
+    "object": "fantasy",    # 会说话的钟等
+    "giant": "fantasy",
+    "hybrid": "fantasy",
+    "fantasy": "fantasy", "magical": "fantasy", "elf": "fantasy",
+    "fairy": "fantasy", "wizard": "fantasy", "monster": "fantasy",
+    "demon": "fantasy", "spirit": "fantasy",
+}
+
+
 def _derive_character_dominant_type(characters: list) -> str:
     """
-    从 character 数据推断主导角色类型。
+    从 character 数据推断主导角色类型（BGM 弱信号，#8 重构）。
+
+    ⚠️ 这是个**弱信号**：meta-prompt 明确 "通常不影响 BGM"，仅 robot 时轻度电子化。
+       BGM 主吃 mood + setting_period + style_category（universal 信号）。
+       本函数只需给一个**诚实**的就近映射，关键是无人类时别误判成 human。
 
     Args:
         characters: outline.characters_overview 列表（或空）
 
     Returns:
-        human / animal / fantasy / robot / generic
+        human / animal / fantasy / robot（4 桶，meta-prompt 认识的弱信号）
+        空数据时返回 human（安全中性默认；此时 BGM 完全由 mood/setting 主导）
     """
     if not characters or not isinstance(characters, list):
-        return "human"  # 安全默认
+        return "human"  # 空数据安全默认（此时弱信号无意义，mood/setting 主导）
 
     type_count: dict[str, int] = {}
     for c in characters:
@@ -323,24 +495,20 @@ def _derive_character_dominant_type(characters: list) -> str:
             or "human"
         )
         ctype = str(ctype).lower().strip()
-        # 归一化
-        if ctype in ("human", "person", "girl", "boy", "man", "woman", "adult", "child"):
-            normalized = "human"
-        elif ctype in ("animal", "dog", "cat", "bird", "creature", "beast", "pet"):
-            normalized = "animal"
-        elif ctype in ("robot", "ai", "android", "cyborg", "machine"):
-            normalized = "robot"
-        elif ctype in ("fantasy", "magical", "elf", "fairy", "wizard", "monster", "demon", "spirit"):
-            normalized = "fantasy"
-        else:
-            normalized = "human"  # 未知类型按人类处理
+        # 就近映射到 BGM 4 桶；未知 type 不再默认 human，而是按 "non_human → fantasy"
+        # 兜底（避免旧版"鱼/草误判 human"的人类中心 bug）。
+        normalized = _CHARACTER_TYPE_TO_BGM_BUCKET.get(ctype)
+        if normalized is None:
+            # 未知 type：若字面像人类才归 human，否则归 fantasy（中性非人类弱信号）
+            normalized = "human" if ("human" in ctype or "person" in ctype) else "fantasy"
         type_count[normalized] = type_count.get(normalized, 0) + 1
 
     if not type_count:
         return "human"
 
-    # 取出现次数最多的
-    return max(type_count.items(), key=lambda kv: kv[1])[0]
+    # 取出现次数最多的；平票时 human > animal > fantasy > robot（稳定且偏中性）
+    _priority = {"human": 3, "animal": 2, "fantasy": 1, "robot": 0}
+    return max(type_count.items(), key=lambda kv: (kv[1], _priority.get(kv[0], 0)))[0]
 
 
 def extract_story_for_music(
@@ -559,10 +727,14 @@ def extract_story_for_music(
     temperature_feels: str = "\n".join(temperature_feels_parts)
     full_narration: str = "\n\n".join(narration_parts)
 
-    # ── Wave 7 / DEC-026 — 4 个 BGM 通用性维度推导 ────────────────────────────
+    # ── Wave 7 / DEC-026 + #8 — 4 个 BGM 通用性维度推导 ───────────────────────
     # 即使 style_preset 为空，仍要尽力从 outline 文本推断（兜底逻辑）
+    # #8: 中式文化符号检测（与时代轴解耦的 universal 信号），喂给 style_category
     setting_period: str = _derive_setting_period(outline)
-    style_category: str = _derive_style_category(style_preset, setting_period)
+    is_chinese_cultural: bool = _detect_chinese_cultural(outline)
+    style_category: str = _derive_style_category(
+        style_preset, setting_period, is_chinese_cultural
+    )
     character_dominant_type: str = _derive_character_dominant_type(
         outline.get("characters_overview", []) or outline.get("characters", [])
     )
@@ -571,6 +743,7 @@ def extract_story_for_music(
         f"[StoryMusicExtractor] BGM 通用性维度: "
         f"style_preset={style_preset!r} → style_category={style_category!r}, "
         f"setting_period={setting_period!r}, "
+        f"chinese_cultural={is_chinese_cultural!r}, "
         f"character_dominant_type={character_dominant_type!r}"
     )
 
