@@ -1,7 +1,26 @@
 # DevOps Agent - 已完成任务
 
 > 按时间倒序记录已完成的工作
-> **2026-05-27 更新**: TASK-DOCKER-COMPOSE-MYSQL-CLEANUP 完成 — docker-compose.yml 删除 mysql service + mysql_data volume, commit 83a576b, VPS 同步, 三容器健康。
+> **2026-05-27 更新**: TASK-BGM8-COMMIT-DEPLOY 完成 — #8 BGM 路径B commit(40a9d02 代码 + d067916 文档)+push+VPS api rebuild(sha256:e22f4e97), 容器内 grep _detect_chinese_cultural=2 实证, /api/health 200, 三容器健康。
+
+---
+
+### TASK-BGM8-COMMIT-DEPLOY ✅ (2026-05-27, DevOps Opus 4.7, Founder go, PM 13:00 审查通过)
+
+**任务**: #8 BGM 路径B(已过 PM 地毯式审查 pytest 395+dry-run)commit+push+VPS 部署。
+
+| 项 | 结果 |
+|----|------|
+| commit 1 (BGM 代码) | `40a9d02` [frontend-impact: no] — story_music_extractor.py(+359/-38) + bgm_signal_probe.py(新) |
+| commit 2 (文档) | `d067916` — team-brain 4 文件 + 全员 progress + test28/29 回溯 + GENERIC_PM + full-retrospective skill + style_drift_probe |
+| push | origin/main `83a576b→d067916`, origin = 本地 HEAD ✅ |
+| git status 干净 | team-members-bp/+logs/+storyrefs/ 被 .gitignore(81b5d25) 全挡, staged 复查 0 误入 ✅ |
+| rsync | `app/` → /opt/xuhua-story/app/(trailing slash 子目录), 增量只传 services/story_music_extractor.py, VPS md5 986d8676 = 本地 ✅ |
+| Docker | build api → sha256:e22f4e97; force-recreate api → healthy(try3); frontend 未动; 无 DB 迁移 |
+| 容器内实证 | `docker exec docker-api-1 grep _detect_chinese_cultural` = 2 处 + is_chinese_cultural L265/L292 ✅ BGM 真上线 |
+| verify | curl /api/health 200 `{"status":"healthy"}` + 主页 200 + 三容器(api/frontend/redis)健康 ✅ |
+
+**关键**: 纯后端 prompt 逻辑, 无前端 rebuild/无 DB 迁移/无契约。真听感(荷塘渡中式 BGM)待 Founder e2e 抽测。
 
 ---
 

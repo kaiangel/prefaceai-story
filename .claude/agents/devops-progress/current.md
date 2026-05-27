@@ -1,11 +1,33 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-05-27 — TASK-DOCKER-COMPOSE-MYSQL-CLEANUP **完成**: 删除 docker-compose.yml 残留 mysql service + mysql_data volume。commit `83a576b`, push origin/main (`81b5d25→83a576b`), VPS compose 已同步, 三容器健康。
-> **状态**: 🟢 空闲 — VPS = Wave13+test29 (ec7b1b6), compose 已清理 mysql 残留
+> **最后更新**: 2026-05-27 — TASK-BGM8-COMMIT-DEPLOY **完成**: #8 BGM 路径B commit+push+VPS 部署。commit 1 `40a9d02`(BGM 代码 [frontend-impact:no])+commit 2 `d067916`(文档), push origin/main (`83a576b→d067916`), VPS api rebuild(sha256:e22f4e97), 容器内 story_music_extractor.py grep _detect_chinese_cultural=2 实证上线, /api/health 200, 三容器健康。
+> **状态**: 🟢 空闲 — VPS = #8 BGM 路径B (d067916), api 已 rebuild 含 BGM 代码
 > **当前**: 无在途任务
 >
 > SECRET-LEAK 历史: Step 6 (key rotation) 5/22 跳过 (Founder 决策 Google 控制台限额兜底)
-> TASK-WAVE13-TEST29 两步全部完成, 已归档 completed.md
+> TASK-BGM8-COMMIT-DEPLOY 完成, 已归档 completed.md
+
+---
+
+## TASK-BGM8-COMMIT-DEPLOY [2026-05-27 15:20 完成] (DevOps Opus 4.7, Founder go, PM 13:00 审查通过)
+
+**背景**: #8 BGM 路径B 已通过 PM 地毯式审查(pytest 395 passed + dry-run probe 实证)。Founder go commit+部署。HEAD=83a576b(#9 已提交), 工作区有 BGM 代码+累积文档未提交。
+
+**A. commit + push（2 commit, message 全覆盖, 含 Co-Authored-By）**:
+- commit 1 `40a9d02` [frontend-impact: no]: BGM 代码 — `app/services/story_music_extractor.py`(+359/-38) + `scripts/bgm_signal_probe.py`(新)。_detect_chinese_cultural universal 信号(与时代轴解耦) + _CHARACTER_TYPE_TO_BGM_BUCKET 19type 就近映射(未知非人类→fantasy 不默认 human) + setting_period 字段名修复
+- commit 2 `d067916`: 文档 — team-brain(TEAM_CHAT/DECISIONS DEC-053/PENDING/PROJECT_STATUS) + 全员 progress 三件套 + test28/29 回溯 + GENERIC_PM_PRINCIPLES + full-retrospective skill + style_drift_probe
+- push origin/main `83a576b..d067916`, **origin/main = 本地 HEAD = d067916**
+- **git status 干净**: team-members-bp/+logs/+storyrefs/ 三危险目录被 .gitignore(81b5d25) 全挡, commit 前 check-ignore 三命中 + staged 复查 0 误入
+
+**B. VPS 部署（rsync 不 git pull, trailing slash 写子目录）**:
+- rsync `app/` → `/opt/xuhua-story/app/`（增量只传 services/story_music_extractor.py, 其余已一致）
+- VPS 文件 md5 `986d8676...` = 本地一致, 落正确子目录 /opt/xuhua-story/app/services/
+- docker compose build api → 新镜像 `sha256:e22f4e97`; up -d --force-recreate api → healthy(等到 try3)
+- frontend 未动(保留 19h Up, BGM 无前端改动), 无 DB 迁移(BGM 不碰 schema)
+- **容器内 BGM 代码实证**: `docker exec docker-api-1 grep _detect_chinese_cultural /app/app/services/story_music_extractor.py` = 2 处 + is_chinese_cultural 参数 L265/L292
+- verify: `curl https://prefaceai.mov/api/health` → 200 `{"status":"healthy"}`, 主页 200, 三容器(api/frontend/redis)健康
+
+**风险**: 无。纯后端 prompt 逻辑, 无前端 rebuild/无 DB 迁移/无契约变更。真听感(荷塘渡是否真出中式 BGM)待 Founder e2e 抽测。
 
 ---
 

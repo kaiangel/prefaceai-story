@@ -22280,3 +22280,25 @@ PM 不信部署自报, spawn fresh DevOps 只读审计容器真实状态:
 **#9 docker-compose mysql 删除 — PM 独立核实**: ✅ `docker/docker-compose.yml` 0 mysql, commit 83a576b push + VPS scp 同步, 无悬空引用, 容器 api/frontend/redis 健康。**Ben 已确认可删, 已完成。**
 
 — PM (Opus 4.7, 2026-05-27 13:00)
+
+---
+
+## [2026-05-27 15:20] ✅ DevOps — #8 BGM 路径B commit + push + VPS 部署完成 @pm @ai-ml @Founder
+
+**A. commit + push（2 commit, message 全覆盖, 含 Co-Authored-By）**:
+- commit 1 `40a9d02` [frontend-impact: no]: BGM 代码 — `app/services/story_music_extractor.py` + `scripts/bgm_signal_probe.py`(新)（_detect_chinese_cultural universal 信号 + character_type 降软提示不默认 human + setting_period 字段名修复）
+- commit 2 `d067916` 文档 — team-brain(TEAM_CHAT/DECISIONS DEC-053/PENDING/PROJECT_STATUS) + 全员 progress 三件套 + test28/29 回溯 + GENERIC_PM_PRINCIPLES + full-retrospective skill + style_drift_probe
+- push origin/main: `83a576b..d067916`，**origin/main = 本地 HEAD = d067916**
+
+**git status 干净**: ✅ `team-members-bp/` + `logs/` + `storyrefs/` 三危险目录被 .gitignore(81b5d25) 全挡，commit 前 check-ignore 三命中 + staged 复查 0 误入。
+
+**B. VPS 部署（rsync 不 git pull, trailing slash 写子目录）**:
+- rsync `app/` → `/opt/xuhua-story/app/`（增量只传 services/story_music_extractor.py，其余已一致）
+- VPS 文件 md5 `986d8676...` = 本地一致，落正确子目录 `/opt/xuhua-story/app/services/`
+- docker compose build api → 新镜像 `sha256:e22f4e97`；force-recreate api → healthy（frontend 未动，无 DB 迁移，BGM 不碰 schema）
+- **容器内 BGM 代码实证**: `docker exec docker-api-1 grep _detect_chinese_cultural /app/app/services/story_music_extractor.py` = 2 处 + is_chinese_cultural 参数逻辑 L265/L292，**BGM 路径B 真上线**
+- verify: `curl https://prefaceai.mov/api/health` → HTTP 200 `{"status":"healthy"}`，主页 200，三容器健康（api/frontend/redis）
+
+**风险**: 无。纯后端 prompt 逻辑，无前端 rebuild、无 DB 迁移、无契约变更。真听感（荷塘渡是否真出中式 BGM）待 Founder e2e 抽测。
+
+— DevOps (Opus 4.7, 2026-05-27 15:20)

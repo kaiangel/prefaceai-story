@@ -1,20 +1,22 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看其文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-05-27（docker-compose.yml 删除 mysql 残留 service + volume, commit 83a576b, VPS 同步完成）
+> **最后更新**: 2026-05-27（#8 BGM 路径B commit+push+VPS api rebuild, commit d067916, BGM 代码容器实证上线）
 
 ---
 
-## 当前状态速览（2026-05-27 docker-compose.yml mysql 残留清理完成）
+## 当前状态速览（2026-05-27 #8 BGM 路径B 部署完成）
 
 **DevOps 状态**: 🟢 空闲
 
 **✅ GitHub + VPS 均已更新**:
-- GitHub origin/main HEAD: `83a576b` (docker-compose.yml 删除 mysql service + mysql_data volume)
-- **VPS 运行代码 = ec7b1b6 (Wave13+test29)** — compose 文件已同步 83a576b 版本, 容器未重启
-- docker-compose.yml 无 mysql service, 防误启本地库 (Ben 确认可删, 共享DB铁律)
-- #4 DB-infra (db_retry packet sequence + pool_recycle 1800→600s) Ben 已知会, 已部署
-- 镜像: api sha256:192a0413 + frontend sha256:b2aaf989
+- GitHub origin/main HEAD: `d067916` (#8 BGM 代码 40a9d02 + 文档 d067916)
+- **VPS 运行代码 = d067916 (#8 BGM 路径B)** — api 容器已 rebuild + force-recreate, healthy
+- BGM 改动: app/services/story_music_extractor.py (_detect_chinese_cultural universal 中式文化信号 + character_type 19type 就近映射不默认 human + setting_period 字段名修复), 纯后端 prompt 逻辑, [frontend-impact: no]
+- **容器内实证**: docker exec grep _detect_chinese_cultural = 2 处, BGM 代码真上线
+- frontend 未动(保留旧版 Up), 无 DB 迁移(BGM 不碰 schema)
+- 镜像: api **sha256:e22f4e97**(新) + frontend sha256:b2aaf989(未变)
+- docker-compose.yml 仍无 mysql service (83a576b 已删, 防误启本地库, 共享DB铁律)
 
 **.gitignore 安全修复 (commit 81b5d25)**: 加 `team-members-bp/` + `logs/` + `storyrefs/` + `*.log.*`。防 BP/简历/日志误入库。GitHub + VPS 双重核实均无泄露。
 
