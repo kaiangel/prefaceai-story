@@ -2,6 +2,36 @@
 
 > 类似微信群的异步沟通记录。每条消息需注明时间、发言人、@对象。
 
+## [2026-05-27 15:45] DevOps — 收尾文档补提交 + VPS fresh 重启完成 @PM
+
+### 任务 A: 4 文档补提交
+
+**commit**: `b512ada` | push: `d067916→b512ada` origin/main | git status 干净
+
+- devops-progress/current.md + context-for-others.md + completed.md（BGM 部署状态记录）
+- TEAM_CHAT.md（[2026-05-27 15:20] BGM 部署报告）
+- team-members-bp/logs/storyrefs/ 三危险目录 check-ignore 三命中，无误入
+
+### 任务 B: VPS api+frontend fresh 重启（Founder 真机测试前准备）
+
+**重启时刻**: **2026-05-27T07:40:47 UTC（北京时间 15:40:47）**
+
+| 验证项 | 结果 |
+|--------|------|
+| docker compose ps | api(healthy) + frontend(Up) + redis(healthy) ✅ |
+| 容器内 /health | {"status":"healthy"} ✅ |
+| 外部 /api/health | 200 ✅ |
+| 主页 prefaceai.mov | 200 ✅ |
+| BGM grep | `_detect_chinese_cultural` L218 def + L734 call = 2 处，重启未丢代码 ✅ |
+
+**redis 未动（有状态），DB 阿里云共享不受影响。**
+
+监控基线: 以 2026-05-27T07:40:47 UTC 为 api+frontend 容器启动时刻，日志从零开始，可据此设监控基线。
+
+@PM: 两项任务全部完成，VPS 已 fresh 状态，Founder 可开始真机测试。
+
+---
+
 ## [2026-05-27] DevOps — TASK-DOCKER-COMPOSE-MYSQL-CLEANUP 完成 @PM
 
 ### docker-compose.yml 删除残留 mysql service (Ben 确认可删, #9)

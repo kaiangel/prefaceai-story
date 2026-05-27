@@ -1,7 +1,28 @@
 # DevOps Agent - 已完成任务
 
 > 按时间倒序记录已完成的工作
-> **2026-05-27 更新**: TASK-BGM8-COMMIT-DEPLOY 完成 — #8 BGM 路径B commit(40a9d02 代码 + d067916 文档)+push+VPS api rebuild(sha256:e22f4e97), 容器内 grep _detect_chinese_cultural=2 实证, /api/health 200, 三容器健康。
+> **2026-05-27 15:45 更新**: TASK-BGM8-DOCS-COMMIT 完成 — 补提交 4 收尾文档 commit b512ada + push(d067916→b512ada), git status 干净, VPS fresh 重启(07:40:47 UTC), api+frontend force-recreate, BGM grep 实证仍在, /api/health 200, 三容器健康。
+
+---
+
+### TASK-BGM8-DOCS-COMMIT ✅ (2026-05-27 15:45, DevOps Sonnet 4.6)
+
+**任务**: 补提交 4 个收尾文档 + VPS fresh 重启（Founder 真机测试前）
+
+| 项 | 结果 |
+|----|------|
+| git status 确认 | 只有 4 个目标文件，team-members-bp/logs/storyrefs/ 全部被 .gitignore 挡住（check-ignore 三命中）✅ |
+| git add | 精确 add 4 文件（devops-progress 三件套 + TEAM_CHAT），无误入 ✅ |
+| commit | `b512ada` — "docs(收尾): devops progress 三件套 + TEAM_CHAT BGM部署记录" ✅ |
+| push | d067916→b512ada origin/main, git status 干净 ✅ |
+| VPS 重启时刻 | **2026-05-27T07:40:47 UTC（北京 15:40:47）** — api+frontend force-recreate ✅ |
+| docker ps | api(healthy) + frontend(Up) + redis(healthy) ✅ |
+| 容器内 /health | {"status":"healthy"} ✅ |
+| 外部 /api/health | 200 ✅ |
+| 主页 | 200 ✅ |
+| BGM grep | docker exec docker-api-1 grep _detect_chinese_cultural = 2 处 (L218 def + L734 call) — 重启未丢代码 ✅ |
+
+**redis 未动（有状态），DB 阿里云共享不受影响。**
 
 ---
 

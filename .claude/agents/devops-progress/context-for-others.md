@@ -1,17 +1,17 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看其文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-05-27（#8 BGM 路径B commit+push+VPS api rebuild, commit d067916, BGM 代码容器实证上线）
+> **最后更新**: 2026-05-27 15:45（补提交 4 文档 commit b512ada + VPS fresh 重启 2026-05-27T07:40:47 UTC）
 
 ---
 
-## 当前状态速览（2026-05-27 #8 BGM 路径B 部署完成）
+## 当前状态速览（2026-05-27 15:45 收尾文档补提交 + VPS fresh 重启）
 
 **DevOps 状态**: 🟢 空闲
 
 **✅ GitHub + VPS 均已更新**:
-- GitHub origin/main HEAD: `d067916` (#8 BGM 代码 40a9d02 + 文档 d067916)
-- **VPS 运行代码 = d067916 (#8 BGM 路径B)** — api 容器已 rebuild + force-recreate, healthy
+- GitHub origin/main HEAD: `b512ada` (devops-progress 三件套 + TEAM_CHAT BGM部署记录收尾)
+- **VPS 代码 = #8 BGM 路径B (d067916)** — api+frontend 已 fresh force-recreate (2026-05-27T07:40:47 UTC / 北京 15:40:47), api healthy
 - BGM 改动: app/services/story_music_extractor.py (_detect_chinese_cultural universal 中式文化信号 + character_type 19type 就近映射不默认 human + setting_period 字段名修复), 纯后端 prompt 逻辑, [frontend-impact: no]
 - **容器内实证**: docker exec grep _detect_chinese_cultural = 2 处, BGM 代码真上线
 - frontend 未动(保留旧版 Up), 无 DB 迁移(BGM 不碰 schema)
