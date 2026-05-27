@@ -1,21 +1,37 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看其文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-05-27 15:45（补提交 4 文档 commit b512ada + VPS fresh 重启 2026-05-27T07:40:47 UTC）
+> **最后更新**: 2026-05-27 17:20（P0 SQLAlchemy 2.0.50 升级 commit 8cabaec + VPS rebuild 部署 + ping bug 实证消失）
 
 ---
 
-## 当前状态速览（2026-05-27 15:45 收尾文档补提交 + VPS fresh 重启）
+## 🔴 P0 修复已部署 (2026-05-27 17:20) — VPS 登录/工作台 500 ping bug 已根治
 
-**DevOps 状态**: 🟢 空闲
+- **commit `8cabaec`**: SQLAlchemy `2.0.36→2.0.50`(修 #13306 do_ping/async ping 签名 bug) + asyncmy `0.2.10→0.2.11`(parity+#86 bugfix) + pymysql `>=1.1.0→==1.1.2`(精确 pin 防 1.2.0)
+- **P0 实证**: 修复前 VPS 近 30min **120 次** `ping() missing 1 required positional argument: 'reconnect'` TypeError → 修复后全程 **0**。/api/projects/ 从间歇 500 → 稳定 401
+- VPS 容器内 pip show 坐实: SQLAlchemy **2.0.50** / asyncmy **0.2.11** / PyMySQL **1.1.2**
+- VPS 旧 pymysql 确认 = **1.2.0**(被 `pymysql>=1.1.0` 无上界拉到 5/19 新发版, = 分裂源根因)
+
+### 🚨 Canonical DB 栈 (本地 + VPS + 测试三处必须镜像, 消除 dev/prod 分裂)
+```
+sqlalchemy == 2.0.50   # 修 #13306 ping bug
+asyncmy    == 0.2.11   # 统一 async 驱动 + #86 bugfix
+pymysql    == 1.1.2    # 精确 pin sync 驱动(alembic), 防 1.2.0 ping bug
+DATABASE_URL scheme = mysql+asyncmy
+engine = pool_pre_ping=True + pool_recycle=600 + pool_size=10 + max_overflow=20
+Python = 3.11.x
+```
+**给所有 Agent**: 本地若仍跑 aiomysql + .env scheme=aiomysql = 分裂源, 永远测不出 VPS 的 asyncmy+pymysql1.2.0 ping bug。本地对齐由 PM 执行(切 asyncmy + .env scheme + reinstall + 重启不带 --reload)。
+
+---
+
+## 历史状态速览（2026-05-27 15:45 BGM 部署 + VPS fresh 重启）
 
 **✅ GitHub + VPS 均已更新**:
-- GitHub origin/main HEAD: `b512ada` (devops-progress 三件套 + TEAM_CHAT BGM部署记录收尾)
-- **VPS 代码 = #8 BGM 路径B (d067916)** — api+frontend 已 fresh force-recreate (2026-05-27T07:40:47 UTC / 北京 15:40:47), api healthy
+- VPS 代码 = #8 BGM 路径B (d067916) + P0 SA2.0.50 (8cabaec)
 - BGM 改动: app/services/story_music_extractor.py (_detect_chinese_cultural universal 中式文化信号 + character_type 19type 就近映射不默认 human + setting_period 字段名修复), 纯后端 prompt 逻辑, [frontend-impact: no]
 - **容器内实证**: docker exec grep _detect_chinese_cultural = 2 处, BGM 代码真上线
 - frontend 未动(保留旧版 Up), 无 DB 迁移(BGM 不碰 schema)
-- 镜像: api **sha256:e22f4e97**(新) + frontend sha256:b2aaf989(未变)
 - docker-compose.yml 仍无 mysql service (83a576b 已删, 防误启本地库, 共享DB铁律)
 
 **.gitignore 安全修复 (commit 81b5d25)**: 加 `team-members-bp/` + `logs/` + `storyrefs/` + `*.log.*`。防 BP/简历/日志误入库。GitHub + VPS 双重核实均无泄露。

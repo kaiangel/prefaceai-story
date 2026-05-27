@@ -1,7 +1,35 @@
 # DevOps Agent - 已完成任务
 
 > 按时间倒序记录已完成的工作
+> **2026-05-27 17:20 更新**: TASK-P0-SQLALCHEMY-250-DEPLOY 完成 — commit 8cabaec(SA2.0.50+asyncmy0.2.11+pymysql1.1.2) push(e3ad64b→8cabaec) + VPS build --no-cache api + force-recreate. P0 ping bug 实证消失(120次/30min→0). 容器 pip 坐实新栈, /api/projects 不再500(401), 三容器健康.
 > **2026-05-27 15:45 更新**: TASK-BGM8-DOCS-COMMIT 完成 — 补提交 4 收尾文档 commit b512ada + push(d067916→b512ada), git status 干净, VPS fresh 重启(07:40:47 UTC), api+frontend force-recreate, BGM grep 实证仍在, /api/health 200, 三容器健康。
+
+---
+
+### TASK-P0-SQLALCHEMY-250-DEPLOY ✅ (2026-05-27 17:20, DevOps Opus 4.7 1M)
+
+**任务**: 部署 P0 修复 — SQLAlchemy 2.0.50 升级修 VPS 登录+工作台 500 的 ping bug (#13306)。PM 20:15 派活, Ben 批 #2+#3。
+
+**真根因**: SA2.0.36 do_ping(inspect 同步 ping 签名) + VPS PyMySQL 1.2.0(ping 默认 reconnect=False) → async 适配器 ping(self,reconnect) 无默认 → TypeError → pool_pre_ping 触发即 500。实证矩阵 A/B/C 定案, 真修=SA≥2.0.50。
+
+| 项 | 结果 |
+|---|---|
+| commit | `8cabaec` (requirements 3 行 + backend/pm progress + TEAM_CHAT + PENDING, 7 文件) + Co-Authored-By |
+| push | origin/main `e3ad64b..8cabaec`, origin = HEAD = 8cabaec ✅ |
+| git 干净 | check-ignore 坐实 team-members-bp/+logs/+storyrefs/+still_image_storyref/ 全挡, staged 0 误入 |
+| 修复前基线 | VPS 容器 SA2.0.36/asyncmy0.2.10/**PyMySQL1.2.0**(矩阵 B), ping bug **120次/30min** |
+| rsync | requirements.txt → /opt/xuhua-story/(context 根, 单文件无平铺陷阱), md5 7dea4367 一致 |
+| build | `docker compose build --no-cache api` → sha256:6797c9ab (6.5min) |
+| recreate | `up -d --force-recreate api`, frontend/redis 未动, 0 DB 迁移/0 schema/0 frontend rebuild |
+| 容器新栈 | pip show: SA **2.0.50** / asyncmy **0.2.11** / PyMySQL **1.1.2** = canonical 栈 ✅ |
+| curl 验证 | /api/projects/ 连刷 43 次全 **401**(不再 500) + /api/health **200** + 主页 **200** |
+| **ping bug 消失** | 重建后全程日志 ping() missing = **0** / TypeError = **0**(3min+90s 间歇请求触发 pre_ping 后仍 0), 对比修复前 120次/30min ✅ |
+| 容器健康 | api(healthy)/frontend/redis(healthy) ✅ |
+| VPS 旧 pymysql 确认 | **1.2.0**(回答 Backend 风险②未直连确认项) |
+
+**Canonical DB 栈 (DEC-054 待 PM 记)**: SA==2.0.50 + asyncmy==0.2.11 + pymysql==1.1.2 + DATABASE_URL=mysql+asyncmy + pool_pre_ping=True + pool_recycle=600。本地+VPS+测试三处必须镜像。
+
+**风险**: 401 走鉴权中间件(DB 查询前), 但 ping TypeError 是 pool_pre_ping 每次连接 checkout 自发触发(不依赖业务路径) → 0 计数已是 ping bug 消失充分证据。带 auth 真实 DB 登录/工作台真体验待 Founder 真机抽测(强信号: 同一 /api/projects/ 从间歇500→稳定401 + 容器0 TypeError)。本地 standby 对齐由 PM 执行(解耦)。
 
 ---
 

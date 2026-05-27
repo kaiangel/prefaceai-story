@@ -1,11 +1,37 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-05-27 15:45 — TASK-BGM8-DOCS-COMMIT 完成: 补提交 4 个收尾文档 commit `b512ada`(devops-progress 三件套+TEAM_CHAT BGM部署记录), push origin/main(d067916→b512ada), git status 干净。VPS fresh 重启 2026-05-27T07:40:47 UTC(北京 15:40:47), api+frontend force-recreate, api(healthy), 三容器健康, /api/health 200+主页 200, BGM grep _detect_chinese_cultural=2 实证仍在。
-> **状态**: 🟢 空闲 — GitHub origin/main=b512ada, VPS 代码=#8 BGM(d067916), api fresh 重启 15:40 北京
+> **最后更新**: 2026-05-27 17:20 — TASK-P0-SQLALCHEMY-250-DEPLOY 完成: commit `8cabaec`(requirements SA2.0.36→2.0.50/asyncmy0.2.10→0.2.11/pymysql>=1.1.0→==1.1.2 + 文档) push origin/main(e3ad64b→8cabaec)。VPS `docker compose build --no-cache api`(新镜像 sha256:6797c9ab) + force-recreate api。容器内 pip show 坐实 SA2.0.50/asyncmy0.2.11/PyMySQL1.1.2。**P0 ping bug 实证消失: 修复前 120次/30min `ping() missing reconnect` TypeError → 修复后全程 0**。/api/projects/ 不再 500(稳定 401) + /api/health 200 + 主页 200, 三容器健康。VPS 旧 pymysql 确认=1.2.0。
+> **状态**: 🟢 空闲 — GitHub origin/main=8cabaec, VPS 代码=P0 SA2.0.50(8cabaec), api force-recreate 17:09 北京(09:09 UTC build)
 > **当前**: 无在途任务
 >
 > SECRET-LEAK 历史: Step 6 (key rotation) 5/22 跳过 (Founder 决策 Google 控制台限额兜底)
+> TASK-P0-SQLALCHEMY-250-DEPLOY 完成, 已归档 completed.md
 > TASK-BGM8-COMMIT-DEPLOY + TASK-BGM8-DOCS-COMMIT 全部完成, 已归档 completed.md
+
+---
+
+## TASK-P0-SQLALCHEMY-250-DEPLOY [2026-05-27 17:20 完成] (DevOps Opus 4.7 1M, PM 20:15 派活, Ben 批 #2+#3)
+
+**背景**: VPS prefaceai.mov 登录+工作台(GET /api/projects/) 间歇 500, `TypeError: AsyncAdapt_asyncmy_connection.ping() missing 1 required positional argument: 'reconnect'`。真根因=SA2.0.36 do_ping + VPS PyMySQL 1.2.0(ping 默认 reconnect=False)→async 适配器无默认→TypeError(SA #13306, 2.0.50 修)。Backend 改 requirements + 隔离 venv 实证 + 回归 272 passed。
+
+**A. commit + push ✅**
+- commit `8cabaec` + Co-Authored-By, 7 文件(requirements.txt 3 行 + backend/pm progress + TEAM_CHAT + PENDING)
+- push origin/main `e3ad64b..8cabaec`, origin/main = 本地 HEAD = 8cabaec
+- git status 干净: check-ignore 坐实 team-members-bp/+logs/+storyrefs/+still_image_storyref/ 全挡, staged 0 误入
+
+**B. VPS rebuild + 部署 ✅**
+- 修复前基线(矩阵 B): VPS 容器 SA2.0.36/asyncmy0.2.10/PyMySQL **1.2.0**(回答 VPS pymysql 旧版确认项), ping bug 120次/30min
+- rsync requirements.txt → /opt/xuhua-story/(context 根), md5 7dea4367 一致
+- `docker compose build --no-cache api`(强制重装) → sha256:6797c9ab → up -d --force-recreate api
+- frontend/redis 未动, 0 DB 迁移/0 schema/0 frontend rebuild
+- 容器内 pip show 坐实: SA **2.0.50** / asyncmy **0.2.11** / PyMySQL **1.1.2** = canonical 栈
+
+**C. P0 验证 ✅**
+- /api/projects/ 连刷 43 次全 401(不再 500) + /api/health 200 + 主页 200
+- ping TypeError 实证消失: 重建后全程日志 ping() missing = 0 / TypeError = 0(3min + 90s 间歇请求触发 pre_ping 后仍 0), 对比修复前 120次/30min
+- 三容器健康: api(healthy)/frontend/redis(healthy)
+
+**风险**: 401 走鉴权中间件(DB 前), 但 ping TypeError 是 pool_pre_ping 每次 checkout 自发触发(不依赖路径)→ 0 计数已是充分证据。带 auth 真实 DB 登录体验待 Founder 真机抽测。本地 standby 对齐由 PM 执行(解耦)。DEC-054 canonical 栈待 PM 记。
 
 ---
 
