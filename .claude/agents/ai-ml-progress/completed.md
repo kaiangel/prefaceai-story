@@ -4,6 +4,27 @@
 
 ---
 
+## 2026-05-27 — #8 BGM 路径B: 文化识别增强 + character_dominant_type 去人类中心 ✅ (Opus 4.7 xhigh)
+
+**背景**: test29《荷塘渡》(锦鲤 aquatic + 菖蒲 plant + 荷塘) 暴露 BGM 两处人类中心偏见：setting_period 字段名 bug 导致荷塘/莲等中式意象未被扫到、character_dominant_type 无人类时错误默认 human。
+
+**方案**: 路径B — universal 文化信号识别，禁路径A（堆 19×type 专属规则），只改 `app/services/story_music_extractor.py` 一个文件（见 DEC-053）。
+
+**改动要点**:
+- **#1a 字段名 bug 修复**: `_derive_setting_period` 改读 `description_zh`/`display_name`/`key_visual_elements`（原只读 `description`/`location_type`），荷塘/锦鲤/莲所在场景文本从此被扫到
+- **#1b 新增 `_detect_chinese_cultural()` + `_CHINESE_CULTURAL_KEYWORDS`**: 中式审美信号（荷塘/锦鲤/莲/水墨/古琴/中秋…）与时代轴解耦，命中则将 style_category 从 western_realistic/generic 拉向 chinese_traditional；universal 信号，任何中式题材受益，非堆 type 规则
+- **#2 character_dominant_type 降级**: 新增 `_CHARACTER_TYPE_TO_BGM_BUCKET` 把 19 type 就近映射到 4 桶（animal/robot/fantasy/human）；**无人类时不再默认 human**（旧 bug），未知非人类 type → fantasy 兜底
+- **#3 顺带修**: 移除 future_keywords 里单独的"霓虹"/"neon"（防现代都市误判 future）+ `plot_points` dict 守卫（与 T19-5/9 同类防御）
+- **新增 `scripts/bgm_signal_probe.py`**: 7 组 type×style×mood dry-run harness，荷塘渡→chinese_traditional 实证
+
+**PM 审查通过**: 395 pytest PASS（bgm/music/extract/emotional_arc 全域）0 FAIL 0 退化；dry-run 荷塘渡→chinese_traditional 确认，现代/武侠/机器人/西式均不退化；Ben 协议 5+1 全符合（0 schema/0 Alembic/0 API 契约/[frontend-impact: no]/DEC-051 0 删 fallback）。
+
+**改的文件**: `app/services/story_music_extractor.py` (改) / `scripts/bgm_signal_probe.py` (新)
+
+**待**: Founder e2e 听感真证（荷塘渡是否真出中式 BGM；现代/西式/武侠不退化）；@tester 建议补正式 unit test（probe harness 可参考）
+
+---
+
 ## 2026-05-26 — test29 非人类消费层专项 #5+#6+#7 ✅ (Opus 4.7 xhigh)
 
 **背景**: test29《荷塘渡》(金鲤 aquatic + 菖蒲 plant + 荷塘 concept, 成片 90 分) 系统性暴露"数据层(Stage 2)已把所有 type 属性写进 physical, 消费层仍假设角色=类人"的假设链。横扫 3 个消费层缺口。

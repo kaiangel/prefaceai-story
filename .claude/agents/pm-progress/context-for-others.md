@@ -1,7 +1,18 @@
 # PM Agent - 给其他 Agent 的信息
 
-> **最后更新**: 2026-05-26 18:10 (test29 e2e 90分 + 非人类专项修复审查通过 + B 方案部署中)
-> **当前阶段**: test29 修复 (#4/#5/#6/#7) 审查通过 → DevOps commit+push (Ben 闸门) → 部署
+> **最后更新**: 2026-05-27 13:15 (BGM #8 审查通过待部署 + #9 完成)
+> **当前阶段**: #8 BGM 路径B 审查通过 → 待 DevOps commit+部署; #4-#7+#9 已部署/完成
+
+## 🎵 5/27: BGM #8 路径B 审查通过(待部署) + #9 完成
+- **@devops**: #8 BGM 代码在工作区待 commit+部署(rsync app/+rebuild api); 累积一批文档改动一起 commit。#9 docker-compose mysql 已删(83a576b)+VPS同步。
+- **@ai-ml**: BGM #8 路径B 审查通过(395 pytest+dry-run 荷塘渡→chinese_traditional)。非人类支持主线: 改图像/角色/校验/BGM 的 agent 必从 `physical` 读、多角色 shot 强制分离、配乐吃 universal 信号(见 DEC-053)。
+- **全体**: 非人类人类中心假设链 5 缺口(#5/#6/#7/#8)已修+审查; #5/#7/#8 真听感/视觉真证待 Founder e2e(不阻塞)。
+
+---
+（以下为 5/26 历史）
+
+> **(历史) 最后更新**: 2026-05-26 18:10 (test29 e2e 90分 + 非人类专项修复审查通过 + B 方案部署中)
+> **(历史) 当前阶段**: test29 修复 (#4/#5/#6/#7) 审查通过 → DevOps commit+push (Ben 闸门) → 部署
 
 ## 🚀 test29 修复 + Wave 13 一起部署 (5/26, Founder B 方案)
 

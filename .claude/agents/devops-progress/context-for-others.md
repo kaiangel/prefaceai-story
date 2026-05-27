@@ -1,22 +1,35 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看其文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-05-26（Wave 13 + test29 commit + push, 未部署 VPS, 等 Ben 闸门）
+> **最后更新**: 2026-05-27（docker-compose.yml 删除 mysql 残留 service + volume, commit 83a576b, VPS 同步完成）
 
 ---
 
-## 当前状态速览（2026-05-26 Wave 13 + test29 已 commit + push, 等 Ben 闸门）
+## 当前状态速览（2026-05-27 docker-compose.yml mysql 残留清理完成）
 
-**DevOps 状态**: 🟡 第 1 步完成 — Wave 13 + test29 commit + push GitHub 完成, **VPS 未部署**
+**DevOps 状态**: 🟢 空闲
 
-**⚠️ 重要 — GitHub 已更新但 VPS 仍是旧版本**:
-- GitHub origin/main: 4 commit (a0c3934 Backend/DB + ca2e43d Frontend + a16c7af AI-ML + 文档 commit), HEAD 已更新
-- **VPS 仍跑 d4541c4 (Wave 12)** — 第 2 步部署是 Ben 闸门, 待 Founder 知会 Ben + PM 放行
-- 含 #4 DB-infra (db_retry packet sequence + pool_recycle 1800→600s) = Ben 域
+**✅ GitHub + VPS 均已更新**:
+- GitHub origin/main HEAD: `83a576b` (docker-compose.yml 删除 mysql service + mysql_data volume)
+- **VPS 运行代码 = ec7b1b6 (Wave13+test29)** — compose 文件已同步 83a576b 版本, 容器未重启
+- docker-compose.yml 无 mysql service, 防误启本地库 (Ben 确认可删, 共享DB铁律)
+- #4 DB-infra (db_retry packet sequence + pool_recycle 1800→600s) Ben 已知会, 已部署
+- 镜像: api sha256:192a0413 + frontend sha256:b2aaf989
 
-**第 2 步部署待办 (PM 放行后)**: rsync app/+frontend/ + Docker rebuild api+frontend + #5c Alembic 确认 + layout.tsx rebuild 硬刷
+**.gitignore 安全修复 (commit 81b5d25)**: 加 `team-members-bp/` + `logs/` + `storyrefs/` + `*.log.*`。防 BP/简历/日志误入库。GitHub + VPS 双重核实均无泄露。
 
-**VPS 上一稳定版本**: d4541c4 (Wave 12: style_enforcer + adjust异步 + sub-progress + 前端)
+**部署 verify (全通过)**:
+- api(healthy) + frontend(Up) + redis(healthy)
+- /health healthy + 外部 /api/health 200 + 主页 200
+- #5c: alembic 006(head) + projects 3 列 EXISTS (aspect_ratio/raw_outline_json/confirmed_outline_json)
+- db_retry middleware: main.py L75 add_middleware (非死代码)
+- layout.tsx 新版: 外部 HTML 含 proxy-init + PROXY_VERSION
+
+**给 Backend 注意**: VPS database.py pool_recycle 已 1800→600s (Wave13 #5d), db_retry 中间件已 wire (transient/packet 重试)。
+
+**给 Frontend 注意**: VPS frontend 已含 #4A/#4B 守卫 + #5 404 分级 + #6 reroll 异步 + #9 vitest 基建。package-lock 已更新 (vitest devDep)。
+
+**VPS 上一稳定版本 (回滚点)**: d4541c4 (Wave 12: style_enforcer + adjust异步 + sub-progress + 前端)
 
 **5/25 VPS 第 4 次部署（TASK-WAVE12-DEPLOY-VPS）**:
 - rsync 3 个目录: app/services/ + app/api/ + frontend/src/ — md5 5/5 一致
@@ -32,13 +45,14 @@
 - **改善比: 333ms → 42ms = 8x 改善** (内网 vs 公网)
 - 判断: P2-1 hydrate 在生产仍慢 (5 并发 × 42ms/query + 多次query = 可测量延迟), 但已比本地公网大幅改善。Backend 聚合端点 (#3 ②) 仍有价值 (减并发 round-trip)
 
-**#5d MySQL idle 观察**: pool_recycle=1800s (30min), pool_pre_ping=True 已在 VPS。idle 2013 风险在内网 <30min 连接时不出现。观察 1h+ idle 后第1次操作。
+**#5d MySQL idle 观察**: Wave13 已把 pool_recycle 1800s→600s (10min, 赶在云端 idle-timeout 前重建), pool_pre_ping=True 已在 VPS。已部署生效。
 
 **VPS 部署历史**:
 - 第 1 次 (2026-05-22 ~19:45): Wave 8 初次部署 (f9987b0)
 - 第 2 次 (2026-05-22 19:50): Wave 9+9.1+Tester (→ c570c2d, PM 代 Docker rebuild)
 - 第 3 次 (2026-05-24): Wave 10+11 (→ 648b81c)
 - 第 4 次 (2026-05-25): Wave 12 (→ d4541c4, DevOps 全程自执行)
+- 第 5 次 (2026-05-26): Wave 13 + test29 (→ ec7b1b6 运行代码, 含 #4 db_retry + pool_recycle 600s) + .gitignore 安全修复 (81b5d25)
 
 ---
 

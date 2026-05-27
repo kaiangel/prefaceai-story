@@ -5,18 +5,25 @@
 
 ---
 
-## 🔧 test29 派活中 — 非人类通用性专项 + Packet retry (5/26, Founder 全派内测前)
+## ✅ test29 非人类专项 + Packet retry — 已修复+审查+部署 (5/26, Founder B 方案) + 剩余持久待办
 
-来源: test29《荷塘渡》e2e (90分) 全维度回溯 `analysis/TEST29_FULL_RETROSPECTIVE_2026-05-26.md`。**核心主题: 数据层 Stage 2 已通用化, 消费层全人类中心**。Founder 决策全派内测前, Backend(#4) ‖ AI-ML(#5/#6/#7) 并行无冲突。
+来源: test29《荷塘渡》e2e (90分) 全维度回溯 `analysis/TEST29_FULL_RETROSPECTIVE_2026-05-26.md` + DEC-053。**核心主题: 数据层 Stage 2 已通用化, 消费层全人类中心**。
 
-- 🟡 **#4 [Backend, Opus default, 内测前]**: Packet sequence — `app/middleware/db_retry.py` `_is_transient_connection_error` 加认 "packet sequence number wrong"(连接握手腐败)。根因: tab挂起→突发并发→新建连接 aiomysql 认证握手(connection.py:844)被公网/VPN截断→`pymysql.err.InternalError`, #5d 只认 2013/2006/2003+OSError 漏接。方案A 外科式(GET幂等已gated+retry重checkout干净连接+自愈已证)。次要可选: 前端 tab-resume serialize 轮询。孤立文件零冲突。
-- 🟡 **#5 [AI-ML, Opus xhigh, 内测前]**: 非人类 type prompt builder 字段错配 — `character_prompt_builder.py:787 _build_aquatic_description`(及 _build_plant/insect/object 等) 从 `character['aquatic']` 读但 Stage 2 数据在 `physical`→空→golden 丢→金爷红。修: 各非人类 type builder 改读 `physical`(或 `character.get(type) or physical` fallback)。落地记忆 `project_schema_humanoid_fallback_remaining` 那条"5 type 待修"。
-- 🟡 **#7 [AI-ML, Opus xhigh, 内测前]**: Seedream 融合非人类角色 — 金爷(鱼)+小蒲(草)焊成一只(草从鱼背长出, shot 10/15 像素确认), 自然度检查误判"intentional surrealist"放行。仅 8/22 同框 shot 受影响, 水彩柔化→90分。修: 多角色 shot prompt 强制"two SEPARATE distinct beings, NOT fused" + 自然度检查对非预期融合不洗白。
-- 🟡 **#6 [AI-ML/Backend, 与#7联动]**: ShotValidator 视觉计数对非人类判 0→8/22 FAIL+重试(总耗时 44min/$1.14, vs 基线 +73%)。**#7 是真实成因之一**(确实没2独立角色)。修: 先修#7→图里真有2角色→计数过半; ShotValidator 计数对非人类 type 放宽/跳过(类 T20-6 environmental)。
-- 🟢 **#8 [AI-ML/Backend, 内测后]**: BGM 提取器无人类时 `character_dominant_type` 默认 'human' + watercolor 误归 western_realistic。P3 低影响(仅微调 BGM 基调)。
-- 📌 **新观察 [内测后评估]**: 结局 shot 出现剧本未设定的人类旁观者(撑船老人+第三人称旁白), 疑 by-design 叙事框架。
+**已闭环 (commit 81b5d25, 三方+VPS容器对齐, PM 独立 grep 容器验证真活)**:
+- ✅ **#4** Packet sequence — db_retry.py:58 加认 "packet sequence number wrong" + main.py:75 wire (容器实证)
+- ✅ **#5** 非人类 type builder + **#5a 锚点层** (identity_anchor_prompts 各非人类 type 列真实色字段 scale_color/leaf_color 等; character_prompt_builder physical fallback)
+- ✅ **#7** 多角色 shot 强制分离 (identity_anchor_injector:262 MULTI-SUBJECT SEPARATION) + 自然度检查不洗白融合
+- ✅ **#6** ShotValidator 计数通用化 (humans AND non-human)
 
-**验收红线**: #5 修后人类既有故事不退化; #7 修后非人类双角色 mini 验证不融合; 碰 storyboard_prompts.py/image_generator.py 必过角色一致性回归(@tester)。**Wave 13 仍未 commit, 本轮叠加工作区, 禁 destructive git**。
+**剩余持久待办 (跨 session 不丢, agent 开工必查)**:
+- 🟡 **#8 [AI-ML, 内测前(Founder 5/27 升级: BGM 用户直接听得到), 派活中]**: BGM 提取器无人类时 `character_dominant_type` 默认 'human' + watercolor 误归 western_realistic。BGM 现状可用(test29 贴合), 增量打磨非救火。**方向已定=路径 B(DEC-053, 别走 A)**: BGM 主吃 universal 信号(mood+setting_period+题材+节奏)+增强 setting_period 文化识别(荷塘/锦鲤=中式被判 generic 是真漏点); character_dominant_type(4桶 vs 19type)&style_category 降软提示+fallback。**禁**给 19type×95style 堆专属规则(无底洞)。依据: test29 character_dominant_type 判错但 BGM 仍贴合→弱信号→深度通用性反指向简化。约 1-2 天代码+一轮跨组合听感测试(主成本, 无法 unit test)。[task #8 + DEC-053]
+- ✅ **#9 [完成 5/27]**: `docker-compose.yml` 残留 mysql service 定义已删 — Ben 微信确认可删 → DevOps commit 83a576b + VPS scp 同步 → PM 独立核实 0 mysql + 无悬空引用 + 容器 api/frontend/redis 健康。
+- 🔄 **#8 [审查通过, 待部署 5/27]**: BGM 路径B (story_music_extractor.py 文化识别 universal 信号 + character_type 降软提示不默认 human)。PM 审查通过 (395 pytest + dry-run 荷塘渡→chinese_traditional)。**代码在工作区待 DevOps commit+部署 (rsync app/+rebuild api)**, #8 内测前。真听感待 Founder e2e。[task #8 + DEC-053]
+- 🟡 **残留验证 gap [低风险, 可关闭]**: `projects` 3 列 (aspect_ratio/raw_outline_json/confirmed_outline_json) 未能独立 SHOW COLUMNS 核实 (生产凭据分类器拦 DB 查询=安全机制正确)。间接佐证强: alembic `006_t21new7_scene_refs (head)` 直接命令输出 + 后端 status 端点正常读 project 字段不报错。下次有 DB 直连机会时补直接证据。
+- 📌 **#5/#7 视觉真证 [Founder B 决定不阻塞]**: 代码已上生产, 但"金色真出金色/鱼草不融合/人类故事不退化"待下轮 e2e 或自然使用浮现。若未生效 = 新一轮 finding。
+- 📌 **结局 uncast 人类旁观者 [内测后评估]**: 结局 shot 出现剧本未设定的撑船老人+第三人称旁白, 疑 by-design 叙事框架。
+
+**说明**: Wave13+test29 已全部 commit+部署 (81b5d25), 不再"禁 commit"。#5/#7 碰高风险文件 (identity_anchor_injector) 单测已绿 (db_retry 21 + AI-ML 域 499), 视觉真证待 e2e。
 
 ---
 

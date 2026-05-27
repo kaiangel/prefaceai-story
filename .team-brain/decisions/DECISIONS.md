@@ -2236,7 +2236,7 @@ DEC-030 (前后端纠验机制) + DEC-051 (fallback 红线) + STATUS_API_CONTRAC
 2. **#7 多角色 shot 强制分离**: `identity_anchor_injector.py` ≥2 角色注入 MULTI-SUBJECT SEPARATION (DO NOT MERGE), 2+ 非人类升级 CRITICAL no-chimera; `shot_validator.py` 自然度检查对"该分离却融合"不洗白成"故意超现实"(保持 log-only 不升 severe, 避免触发 #6 重试浪费)。
 3. **#6 ShotValidator 计数通用化**: 计数问题 "human characters" → "FEATURED characters (humans AND non-human)", 不对非人类判 0 (取舍: 通用化而非跳过, 保留数量保护)。
 4. **#4 (Backend, DB-infra)**: db_retry 加认 "packet sequence number wrong" 握手腐败为 transient。
-5. **#8 BGM 默认 human + 画风误归类 → 内测后** (P3 低影响)。
+5. **#8 BGM 默认 human + 画风误归类 → 内测前** (Founder 2026-05-27 升级: BGM 用户直接听得到, 内测前做掉; 增量打磨非救火)。**方向已定=路径 B(Founder 2026-05-26 拍板, 别走 A)**: BGM 四维矩阵(style_category×mood×setting_period×character_dominant_type)。修法 = 让 BGM 主吃 **universal 信号**(mood[用户选]+setting_period+题材+节奏, 对任何角色/风格都成立) + 增强 setting_period 文化识别(《荷塘渡》荷塘/锦鲤=中式符号被判 generic→错过中式基调); character_dominant_type(只4桶 vs 19type) & style_category 降为软提示+安全 fallback。**禁路径 A**(给 19type×95style 堆专属音乐规则=通用性无底洞)。依据: test29 实证 character_dominant_type 判错(鱼→human)但 BGM 仍贴合→该信号弱→通用性深度考量反指向"简化/克制"非"堆料"。目的=增量越修越贴合, 非救火。
 6. **结局 uncast 人类旁观者 → 内测后评估** (疑 by-design 叙事框架)。
 
 **验证**: PM 地毯式审查 (追调用链 + 亲跑 db_retry 21 + AI-ML 域 499 pytest + 越权 + Ben 维度) 全过, 0 修复轮次。#5/#7 视觉真证待 e2e (Founder 选不复测先信任单测)。

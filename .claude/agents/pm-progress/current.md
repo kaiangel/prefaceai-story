@@ -1,9 +1,16 @@
 # PM Agent - 当前任务
 
-> **最后更新**: 2026-05-26 16:30 (test29 e2e 90分 + 全维度回溯 + 非人类专项派活中)
-> **状态**: 🔧 test29 派活进行中 — Backend(#4) ‖ AI-ML(#5/#6/#7) 并行, 待 spawn
+> **最后更新**: 2026-05-27 13:15 (BGM #8 审查通过 + #9 完成, 待 DevOps commit+部署 BGM #8)
+> **状态**: 🚀 #8 BGM 路径B 审查通过 → 待 DevOps commit+部署 (Founder go); #9 已完成
 
-## test29《荷塘渡》e2e 完成 + 全维度回溯 + 派活 (5/26)
+## 5/27 进展: BGM #8 路径B + #9 docker-compose 清理
+
+- ✅ **#8 BGM 路径B** (升级内测前): AI-ML 改 story_music_extractor.py (文化识别 universal 信号 + character_type 降软提示不默认 human)。**PM 地毯式审查通过**: 调用链非死代码(_detect_chinese_cultural L218→734→292消费) + PM 亲跑 395 pytest 0退化 + dry-run 实证荷塘渡→chinese_traditional/非人类→animal + 越权0 + Ben维度(纯数据提取零契约/DB表面)。真听感待 Founder e2e。**代码在工作区待 commit+部署。**
+- ✅ **#9 docker-compose mysql 删除**: Ben 确认→DevOps commit 83a576b+VPS同步→PM 独立核实 0 mysql+容器健康。完成。
+- **待办**: ⏳ DevOps commit BGM #8 + 累积文档 + push + 部署(rsync app/+rebuild api) → #8 内测前生效。真听感 Founder e2e 验。
+
+---
+## (历史) test29《荷塘渡》e2e 完成 + 全维度回溯 + 派活 (5/26)
 
 Founder 真机 e2e 跑通 (watercolor + 红锦鲤金爷 aquatic + 菖蒲小蒲 plant + 荷塘 concept, 专踩非人类盲区)。**成片 90 分**。Wave 13 修复全部实测生效 (#5e/#6/#4A/#4B/#5-404/B52/ETA/T17/条漫文字/画幅 3:4)。回溯 `analysis/TEST29_FULL_RETROSPECTIVE_2026-05-26.md` (full-retrospective skill, 像素级看图)。
 
@@ -16,8 +23,8 @@ Founder 真机 e2e 跑通 (watercolor + 红锦鲤金爷 aquatic + 菖蒲小蒲 p
 
 **派活 (Founder 全派内测前, 并行无冲突)**: Backend Opus default #4 (孤立文件) ‖ AI-ML Opus xhigh #5/#6/#7 (非人类消费层专项, 一 agent 连贯避免撞文件) → Tester Sonnet high 回归 (角色一致性+人类不退化+Wave13不退化)。
 
-**进度**: ✅ Backend(#4) + AI-ML(#5/#6/#7) 已完成并通过 PM 地毯式审查（追调用链+亲跑回归 db_retry 21+AI-ML域 499 passed+越权+Ben维度）。AI-ML 补挖出 **#5a 锚点层**（identity_anchor_prompts，比回溯点的 builder 更关键）。Ben 维度: test29 改动零前端/契约表面、不碰 DB 边界，但 **#4 是 DB-infra→部署前需知会 Ben**。
-**待办**: ⏳ #5/#7 视觉真证需 Founder e2e 复测(test30)最终验收 → 通过后 commit+部署(连同 Wave13, 知会 Ben)。⚠️ Wave 13+test29 全未 commit, 叠加工作区, 禁 destructive git。
+**进度**: ✅ **全部闭环并已部署生产**。Backend(#4)+AI-ML(#5/#6/#7) 修复→PM 地毯式审查(追调用链+亲跑 db_retry 21+AI-ML域 499+越权+Ben维度)→Founder B 方案→DevOps commit 4组+push→.gitignore 安全修复(BP/简历确认 0 入库)→VPS 第5次部署。**三方同步 `81b5d25`** (本地=GitHub=VPS运行代码 Wave13+test29)。PM 独立验证: 生产 200/200 + HTML 含 w13-404 proxy-init。Ben 已知会(#4 DB-infra)。
+**剩余**: #8 BGM 内测后(P3); #5/#7 视觉真证 Founder 选不阻塞(待下轮 e2e/自然使用浮现); 结局 uncast 人类观察内测后评估。Wave13+test29 已全部 commit。
 
 ---
 

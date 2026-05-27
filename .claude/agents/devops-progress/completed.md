@@ -1,7 +1,71 @@
 # DevOps Agent - 已完成任务
 
 > 按时间倒序记录已完成的工作
-> **2026-05-25 更新**: TASK-WAVE12-DEPLOY-VPS 第 4 次部署完成 (648b81c → d4541c4) + 生产性能基线实测.
+> **2026-05-27 更新**: TASK-DOCKER-COMPOSE-MYSQL-CLEANUP 完成 — docker-compose.yml 删除 mysql service + mysql_data volume, commit 83a576b, VPS 同步, 三容器健康。
+
+---
+
+### TASK-DOCKER-COMPOSE-MYSQL-CLEANUP ✅ (2026-05-27, DevOps Sonnet 4.6)
+
+**任务**: 删除 docker-compose.yml 残留 mysql service 定义 (Ben 微信确认可删)。
+
+| 项 | 结果 |
+|----|------|
+| 引用检查 | api/worker 的 depends_on 均只依赖 redis, 无任何 mysql 引用 ✅ |
+| 删除内容 | mysql service (image: mysql:8.4, 13 行) + mysql_data volume 声明 (1 行) |
+| 语法验证 | docker compose config --no-interpolate 解析通过, 0 mysql/error/warn ✅ |
+| commit | `83a576b` (1 file, 15 deletions) ✅ |
+| push | `81b5d25→83a576b` origin/main ✅ |
+| VPS 同步 | scp docker-compose.yml → /opt/xuhua-story/docker/, VPS grep mysql = 0 ✅ |
+| 容器不受影响 | api(healthy 19h) + frontend(Up 19h) + redis(healthy 2mo) + /health {"status":"healthy"} ✅ |
+
+---
+
+### TASK-WAVE13-TEST29 ✅ (2026-05-26, DevOps Opus 4.7, Founder 决策 B 两步)
+
+**任务**: Wave 13 + test29 修复上线。Founder 决策 B (信任单测, commit+部署), 分两步 (第 2 步 Ben 闸门)。
+
+---
+**第 1 步 (18:35 完成): commit + push GitHub, 未碰 VPS**
+
+HEAD 68e4211 (Wave12) 起 4 commit:
+| commit | hash | 范围 |
+|--------|------|------|
+| 1 Backend/DB-infra `[frontend-impact: no]` | `a0c3934` | #5d MySQL retry middleware (db_retry.py 新, 含 test29 #4 packet sequence) + database.py pool_recycle 1800→600s + #6 regenerate-portrait 异步 + #5e clothing 旁路防崩 + main.py wire + 3 wave13 test |
+| 2 Frontend | `ca2e43d` | #4A hydrate 超时守卫 + #4B 后台按钮 scenesConfirmed 守卫 + #5 404 分级 + #6 reroll 异步轮询 + #9 vitest 基建 |
+| 3 AI-ML test29 非人类 `[frontend-impact: no]` | `a16c7af` | #5a 锚点层 primary_color 字段 map + #5b builder physical fallback + #7 MULTI-SUBJECT SEPARATION + #6 ShotValidator 计数通用化 |
+| 4 契约+文档 | `ec7b1b6` | STATUS_API_CONTRACT §9.7.4 + DECISIONS + PENDING/checklist/PROJECT_STATUS/TODAY_FOCUS + TEST29 回溯 + 15 progress + TEAM_CHAT |
+
+push: 68e4211→ec7b1b6, origin/main verified。第 1 步停手等 Ben 闸门 (含 #4 DB-infra = Ben 域)。
+
+---
+**第 2 步 (19:30 完成): .gitignore 安全修复 + 泄露核实 + VPS 第 5 次部署** (Founder 知会 Ben + PM 放行后)
+
+**A. .gitignore 安全修复 (commit `81b5d25`, ec7b1b6→81b5d25)**:
+- 加规则: `team-members-bp/` + `logs/` + `storyrefs/` + `*.log.*` (rotated 日志)
+- `git check-ignore` 三项全命中 + rotated 日志 `logs/backend.log.20260526-1534-rotate` 命中
+- 纯增忽略规则, 零副作用 (防 BP/简历/日志误入库)
+
+**B. 双重核实无泄露 (GitHub + VPS)**:
+- GitHub 历史: grep `team-members-bp|商业计划|简历|resume|.pdf` → 0 真泄露 (扫到的 seed 全是 Seedream/seed-ref 误匹配); `git ls-files` → 0 tracked
+- VPS: `/opt/xuhua-story/` 无 team-members-bp/、无 storyrefs/ (只有 team-members/ 照片, 本就在 .gitignore + 不进镜像); Dockerfile 只 COPY app/docs/alembic, 容器内 0 敏感目录
+- 结论: GitHub + VPS 均干净 (预期本就干净, 确认无误)
+
+**C. VPS 第 5 次部署 (d4541c4 Wave12 → 运行代码 ec7b1b6 Wave13+test29)**:
+- rsync `app/` (115 files) + `frontend/src/` (126 files) + package.json/lock — md5 6/6 全一致 (db_retry.py 新 + identity_anchor_prompts + injector + shot_validator + database.py + layout.tsx)
+- Docker rebuild --no-cache: api `sha256:192a0413` + frontend `sha256:b2aaf989` (frontend next standalone build 走完, vitest devDep 未破坏构建)
+- force-recreate: api(healthy) + frontend(Up) + redis(healthy)
+- **#5c Alembic/DB**: alembic current = `006_t21new7_scene_refs (head)`; projects 3 列 aspect_ratio varchar(16) + raw_outline_json text + confirmed_outline_json text = EXISTS (无需新迁移)
+- **新代码 grep (容器内)**: db_retry.py 存在 + 9 处 transient/packet / database.py pool_recycle=600 / #5a primary_color map 15 处 / #7 MULTI-SUBJECT SEPARATION 1 处
+- **db_retry 非死代码**: main.py L17 import + L75 `app.add_middleware(DBConnectionRetryMiddleware)`
+- **layout.tsx 新版生效 (硬证据)**: 外部主页 HTML 含 `proxy-init` + `PROXY_VERSION` inline script + 镜像 build 2026-05-26T12:41:58Z
+- **verify**: 容器内 /health healthy + 外部 /api/health 200 + 主页 200
+
+**踩坑**: DB schema 查询 — 容器用 asyncmy (非 aiomysql), 且 MYSQL_USER/PASSWORD env 不直接暴露 (分类器正确拦截 env dump)。最终用项目 SQLAlchemy `app.database.engine` (PYTHONPATH=/app + -w /app) 跑 SHOW COLUMNS, 不接触任何凭据。
+
+**Ben 协议**: #4 DB-infra (db_retry packet sequence + pool_recycle 1800→600s) = Ben 域, Founder 已微信知会 Ben + PM 放行后部署。0 schema 改动 / 0 新 Alembic revision / 0 .env 改动 / 0 越权 (只碰 .gitignore + rsync + Docker)。
+
+**风险**: 无。pool_recycle 600s 在 VPS 生效 (赶在云端 idle-timeout 前重建)。
 
 ---
 

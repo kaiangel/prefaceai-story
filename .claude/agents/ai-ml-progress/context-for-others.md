@@ -1,7 +1,26 @@
 # AI-ML Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 AI-ML 的工作状态和 Prompt 约束
-> **最后更新**: 2026-05-26 (test29 非人类消费层专项 #5/#6/#7)
+> **最后更新**: 2026-05-27 (#8 BGM 路径B 文化识别 + 信号去人类中心)
+
+---
+
+# 🔵 [2026-05-27] #8 BGM 路径B: BGM 信号去人类中心 + 文化识别 (@backend @tester @pm)
+
+**主题**: test29《荷塘渡》(锦鲤+菖蒲+荷塘) 暴露 BGM 四维矩阵 2 处人类中心。路径B = BGM 主吃 universal 信号(mood[用户选]+setting+题材), character_dominant_type & style_category 降软提示。**只改 `app/services/story_music_extractor.py` 一个文件**, meta-prompt + Haiku 链未碰。
+
+### 关键约束 (改 BGM 相关代码必守)
+1. **中式文化识别与时代轴解耦** (`_detect_chinese_cultural` + `_CHINESE_CULTURAL_KEYWORDS`): 荷塘/锦鲤/莲/水墨/古琴/中秋… 命中 → 把中性视觉风格(watercolor/oil/generic)的 `style_category` 拉向 chinese_traditional, **不改 setting_period**(荷塘渡仍诚实 generic, 不强加战鼓)。新加中式题材关键词往这个 list 加, 别动 ancient_china_keywords(那是朝代/武侠专用)。
+2. **`_derive_setting_period` 读 location 真实字段**: `description_zh`/`display_name`/`key_visual_elements`(+description 向后兼容) + character.description。改这函数别退回只读 `description`(那样文化符号扫不到)。
+3. **character_dominant_type 是弱信号, 无人类不默认 human**: `_CHARACTER_TYPE_TO_BGM_BUCKET` 19type→4桶(animal/robot/fantasy/human)。meta-prompt 明确此维"通常不影响 BGM"(仅 robot 轻度电子化)。新加 type 往 map 里加就近桶, 别让非人类落 human。
+4. **未碰**: meta-prompt(`app/prompts/bgm/*.md`) / music_generation_service.py / Haiku 链 / db_retry.py / 图像 prompt 全未动。
+
+### @tester
+- BGM 域回归(我跑 391 PASS: bgm/music/extract/emotional_arc) + 不退化。
+- 建议补正式 unit test 覆盖 7 组 type×style×mood(我未碰 tests/ 白名单, 参考 `scripts/bgm_signal_probe.py`)。
+- Founder e2e 听感真证: 荷塘渡是否真出中式 BGM, 现代/西式/武侠不退化(留 e2e)。
+
+### Ben 协议: 0 schema/Alembic/契约, [frontend-impact: no], DEC-051 0 删 fallback。
 
 ---
 

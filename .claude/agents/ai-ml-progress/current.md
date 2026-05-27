@@ -1,7 +1,63 @@
 # AI-ML Engineer 当前任务
 
-> 更新时间: 2026-05-26 (test29 非人类消费层专项 #5+#6+#7 完成)
-> 状态: 🟢 test29 #5/#6/#7 全完成, 3 文件改, 426+ 回归 PASS, 待 @tester 回归 + e2e 复测
+> 更新时间: 2026-05-27 (#8 BGM 路径B 完成)
+> 状态: 🟢 #8 BGM 文化识别 + 信号去人类中心完成, 1 文件改 + 1 probe, 391 回归 PASS, 待 @tester 回归 + Founder e2e 听感
+
+---
+
+## 🟢 #8 BGM 路径B [2026-05-27] — 文化识别增强 + character_dominant_type 降级 (Opus 4.7 xhigh)
+
+### 一句话
+test29《荷塘渡》(锦鲤 aquatic + 菖蒲 plant + 荷塘) 暴露 BGM 两处人类中心。路径B=让 BGM 主吃 universal 信号(mood[用户选]+setting_period+题材), 把 character_dominant_type & style_category 降软提示。**禁路径A**(19×95 堆专属规则)。只改 `story_music_extractor.py` 一个文件 (BGM prompt 仍 Haiku 生成, meta-prompt 未碰)。
+
+### 改了什么 (全在 `app/services/story_music_extractor.py`)
+
+**① setting_period 文化识别增强 (真漏点, 2 处)**
+- **#1a 字段名 bug 修复**: `_derive_setting_period` 旧版读 location `description`+`location_type`, 但真实 outline 用 `description_zh`/`display_name`/`key_visual_elements` → 荷塘/锦鲤/莲 所在的场景文本**从未被扫到**。修: 读全 4 个字段 (description 保留作向后兼容) + 加扫 character.description (非人类物种线索)。
+- **#1b 新增 `_detect_chinese_cultural()` + `_CHINESE_CULTURAL_KEYWORDS`**: 中式审美是**和时代轴正交**的信号 (荷塘渡 = 中式但不特定朝代)。旧 ancient_china_keywords 偏 wuxia/朝代 → 荷塘渡判 generic。新 helper 扫荷塘/锦鲤/莲/水墨/古琴/中秋… (跨时代中式意象), 命中则在 `_derive_style_category` 把中性视觉风格(western_realistic/generic)拉向 chinese_traditional。**universal**(任何中式题材受益), 非堆 type 规则。setting_period 本身仍诚实返回 generic (荷塘渡无朝代) → meta-prompt 不强加战鼓/古战场修饰, 正合温柔荷塘基调。
+
+**② character_dominant_type 降级 (软提示 + 安全 fallback)**
+- 新增 `_CHARACTER_TYPE_TO_BGM_BUCKET` 把 19 系统 type 就近映射到 meta-prompt 认识的 4 桶 (animal/aquatic/insect/anthropomorphic_animal→animal; robot/digital_virtual/vehicle_character→robot; fantasy/mythological/elemental/plant/object/concept…→fantasy; human/miniature→human)。
+- **关键修**: 无人类时**不再默认 human** (旧版 bug: 鱼/草/物件全落 human → log 误导)。未知 type 字面非人类 → fantasy 兜底。平票 human>animal>fantasy>robot 稳定排序。
+- **取舍说明**: meta-prompt 明确此维 "通常不影响 BGM"(仅 robot 轻度电子化) = 本就弱信号。所以**不精确分类 19 type**(那是路径A 无底洞), 只给诚实就近映射, 关键是消除"鱼→human"误导。BGM 听感真正由 mood+setting+style_category 主导。
+
+**③ 顺带修 2 个 pre-finding (我触碰函数时暴露, 同类防御)**
+- 移除 future_keywords 里单独的 "霓虹"/"neon" — 现代都市夜景普遍有霓虹, 单独命中把现代爱情/外卖误判 future (probe 案例②③实证)。赛博朋克仍由 赛博/cyber/全息 命中。
+- `_derive_setting_period` 的 plot_points 循环加 `isinstance(p, dict)` 守卫 (与 T19-5/9 同类 dict/str 防御) — plot_points 偶被 LLM 输成 str 会 AttributeError 冲垮提取。
+
+### dry-run 证据 (`scripts/bgm_signal_probe.py`, 7 组 type×style×mood)
+| 案例 | style_preset | setting_period | cultural | **style_category** | char_dom | mood |
+|---|---|---|---|---|---|---|
+| ① 荷塘渡 锦鲤+菖蒲 | watercolor | generic | ✅True | **chinese_traditional**(修前 western_realistic) | **animal**(修前 human) | 感人 |
+| ② 西式现代爱情 | oil_painting | generic(修前误判future) | False | western_realistic | human | 浪漫 |
+| ③ 外卖小哥 | manhwa | modern_china(修前误判future) | False | western_realistic | human | 热血 |
+| ④ 古风武侠 | ink_wash | ancient_china | False | ink_painting | human | 紧张 |
+| ⑤ 机器人末日 | cyberpunk | future | False | sci_fi | robot | 悬疑 |
+| ⑥ 奇幻动物 | ghibli | fantasy_world | False | japanese_anime | animal | 治愈 |
+| ⑦ 中式灯笼(object) | watercolor | ancient_china | ✅True | chinese_traditional | **fantasy**(非human) | 温馨 |
+
+- _fill_placeholders round-trip: 荷塘渡 user prompt 含 chinese_traditional×11, 0 data placeholder 泄露 → Haiku 走中式 cell (古琴/dizi/pentatonic) 而非西式 piano/strings。
+
+### 人类不退化验证
+- 年夜饭 human 故事 self-test: human 保持, style→chinese_traditional (灯笼命中, 中国新年用中式 BGM **正确改进**)
+- probe 案例②③④⑤ 全 human/正确 category
+- 391 PASS (bgm/music/extract/emotional_arc 全域) 0 FAIL 0 退化
+- 空数据/malformed(str chars/locs/plot, None/int 混入) 全graceful 不崩
+
+### Ben 协议 5+1 / 边界
+- 0 schema / 0 Alembic / 0 API 契约 / [frontend-impact: no] / DEC-051 0 删 fallback / 图像 prompt 未碰 / db_retry.py 未碰 / meta-prompt 未碰
+- 只改 1 文件 `story_music_extractor.py` (纯数据提取, 无 API/DB)
+
+### 改的文件
+- `app/services/story_music_extractor.py` (#1a 字段 + #1b 文化检测 + #2 19type 映射 + #3 neon/guard)
+- `scripts/bgm_signal_probe.py` (新, dry-run harness, 复用 extract 管道)
+
+### 待 @tester / Founder
+- @tester: BGM 域回归 (上述 391 + 不退化) + 建议补正式 unit test (我未碰 tests/ 白名单, probe 可参考)
+- Founder e2e/抽测听感真证: 荷塘渡是否真出中式 BGM; 现代/西式/武侠不退化 (听感真证留 e2e)
+
+### 待 PM
+- 建议记 DEC 补充: "#8 BGM 路径B — 文化符号(与时代轴解耦)拉 style_category + char_dom 19type 就近映射不默认 human"
 
 ---
 

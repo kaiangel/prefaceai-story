@@ -4,6 +4,15 @@
 
 ---
 
+## 2026-05-27 — BGM #8 路径B 审查 + #9 docker-compose 清理 (xhteam 轮)
+
+- **#9 docker-compose mysql 残留删除**: 向 Founder 通俗解释 Ben知会内容 + 校准"哑雷"措辞(实际低风险) → Ben 确认 → DevOps 删(83a576b)+VPS同步 → PM 独立核实 0 mysql+容器健康。完成。
+- **#8 BGM 升级内测前 + 路径B 决策**: Founder 问"通用性全面深度考量复杂吗" → PM 看代码后判断: 深度通用性反指向**简化/克制(路径B: 信号去人类中心+文化识别)**, 非堆 19×95 type规则(路径A无底洞)。锁进 task#8+DEC-053+PENDING。Founder 升级内测前 → 派 AI-ML(Opus xhigh)。
+- **PM 地毯式审查 BGM #8 通过**: 追调用链(_detect_chinese_cultural 非死代码)+ 亲跑 395 pytest 0退化 + 亲跑 dry-run(荷塘渡→chinese_traditional/非人类→animal/人类不退化)+ 越权0 + Ben维度(零契约/DB表面)。真听感待 Founder e2e。
+- **方法论**: 三次被 Founder 提醒后, 审查铁律 + Ben维度对**部署/运维层**也严格执行 — 独立 VPS 审计闭合部署 gap + 挖出 docker-compose mysql 残留。task 是 session-only, 持久待办进 PENDING。
+
+---
+
 ## 2026-05-26 — test29《荷塘渡》e2e + 全维度回溯 + 非人类专项派活审查
 
 - **test29 e2e 全程守护**: 干净重启(restart-monitors skill, 5 Monitor 含浏览器 console)+ 实时监控全 5 阶段, Founder 成片 **90 分**。Wave 13 全修复实测生效 (#5e/#6/#4A/#4B/#5-404/B52/ETA/T17/条漫文字/画幅3:4)。

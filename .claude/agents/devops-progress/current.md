@@ -1,10 +1,23 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-05-26 — TASK-WAVE13-TEST29-COMMIT 第 1 步完成 (commit + push, 未部署 VPS)
-> **状态**: 🟡 Wave 13 + test29 已 commit + push GitHub (68e4211 → 4 commit), **等 Ben 闸门** (Founder 知会 Ben → PM 放行 → 第 2 步 VPS 部署)
-> **当前**: 第 1 步完成停手, 绝不部署 VPS (含 #4 DB-infra = Ben 域)
+> **最后更新**: 2026-05-27 — TASK-DOCKER-COMPOSE-MYSQL-CLEANUP **完成**: 删除 docker-compose.yml 残留 mysql service + mysql_data volume。commit `83a576b`, push origin/main (`81b5d25→83a576b`), VPS compose 已同步, 三容器健康。
+> **状态**: 🟢 空闲 — VPS = Wave13+test29 (ec7b1b6), compose 已清理 mysql 残留
+> **当前**: 无在途任务
 >
 > SECRET-LEAK 历史: Step 6 (key rotation) 5/22 跳过 (Founder 决策 Google 控制台限额兜底)
+> TASK-WAVE13-TEST29 两步全部完成, 已归档 completed.md
+
+---
+
+## TASK-WAVE13-TEST29 第 2 步 [2026-05-26 19:30 完成] (DevOps Opus 4.7, Founder 决策 B 第 2 步)
+
+**3 件事全 PASS** (详情见 completed.md + TEAM_CHAT 19:30):
+
+**A. .gitignore 安全修复 (commit `81b5d25`)**: 加 `team-members-bp/` + `logs/` + `storyrefs/` + `*.log.*`。check-ignore 三项全命中 + rotated 日志命中。纯增忽略, 零副作用。push ec7b1b6→81b5d25。
+
+**B. 双重核实无泄露**: GitHub 历史 0 真泄露 (seed 全是 Seedream 误匹配) + 0 tracked; VPS 无 team-members-bp/storyrefs/, 容器内 0 敏感目录 (Dockerfile 只 COPY app/docs/alembic)。GitHub+VPS 均干净。
+
+**C. VPS 部署 (d4541c4 → ec7b1b6 运行代码)**: rsync app/(115)+frontend/src/(126) md5 6/6 一致; rebuild api sha256:192a0413 + frontend sha256:b2aaf989; api(healthy)+frontend(Up); #5c alembic 006(head) + projects 3 列 EXISTS; db_retry main.py L75 add_middleware (非死代码); layout.tsx 新版 (外部 HTML 含 proxy-init+PROXY_VERSION); /health+/api/health+主页 200。
 
 ---
 
@@ -19,9 +32,9 @@
 | 1 Backend/DB-infra | `a0c3934` | 8 (+864/-40) | #5d MySQL retry middleware (db_retry.py 新, 含 test29 #4 packet sequence) + pool_recycle 1800→600s + #6 regenerate-portrait 异步 + #5e clothing 旁路防崩 + 3 wave13 test | [frontend-impact: no] |
 | 2 Frontend | `ca2e43d` | 8 (+3489/-664) | #4A hydrate 超时守卫 + #4B 后台按钮 scenesConfirmed 守卫 + #5 404 分级真根因 + #6 reroll 异步轮询 + #9 vitest 基建 | (前端) |
 | 3 AI-ML test29 非人类 | `a16c7af` | 4 (+140/-40) | #5a 锚点层 primary_color 字段 map + #5b builder physical fallback + #7 MULTI-SUBJECT SEPARATION + #6 ShotValidator 计数通用化 | [frontend-impact: no] |
-| 4 契约+文档 | (见下方提交后补) | 22+ | STATUS_API_CONTRACT §9.7.4 + DECISIONS DEC-052/053 + PENDING/checklist/PROJECT_STATUS/TODAY_FOCUS + TEST29 回溯 + 14 progress + TEAM_CHAT + devops 三件套 | (文档) |
+| 4 契约+文档 | `ec7b1b6` | 25 (+1487/-30) | STATUS_API_CONTRACT §9.7.4 + DECISIONS DEC-052/053 + PENDING/checklist/PROJECT_STATUS/TODAY_FOCUS + TEST29 回溯 + 15 progress (含 backend completed.md test29#4 归档, amend 补入) + TEAM_CHAT + devops 三件套 | (文档) |
 
-**push**: `git push origin main` (68e4211 → commit4 HEAD), origin/main = 本地 HEAD verified
+**push**: `git push origin main` 成功 (68e4211..ec7b1b6), origin/main = 本地 HEAD = `ec7b1b6` (git ls-remote + gh api 双重 verified)
 
 **⚠️ 第 1 步做完即停, 未碰 VPS**:
 - 含 #4 DB-infra (db_retry packet sequence + pool_recycle 1800→600s) = Ben 域 → 须 Founder 先微信知会 Ben (push 后 Ben 才在 GitHub 看得到), PM 放行后才做第 2 步
