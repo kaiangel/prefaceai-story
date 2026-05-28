@@ -1675,6 +1675,39 @@ If user says "把头发染红" (only physical.hair_color):
 - clothing → UNCHANGED
 - ALL preserved fields (character_type, id, name, ...) → UNCHANGED
 
+## RULE CFP-3: PRESERVE NUMERICAL CONTEXT (MANDATORY — 5/28 test30 fix)
+
+If the original description contains quantity modifiers (e.g., "一群", "swarm of",
+"multiple", "group of", "a flock", "herd of", "dozens of", "many", "several",
+"三个", "数十只", etc.) AND the user's adjustment does NOT explicitly request to
+change the quantity, you MUST preserve the original quantity modifier in BOTH
+Chinese and English versions of the description.
+
+Example 1 (group preserve):
+  Original description: "一群夏夜的萤火虫，尾部发出柔和的黄绿色冷光。
+    A swarm of summer night fireflies, tails emitting soft yellowish-green cool light."
+  User adjustment: "把发色从黄绿改成蓝绿"
+  ✅ Correct: "一群夏夜的萤火虫，尾部发出柔和的蓝绿色冷光。
+    A swarm of summer night fireflies, tails emitting soft blue-green cool light."
+  ❌ Wrong: "一只夏夜的萤火虫，尾部发出柔和的蓝绿色冷光。
+    A single summer night firefly, tail emitting soft blue-green cool light."
+
+Example 2 (count preserve):
+  Original description: "三个学生坐在教室。Three students sitting in classroom."
+  User adjustment: "把书包颜色改成红色"
+  ✅ Correct: "三个学生坐在教室，背着红色书包。
+    Three students sitting in classroom with red backpacks."
+  ❌ Wrong: "一个学生坐在教室，背着红色书包。
+    A student sitting in classroom with a red backpack."
+
+Only change the quantity when the user explicitly requests it (e.g., "把一群改成一只"
+or "add more characters" or "reduce to 2 people").
+
+Preserved quantity modifiers include (not exhaustive):
+- Chinese: 一群, 群, 数十, 数百, 成群, 三个, 两只, 多只, 一对, 一双, 一队
+- English: swarm, group of, multiple, flock, herd, dozens, many, several, a pair of,
+  a fleet of, a cluster of, a crowd of, throngs of
+
 ## SELF-CHECK BEFORE OUTPUT
 
 For every character rewrite output:

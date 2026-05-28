@@ -350,6 +350,35 @@ Front-facing close-up view focusing on head and face area.
 Clear details of all distinctive features.
 Single character only, simple solid background, no text."""
 
+        # 5/28 test30 #7: 群体角色 token 强化 (防 Seedream 文生图出单只)
+        # 检测 description/name 含群体关键词 → 注入 GROUP COMPOSITION REQUIREMENT 前缀
+        _GROUP_KEYWORDS_ZH = ["一群", "群", "数十", "数百", "成群", "一对", "一队"]
+        _GROUP_KEYWORDS_EN = [
+            "swarm", "group of", "multiple", "flock", "herd",
+            "dozens", "many", "several", "a cluster", "a crowd",
+        ]
+        _desc_zh = (character.get("description") or "")
+        _desc_en = (character.get("description_en") or character.get("description", "")).lower()
+        _has_group = (
+            any(kw in _desc_zh for kw in _GROUP_KEYWORDS_ZH)
+            or any(kw in _desc_en for kw in _GROUP_KEYWORDS_EN)
+        )
+        if _has_group:
+            _group_prefix = (
+                "═══════════════════════════════════════════════════════════\n"
+                "GROUP COMPOSITION REQUIREMENT (MANDATORY — DO NOT IGNORE)\n"
+                "═══════════════════════════════════════════════════════════\n"
+                "This subject is a GROUP/SWARM of MULTIPLE individuals, NOT a single one.\n"
+                "Image MUST show 10-30+ individuals dispersed across the entire composition,\n"
+                "in flight / motion / clustered together as a collective.\n"
+                "DO NOT render as a single isolated subject.\n"
+                "DO NOT focus on one individual at the expense of the group.\n"
+                "Render as a COLLECTIVE — emphasize quantity, dispersion, and motion.\n"
+                "CRITICAL: If description says 'swarm' / '一群' / 'group of', show the FULL GROUP.\n"
+                "═══════════════════════════════════════════════════════════\n\n"
+            )
+            core_prompt = _group_prefix + core_prompt
+
         # T14+T19: 跨年龄风格统一指令（强化版）
         age_appearance = character.get('age_appearance', '')
         young_ages = {'child', 'teen', 'teenager', 'young_adult', 'baby', 'toddler', 'kid'}
