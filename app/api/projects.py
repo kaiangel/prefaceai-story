@@ -1020,9 +1020,15 @@ async def get_generation_result(
         shot_id = shot.get("shot_id", 0)
         narration = shot.get("narration_segment", "")
         text_overlay = shot.get("text_overlay", {})
+        # #13: 优先读 storyboard JSON 的 image_url 字段（可能含 .webp 路径），
+        # fallback static path（防旧数据无 image_url 字段）
+        _image_url = (
+            shot.get("image_url")
+            or f"/static/outputs/{project_id}/images/shot_{shot_id:02d}.png"
+        )
         shots.append({
             "shotId": shot_id,
-            "imageUrl": f"/api/projects/{project_id}/images/shot_{shot_id:02d}.png",
+            "imageUrl": _image_url,
             "narration": narration,
             "textOverlay": {
                 "type": text_overlay.get("text_type", "none"),
@@ -1849,11 +1855,22 @@ async def _regenerate_portrait_core(
         job_id, progress=20, stage_message="正在重新绘制肖像..."
     )
 
+    # RISK-T17-9 wire: 传入现有 portrait 作 reference，锁定 identity ground truth
+    # 镜像 AdjustCharacter L1549-1555 模式
+    _outputs_root = os.path.abspath("output")
+    _char_refs_dir = os.path.join(_outputs_root, str(project.uuid), "character_refs")
+    _existing_portrait_path = os.path.join(_char_refs_dir, f"{char_id}_portrait.png")
+    _existing_portrait_pil = None
+    if os.path.exists(_existing_portrait_path):
+        from PIL import Image as _PilImage
+        _existing_portrait_pil = _PilImage.open(_existing_portrait_path).convert("RGB")
+
     _portrait_result = await _ref_manager.generate_character_reference(
         character=target_char,
         project_style=_project_style,
         image_generator=_image_gen,
         ref_type="portrait",
+        portrait_ref=_existing_portrait_pil,
     )
 
     if not (_portrait_result.get("success") and _portrait_result.get("pil_image")):

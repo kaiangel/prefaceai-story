@@ -994,7 +994,21 @@ class Phase2PipelineOrchestrator:
                     for anchor_key, anchor_data in scene_anchors.items():
                         img = anchor_data.get('image')
                         if img:
-                            img.save(os.path.join(scene_refs_dir, f"{anchor_key}.png"))
+                            _anchor_png = os.path.join(scene_refs_dir, f"{anchor_key}.png")
+                            img.save(_anchor_png)
+                            # #9: 生成场景参考图 thumbnail（非阻塞）
+                            try:
+                                from PIL import Image as _PILAnchor
+                                _anc_thumb = _PILAnchor.open(_anchor_png)
+                                _anc_thumb.thumbnail((832, 1109), _PILAnchor.Resampling.LANCZOS)
+                                _anc_thumb_path = _anchor_png.replace(".png", "_thumb.webp")
+                                _anc_thumb.save(_anc_thumb_path, "WEBP", quality=80, method=6)
+                                logger.info(
+                                    f"    [Thumbnail] {anchor_key}_thumb.webp "
+                                    f"({os.path.getsize(_anc_thumb_path) // 1024}KB)"
+                                )
+                            except Exception as _anc_thumb_e:
+                                logger.warning(f"    [Thumbnail] scene_ref {anchor_key} failed (非阻塞): {_anc_thumb_e}")
 
                     cost_tracker.add_cost(
                         "gemini_nb2", 0.067 * len(scene_anchors),
@@ -1022,11 +1036,24 @@ class Phase2PipelineOrchestrator:
                             f"/static/outputs/{project_id}/scene_refs/{_exterior_key}.png?v={_v45}"
                             if os.path.exists(_exterior_path_disk) else None
                         )
+                        # #9 scene_ref thumb URL (与 shot 路径 image_url_thumb 对称)
+                        _interior_thumb_path = _interior_path_disk.replace(".png", "_thumb.webp")
+                        _exterior_thumb_path = _exterior_path_disk.replace(".png", "_thumb.webp")
+                        _interior_url_thumb = (
+                            f"/static/outputs/{project_id}/scene_refs/{_interior_key}_thumb.webp"
+                            if os.path.exists(_interior_thumb_path) else None
+                        )
+                        _exterior_url_thumb = (
+                            f"/static/outputs/{project_id}/scene_refs/{_exterior_key}_thumb.webp"
+                            if os.path.exists(_exterior_thumb_path) else None
+                        )
                         scene_references_list.append({
                             "location_id": loc_id,
                             "location_zh": _loc_zh,
                             "interior_url": _interior_url,
                             "exterior_url": _exterior_url,
+                            "interior_url_thumb": _interior_url_thumb,
+                            "exterior_url_thumb": _exterior_url_thumb,
                             "interior_description": loc.get('interior_description', ''),
                             "exterior_description": loc.get('exterior_description', ''),
                             "description_zh": loc.get('display_name', '') + ' - ' + (
@@ -1378,7 +1405,21 @@ class Phase2PipelineOrchestrator:
                         for anchor_key, anchor_data in scene_anchors.items():
                             img = anchor_data.get('image')
                             if img:
-                                img.save(os.path.join(scene_refs_dir, f"{anchor_key}.png"))
+                                _fb_anchor_png = os.path.join(scene_refs_dir, f"{anchor_key}.png")
+                                img.save(_fb_anchor_png)
+                                # #9: fallback path thumbnail（非阻塞）
+                                try:
+                                    from PIL import Image as _PILAnchorFb
+                                    _fb_thumb = _PILAnchorFb.open(_fb_anchor_png)
+                                    _fb_thumb.thumbnail((832, 1109), _PILAnchorFb.Resampling.LANCZOS)
+                                    _fb_thumb_path = _fb_anchor_png.replace(".png", "_thumb.webp")
+                                    _fb_thumb.save(_fb_thumb_path, "WEBP", quality=80, method=6)
+                                    logger.info(
+                                        f"    [Thumbnail] {anchor_key}_thumb.webp (fb) "
+                                        f"({os.path.getsize(_fb_thumb_path) // 1024}KB)"
+                                    )
+                                except Exception as _fb_thumb_e:
+                                    logger.warning(f"    [Thumbnail] scene_ref fb {anchor_key} failed (非阻塞): {_fb_thumb_e}")
                         cost_tracker.add_cost(
                             "gemini_nb2", 0.067 * len(scene_anchors),
                             f"Scene refs fallback {len(scene_anchors)} images"
@@ -1627,6 +1668,33 @@ class Phase2PipelineOrchestrator:
                         image_path = os.path.join(images_dir, f"shot_{shot_id:02d}.png")
                         result["pil_image"].save(image_path)
 
+                        # #10: 同步保存 WebP 全分辨率（非阻塞，节省传输带宽 ~60%）
+                        _webp_path = image_path.replace(".png", ".webp")
+                        try:
+                            result["pil_image"].save(_webp_path, "WEBP", quality=85, method=6)
+                            logger.info(
+                                f"    [WebP] shot_{shot_id:02d}.webp "
+                                f"({os.path.getsize(_webp_path) // 1024}KB)"
+                            )
+                        except Exception as _webp_e:
+                            logger.warning(f"    [WebP] full-res failed (非阻塞): {_webp_e}")
+                            _webp_path = None
+
+                        # #8: 生成 thumbnail .webp（832×1109 max，非阻塞）
+                        _thumb_path = image_path.replace(".png", "_thumb.webp")
+                        try:
+                            from PIL import Image as _PILForThumb
+                            _pil_thumb = _PILForThumb.open(image_path)
+                            _pil_thumb.thumbnail((832, 1109), _PILForThumb.Resampling.LANCZOS)
+                            _pil_thumb.save(_thumb_path, "WEBP", quality=80, method=6)
+                            logger.info(
+                                f"    [Thumbnail] shot_{shot_id:02d}_thumb.webp "
+                                f"({os.path.getsize(_thumb_path) // 1024}KB)"
+                            )
+                        except Exception as _thumb_e:
+                            logger.warning(f"    [Thumbnail] failed (非阻塞): {_thumb_e}")
+                            _thumb_path = None
+
                         # TextOverlay: 生成带文字版本
                         with_text_path = None
                         text_type = text_overlay_data.get("text_type", "none") if text_overlay_data else "none"
@@ -1648,8 +1716,15 @@ class Phase2PipelineOrchestrator:
                         logger.info(f"    ✅ Shot {shot_id} 保存: {image_path}")
 
                         # BE-3: 将 HTTP URL 写回 shot dict（让前端预览页能正确加载）
-                        _image_http_url = f"/static/outputs/{project_id}/images/shot_{shot_id:02d}.png"
+                        # #10: 优先用 .webp URL，fallback .png
+                        _base_url = f"/static/outputs/{project_id}/images/shot_{shot_id:02d}"
+                        _webp_url = f"{_base_url}.webp" if _webp_path and os.path.exists(_webp_path) else None
+                        _image_http_url = _webp_url or f"{_base_url}.png"
                         shot["image_url"] = _image_http_url
+
+                        # #8: thumbnail URL 写回 shot dict
+                        if _thumb_path and os.path.exists(_thumb_path):
+                            shot["image_url_thumb"] = f"{_base_url}_thumb.webp"
 
                         # 每张完成后回调进度
                         # RISK-T18-A (Wave 11.4): per-shot 增量

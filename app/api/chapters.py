@@ -3645,6 +3645,8 @@ async def regenerate_scene_reference(
     _v_ts = int(_time.time())  # cache-buster
     interior_url_result: Optional[str] = None
     exterior_url_result: Optional[str] = None
+    interior_url_thumb_result: Optional[str] = None
+    exterior_url_thumb_result: Optional[str] = None
     interior_image: Optional[_PilImg.Image] = None  # 重生 exterior 时复用
 
     aspect_ratio = project.aspect_ratio or "2:3"
@@ -3680,6 +3682,19 @@ async def regenerate_scene_reference(
                     f"/static/outputs/{project.uuid}/scene_refs/"
                     f"{location_id}_interior_anchor.png?v={_v_ts}"
                 )
+                # #9: 生成 interior thumbnail（与 Pipeline Stage 4.5 对称）
+                try:
+                    _int_thumb = _PilImg.open(_int_path)
+                    _int_thumb.thumbnail((832, 1109), _PilImg.Resampling.LANCZOS)
+                    _int_thumb_path = _int_path.replace(".png", "_thumb.webp")
+                    _int_thumb.save(_int_thumb_path, "WEBP", quality=80, method=6)
+                    interior_url_thumb_result = (
+                        f"/static/outputs/{project.uuid}/scene_refs/"
+                        f"{location_id}_interior_anchor_thumb.webp"
+                    )
+                    logger.info(f"[ScenRefRegenerate] interior thumb OK ({_os.path.getsize(_int_thumb_path) // 1024}KB)")
+                except Exception as _thumb_e:
+                    logger.warning(f"[ScenRefRegenerate] interior thumb 失败（非阻塞）: {_thumb_e}")
                 interior_image = pil_image
                 logger.info(
                     f"[ScenRefRegenerate] T21-NEW-7 interior 重生成功: "
@@ -3727,6 +3742,19 @@ async def regenerate_scene_reference(
                     f"/static/outputs/{project.uuid}/scene_refs/"
                     f"{location_id}_exterior_anchor.png?v={_v_ts}"
                 )
+                # #9: 生成 exterior thumbnail（与 Pipeline Stage 4.5 对称）
+                try:
+                    _ext_thumb = _PilImg.open(_ext_path)
+                    _ext_thumb.thumbnail((832, 1109), _PilImg.Resampling.LANCZOS)
+                    _ext_thumb_path = _ext_path.replace(".png", "_thumb.webp")
+                    _ext_thumb.save(_ext_thumb_path, "WEBP", quality=80, method=6)
+                    exterior_url_thumb_result = (
+                        f"/static/outputs/{project.uuid}/scene_refs/"
+                        f"{location_id}_exterior_anchor_thumb.webp"
+                    )
+                    logger.info(f"[ScenRefRegenerate] exterior thumb OK ({_os.path.getsize(_ext_thumb_path) // 1024}KB)")
+                except Exception as _thumb_e:
+                    logger.warning(f"[ScenRefRegenerate] exterior thumb 失败（非阻塞）: {_thumb_e}")
                 logger.info(
                     f"[ScenRefRegenerate] T21-NEW-7 exterior 重生成功: "
                     f"location={location_id}, cache-buster v={_v_ts}"
@@ -3760,10 +3788,14 @@ async def regenerate_scene_reference(
                 # 如果 user_edit 改了 interior, 同步写 description
                 if body.user_edit and body.ref_type in ("interior", "both"):
                     entry["interior_description"] = body.user_edit.strip()
+            if interior_url_thumb_result:
+                entry["interior_url_thumb"] = interior_url_thumb_result
             if exterior_url_result:
                 entry["exterior_url"] = exterior_url_result
                 if body.user_edit and body.ref_type in ("exterior", "both"):
                     entry["exterior_description"] = body.user_edit.strip()
+            if exterior_url_thumb_result:
+                entry["exterior_url_thumb"] = exterior_url_thumb_result
             updated_in_list = True
             break
     if not updated_in_list:
@@ -3773,6 +3805,8 @@ async def regenerate_scene_reference(
             "location_zh": _display_name,
             "interior_url": interior_url_result,
             "exterior_url": exterior_url_result,
+            "interior_url_thumb": interior_url_thumb_result,
+            "exterior_url_thumb": exterior_url_thumb_result,
             "interior_description": _interior_desc,
             "exterior_description": _exterior_desc,
             "description_zh": _display_name + " - " + (_interior_desc or _exterior_desc),
