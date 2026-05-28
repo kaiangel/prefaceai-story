@@ -354,6 +354,7 @@ export default function StageC() {
         storyboard: { shots: Array<{
           shotId: number;
           imageUrl: string | null;
+          image_url_thumb?: string | null;
           narration?: string;
           narrationSegment?: string;
           textOverlay?: { type: string; text: string };
@@ -370,6 +371,16 @@ export default function StageC() {
       console.timeEnd("[FE-5] /generation-result roundtrip");
 
       if (result.storyboard?.shots?.length) {
+        // Task#13 fix: /generation-result backend currently returns imageUrl as
+        // /api/projects/{uuid}/images/shot_XX.png (old route that returns 404 on VPS).
+        // Normalise to /static/outputs/{uuid}/images/shot_XX.png so toAbsoluteUrl
+        // produces the correct CDN-cached static URL.
+        const fixImageUrl = (url: string | null): string | null => {
+          if (!url) return null;
+          const m = url.match(/^\/api\/projects\/([^/]+)\/images\/(.+)$/);
+          if (m) return `/static/outputs/${m[1]}/images/${m[2]}`;
+          return url;
+        };
         const mappedShots: Shot[] = result.storyboard.shots.map((s) => ({
           shotId: s.shotId,
           sceneId: s.sceneId || 1,
@@ -379,7 +390,8 @@ export default function StageC() {
           cameraAngle: s.cameraAngle || "eye level",
           textType: s.textOverlay?.type || "narration",
           chineseText: s.textOverlay?.text ? [s.textOverlay.text] : [],
-          imageUrl: s.imageUrl,
+          imageUrl: toAbsoluteUrl(fixImageUrl(s.imageUrl)),
+          imageUrlThumb: toAbsoluteUrl(fixImageUrl(s.image_url_thumb ?? null)),
           charactersInScene: [],
           // D.17: content safety fields
           safetyAdvice: s.safety_advice || null,
@@ -2161,6 +2173,29 @@ function SceneRefsPreview({
   }, [projectId, token, hydrate, clearHydratePoll]);
 
   const hasData = sceneRefs.length > 0;
+
+  // P1 #3 (scenes): Prefetch all scene reference images when sceneRefs loads.
+  // Scene refs show all scenes in a vertical list (no pagination), so preload all at once.
+  // This prevents the 10-20s lag caused by 2.85MB+ PNGs over cross-ocean bandwidth.
+  //
+  // Plan A++ NOTE: SceneReferenceItem does NOT have thumbnail URL fields
+  // (interior_url_thumb / exterior_url_thumb) — the backend scene-references endpoint
+  // returns only interior_url + exterior_url. Progressive enhancement (thumb → full swap)
+  // is therefore not applicable here. The prefetch below serves as the perf optimization:
+  // images are loaded into browser cache before the user scrolls to them.
+  useEffect(() => {
+    if (!hasData) return;
+    sceneRefs.forEach((ref) => {
+      if (ref.interior_url) {
+        const img = new Image();
+        img.src = toAbsoluteUrl(ref.interior_url) ?? ref.interior_url;
+      }
+      if (ref.exterior_url) {
+        const img = new Image();
+        img.src = toAbsoluteUrl(ref.exterior_url) ?? ref.exterior_url;
+      }
+    });
+  }, [sceneRefs, hasData]);
 
   // ---- Confirm handler (R4-3 闸门解锁) ----
   const handleConfirmWithApi = useCallback(async () => {

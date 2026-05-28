@@ -965,6 +965,7 @@ async function hydrateProjectFromBackend(
       shots = rawShots.map((shot, i) => {
         const s = shot as Record<string, unknown>;
         const rawImageUrl = (s["image_url"] as string | null | undefined) || null;
+        const rawImageUrlThumb = (s["image_url_thumb"] as string | null | undefined) || null;
         const textOverlay = s["text_overlay"] as { type?: string; text?: string } | undefined;
         return {
           shotId: (s["shot_id"] as number) || i + 1,
@@ -979,6 +980,7 @@ async function hydrateProjectFromBackend(
           textType: textOverlay?.type || "narration",
           chineseText: textOverlay?.text ? [textOverlay.text] : [],
           imageUrl: toAbsoluteUrl(rawImageUrl),
+          imageUrlThumb: toAbsoluteUrl(rawImageUrlThumb),
           charactersInScene: (s["characters_in_scene"] as string[]) || [],
           // B44: read safety_advice + error fields written back by Stage 5 pipeline
           success: s["success"] !== undefined ? (s["success"] as boolean) : (rawImageUrl != null),

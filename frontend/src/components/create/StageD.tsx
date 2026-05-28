@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   ChevronLeft,
@@ -39,6 +39,12 @@ export default function StageD() {
   // D.17: ref for adjustment input to focus when user clicks "改一下文字"
   const adjustInputRef = useRef<HTMLInputElement>(null);
 
+  // Plan A++ progressive enhancement: show thumb first (fast), then swap to full image on load.
+  // progressiveImageSrc starts as null; set to thumb URL immediately on shot change, then
+  // background-loads full image and swaps when ready.
+  const [progressiveImageSrc, setProgressiveImageSrc] = useState<string | null>(null);
+  const [isHighRes, setIsHighRes] = useState(false);
+
   const token = getStoredToken();
   const shots = state.shots;
   const currentShot = shots[currentIndex];
@@ -48,6 +54,81 @@ export default function StageD() {
     .map((s, i) => (s.imageUrl === null ? i : -1))
     .filter((i) => i !== -1);
   const failedShotCount = failedShotIndices.length;
+
+  // Plan A++ progressive enhancement: thumb first → full image swap.
+  // When currentShot changes, immediately show thumb (2s over cross-ocean) then
+  // background-load the full image and swap src when ready.
+  // Race condition handled by cancel flag: if user navigates before full image loads,
+  // the stale onload does not update state.
+  useEffect(() => {
+    if (!currentShot) {
+      setProgressiveImageSrc(null);
+      setIsHighRes(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const thumbUrl = toAbsoluteUrl(currentShot.imageUrlThumb ?? null);
+    const fullUrl = toAbsoluteUrl(currentShot.imageUrl);
+
+    if (thumbUrl) {
+      // Step 1: show thumb immediately
+      setProgressiveImageSrc(thumbUrl);
+      setIsHighRes(false);
+    } else if (fullUrl) {
+      // No thumb (old data) — show full image directly, already high-res
+      setProgressiveImageSrc(fullUrl);
+      setIsHighRes(true);
+      return () => { cancelled = true; };
+    } else {
+      // No image at all (failed shot)
+      setProgressiveImageSrc(null);
+      setIsHighRes(false);
+      return () => { cancelled = true; };
+    }
+
+    // Step 2: background-load full image; swap on load (only when thumb != full)
+    if (fullUrl && thumbUrl !== fullUrl) {
+      const fullImg = new window.Image();
+      fullImg.onload = () => {
+        if (cancelled) return;
+        setProgressiveImageSrc(fullUrl);
+        setIsHighRes(true);
+      };
+      // onerror: full image load failed, keep showing thumb — no-op here
+      fullImg.src = fullUrl;
+    } else if (fullUrl) {
+      // thumb === full (same URL), already high-res
+      setIsHighRes(true);
+    }
+
+    return () => { cancelled = true; };
+  // Intentional: deps are specific fields, not the whole currentShot object.
+  // We only re-run when the shot's identity or URLs change, not on every render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentShot?.shotId, currentShot?.imageUrl, currentShot?.imageUrlThumb]);
+
+  // P1 #3: Preload adjacent shots (±2) when currentIndex changes.
+  // Browsers cache images fetched via new Image(), so the next/prev shots
+  // load from cache instead of re-fetching 2.85MB PNGs over the wire.
+  // Prefer imageUrlThumb (WebP ~300KB) when available; fall back to full imageUrl.
+  useEffect(() => {
+    const preloadIndices = [
+      currentIndex - 2, currentIndex - 1,
+      currentIndex + 1, currentIndex + 2,
+    ].filter((i) => i >= 0 && i < shots.length);
+
+    preloadIndices.forEach((i) => {
+      const shot = shots[i];
+      if (!shot) return;
+      const url = shot.imageUrlThumb || shot.imageUrl;
+      if (url) {
+        const img = new Image();
+        img.src = url;
+      }
+    });
+  }, [currentIndex, shots]);
 
   // B46: jump to the first failed shot
   const jumpToFirstFailedShot = useCallback(() => {
@@ -312,13 +393,16 @@ export default function StageD() {
                     {adjusting ? "正在调整画面..." : "正在重新生成..."}
                   </span>
                 </div>
-              ) : toAbsoluteUrl(currentShot.imageUrl) ? (
-                // P0-1: Use toAbsoluteUrl to convert /static/... paths to absolute backend URLs
+              ) : progressiveImageSrc ? (
+                // Plan A++ progressive enhancement:
+                // progressiveImageSrc starts as thumb (fast load ~2s), then swaps to full image
+                // after background load completes. isHighRes tracks current resolution.
+                // P0-1: toAbsoluteUrl already applied (urls stored in progressiveImageSrc are absolute)
                 // P3-5: onError shows a fallback placeholder when image fails to load
                 <img
-                  src={toAbsoluteUrl(currentShot.imageUrl)!}
+                  src={progressiveImageSrc}
                   alt={`Shot ${currentShot.shotId}`}
-                  className="w-full h-full object-cover"
+                  className={`w-full h-full object-cover transition-opacity duration-300 ${isHighRes ? "opacity-100" : "opacity-90"}`}
                   onError={(e) => {
                     const target = e.currentTarget;
                     target.style.display = "none";

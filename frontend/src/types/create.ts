@@ -103,6 +103,7 @@ export interface Shot {
   textType: string;
   chineseText: string[];
   imageUrl: string | null;
+  imageUrlThumb?: string | null;
   charactersInScene: string[];
   // D.17 / B44: content safety fields (populated when image generation is blocked)
   // safetyAdvice is now a structured SafetyAdvice object (not a plain string)
