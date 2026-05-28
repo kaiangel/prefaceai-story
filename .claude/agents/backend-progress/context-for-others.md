@@ -1,6 +1,21 @@
 # Backend Agent - 给其他 Agent 的上下文
 
-> **最后更新**: [2026-05-28] ✅ P1 followup scene_ref thumbnail URL wire 完成。2400 PASS 0 退化。待 DevOps 部署同批。
+> **最后更新**: [2026-05-28 22:00] ✅ fallback 路径 scene_references_list wire 完美闭环。pipeline_orchestrator.py L1428-1494。2400 PASS 0 退化。待 DevOps 部署同批。
+
+---
+
+## ✅ [fallback 路径 scene_references_list wire 完美闭环] [2026-05-28 22:00] — @devops(部署同批) @pm(可改 PENDING)
+
+### 改动
+- `pipeline_orchestrator.py:L1428-1494` — fallback 路径镜像主路径 L1031-1080，完整构建 fallback_scene_references_list + 调 checkpoint_callback 持久化到 chapter.scene_references_json
+- 全 try/except 兜底，失败 log warning 不中断 fallback 主流程
+
+### @pm 注意
+- PENDING.md 里"已知限制 — Fallback 路径生成的 thumb 文件需等下次主路径 scene_references_json 重建后才写入"可以标为 ✅ 完美闭环已修，待 DevOps 部署
+- fallback 触发极罕见（6 次部署历史几乎未见），对 ROI 影响极小，属于代码可维护性改善
+
+### @devops 部署说明
+- 纯代码改动，无 Alembic 迁移，rsync app/ 后 docker rebuild api 即可
 
 ---
 

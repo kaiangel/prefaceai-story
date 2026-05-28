@@ -1424,6 +1424,75 @@ class Phase2PipelineOrchestrator:
                             "gemini_nb2", 0.067 * len(scene_anchors),
                             f"Scene refs fallback {len(scene_anchors)} images"
                         )
+
+                        # fb 路径 scene_references_list 持久化 (镜像主路径 L1031-1056, 5/28 22:00 完美闭环)
+                        try:
+                            import time as _t45_fb
+                            _v45_fb = int(_t45_fb.time())  # cache-buster
+                            fallback_scene_references_list = []
+                            for _fb_loc in unique_locations:
+                                _fb_loc_id = _fb_loc.get('location_id', '')
+                                if not _fb_loc_id:
+                                    continue
+                                _fb_loc_zh = _fb_loc.get('display_name') or _fb_loc.get('location_id', '')
+                                _fb_interior_key = f"{_fb_loc_id}_interior_anchor"
+                                _fb_exterior_key = f"{_fb_loc_id}_exterior_anchor"
+                                _fb_interior_path_disk = os.path.join(scene_refs_dir, f"{_fb_interior_key}.png")
+                                _fb_exterior_path_disk = os.path.join(scene_refs_dir, f"{_fb_exterior_key}.png")
+                                _fb_interior_url = (
+                                    f"/static/outputs/{project_id}/scene_refs/{_fb_interior_key}.png?v={_v45_fb}"
+                                    if os.path.exists(_fb_interior_path_disk) else None
+                                )
+                                _fb_exterior_url = (
+                                    f"/static/outputs/{project_id}/scene_refs/{_fb_exterior_key}.png?v={_v45_fb}"
+                                    if os.path.exists(_fb_exterior_path_disk) else None
+                                )
+                                # thumb URL (镜像主路径 L1040-1048)
+                                _fb_interior_thumb_path = _fb_interior_path_disk.replace(".png", "_thumb.webp")
+                                _fb_exterior_thumb_path = _fb_exterior_path_disk.replace(".png", "_thumb.webp")
+                                _fb_interior_url_thumb = (
+                                    f"/static/outputs/{project_id}/scene_refs/{_fb_interior_key}_thumb.webp"
+                                    if os.path.exists(_fb_interior_thumb_path) else None
+                                )
+                                _fb_exterior_url_thumb = (
+                                    f"/static/outputs/{project_id}/scene_refs/{_fb_exterior_key}_thumb.webp"
+                                    if os.path.exists(_fb_exterior_thumb_path) else None
+                                )
+                                fallback_scene_references_list.append({
+                                    "location_id": _fb_loc_id,
+                                    "location_zh": _fb_loc_zh,
+                                    "interior_url": _fb_interior_url,
+                                    "exterior_url": _fb_exterior_url,
+                                    "interior_url_thumb": _fb_interior_url_thumb,
+                                    "exterior_url_thumb": _fb_exterior_url_thumb,
+                                    "interior_description": _fb_loc.get('interior_description', ''),
+                                    "exterior_description": _fb_loc.get('exterior_description', ''),
+                                    "description_zh": _fb_loc_zh + ' - ' + (
+                                        _fb_loc.get('interior_description', '') or _fb_loc.get('exterior_description', '')
+                                    ),
+                                    "atmosphere": _fb_loc.get('atmosphere', ''),
+                                    "time_of_day": _fb_loc.get('time_of_day', ''),
+                                    "lighting_condition": _fb_loc.get('lighting_condition', ''),
+                                    "key_visual_elements": _fb_loc.get('key_visual_elements', []),
+                                })
+
+                            # checkpoint 持久化 (镜像主路径 L1069-1079)
+                            if checkpoint_callback:
+                                try:
+                                    await checkpoint_callback("scene_references_json", fallback_scene_references_list)
+                                    logger.info(
+                                        f"[Pipeline] T21-NEW-7 (fb): scene_references_json checkpoint OK "
+                                        f"({len(fallback_scene_references_list)} locations)"
+                                    )
+                                except Exception as _fb_cb_e:
+                                    logger.warning(
+                                        f"[Pipeline] T21-NEW-7 (fb): scene_references_json checkpoint 失败（非阻塞）: {_fb_cb_e}"
+                                    )
+                        except Exception as _fb_refs_e:
+                            logger.warning(
+                                f"[Pipeline] T21-NEW-7 (fb): fallback scene_references_list 构建失败（非阻塞）: {_fb_refs_e}"
+                            )
+
                         print(f"✅ 场景参考图兜底生成完成: {len(scene_anchors)}张")
                     except Exception as e:
                         print(f"⚠️ 场景参考图兜底生成失败: {e}")

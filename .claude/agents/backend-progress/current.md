@@ -1,6 +1,42 @@
 # Backend Agent - 当前任务
 
-> **最后更新**: [2026-05-28] ✅ P1 followup scene_ref thumbnail URL wire 完成: 3 处改动 (pipeline_orchestrator + chapters.py regenerate + scene_references_json 写入) — pytest 2400 PASS 0退化
+> **最后更新**: [2026-05-28] ✅ fallback 路径 scene_references_list wire 完美闭环: pipeline_orchestrator.py L1428-1494 (fallback 路径镜像主路径 L1031-1080) — pytest 2400 PASS 0退化
+
+---
+
+## ✅ 完成: fallback 路径 scene_references_list wire 完美闭环 [2026-05-28 22:00, Sonnet 4.6 high]
+
+### 任务背景
+PM 5/28 22:00 Founder 决策 "没风险就修": fallback 路径 (Stage 5 5a.5 兜底) 生成 anchor 图 + thumb，但没构建 fallback_scene_references_list + 没调 checkpoint_callback，与主路径 L1031-1080 不对称。
+
+### 改动文件
+
+| 文件 | 行号 | 改动 |
+|------|------|------|
+| `app/services/pipeline_orchestrator.py` | L1428-1494 | fallback 路径加 fallback_scene_references_list 构建 + checkpoint_callback 调用 (镜像主路径 L1031-1080) |
+
+### 模式镜像
+
+| 主路径 (L1031-1080) | fallback 路径 (L1428-1494) |
+|---|---|
+| `import time as _t45; _v45 = int(...)` | `import time as _t45_fb; _v45_fb = int(...)` |
+| 遍历 `unique_locations` | 同上 (`_fb_loc`) |
+| `os.path.exists(...)` 检查 png + thumb | 同上 |
+| `scene_references_list.append({...})` | `fallback_scene_references_list.append({...})` |
+| `if checkpoint_callback: await checkpoint_callback(...)` | 同上 |
+| 失败 → log warning 非阻塞 | 外层 try/except 兜底 → log warning 不中断 fallback |
+
+### try/except 兜底覆盖率
+- **外层 (L1429-1494)**: 整个 fallback_scene_references_list 构建失败（unique_locations 缺字段 / os.path 异常等）→ log warning，继续
+- **内层 (L1480-1490)**: checkpoint_callback 调用失败（DB 异常 / callback None check 已通过 if checkpoint_callback 守卫）→ log warning，继续
+- **不中断 fallback**: `print(f"✅ 场景参考图兜底生成完成...")` 在两层 try/except 外，始终执行
+
+### pytest
+- `pytest tests/ -q --tb=short`: **15 failed / 2400 passed / 0 退化** (与上一轮完全一致)
+
+### Ben 协议
+- 0 schema 改动 / 0 Alembic migration / 0 STATUS_API_CONTRACT / 不涉公网内网
+- `[frontend-impact: no]` — fallback 路径罕见触发，数据结构与主路径完全对称
 
 ---
 
