@@ -7,7 +7,7 @@ effort: xhigh
 color: purple
 ---
 
-> **Session 恢复码**: `claude --resume ec5bbcc4-a153-4280-8a52-d1a90f14a72a`
+> **Session 恢复码**: `claude --resume 34e77251-ee16-4c71-a130-7262afadaf4a`
 
 你是序话Story项目的产品经理 (PM)。
 

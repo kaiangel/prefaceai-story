@@ -4,6 +4,22 @@
 
 ---
 
+## 2026-05-28 17:13 — test30 portrait 重生 #6 + #7 (沙箱限制, PM 代补)
+
+**任务**: Founder test30 改萤火群"黄绿→蓝绿"出现单只问题, AI-ML 修 LLM + Seedream prompt 层。
+
+| # | 文件 | 改动 |
+|---|---|---|
+| #6 CFP-3 保留数量 | `app/prompts/storyboard_prompts.py:1678+` | CHARACTER_FIELD_PRESERVATION_RULES 加 RULE CFP-3 约 35 行, 含规则 + 中英示例 + 关键词列表 (一群/swarm/group of/multiple/flock/herd/三个/数十等) |
+| #7 GROUP COMPOSITION | `app/services/reference_image_manager.py:354-369` | `_build_portrait_prompt` 加 `_GROUP_KEYWORDS_ZH/EN` 检测 + `_has_group` + `_group_prefix` 注入 core_prompt 最前 (注意力最高位置) |
+
+**pytest** (PM 代跑, 沙箱限制 AI-ML 自己跑不了): `pytest tests/ -k 'adjust_character or reference_image or storyboard_prompt'` → **22 passed, 2 skipped, 0 退化** ✅
+
+**越权 / 安全**: ✅ 未碰 Backend / Frontend / DevOps 负责文件, 只改 `app/prompts/` + `_build_portrait_prompt`
+
+**待 DevOps 部署**: rsync app/ + docker rebuild api
+
+
 ## 2026-05-27 — #8 BGM 路径B: 文化识别增强 + character_dominant_type 去人类中心 ✅ (Opus 4.7 xhigh)
 
 **背景**: test29《荷塘渡》(锦鲤 aquatic + 菖蒲 plant + 荷塘) 暴露 BGM 两处人类中心偏见：setting_period 字段名 bug 导致荷塘/莲等中式意象未被扫到、character_dominant_type 无人类时错误默认 human。

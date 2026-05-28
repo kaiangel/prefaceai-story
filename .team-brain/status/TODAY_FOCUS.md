@@ -1,8 +1,56 @@
 # Today's Focus
 
-> **Updated**: 2026-05-26 17:55 (PM — test29 e2e 90分 + 非人类专项修复审查通过)
+> **Updated**: 2026-05-28 17:55 (test30 整轮 e2e + 4 处 parity + portrait deep dive + 性能 P0 Plan A++ 代码闭环, 等 DevOps 部署)
 
-## 当前阶段: test29 后 — 非人类通用性专项修复 (待 e2e 视觉验证 + 部署)
+## 当前阶段: 代码层完整闭环, Founder 下班, DevOps 部署待安排 (含 scene_ref thumb URL wire P1 followup)
+
+### 5/28 整轮成果
+
+✅ **Pipeline e2e** 3840.2s 跑通《灯笼与萤火》, 20 shot + BGM 全落盘
+✅ **Dev/Prod Parity 4 处 P0**: SKIP / ARK / IMAGE_GEN_PROVIDER+PROMPT_FORMAT / Nginx /static/ 全修
+✅ **Portrait 重生 Explore very-thorough 5 维度深审**: Adjust + Regenerate 双 endpoint, LLM CFP-3 + Seedream GROUP COMPOSITION
+✅ **性能 P0 Plan A++ progressive enhancement**: Backend thumbnail + WebP + Frontend StageD progressive (thumb 2s 秒切 + 后台升清)
+✅ **DEC-055 + Deploy SOP 11 维度** 锁定永不再犯
+✅ **15 个问题完整深度回溯** (analysis/TEST30_FULL_RETROSPECTIVE_2026-05-28.md, 8000 字)
+✅ **4 个 memory + MEMORY.md** 索引
+
+### 待 DevOps 部署 (Founder 下班, 之后做)
+
+1. **B**ackend scene_ref thumb URL wire 补 (~20 min, PENDING 顶部 P1 followup) — 与本批同部署
+2. commit 按 scope 分 4-5 组 (Backend / AI-ML / Frontend / 文档 / scene_ref wire 补)
+3. rsync app/ + frontend/ 到 VPS
+4. VPS docker compose rebuild api + frontend
+5. 验证: portrait 重生 refs=1 / shot 三件套 (png+webp+thumb) / 前端 preview 页 thumb 2s 秒切 + 自动升清
+
+### P2 内测后
+
+- CDN 国内化 (等 Ben 讨论)
+- WebP fallback PNG 兜底 (96%+ 浏览器覆盖)
+- chapter_scene_images.thumbnail_path dead column 处理
+- STATUS_API_CONTRACT 加 §X "shot 数据字段" 一节
+
+---
+（以下为 5/28 早 历史）
+
+## (历史) 当前阶段: P0-2 修完, 等 Founder 重发新 test30《灯笼与萤火》真生图
+
+### 5/28 凌晨最重要
+
+1. **P0-2 VPS test30 portrait 全失败根治**: Founder VPS 真机 test30 /characters 三角色全失败, Pipeline `generate_images=True` 但 0 portrait。PM 铁律 5 维度核实 (容器代码 + 完整调用链 + 历史证据 + 其他 flag 排查 + Ben 维度), 锁定根因 = `.env.production` 误开 `SKIP_IMAGE_GENERATION=true`。Founder go 后 sed + force-recreate api 修复, 容器 settings=False + /api/health 200 ✅。**待 Founder 重发新 test30 真生图** (e48baa8a 项目废弃: API 重启 in-memory 丢 + portrait 窗口已过)。
+2. **PM 盲区透明承认**: test29 后看到 VPS 仅 1 output 目录归因 "其他 35 个 local-origin", 没追 "为什么 36 项目里只 1 个有图" — 那时该挖到 SKIP 模式。下次 dashboard/output 数量背离立即追 "是什么开关让 VPS 不生图"。
+3. **Ben 暂不通知** (Founder 决策, 本轮)。SKIP toggle 不涉契约/DB/公网/DB-infra, 纯本机 feature toggle。
+
+### 仍在工作区待 commit+部署 (内测前)
+
+- **#8 BGM 路径B** (story_music_extractor.py 文化识别 universal 信号 + character_type 降软提示)。PM 审查通过 (395 pytest + dry-run), 等 DevOps 下一批一起 push 部署。真听感 Founder e2e。
+
+### 5/27 历史
+- ✅ P0 SQLAlchemy 2.0.50 部署 (ping TypeError 120→0) + dev/prod parity (DEC-054 canonical DB 栈)
+
+---
+（以下为 5/26 历史）
+
+## (历史) 当前阶段: test29 后 — 非人类通用性专项修复 (待 e2e 视觉验证 + 部署)
 
 ### 今日 (5/26) 最重要的三件事
 

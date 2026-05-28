@@ -1,7 +1,30 @@
 # AI-ML Engineer 当前任务
 
-> 更新时间: 2026-05-27 (#8 BGM 路径B 完成)
-> 状态: 🟢 #8 BGM 文化识别 + 信号去人类中心完成, 1 文件改 + 1 probe, 391 回归 PASS, 待 @tester 回归 + Founder e2e 听感
+> 更新时间: 2026-05-28 17:05 (test30 portrait 重生 #6 + #7 完成, PM 沙箱代补)
+> 状态: 🟢 #6 CFP-3 保留数量 + #7 GROUP COMPOSITION 群体 token 强化全部代码层完成, PM 跑 pytest 22 PASS / 0 退化, 待 DevOps 部署
+
+## 🟢 5/28 test30 portrait 重生批次 — Sonnet 4.6 high (沙箱限制 progress 由 PM 代补)
+
+### 一句话
+
+`storyboard_prompts.py:1678` 加 RULE CFP-3 (LLM 层防丢失"一群"等数量 token) + `reference_image_manager.py:L353` 加群体检测注入 GROUP COMPOSITION (Seedream 层强化群体 token 权重)。
+
+### 改动文件 (2 个)
+1. **`app/prompts/storyboard_prompts.py:1678+`** — `CHARACTER_FIELD_PRESERVATION_RULES` 内加 RULE CFP-3 约 35 行, 含完整规则说明 + 2 个 ✅/❌ 示例 (萤火群改颜色 / 三学生改书包) + 中英关键词列表
+2. **`app/services/reference_image_manager.py:354-369`** — `_build_portrait_prompt` 内三 char_type 分支之后加 `_GROUP_KEYWORDS_ZH/EN` 检测 + `_has_group` 判断 + `_group_prefix` 注入到 `core_prompt` 最前面
+
+### Pytest (PM 代跑)
+- `pytest tests/ -k 'adjust_character or reference_image or storyboard_prompt'` → **22 passed, 2 skipped, 0 退化** ✅
+
+### 越权 / 安全
+- ✅ 未碰 Backend / Frontend / DevOps 负责文件
+- ✅ 只改 `app/prompts/` + `app/services/reference_image_manager.py:_build_portrait_prompt`
+
+### 待 DevOps 部署 (commit + rsync + VPS rebuild api)
+
+---
+
+## (历史 2026-05-27) #8 BGM 路径B 完成
 
 ---
 

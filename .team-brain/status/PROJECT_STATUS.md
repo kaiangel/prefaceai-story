@@ -1,6 +1,8 @@
 # Project Status
 
-> **Updated**: 2026-05-26 17:55 (PM — test29 e2e 90分 + 非人类专项修复)
+> **Updated**: 2026-05-28 17:55 (test30 e2e + 4 处 parity 修 + portrait deep dive + 性能 P0 Plan A++ 代码层完整闭环, 等 DevOps 部署)
+>
+> **5/28 进展**: test30《灯笼与萤火》VPS 真机 e2e 3840.2s 跑通 → **暴露 dev/prod parity 4 处 P0 哑雷连环**(SKIP/ARK/IMAGE_GEN_PROVIDER+PROMPT_FORMAT/Nginx /static/) **全已修** → portrait 重生 Explore very-thorough 5 维度深审 (LLM CFP-3 保留数量 + Seedream GROUP COMPOSITION + Regenerate-portrait L1852 wire 补) → 用户体验性能 P0 Plan A++ (Backend thumbnail+WebP+Frontend StageD progressive enhancement, thumb 2s 秒切 + 后台升清) **代码层完整闭环**。3 agent 并行完工 + Frontend Plan A++ 二次修, pytest 205+22 + vitest 20/20 + build 0 errors。**DEC-055 + Deploy SOP 11 维度**锁定永不再犯。Founder 下班, DevOps 部署待安排 (含 scene_ref thumb URL wire P1 followup ~20 min, 同批补)。详 `analysis/TEST30_FULL_RETROSPECTIVE_2026-05-28.md` 完整 8000 字深度回溯。
 >
 > **5/23-5/26 进展补记**: Wave 13 内测前 FIXBATCH 全修复 (5/25) → test29《荷塘渡》e2e 跑通 Founder 90分 (5/26), Wave 13 全部实测生效 → 炸出「非人类人类中心假设链」5缺口, 当场修 #4(Packet retry, Backend)+#5/#6/#7(非人类消费层专项, AI-ML, 含补挖 #5a 锚点层), PM 地毯式+Ben维度审查通过, #8(BGM)内测后。**已闭环 + 部署**: Founder B 方案(信任单测) → commit 4 组 + push + .gitignore 安全修复(BP/简历 0 入库) + VPS 第 5 次部署。**三方同步 `81b5d25`** (本地=GitHub=VPS运行代码 Wave13+test29), 生产 prefaceai.mov 200/200 + w13-404 proxy-init 实锤。Ben 已知会(#4 DB-infra)。剩 #8(内测后)+#5/#7视觉真证(Founder 选不阻塞)。详见 `analysis/TEST29_FULL_RETROSPECTIVE_2026-05-26.md`。
 

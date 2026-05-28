@@ -1,6 +1,49 @@
 # Frontend 状态速览（供其他Agent参考）
 
-> 更新时间: 2026-05-25 [Wave 13 #6 前端] regenerate-portrait (reroll) 改异步轮询 完成
+> 更新时间: 2026-05-28 [Plan A++ progressive enhancement] StageD 主 img thumb→full swap 完成
+
+## Plan A++ progressive enhancement (2026-05-28) ✅ P0 性能真 10x 闭环
+
+**2 文件改 + 1 新建测试, build 0 errors, npm test 20/20 PASS**
+
+**StageD 主 `<img>` 现在用 progressive enhancement**: 默认显示 `imageUrlThumb` (thumb ~300KB, 2s 跨海秒切), `useEffect` 后台加载 `imageUrl` 全图 (~1MB), `onload` 后自动 swap src 升清。Cancel flag 处理 race condition (快速切 shot 时 stale onload 不污染 state)。旧数据无 `imageUrlThumb` 时直接用全图 (兼容)。
+
+### 给 @backend (依赖确认)
+- `shot["image_url_thumb"]` (storyboard_json 字段) 已在上一轮 Backend #8/#9/#10 写入
+- 前端 `Shot.imageUrlThumb?: string | null` 已加 (types/create.ts L106)
+- 前端 hydrate (CreateContent.tsx + StageC.tsx finalizeAndGoToPreview) 已读 `image_url_thumb`
+- **一切就绪**: 只需 DevOps 部署 (含 Backend 上一轮 P0 代码)
+
+### 给 @tester (复测点)
+- **Network tab 验证**: preview 页切 shot → 先看到 `.thumb.webp` 请求 (~300KB) 出图 → 几秒后 `.webp` 全图静默加载
+- **快速切 shot**: 快速连点 next — 不应看到过期 shot 图片 "回来" (cancel flag 验证)
+- **旧数据兼容**: 无 `image_url_thumb` 字段的旧项目 → 直接显全图, 功能不破
+
+### 给 @devops (部署注意)
+- 本批改动 2 文件改 + 1 新建测试，0 layout.tsx，正常 build 部署
+- SceneRefsPreview: 暂无 thumbnail 字段 (backend `/scene-references` 端点不返回), prefetch 已覆盖体感优化
+
+---
+
+## test30 性能修复 (2026-05-28) ✅ P1 #3 预加载 + imageUrlThumb + P2 #13 workaround
+
+**4 文件改 (types/create.ts + CreateContent.tsx + StageC.tsx + StageD.tsx), build 0 errors, npm test 15/15 PASS**
+
+### 给 @backend (重要: 根治 imageUrl 硬编码)
+- **`app/api/projects.py:1025`** 硬编码 `f"/api/projects/{project_id}/images/shot_{shot_id:02d}.png"` — 应该读 `shot.get("image_url")` (storyboard_json 里的真实 `/static/outputs/...` 路径)
+- 前端已加 `fixImageUrl()` workaround regex 修正，但 backend 才是根治: 把 L1025 改成 `"imageUrl": shot.get("image_url")` 并 toAbsoluteUrl 留给前端处理
+- **Backend P0 #1 thumbnail**: 前端已加 `Shot.imageUrlThumb?: string | null` 类型 + `CreateContent.tsx` hydrate 读 `s["image_url_thumb"]` + `StageC finalizeAndGoToPreview` 读 `s.image_url_thumb`。一旦 backend storyboard_json 写 `image_url_thumb` 字段，前端自动使用 WebP 缩略图预加载
+
+### 给 @tester (复测点)
+- **StageD shot 切换**: 切换镜头时，浏览器后台预拉 ±2 相邻 shots。若 backend P0 #1 thumbnail 已上线: 切换应接近秒切 (WebP ~300KB vs PNG 2.85MB)
+- **SceneRefsPreview**: 场景确认页加载后，所有 scene ref 图 prefetch。场景图加载应明显变快
+- **imageUrl 路径**: StageD 镜头图片应正确加载 (不再 404/401)。若 VPS 实测仍有问题，检查 backend P0 #1 是否已部署
+
+### 给 @devops (部署注意)
+- 本批改动 4 文件，0 layout.tsx，正常 build 部署即可
+- 若 Backend P0 #1 thumbnail 同步部署，需同时做 Alembic 迁移 (thumbnail_url/thumbnail_path 列)
+
+---
 
 ## Wave 13 #6 前端 (2026-05-25) ✅ regenerate-portrait 异步轮询
 

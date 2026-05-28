@@ -2244,3 +2244,69 @@ DEC-030 (前后端纠验机制) + DEC-051 (fallback 红线) + STATUS_API_CONTRAC
 **Ben 维度**: test29 改动零前端/契约表面 (DEC-030 无 frontend-impact), 不碰 DB 边界; #4 是 DB-infra → 部署前 Founder 知会 Ben。
 
 **关联**: 落地 memory `project_schema_humanoid_fallback_remaining` (aquatic 等 5 type prompt 层) + 回溯 `analysis/TEST29_FULL_RETROSPECTIVE_2026-05-26.md` + DEC-051 (0 删 fallback)。**长期**: 通用性是产品灵魂, 非人类多角色互动是核心场景, 后续消费层 (BGM/旁白/场景) 持续去人类中心。
+
+---
+
+## [2026-05-28] DEC-055 Canonical Dev/Prod Parity 11 维度审计标准 + Deploy SOP (4 处 P0 连环触发后系统性根治)
+
+**背景**: 5/27 DEC-054 只钉死 DB 栈 parity, **没扫 .env keys / Nginx 反代 / 静态文件 serving 链路 / 容器化 vs 本地服务启动差异**。5/28 VPS test30 真机测试**连环暴露 4 只哑雷**:
+1. **P0-2** `.env.production` 误开 `SKIP_IMAGE_GENERATION=true` (06:20 修)
+2. **P0-3** `.env.production` 完全缺 `ARK_API_KEY` (06:45 修, 之前被 SKIP=true 掩盖)
+3. **P0-4** `.env.production` 缺 `IMAGE_GEN_PROVIDER` + `PROMPT_FORMAT` parity 红线 (06:45 同批修)
+4. **P0-5** host Nginx `prefaceai-mov` 缺 `location /static/` proxy → portrait png 真落盘但浏览器 404 HTML (07:12 Founder sudo 修)
+
+Founder 严厉提醒: "全维度毫无遗漏要本地一致或对齐 这点那么难吗"。PM 派 Explore very-thorough 11 维度 audit + 实测 verify, 锁进 canonical 标准, 永不再循环踩雷。
+
+**决策**: 钉死 **Canonical Dev/Prod Parity = 11 维度强制对齐 + Deploy SOP 强制 checklist**。
+
+**11 维度 (按风险降序)**:
+
+| # | 维度 | Canonical 标准 | 漏过后果 |
+|---|---|---|---|
+| **D** | **`.env` keys** | 本地 `.env` 与 VPS `.env.production` 全 key 必须一对一对应 (差异仅限 ops 显式化 / DEBUG flag), API keys 一个不能少 | 任何 API 失效 = 用户感知功能炸 |
+| **E** | **Nginx / 反向代理** | host Nginx `/etc/nginx/sites-enabled/<site>` location 块必须 cover **全部** FastAPI mount path (`/api/` + `/static/` + Next.js `/` + `/_next/static/`)。新加 FastAPI mount 必须同步加 Nginx location | 即使后端正常, 浏览器 404 看不到 |
+| **G** | **静态文件 mount 链路** | 后端 `app/main.py` 的 `app.mount("/static/...", StaticFiles(directory=...))` 路径 + Pipeline 写文件目录 + Docker volume 挂载点 + Nginx proxy_pass + 本地直访链路, 5 段必须端到端跑通 | 文件真生成但取不到 |
+| **C** | **DB 栈** | DEC-054 已钉: `sqlalchemy==2.0.50` + `asyncmy==0.2.11` + `pymysql==1.1.2` + `DATABASE_URL=mysql+asyncmy://` + `pool_pre_ping=True` + `pool_recycle=600s` | ping bug 间歇 500 |
+| **B** | **Python 依赖** | `requirements.txt` 精确 pin (无 `>=` 无上界), 本地+VPS+CI 三处 `pip freeze` 一致 | 隐式升级炸 (PyMySQL 1.1.2→1.2.0 教训) |
+| **A** | **应用代码** | git HEAD + rsync 同步状态。VPS 容器内 `/app/` = 本地仓库 HEAD = GitHub main | 行为差异难诊断 |
+| **F** | **Docker 配置** | `docker-compose.yml` volume/ports/network/healthcheck/restart_policy + Dockerfile `CMD` + `env_file` 指向 | env 不注入 / 端口冲突 |
+| **K** | **build-time env** | Next.js `NEXT_PUBLIC_*` 必须 build time 注入 (Dockerfile.frontend `ENV` 或 build-arg), 不能依赖 runtime .env。本地 dev `next dev` vs VPS `next start` 差异 | 前端 API URL 错误 |
+| **H** | **服务启动方式** | 本地 `uvicorn --reload`(开发) vs VPS `uvicorn` 不带 `--reload`(生产, 避 metadata lock 死锁); Next.js 本地 `next dev` vs VPS `next start` 容器 | --reload 在远 MySQL 会死锁 |
+| **I** | **端口 / 网络** | 容器内 :8000 + :3000 + Docker network bridge, host 127.0.0.1:8000/3000 (避公网直暴露), Nginx 443/80 反代 | 端口被外网直访绕 Nginx |
+| **J** | **文件权限 / 用户** | Docker 容器 root 写 volume, host trader 用户可读 (755 自动); 不可在容器内 chmod 700 否则 Nginx www-data 读不到 | 静态文件 403 |
+
+**Deploy SOP 强制 checklist**: `.team-brain/sops/DEPLOY_PARITY_CHECK.md` (新建, DevOps 每次部署前**必须**逐条跑通, 一条不过不准上)。SOP 内含:
+- `diff` 本地 `.env` keys vs VPS `.env.production` keys (key 名, 不打印 value)
+- 容器内 `python3 -c 'from app.config import settings; ...'` 实证全部关键 settings 有 value
+- Nginx `/static/` location 对照 FastAPI mount 列表 (grep `app.mount` 在代码里)
+- 容器 runtime env `printenv` 与 .env.production keys 完全一致
+- `curl -I` 抽测每个 mount 路径 200 + Content-Type
+- DB 栈 `pip show` 3 包版本对照 canonical
+
+**今晚 4 处修复实证 (5/28 完整收口)**:
+- P0-2 SKIP=false (docker exec python3 `settings.SKIP_IMAGE_GENERATION = False` ✅)
+- P0-3 ARK_API_KEY 真鉴权 (Seedream API HTTP 400 InvalidParameter, 鉴权层通过 ✅; 实战: 3 张 portrait 真生成 2-3MB png ✅)
+- P0-4 IMAGE_GEN_PROVIDER=seedream + PROMPT_FORMAT=b_prime 显式化 ✅
+- P0-5 Nginx `location /static/ → 127.0.0.1:8000` reload 后, 外部 `curl -I` 3 张 portrait HTTP 200 + image/png ✅
+
+**Ben 维度核查**: P0-2/3/4 backend env 域非 Ben 强域 (Founder 决策暂不通知); P0-5 host Nginx 基础设施层偏 Ben, 但当下 hotfix Founder 自己 sudo 改, **DEC-055 落地后建议 Founder 微信告知 Ben "今晚补了 11 维度 parity + SOP, 以后部署不会再有这种哑雷"**。
+
+**关联**: 修复 [PENDING.md "Dev/Prod Parity 全维度根治批次"]。+ 锁定 memory `feedback_dev_prod_parity_full_audit` (待新增) — PM 每次部署前必须跑 SOP 11 维度, 不可省略。**长期**: DEC-054 (DB 栈) + DEC-055 (11 维度全栈) 联合构成"序话 Story dev/prod parity 完整宪法"。
+
+---
+
+## [2026-05-27] DEC-054 Canonical DB 栈 + dev/prod parity (P0 ping bug 根治, Ben 批)
+
+**背景**: VPS 真机测试炸出 P0 —— 登录+工作台 GET /api/projects/ 间歇 500, `AsyncAdapt_asyncmy_connection.ping() missing 1 required positional argument: 'reconnect'`。真根因(Backend 真阿里云 MySQL 实证矩阵): SQLAlchemy 2.0.36 `do_ping`(pymysql.py:105 `_send_false_to_ping` inspect PyMySQL 同步 ping 签名) + VPS **PyMySQL 1.2.0**(2026-05-19 新发, ping 默认 reconnect=False)→ 无参 `ping()` → async 适配器 `ping(self,reconnect)` 无默认 → TypeError → pool_pre_ping 触发即 500。**真凶=PyMySQL 版本(VPS 1.2.0/本地 1.1.2 分裂)+ SA do_ping 逻辑, 非 async 驱动**(asyncmy/aiomysql 同病)。SQLAlchemy 官方 #13306, 2.0.50 修。矩阵: A(2.0.36+1.1.2)PASS / B(2.0.36+1.2.0=VPS)TypeError逐字match / C(2.0.50+1.2.0)PASS。
+
+**3 次诊断纠偏(地毯式审查+实测, 铁律省 2 次错误部署)**: ①Backend 首轮升 asyncmy 0.2.11(修错 bug `_auth_plugin_name`, VPS traceback 全程无)→PM 核 traceback 推翻 ②PM 推断换 aiomysql→Backend round2 实测推翻(aiomysql+pymysql1.2.0 同崩) ③真修=升 SQLAlchemy≥2.0.50。
+
+**决策(Ben 批 2+3)**:
+- **#2 修复**: `requirements.txt sqlalchemy==2.0.36→==2.0.50`(修 ping bug, 两驱动两 pymysql 都修)。
+- **#3 dev/prod parity**: 钉死 **Canonical DB 栈 = `SQLAlchemy==2.0.50` + `asyncmy==0.2.11` + `pymysql==1.1.2` + `DATABASE_URL=mysql+asyncmy` + `pool_pre_ping=True`**。`pymysql>=1.1.0`(无上界)是分裂源→钉 1.1.2(广泛验证, 1.2.0 一周前新发+多行为变更, 不在 P0 引入)。asyncmy 0.2.10→0.2.11(修 _auth_plugin_name 隐患)。驱动统一 asyncmy(尊重 Ben 既有选择)。**本地+VPS+测试三处必须镜像此栈**(根治"本地 aiomysql / VPS asyncmy + pymysql 版本分裂 → 本地测不出 VPS bug")。
+
+**验证(独立)**: 隔离 venv canonical 栈 pool_pre_ping vs 阿里云 0 TypeError + 回归 272 passed 0 退化。部署后 PM 独立核实: VPS 容器 SA2.0.50/asyncmy0.2.11/pymysql1.1.2 + ping TypeError 120/30min→**0** + /api/projects 401(不再 500)。本地已对齐(venv+.env 切 asyncmy+重启)= 镜像 VPS。
+
+**Ben 维度**: 纯客户端依赖版本, 阿里云**零操作**(Ben 已批)。服务端=阿里云 ECS 自建 MySQL 8.0.35 / root@% native_password / 不强制 SSL(Backend 实查; aiomysql caching_sha2 坑不适用)。**长期建议(与 P0 解耦)**: root@% 公网通配 native_password 偏裸奔, 可建最小权限 app 账号+限内网/白名单(Ben 评估)。
+
+**commit**: 8cabaec(requirements)。VPS HEAD=b219d00。**关联**: #4 Packet sequence(本地 aiomysql)亦同源 dev/prod 分裂产物。

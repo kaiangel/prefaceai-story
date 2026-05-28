@@ -1,9 +1,64 @@
 # PM Agent - 当前任务
 
-> **最后更新**: 2026-05-27 (P0 VPS DB ping bug 根治派活中, Ben已批2+3)
-> **状态**: 🔴 P0 根治: #2 升SQLAlchemy2.0.50 + #3 dev/prod parity, 派 Backend 中
+> **最后更新**: 2026-05-28 17:15 (test30 性能 P0 + portrait 重生 P1 + 预加载, 3 agent 完工, PM 审查通过, 等 Founder 批 DevOps 部署)
+> **状态**: ✅ 代码层全部完成, 待 Founder 批 DevOps commit + rsync + VPS rebuild
 
-## 5/27 晚: P0 VPS DB ping bug 根治 (#2+#3, Ben已批)
+## 5/28 17:15 PM 审查通过 + 集成验证结论
+
+**3 个 agent 并行完工**:
+- ✅ **Backend** (Sonnet 4.6 high, Opus 4.7 529 重派): #5 + #8 + #9 + #10 + #13 (5 项), pytest 205 PASS 0 退化
+- ✅ **AI-ML** (Sonnet 4.6 high): #6 CFP-3 + #7 GROUP COMPOSITION (2 项), PM 跑 pytest 22 PASS 0 退化 (沙箱限制)
+- ✅ **Frontend** (Sonnet 4.6 high): Shot type + StageD prefetch + SceneRefs prefetch + fixImageUrl (4 项), vitest 15/15 + build 0 errors
+
+**PM 地毯式审查 12 维度全 PASS** — 完整调用链路验证 (函数定义→调用点→参数传递→数据流向→消费点) + 越权零 + 文档更新到位 (AI-ML progress 沙箱限制 PM 代补完成, Backend completed PM 补完, Frontend 自动更新, TEAM_CHAT 各方追加完成)。
+
+**待 Founder 批 DevOps 部署**:
+- commit + push GitHub (按 scope 分 4 组)
+- rsync app/ + frontend/ 到 VPS
+- VPS docker compose rebuild api + frontend
+- 验证 dry-run: portrait 重生 refs=1 + shot 三件套 (png+webp+thumb.webp) + 前端 thumb 秒切
+
+**P2 记下 (内测后)**: CDN 国内化 (Ben 讨论) / ShotValidator 群体优化 / 复杂 prop 描述拆分
+
+## 5/28 08:35 派活批次: Performance P0 + Portrait 重生 P1 + Frontend 预加载
+
+**Founder 批准**: P0 thumbnail + 2 个 P1 (portrait 重生 fix + 预加载/WebP), P2 (CDN 国内化 + ShotValidator 群体) 记下来内测后。
+
+**派活清单**:
+- **Backend** (Opus 4.7 default): #5 Regenerate-portrait portrait_ref wire + #8/#9 thumbnail (shot+scene_ref webp 300KB) + #10 WebP 全分辨率压缩 + Alembic 迁移 thumbnail_url
+- **AI-ML** (Sonnet 4.6 high): #6 AdjustCharacter RULE CFP-3 保留数量 + #7 Seedream portrait 群体 token 强化
+- **Frontend** (Sonnet 4.6 high): #3 预加载相邻 shots/scenes + #13 generating 页错路径修 + Shot type 加 imageUrlThumb
+
+**收尾**: Backend/AI-ML/Frontend 三方完工后, DevOps 接力 (commit + rsync + VPS rebuild + Alembic 迁移)。Ben 不通知 (全 backend/prompt/frontend 域)。
+
+**关联文档**:
+- `analysis/TEST30_FULL_RETROSPECTIVE_2026-05-28.md` 完整 8000 字深度回溯
+- `PENDING.md` 顶部 3 批次派活清单
+- `DECISIONS.md` DEC-055 Canonical 11 维度 + Deploy SOP
+- `sops/DEPLOY_PARITY_CHECK.md` 11 维度强制 checklist
+- 4 memory 新增
+
+## (历史) 5/28 凌晨: P0-2 VPS test30 portrait 全失败根因 + 修复 (Ben 暂不通知)
+
+- **现象**: Founder VPS 真机 test30《灯笼与萤火》/characters 三个角色卡片全失败, Pipeline 日志 `generate_images=True` 但 0 portrait/0 Seedream call, 0 portrait png 落盘。
+- **铁律 5 维度根因核实**:
+  1. 容器 ACTUAL 代码 `pipeline_orchestrator.py:598` 条件 gate `if generate_images and not settings.SKIP_IMAGE_GENERATION` (本地源码 + 容器 sed 双证)
+  2. 完整调用链: .env=true → settings.SKIP_IMAGE_GENERATION=True (docker exec python3 实证) → gate False → 整个 portrait 代码块 silently skip
+  3. 历史: VPS `output/a3966a40-*/` 有 portrait/shot png — 说明 SKIP 不是一直 True, 某时点被改; **PM 盲区透明承认**: test29 后看到 VPS 仅 1 个 output 目录归因 "其他 35 个 local-origin", 没追"为什么 VPS 36 项目里只 1 个有图" — 那时该挖到 SKIP 模式, 今天 test30 才暴露
+  4. .env 内无其他 kill switch (TEXT_ONLY/MOCK/DISABLE 排查全空), 只有 SKIP 是 boolean 杀手
+  5. Ben 维度: 不涉前后端契约/共享 DB/公网内网/DB-infra (纯本机 feature toggle), Founder 决策暂不通知 Ben
+- **修复执行 (Founder go 后)**:
+  - 备份 `.env.production.bak-$(date +%s)`
+  - `sed -i 's/^SKIP_IMAGE_GENERATION=true$/SKIP_IMAGE_GENERATION=false/' /opt/xuhua-story/.env.production`
+  - `docker compose up -d --force-recreate api` → Recreated/Started
+  - 验证: docker exec python3 `settings.SKIP_IMAGE_GENERATION = False` ✅ + /api/health 200 ✅ + api/frontend/redis 三容器 Up ✅
+- **待办**:
+  - ⚠️ e48baa8a (test30) 项目废弃: API 重启 in-memory Pipeline 丢失 + Stage 2 portrait 窗口已过, Founder 重新发起新 test30 (同 idea 《灯笼与萤火》) 才能真生图
+  - 💰 生图开销恢复: ~$0.78/短篇 (Seedream + Mureka BGM), Founder 已知接受
+  - dashboard 36 项目中 35 个 local-origin 的图仍在 Founder 本地, VPS 缩略图仍空 (预期); 今后 VPS 全新生成的项目会真有图
+- **下次教训**: dashboard/output 数量背离时立即追"是什么开关让 VPS 不生图", 不止停在"项目归属 local vs VPS"; .env.production 不入 git 时无 git history, 但 .env.production.bak-* 备份是有价值的留底
+
+## (历史) 5/27 晚: P0 VPS DB ping bug 根治 (#2+#3, Ben已批)
 
 - **P0**: VPS 登录+工作台 GET /api/projects/ 间歇500 (`AsyncAdapt_asyncmy_connection.ping() missing reconnect` TypeError)。Founder VPS 真机测试炸出, VPS监控即时捕。
 - **真根因(Backend实证矩阵定案)**: SQLAlchemy 2.0.36 do_ping + PyMySQL 1.2.0(VPS) → 无参ping()→async适配器TypeError。真凶=PyMySQL版本非驱动(asyncmy/aiomysql同病)。本地安全仅因PyMySQL1.1.2。SQLAlchemy#13306, 2.0.50修。

@@ -1,6 +1,41 @@
 # Backend Agent - 给其他 Agent 的上下文
 
-> **最后更新**: [2026-05-27] ✅ 第3轮: #2 P0修复 + #3 parity 完成。requirements.txt → SA2.0.50 + asyncmy0.2.11 + pymysql==1.1.2。实证 canonical 栈 0 TypeError + 272 pytest 0 退化。详见下方 [canonical DB 栈] + TEAM_CHAT [当前]
+> **最后更新**: [2026-05-28] ✅ P1 followup scene_ref thumbnail URL wire 完成。2400 PASS 0 退化。待 DevOps 部署同批。
+
+---
+
+## ✅ [P1 followup scene_ref thumbnail URL wire 完成] [2026-05-28] — @devops(部署同批) @frontend(可接字段)
+
+### 新增字段
+- `chapter.scene_references_json` 每个 entry 新增 `interior_url_thumb` / `exterior_url_thumb`（字符串或 null）
+- GET `/chapters/{n}/scene-references` 自动透传，前端无需改 endpoint 调用
+- `regenerate-reference` 端点重生后也同步写 thumb
+
+### 已知限制
+- 旧项目 JSON 无此字段（Pipeline 重跑前为 null）
+- Fallback 路径生成的 thumb 文件需等下次主路径 scene_references_json 重建后才出现在 API 里
+
+### @devops 部署说明
+- 无 Alembic 迁移，纯代码改动，rsync 后 docker rebuild api 即可
+
+---
+
+## ✅ [Test30批次 #5/#8/#9/#10/#13 完成] [2026-05-28] — @pm(审查) @devops(部署) @frontend(webp确认)
+
+### 修改文件
+- `app/api/projects.py`: #5 portrait_ref wire + #13 image_url 读 storyboard
+- `app/services/pipeline_orchestrator.py`: #8 shot thumbnail + #9 scene_ref thumbnail + #10 WebP全分辨率
+
+### 关键行为变化（frontend 需确认）
+- `shot["image_url"]` 现在优先返回 `.webp` URL（若存在），fallback `.png`
+- `shot["image_url_thumb"]` 新增字段（thumbnail .webp，832×1109 max）
+- `finalizeAndGoToPreview` 的 `imageUrl` 字段也对齐读 storyboard JSON（不再硬编码 /api/... 路径）
+
+### pytest 结果
+- 205 PASS, 0 退化
+
+### @devops 部署说明
+- 无 Alembic 迁移，纯代码改动，rsync 后 docker rebuild 即可
 
 ---
 

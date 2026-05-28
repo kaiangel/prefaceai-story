@@ -5,6 +5,244 @@
 
 ---
 
+## ✅ P1 followup — Backend scene_ref thumbnail URL wire (代码层完成, 待 DevOps 部署同批)
+
+**PM 5/28 17:55 地毯式重审 Ben 维度发现** — scene_ref thumbnail 物理落盘了但 API 链路没接通:
+- ✅ `pipeline_orchestrator.py:L1004` scene_ref `_thumb.webp` 真生成
+- ❌ `scene_reference_manager.py` 数据结构 0 个 thumb 字段
+- ❌ `chapters.py` scene-references endpoint L3471-3549 只返 `interior_url + exterior_url`, **0 thumb URL**
+- ❌ `chapter.scene_references_json` L3743 写入不含 thumb URL
+
+**结果**: Frontend 拿不到 scene_ref thumb URL, scene_ref 体感优化没真闭环 (与 shot 路径 `image_url_thumb` 写 storyboard_json 不对称)。Frontend agent 已加注释 "无 thumbnail 字段所以不做 progressive", 已知限制, 用 prefetch 兜底。
+
+**派活 Backend Sonnet 4.6 high (~20 min, DevOps 部署前同批做)**:
+- `scene_reference_manager.py`: SceneAnchor 数据结构加 `interior_url_thumb` + `exterior_url_thumb` 字段
+- `pipeline_orchestrator.py:L1010` thumb 落盘后写 `anchor_data['thumb_url']` 到 in-memory 数据
+- `chapters.py:L3471-3549 + L3743` scene-references endpoint + scene_references_json 写入 同步增 `interior_url_thumb` + `exterior_url_thumb`
+- `frontend/src/components/create/StageC.tsx:SceneRefsPreview` 拿到字段后加 progressive enhancement (镜像 StageD L40-110 模式)
+
+**Ben 维度**: ✓ 数据流字段对称问题, 不涉契约 (在 chapter.scene_references_json 内), 不需 Alembic 迁移, 不涉公网内网
+
+---
+
+## 🟢 性能 P0 + Portrait 重生 P1 + Plan A++ progressive enhancement — 代码层完整闭环, 待 DevOps 部署
+
+**3 个 agent 并行完工, PM 地毯式审查通过, 集成验证全过**:
+
+| Agent | 状态 | 改动 | 测试 |
+|---|---|---|---|
+| **Backend** (Sonnet 4.6 high, Opus 4.7 重派) | ✅ 5 项 (#5/#8/#9/#10/#13) | projects.py L1025+L1852 / pipeline_orchestrator L997+L1395+L1659+L1670+L1714 / 无 Alembic | pytest 205 PASS / 0 退化 |
+| **AI-ML** (Sonnet 4.6 high) | ✅ 2 项 (#6 CFP-3 + #7 GROUP COMPOSITION) | storyboard_prompts L1678 + reference_image_manager L354-369 | PM 跑 pytest 22 PASS / 0 退化 (沙箱限制 AI-ML 自己跑不了) |
+| **Frontend** (Sonnet 4.6 high) | ✅ 6 项 (Shot type + StageD prefetch + SceneRefs prefetch + fixImageUrl workaround + **Plan A++ progressive** + vitest 5 新 case) | types/create.ts L106 + CreateContent L983 + StageC L394+L378+L2180 + StageD L53-67 + **StageD progressive useEffect L63-108** + StageD.progressive.test.ts (新) | vitest **20/20** PASS + build 0 errors |
+
+**PM 审查 12 维度全 PASS**: 完整调用链路验证 (函数定义→调用点→参数传递→数据流向→消费点) + 越权零 + 文档更新基本到位 (AI-ML progress 三件套沙箱限制 PM 代补完成, Backend completed 补完, Frontend 三件套自动更新, TEAM_CHAT 各方追加完成)。
+
+**待 DevOps 部署 (无 Alembic 迁移, 纯代码)**:
+- commit + push GitHub (按 commit message scope 分批: Backend / AI-ML / Frontend / 文档 4 组)
+- rsync app/ + frontend/ 到 VPS
+- VPS docker compose rebuild api + frontend (有前端代码 + storyboard_json 字段改动)
+- 验证: portrait 重生 dry-run refs=1 / shot 落盘三件套 (png + webp + thumb.webp) / 前端 preview 页 thumb 秒切 / regenerate-portrait 萤火群保留群体性
+
+**P2 内测后排期**:
+- CDN 国内化 (阿里云 / 腾讯云 + ICP 备案, 等 Ben 讨论)
+- ShotValidator chars 群体角色 false positive 优化 (DEC-053 延伸)
+- ShotValidator 复杂 prop 描述拆分 (Stage 4 prompt 工程)
+
+---
+
+## (历史) 🚨 性能 P0 + P1 修复批次 (5/28 test30 实测暴露, Founder 批"P0 和 2 个 P1 都要做")
+
+**触发**: VPS 真机 e2e 跑通后, Founder 点 preview 页"下一张" shot_02 加载**10-20s**, shot_03 同样慢, scenes 页 scene_ref 也慢。**用户体验崩溃, 内测前必修**。
+
+**铁证 (curl 实测)**:
+```
+shot_02.png 真实大小: 2,846,627 bytes (2.85 MB)
+Cloudflare 已缓存:    cf-cache-status: HIT, age=1171s
+但下载耗时:            total=20.04s (HIT 也 20s)
+有效带宽:              ~142 KB/s
+TLS appconnect:       2.23s
+starttransfer (TTFB): 2.90s
+```
+
+**真根因 (5 维度)**:
+1. **图大**: Seedream 输出 1664×2218 PNG ~2-3MB, 20 张 shot 总 60MB / 5 张 scene_ref 总 10-15MB
+2. **跨海带宽**: Founder 国内 → Cloudflare NRT(东京)边缘 → VPS 国外 = 142KB/s (跨海路由 + 丢包 + 单连接限速)
+3. **不是 CDN miss**: cf-cache-status=HIT 也慢, **纯 last-mile 带宽问题**
+4. **本地秒切原因**: localhost 直连 + 无 SSL + Next.js dev 内存 cache, 不是性能优化, 是环境差异
+5. **场景参考图同病**: scene_ref 也是大 PNG, scenes 页加载同样慢
+
+**Ben 维度**: ✓ CDN 选型 + 大图压缩属 backend/infra 域, 建议 Founder **微信通知 Ben** 一起讨论长期方案 (国内 CDN / 备案 / 图片压缩 pipeline)。Founder 决策本批 P0 + P1 由 PM 派活做, CDN 国内化 (P2) 等 Ben 讨论。
+
+**修复 (三层叠加, 派活清单)**:
+
+### 🚨 P0 #1 — Backend 生成 thumbnail (Sonnet 4.6 high, 1h)
+- **文件**: `app/services/pipeline_orchestrator.py` (Stage 5 shot 保存后) + `app/services/seedream_generator.py` (输出 hook) + `app/services/scene_reference_manager.py` (Stage 4.5 同步加)
+- **实现**: shot 落盘后立即生成 webp thumbnail (~300KB, 832×1109 半分辨率, quality=80)
+  ```python
+  from PIL import Image
+  shot_pil = Image.open(shot_path)
+  thumb_size = (832, 1109)
+  shot_pil.thumbnail(thumb_size, Image.Resampling.LANCZOS)
+  thumb_path = shot_path.replace(".png", "_thumb.webp")
+  shot_pil.save(thumb_path, "WEBP", quality=80, method=6)
+  ```
+- **DB schema**: `chapter_scene_images` 加 `thumbnail_url` 字段 (Alembic 迁移, 已知字段名: `thumbnail_path`)
+- **storyboard_json**: 同时写 `image_url_thumb` 字段供前端读
+- **预期效果**: thumb ~300KB / 142KB/s = ~2s 切完, **10x 提升**
+
+### 🚨 P0 #2 — Scene refs 也生成 thumbnail (与 #1 同批, +30 min)
+- **文件**: `app/services/scene_reference_manager.py` Stage 4.5 anchor 生成后同样跑 webp thumb
+- **前端**: scenes 页 (`frontend/src/components/create/StageBScenes.tsx` 或类似) 同样优先显示 thumb
+
+### 🟡 P1 #3 — Frontend 预加载相邻 shots/scenes (Sonnet 4.6 high, 30 min)
+- **文件**: `frontend/src/components/create/StageD.tsx` + scenes 确认页
+- **实现**: useEffect 在 currentIndex 变化时悄悄预拉前后 ±2 张
+  ```tsx
+  useEffect(() => {
+    const preload = [currentIndex-2, currentIndex-1, currentIndex+1, currentIndex+2]
+      .filter(i => i >= 0 && i < shots.length);
+    preload.forEach(i => {
+      const url = shots[i]?.imageUrlThumb || shots[i]?.imageUrl;
+      if (url) { const img = new Image(); img.src = toAbsoluteUrl(url)!; }
+    });
+  }, [currentIndex, shots]);
+  ```
+- **效果**: 切换前已预拉, 体感秒切
+
+### 🟡 P1 #4 — Backend WebP/AVIF 全分辨率压缩 (Sonnet 4.6 high, 1h)
+- **文件**: `app/services/seedream_generator.py` 输出保存
+- **实现**: PNG 保存外**同时**输出 WebP 全分辨率版本 (quality=85, 约 600KB-1MB), storyboard_json `image_url` 优先返 .webp
+- **效果**: 即使用户点放大看原图, 600KB / 142KB/s = ~4s, 比 PNG 2.85MB 20s 快 5x
+
+### 🔵 P2 #5 — CDN 国内化 (等 Ben 讨论, 内测后)
+- 替换 Cloudflare → 阿里云 CDN / 腾讯云 CDN / Cloudflare China (后者需付费 + 备案)
+- ICP 备案 + 国内 DNS 解析 (~1-2 day + 备案时间)
+- Founder 决定时机, 不阻塞内测启动
+
+**派活 (Founder 批准后立即开干, 估总 ~3.5h commit + 部署)**:
+| 派 | 任务 | Model | Effort |
+|---|---|---|---|
+| Backend | #1 + #2 thumbnail + #4 WebP (一并部署) | Sonnet 4.6 | high |
+| Frontend | #3 预加载 (StageD + scenes 两处) | Sonnet 4.6 | high |
+| Tester | 回归测试: thumbnail 生成 + 预加载 + WebP 输出 + 旧项目兼容 | Sonnet 4.6 | high |
+| DevOps | rsync app/ + frontend rebuild + VPS docker rebuild api + Alembic 迁移 thumbnail_path 列 | Sonnet 4.6 | high |
+
+**关联**: DEC-055 (dev/prod parity), `analysis/TEST30_FULL_RETROSPECTIVE_2026-05-28.md` 批次 3 详细深挖。
+
+---
+
+## 🟡 Portrait 重生 + AdjustCharacter LLM 修复批次 (5/28 test30 Explore very-thorough 深审)
+
+**触发**: test30《灯笼与萤火》Founder 改萤火群"黄绿→蓝绿" Adjust 后, 新 portrait 变**单只**萤火虫 (原本群体). Explore agent 5 维度地毯式审查 (前端 UI / 后端 endpoint / LLM prompt / TEAM_CHAT 历史 / Seedream API) 给出真根因 + 4 项修复.
+
+**真根因诊断 (不是 dev/prod parity)**:
+- 本地 vs VPS `app/api/projects.py` MD5 完全一致 (`33bc80fd8e3214c4143917d7dfcbe205`), **不是部署差异**
+- Adjust endpoint (L1557) **真传** `portrait_ref=_existing_portrait_pil`, VPS log `refs=1` 实证
+- 单只问题是 **多层协作产物**:
+  1. **AdjustCharacter Haiku LLM** 改写 description 太狠, 把"一群" 数量 token 削弱 (prompt 缺保留数量约束)
+  2. **Seedream prompt token 强度 > 单张 portrait_ref 权重**: portrait_ref 锁脸/identity 但不锁群体构图
+  3. **代码缺陷副线** (但非本次根因): Regenerate-portrait endpoint (L1852) **没传** portrait_ref, 两 endpoint 行为分裂 (Wave 13 #6 异步化迁移漏修)
+
+**4 项修复 (按优先级)**:
+
+### 🔴 #1 P0 — Regenerate-portrait endpoint 补 portrait_ref wire (Backend, ~15 min)
+- **位置**: `app/api/projects.py:1852 _regenerate_portrait_core`
+- **问题**: 调用 `_ref_manager.generate_character_reference()` 缺 `portrait_ref` 参数, 与 L1557 Adjust endpoint 行为不一致
+- **历史**: Wave 11.1 (5/14) T17-9 P0 修复在 Adjust 端补了 portrait_ref; Wave 13 #6 (5/25) Regenerate 异步化迁移**漏了**这条 wire
+- **修复**: 镜像 L1545-1562 模式, 读 existing_portrait_path → PIL.open → 传 portrait_ref=_existing_portrait_pil
+- **派**: Backend (Sonnet 4.6 high), commit + rsync app/ + docker rebuild api
+
+### 🟡 #2 P1 — AdjustCharacter LLM prompt 补"保留数量"约束 (AI-ML, ~30 min)
+- **位置**: `app/api/projects.py:1390-1426` 附近 (`_adjust_character_core` 的 LLM prompt 构建)
+- **问题**: prompt 没显式约束 "保留原 description 中的数量修饰 (群/swarm/multiple/group/herd)"
+- **修复 (示例 rule)**:
+  ```
+  RULE CFP-3 (新增): PRESERVE NUMERICAL CONTEXT
+  If 原 description 含 "一群/swarm/multiple/group/herd" 且用户调整指令未明确改数量,
+  必须保留原数量修饰. 例:
+    原 "一群黄绿色萤火虫" + 调整 "改蓝绿" → "一群蓝绿色萤火虫" ✅ NOT "一只蓝绿色萤火虫" ❌
+  ```
+- **派**: AI-ML (Opus default), 改 prompt + dry-run 萤火群场景验证 + commit
+
+### 🟡 #3 P1 — Seedream prompt 加强群体 token (AI-ML, ~20 min)
+- **位置**: `app/services/reference_image_manager.py:265 _build_portrait_prompt`
+- **问题**: 当 character 含 swarm/group 时, prompt 没显式强化 "swarm of dozens"/"a swarm of fireflies, multiple insects in flight"
+- **修复**: portrait_prompt builder 检测 description/name 含群体 keyword → 自动 prefix "a swarm of N+ ___, multiple subjects in flight, group composition" 强化 token 权重
+- **派**: AI-ML 与 #2 一起做, 同一 commit
+
+### 🔵 #4 P2 — 前端 UI 加"微调 vs 完全重画" 双模式 (Frontend, 本期不做)
+- **位置**: `frontend/src/components/create/StageC.tsx:1554-1616`
+- **问题**: 当前"调整" + "重新生成"双按钮但用户看不出 portrait_ref 是否传, 设计意图不明
+- **修复**: 改成"微调 (传旧 portrait 锁脸 + 改局部)" vs "完全重画 (纯文生图)" 双模式 checkbox, 用户可选
+- **派**: Frontend, 本期内测后再做
+
+**当下决策**:
+- test30《灯笼与萤火》Pipeline **不中断, 让它跑完看 e2e** (萤火群单只跟下去, shot 阶段可能 cascade 单只, 但完整 e2e 比单角色完美更值得验证)
+- #1 P0 修完后立即 patch 部署, **不影响本次 e2e** (e2e 跑完才修, 修复后下一轮 e2e 再验)
+- 视觉验证: 若 #1+#2+#3 修完后改萤火群仍单只 → 锁 Seedream API 本身权重限制 → 走 #4 用户选择方案
+
+**Ben 维度核查**: ✅ 全 backend/prompt 工程域, 不涉前后端契约/共享 DB/公网内网/DB-infra, Founder 不通知 Ben.
+
+**关联**: DEC-055 (dev/prod parity) — 本批不是 parity 问题, 是产品功能 bug. memory `feedback_portrait_regen_dual_endpoint_inconsistency` (新增, PM 教训: 两 endpoint 异步化迁移时必须 cross-check 全部参数传递).
+
+---
+
+## ✅ Dev/Prod Parity 全维度根治批次 (5/28, 4 处 P0 全闭环) → DEC-055 + SOP
+
+**主因**: PM 之前 dev/prod parity 工作只盯 DB 栈 (DEC-054), 没扫 **.env keys / Nginx 路由 / 静态文件 serving 链路**。VPS test30 接连暴露 4 只哑雷, Founder 严厉提醒"全维度毫无遗漏要本地一致或对齐"。今晚 PM 派 Explore agent very-thorough 11 维度 audit + 全部修复。
+
+**已闭环 (按时间顺序)**:
+
+### ✅ P0-2 SKIP_IMAGE_GENERATION=true 误开 (5/28 06:20 修)
+- **现象**: test30《灯笼与萤火》/characters 三个角色图全失败, Pipeline `generate_images=True` 但 0 portrait/0 shot
+- **根因**: VPS `.env.production` L40 显式 `SKIP_IMAGE_GENERATION=true` 覆盖 config.py L54 默认 False, gate `if generate_images and not settings.SKIP_IMAGE_GENERATION` 评估 False 整个 portrait 块 silent skip
+- **PM 自查盲区**: test29 后看到 VPS 仅 1 output 目录归因 "local-origin", 没追 "为什么 36 项目只 1 个有图" → 那时该挖到 SKIP 模式
+- **修复**: sed true→false + 备份 + `docker compose up -d --force-recreate api`
+
+### ✅ P0-3 ARK_API_KEY 完全缺失 (5/28 06:45 修)
+- **现象**: SKIP 修后 Pipeline 进 portrait 块, Layer 1 inject + Seedream dispatch 都进, 但 3 张全 WARNING `ARK_API_KEY not set` fail
+- **根因**: VPS `.env.production` **从未配过** `ARK_API_KEY` (火山方舟 Seedream key), 只有 TTS 用的 `VOLCENGINE_*`。本地 `.env` 有, 但 dev/prod parity 工作没扫 API keys, ARK 缺一直被 SKIP=true 掩盖
+- **修复**: 本地 cat .env → ssh stdin → append 3 行 (ARK_API_KEY + IMAGE_GEN_PROVIDER + PROMPT_FORMAT) + force-recreate api
+- **真调实证**: 容器内 Python 调 Seedream API HTTP 400 InvalidParameter (size 太小) — 鉴权层通过, ARK_API_KEY 真有效
+
+### ✅ P0-4 IMAGE_GEN_PROVIDER + PROMPT_FORMAT parity 显式化 (5/28 06:45 修, 与 P0-3 同批)
+- **gap**: VPS `.env.production` 缺这 2 项 (config.py 兜底默认值能 work 但 parity 红线破)
+- **修复**: append `IMAGE_GEN_PROVIDER=seedream` / `PROMPT_FORMAT=b_prime` 与 ARK 同次操作
+
+### ✅ P0-5 Nginx 配置缺 `location /static/` proxy (5/28 07:12 Founder sudo 修)
+- **现象**: 3 张 portrait 真落盘 (容器内 ls 2-3MB png 真在), 容器内 curl `localhost:8000/static/outputs/...` = 200, 但外部 `https://prefaceai.mov/static/...` = 404 len=27683 (Next.js 错误页 HTML)
+- **根因**: VPS host Nginx `prefaceai-mov` 配置只有 `location /api/` + `location /` + `location /_next/static/`, **缺 `location /static/`** → `/static/*` 请求落到 default `location /` 转给 Next.js, Next.js 不识别返 404 HTML
+- **为什么 test29 没暴露**: test29 是 Founder 在**本地**测的 e2e, 走 localhost:8000 + uvicorn 直 serve 静态; VPS 一直 SKIP=true 没真生过图, `/static/*` Nginx serving 链路从未被验证过
+- **修复**: PM 写新配置到 `/tmp/prefaceai-mov.new` (加 `location /static/ → 127.0.0.1:8000`) → Founder `su -` 切 root → `cp /tmp/prefaceai-mov.new /etc/nginx/sites-enabled/prefaceai-mov` + `nginx -t` (syntax OK) + `systemctl reload nginx`
+- **真验实证**: 3 张 portrait `curl -I` 全部 HTTP 200 + Content-Type: image/png
+
+**Ben 维度核查 (4 处全过)**:
+- P0-2/P0-3/P0-4: 不涉前后端契约/共享 DB/公网内网/DB-infra (纯 backend env config), Founder 决策暂不通知 Ben
+- P0-5: host Nginx 反向代理 (基础设施层偏 Ben 域), Founder 决定 sudo 自己改, Ben 暂不通知
+
+**当下 Pipeline 状态 (5/28 07:15)**:
+- 项目 943a4f2d (test30《灯笼与萤火》, ink, 3min) 在 R4-1 等用户确认角色 (~960s/1800s)
+- 3 张 portrait 已 200 image/png 真出图, fullbody/scene refs 未生 (R4-1 之后才跑)
+- Founder 即将刷新 characters 页 → 看图 → 点"确认角色继续" → Pipeline 进 Stage 3+4+5+BGM+shot 生成
+
+**永不再犯保障**:
+- DEC-055 锁 Canonical Dev/Prod Parity 11 维度审计标准 (代码/依赖/DB 栈/.env/Nginx/Docker/静态挂载/启动方式/端口/权限/build-time env)
+- **新 deploy SOP** `.team-brain/sops/DEPLOY_PARITY_CHECK.md` 部署前强制 11 维度 checklist, DevOps 必跑通才能上
+
+---
+
+## ✅ P0-1 已根治+部署 — VPS DB ping bug + dev/prod parity (5/27, DEC-054)
+
+**完成**: 升 SQLAlchemy 2.0.50(commit 8cabaec) → VPS rebuild 部署(b219d00) → PM 独立核实 ping TypeError 120/30min→**0** + /api/projects 401(不再500) + 容器 SA2.0.50/asyncmy0.2.11/pymysql1.1.2 + 本地对齐镜像同栈。Canonical DB 栈见 DEC-054。Founder VPS 测试解封。剩: Founder 带 auth 真机抽测登录/工作台真体验确认。
+
+---
+
+## ✅ P0 已根治+部署 — VPS DB ping bug + dev/prod parity (5/27, DEC-054)
+
+**完成**: 升 SQLAlchemy 2.0.50(commit 8cabaec) → VPS rebuild 部署(b219d00) → PM 独立核实 ping TypeError 120/30min→**0** + /api/projects 401(不再500) + 容器 SA2.0.50/asyncmy0.2.11/pymysql1.1.2 + 本地对齐镜像同栈。Canonical DB 栈见 DEC-054。Founder VPS 测试解封。剩: Founder 带 auth 真机抽测登录/工作台真体验确认。
+
+<details><summary>(历史) 原派活记录</summary>
+
 ## 🔴 P0 派活中 — VPS DB ping bug 根治(#2) + dev/prod parity(#3) (5/27, Ben已批)
 
 **现象**: VPS prefaceai.mov 登录+工作台(GET /api/projects/)间歇 500, `TypeError: AsyncAdapt_asyncmy_connection.ping() missing 1 required positional argument: 'reconnect'`。Founder VPS 真机测试时炸出。
@@ -18,6 +256,14 @@
 - **执行链**: Backend改requirements+跑回归(确认SA小版本升级0退化) → PM对齐本地(切asyncmy+reinstall+重启standby) → DevOps VPS rebuild+部署+验证(ping bug消失) → PM审查。
 - **Ben**: 已批; 阿里云零操作(纯客户端依赖版本)。
 - 详见 task #10。
+
+</details>
+
+---
+
+## 🔵 Ben 域安全跟进(P3, 与P0解耦, 内测后): 收紧 root@% 公网账号
+
+Backend 诊断 P0 时实查发现: 阿里云 ECS 自建 MySQL 8.0.35 连接账号 `root@%`(公网通配 + mysql_native_password + 不强制SSL)偏裸奔。建议 Ben(DB域)评估: 建最小权限 app 专用账号 + 限内网/IP白名单 + 评估 SSL。非阻塞, 内测后 Ben 排期。
 
 ---
 

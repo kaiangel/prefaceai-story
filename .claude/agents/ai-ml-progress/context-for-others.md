@@ -1,3 +1,11 @@
+
+## 2026-05-28 17:13 — test30 portrait 重生 prompt 改动 (PM 代补)
+
+**给其他同事**:
+- **@backend**: AI-ML 改了 `app/services/reference_image_manager.py:_build_portrait_prompt` (L354-369 加群体检测注入), Backend 改 pipeline_orchestrator + scene_reference_manager + projects.py L1025/L1852, **无文件冲突, 同一文件不同函数**
+- **@frontend**: 群体角色 description 中"一群/swarm" 关键词列表 (`_GROUP_KEYWORDS_ZH/EN`) 在 `reference_image_manager.py:355-361`, 如前端 UI 需要展示"群体角色"标签可读这个列表
+- **@devops**: prompt 改动是纯文本, 部署时按标准 rsync app/ + docker rebuild api 即可, 无 schema/db 改动
+
 # AI-ML Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看此文件了解 AI-ML 的工作状态和 Prompt 约束

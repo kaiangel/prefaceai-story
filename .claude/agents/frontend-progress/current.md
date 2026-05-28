@@ -1,9 +1,57 @@
 # Frontend 当前任务进度
 
-> 更新时间: 2026-05-25 [Wave 13 #6 前端] 完成 — regenerate-portrait (reroll) 改异步轮询 (修前后端契约 gap)
-> 状态: ✅ 完成 (1 文件改 StageC.tsx, build 20 routes 0 errors, tsc 0, eslint 0, npm test 15/15 PASS)
-> 模型: Opus 4.7 xhigh
-> 下一步: 等 PM 审查 + @tester 复测 reroll 不转圈 + 轮询拿 portrait
+> 更新时间: 2026-05-28 [Plan A++ progressive enhancement] 完成 — StageD 主 img thumb→full swap + vitest 5 新 case
+> 状态: ✅ 完成 (2 文件改 + 1 新建测试, build 20 routes 0 errors, npm test 20/20 PASS)
+> 模型: Sonnet 4.6
+> 下一步: 等 PM 审查 + DevOps 部署 + Founder 浏览器手测 (Network tab 确认 thumb 秒出, 后台全图 swap)
+
+## 最新完成: Plan A++ progressive enhancement (2026-05-28)
+
+### 改动文件 (2 改 + 1 新建, 0 越权)
+
+| 文件 | 改动 |
+|------|------|
+| `frontend/src/components/create/StageD.tsx` | 加 `progressiveImageSrc` + `isHighRes` state; 加 progressive enhancement useEffect (thumb 先显 + cancel flag + 后台全图 swap); 主 `<img>` src 改为 `progressiveImageSrc`; `opacity-90/100` CSS transition |
+| `frontend/src/components/create/StageC.tsx` | SceneRefsPreview prefetch useEffect 加注释: `SceneReferenceItem` 无 thumbnail 字段, 不做 progressive (prefetch 已覆盖体感优化) |
+| `frontend/src/components/create/StageD.progressive.test.ts` (新) | 5 个 vitest 单测: thumb→full swap / 无 thumb fallback / null src / cancel flag / thumb==full |
+
+### 关键实现细节
+
+**Plan A++ 行为**:
+1. `currentShot` 变化 → useEffect 立即 `setProgressiveImageSrc(thumbUrl)` + `setIsHighRes(false)` → thumb ~2s 跨海出图
+2. `new window.Image()` 后台加载 fullUrl (~1MB, ~4-7s)
+3. `fullImg.onload` → 自动升清 (cancel flag 保证: 快速切 shot 时 stale onload 不更新状态)
+4. 旧数据 (无 `imageUrlThumb`) → 直接全图, `isHighRes=true` (兼容)
+
+**SceneRefsPreview 状态**: `SceneReferenceItem` 无 thumbnail 字段, progressive 不适用, prefetch 已是体感优化。
+
+### 验证
+- ✅ `npm run test` 20/20 PASS (15 useETA + 5 新 progressive)
+- ✅ `npm run build` 20 routes 0 errors
+
+---
+
+## 上一批完成: test30 性能 P0+P2 修复 (2026-05-28)
+
+### 改动文件 (4 改, 0 越权)
+
+| 文件 | 改动 |
+|------|------|
+| `frontend/src/types/create.ts` | Shot interface 加 `imageUrlThumb?: string \| null` |
+| `frontend/src/app/create/CreateContent.tsx` | hydrate rawShots.map() 加 `rawImageUrlThumb` + `imageUrlThumb: toAbsoluteUrl(rawImageUrlThumb)` |
+| `frontend/src/components/create/StageC.tsx` | `finalizeAndGoToPreview`: 加 `fixImageUrl()` 修正旧 `/api/projects/` 路径 + `imageUrlThumb` mapping; SceneRefsPreview: 加 prefetch useEffect (全部 interior+exterior URLs) |
+| `frontend/src/components/create/StageD.tsx` | import 加 `useEffect`; 加 preload useEffect — currentIndex 变化时 prefetch ±2 相邻 shots |
+
+### P2 #13 根因说明 (通知 PM 需 Backend 根治)
+`app/api/projects.py:1025` 硬编码 `f"/api/projects/{project_id}/images/shot_{shot_id:02d}.png"` 而不读 storyboard_json 的 `image_url`。前端 `fixImageUrl()` 是 workaround；backend 根治 = 修 L1025 直接读 `shot.get("image_url")`。
+
+### 验证
+- ✅ `npm run test` 15/15 PASS
+- ✅ `npm run build` 20 routes 0 errors (0 新增 warning)
+
+---
+
+## 上一批完成: Wave 13 #6 前端 (2026-05-25, 修前后端契约 gap)
 
 ## 最新完成: Wave 13 #6 前端 (2026-05-25, 修前后端契约 gap)
 

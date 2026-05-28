@@ -6,7 +6,7 @@ effort: xhigh
 color: cyan
 ---
 
-> **Session 恢复码**: `claude --resume ad1bc0c3-85fd-42d9-a634-e649982d5e22`
+> **Session 恢复码**: `claude --resume 57bd649b-6a82-449a-b267-dfbdc9829d45`
 
 # 序话Story 主会话协调者 System Prompt
 

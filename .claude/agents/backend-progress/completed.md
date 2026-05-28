@@ -4,6 +4,24 @@
 
 ---
 
+## 2026-05-28 17:09 — test30 性能 P0 + portrait 重生 wire + #13 根因修
+
+**5 个任务全完成** (Sonnet 4.6 high, Opus 4.7 529 过载后重派):
+
+| # | 任务 | 文件 | 关键改动 |
+|---|---|---|---|
+| #5 | Regenerate-portrait portrait_ref wire | `app/api/projects.py:1852` 前 | 读现有 portrait PNG → PIL.open → 传 `portrait_ref=_existing_portrait_pil`, 镜像 Adjust 模式 |
+| #8 | Shot thumbnail 生成 | `app/services/pipeline_orchestrator.py:L1670+` | `shot_XX_thumb.webp` (832×1109, quality=80) + `shot["image_url_thumb"]` 写回 storyboard_json |
+| #9 | Scene_ref anchor thumbnail | `pipeline_orchestrator.py:L997 + L1395` | 主路径 + fallback 路径各加 thumbnail, 全部非阻塞 try/except |
+| #10 | WebP 全分辨率 | `pipeline_orchestrator.py:L1659+` | `shot_XX.webp` (quality=85), `shot["image_url"]` 优先 .webp |
+| #13 | backend hardcoded URL 根治 | `app/api/projects.py:L1025` | 读 `shot.get("image_url")`, fallback `/static/outputs/...` |
+| #4 | Alembic 迁移 | — | thumbnail_path 字段已存在, **跳过** |
+
+**pytest**: 205 PASS, 0 退化 ✅
+**待 DevOps 部署** (无 Alembic 迁移, 纯代码, rsync + docker rebuild api)
+
+---
+
 ## 2026-05-27
 
 ### 🔧 P0 #2 修复 + #3 dev/prod parity（第3轮, 改 requirements + 实证 + 回归）✅ [2026-05-27 — Opus 4.7 1M]

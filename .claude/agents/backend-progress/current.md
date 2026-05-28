@@ -1,6 +1,72 @@
 # Backend Agent - 当前任务
 
-> **最后更新**: [2026-05-27] ✅ 第3轮完成: #2 P0修复(SA2.0.50) + #3 dev/prod parity(pin pymysql==1.1.2 + asyncmy 0.2.11) — 已归档 completed.md, 见下方
+> **最后更新**: [2026-05-28] ✅ P1 followup scene_ref thumbnail URL wire 完成: 3 处改动 (pipeline_orchestrator + chapters.py regenerate + scene_references_json 写入) — pytest 2400 PASS 0退化
+
+---
+
+## ✅ 完成: P1 followup scene_ref thumbnail URL wire [2026-05-28, Sonnet 4.6 high]
+
+### 任务背景
+PM 5/28 17:55 地毯式重审 Ben 维度发现: scene_ref thumb 物理文件生成了但 API 链路没接通，与 shot 路径 image_url_thumb 不对称。
+
+### 3 处改动
+
+| 文件 | 行号 | 改动 |
+|------|------|------|
+| `app/services/pipeline_orchestrator.py` | L1031-1056 | `scene_references_list.append()` 构建时加 `interior_url_thumb` + `exterior_url_thumb` 字段 |
+| `app/api/chapters.py` | L3648-3649 初始化; L3685-3698 interior thumb; L3747-3756 exterior thumb; L3793-3811 step6 写入 | `regenerate_scene_reference` 端点生成 thumb + 写 scene_references_json |
+| GET scene-references endpoint | 无需改 | 直接透传 JSON blob，blob 有字段自动返回 |
+
+### pytest
+- `pytest tests/ -q --tb=short`: 15 failed / 2400 passed / 0 退化
+
+### Ben 协议
+- 0 schema 改动 / 0 Alembic migration / 0 STATUS_API_CONTRACT / 不涉公网内网
+- `[frontend-impact: yes]` — Frontend 可从 scene_references_json 读取 `interior_url_thumb` / `exterior_url_thumb`（旧项目无字段时为 null，需 `?? null` 兼容）
+
+---
+
+## ✅ 完成: Test30 批次 — #5/#8/#9/#10/#13 [2026-05-28, Sonnet 4.6 high]
+
+### 任务背景 (TEST30_FULL_RETROSPECTIVE + PENDING.md 性能P0 + Portrait重生)
+
+5 项修复全部完成，代码层验证通过，待 PM 审查 + DevOps 部署。
+
+### 改动文件
+
+| 文件 | 改动 |
+|------|------|
+| `app/api/projects.py` | #5: `_regenerate_portrait_core` L1852 加 portrait_ref wire (镜像 adjust L1549-1555) + #13: L1025 hardcoded URL → 读 shot.image_url (优先 .webp), fallback static path |
+| `app/services/pipeline_orchestrator.py` | #8: shot 保存后生成 thumbnail .webp + shot["image_url_thumb"] 写回 storyboard_json; #9: scene_ref anchor 保存后生成 thumbnail（主路径 L997 + fallback路径 L1395）; #10: shot 保存后同步生成 WebP 全分辨率，image_url 优先返 .webp |
+
+### #5 具体改动
+- `_regenerate_portrait_core` 的 portrait 生成调用前，先读 `output/{uuid}/character_refs/{char_id}_portrait.png`
+- 若存在则 PIL.open → 传 `portrait_ref=_existing_portrait_pil`
+- 保证 regenerate-portrait 走 Seedream 时有 identity ground truth
+
+### #8/#9/#10 thumbnail + WebP 机制
+- Shot 路径: `shot_XX.png` → 同步生成 `shot_XX.webp`(quality=85) + `shot_XX_thumb.webp`(832×1109 max, quality=80)
+- `shot["image_url"]` = .webp URL（若存在），fallback .png URL
+- `shot["image_url_thumb"]` = _thumb.webp URL（若存在）
+- scene_ref anchor 路径: `{anchor_key}.png` → 生成 `{anchor_key}_thumb.webp`
+- 全部 try/except 非阻塞，失败只 warning 不影响 pipeline 主流程
+
+### #13 具体改动
+- `finalizeAndGoToPreview` L1025: `f"/api/projects/{project_id}/images/shot_{shot_id:02d}.png"` → 读 `shot.get("image_url")` (含 .webp), fallback `/static/outputs/{project_id}/images/shot_{shot_id:02d}.png`
+
+### pytest (代码层验证)
+- test_wave13_regenerate_portrait_async: 4/4 PASS
+- test_wave12_adjust_async_job + test_first_batch_chars_not_zero + test_llm_fallback_chain: 50/50 PASS
+- 广泛回归 (wave13 + clothing + adjust + r4_2 + schema_fallback): 155/155 PASS
+- **合计: 205 PASS, 0 退化**
+
+### Ben 协议
+- 0 schema 改动 / 0 Alembic migration / 0 STATUS_API_CONTRACT / [frontend-impact: yes] (#13 image_url 格式变 .webp 优先，前端需确认 .webp 支持；thumbnail 字段新增但可选)
+
+### 待 PM 做
+- 审查代码改动（主要 projects.py L1852 + pipeline_orchestrator.py L997/L1395/L1627-1690）
+- 通知 DevOps 部署（无 Alembic 迁移，纯代码改动）
+- #4 Alembic 迁移：PM 已实测 verify thumbnail_path 字段存在，**跳过**
 
 ---
 

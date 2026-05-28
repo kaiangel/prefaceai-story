@@ -4,6 +4,42 @@
 
 ---
 
+## Plan A++ progressive enhancement — StageD 主 img thumb→full swap (2026-05-28)
+
+**模型**: Sonnet 4.6
+**背景**: PM 重审发现 StageD 主 `<img src>` 仍用 `currentShot.imageUrl` 全图, prefetch ±2 用 thumb 是对的但主显示没用 thumb → 性能 P0 没真 10x 闭环。Founder 决策 Plan A++ progressive enhancement。
+**文件改动 (2 改 + 1 新建, 0 越权)**:
+- `frontend/src/components/create/StageD.tsx`: 加 `progressiveImageSrc` + `isHighRes` state; 加 progressive useEffect (thumb 先显 + cancel flag + 后台全图 swap onload); 主 `<img>` src 改为 `progressiveImageSrc`; CSS `opacity-90/100 transition-opacity duration-300`
+- `frontend/src/components/create/StageC.tsx`: SceneRefsPreview prefetch useEffect 加注释 (无 thumbnail 字段 → 不做 progressive, 说明原因)
+- `frontend/src/components/create/StageD.progressive.test.ts` (新): 5 vitest 单测覆盖 progressive state machine
+
+**结果**: `npm test` 20/20 PASS, `npm run build` 20 routes 0 errors
+
+---
+
+## test30 性能 P0+P2 修复批次 — 预加载 + imageUrlThumb + wrong-path 补丁 (2026-05-28)
+
+**模型**: Sonnet 4.6 high
+**背景**: VPS 实测 test30《灯笼与萤火》shot 切换 10-20s (2.85MB PNG × 142KB/s cross-ocean), scenes 页同病。Backend P0 #1 thumbnail 生成上线前的前端先行任务。
+**文件改动 (4, 0 越权)**:
+- `frontend/src/types/create.ts`: Shot interface 加 `imageUrlThumb?: string | null`
+- `frontend/src/app/create/CreateContent.tsx`: hydrate rawShots.map 加 `rawImageUrlThumb` + `imageUrlThumb: toAbsoluteUrl(rawImageUrlThumb)`
+- `frontend/src/components/create/StageC.tsx`: `finalizeAndGoToPreview` 加 `fixImageUrl()` + `imageUrlThumb` mapping; `SceneRefsPreview` 加 prefetch useEffect
+- `frontend/src/components/create/StageD.tsx`: import `useEffect`; 加 preload useEffect (currentIndex ±2)
+
+### P1 #3 预加载设计
+- **StageD**: `useEffect` on `[currentIndex, shots]` — prefetch indices `[idx-2, idx-1, idx+1, idx+2]` (boundary-checked), `new Image(); img.src = shot.imageUrlThumb || shot.imageUrl`
+- **SceneRefsPreview**: `useEffect` on `[sceneRefs, hasData]` — prefetch all `interior_url` + `exterior_url` once on mount
+
+### P2 #13 workaround
+- `app/api/projects.py:1025` 硬编码错路径 (backend bug), 前端 `fixImageUrl()` regex 修正
+- 已通知: backend 根治 = 修 L1025 直接读 `shot.get("image_url")`
+
+### 验证
+- npm test 15/15 PASS / npm run build 20 routes 0 errors / 0 越权
+
+---
+
 ## Wave 13 #6 前端 — regenerate-portrait (reroll) 改异步轮询 (2026-05-25)
 
 **模型**: Opus 4.7 xhigh

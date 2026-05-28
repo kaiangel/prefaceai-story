@@ -1,9 +1,18 @@
 # PM Agent - 给其他 Agent 的信息
 
-> **最后更新**: 2026-05-27 13:15 (BGM #8 审查通过待部署 + #9 完成)
-> **当前阶段**: #8 BGM 路径B 审查通过 → 待 DevOps commit+部署; #4-#7+#9 已部署/完成
+> **最后更新**: 2026-05-28 06:20 (VPS .env SKIP_IMAGE_GENERATION 修复, 等 Founder 重发 test30)
+> **当前阶段**: P0-2 portrait 全失败已根治, 等 Founder 真验; #8 BGM 仍在工作区待 commit+部署 (内测前)
 
-## 🎵 5/27: BGM #8 路径B 审查通过(待部署) + #9 完成
+## 🚨 5/28: VPS .env SKIP_IMAGE_GENERATION=true 误开根治 (Ben 暂不通知)
+
+- **@devops**: VPS `/opt/xuhua-story/.env.production` L40 之前是 `SKIP_IMAGE_GENERATION=true` (来源不明, 推测早期 infra 测试遗留)。PM 已 sed 改 false + `docker compose up -d --force-recreate api` + 备份 `.env.production.bak-*`。.env.production 不入 git, 无 commit。下次部署前 grep 一遍 .env.production 的关键 boolean flag (SKIP_/MOCK_/TEXT_ONLY/DISABLE_) 确认无误开, 避免类似哑雷。
+- **@backend**: `pipeline_orchestrator.py:598` 的 gate `if generate_images and not settings.SKIP_IMAGE_GENERATION` 是用户感知性 kill switch — 任何"用户选了参数但实际跳过"类配置都应该至少在启动 banner / health 端点 / Pipeline 起跑日志里打出来 (现在 silent skip 是隐患)。**非阻塞建议**: 启动日志或 health response 加上 `image_gen_enabled` 字段, 让运维一眼能看到。等内测后排期。
+- **全体**: VPS 当前 image gen 已恢复, Founder 即将重发新 test30 真验。仍未在工作区 commit 的 #8 BGM 路径B 代码继续等下一批 deploy 一起 push (跟本次 .env 改不冲突)。
+
+---
+（以下为 5/27 历史）
+
+## (历史) 5/27: BGM #8 路径B 审查通过(待部署) + #9 完成
 - **@devops**: #8 BGM 代码在工作区待 commit+部署(rsync app/+rebuild api); 累积一批文档改动一起 commit。#9 docker-compose mysql 已删(83a576b)+VPS同步。
 - **@ai-ml**: BGM #8 路径B 审查通过(395 pytest+dry-run 荷塘渡→chinese_traditional)。非人类支持主线: 改图像/角色/校验/BGM 的 agent 必从 `physical` 读、多角色 shot 强制分离、配乐吃 universal 信号(见 DEC-053)。
 - **全体**: 非人类人类中心假设链 5 缺口(#5/#6/#7/#8)已修+审查; #5/#7/#8 真听感/视觉真证待 Founder e2e(不阻塞)。

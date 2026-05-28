@@ -4,6 +4,64 @@
 
 ---
 
+## 2026-05-28 整轮 (06:00-18:00) — test30 e2e + dev/prod parity 4 处 P0 + Portrait 重生 deep dive + 性能 P0 闭环
+
+**Pipeline 整轮 e2e**: 3840.2s (~64min) 全跑通《灯笼与萤火》, 20 shot + 5 scene_ref + BGM (Mureka ink 176s) + 3 portrait + 3 fullbody 全落盘。
+
+**Dev/Prod Parity 4 处 P0 全修** (PM 派 + 自己 sed + Founder sudo):
+- P0-2 SKIP_IMAGE_GENERATION=true (06:20)
+- P0-3 ARK_API_KEY 完全缺失 (06:45) — Seedream API HTTP 400 鉴权层通过实证
+- P0-4 IMAGE_GEN_PROVIDER + PROMPT_FORMAT parity (06:45)
+- P0-5 Nginx 缺 location /static/ (07:12, Founder su - root + sudo cp + nginx -t + reload)
+
+**Portrait 重生 Explore very-thorough 5 维度深审**:
+- 锁定真根因 = Adjust endpoint L1557 真传 portrait_ref + Haiku LLM 改 description 丢失"一群" + Seedream prompt 缺群体 token 强化 (multi-layer collaboration)
+- 副线 bug: Regenerate-portrait L1852 没传 portrait_ref (Wave 13 #6 异步化漏修)
+
+**派活 3 agent 并行 + Frontend 二次 Plan A++ progressive 修复**:
+- Backend (Sonnet 4.6 high, Opus 4.7 529 重派): 5 项 (#5/#8/#9/#10/#13), pytest 205 PASS
+- AI-ML (Sonnet 4.6 high): 2 项 (CFP-3 + GROUP COMPOSITION), PM 跑 pytest 22 PASS
+- Frontend 一轮 (Sonnet 4.6 high): 4 项 (Shot type + StageD prefetch + SceneRefs prefetch + fixImageUrl), vitest 15/15
+- Frontend 二轮 (Plan A++): StageD progressive useEffect L40-110 + 5 vitest 新 case, total 20/20
+
+**PM 地毯式审查**:
+- 第一轮 12 维度全 PASS
+- Founder 提醒后第二轮发现 4 真问题: Plan B 实情 / WebP fallback / dead column / STATUS_API_CONTRACT scope
+- Founder 选 Plan A++ progressive
+- 第三轮 (Founder 再次提醒) 发现 Backend scene_ref thumb URL wire 漏接, 已进 PENDING P1 followup (DevOps 部署时同批)
+
+**完整文档收口** (5/28 17:55):
+- `analysis/TEST30_FULL_RETROSPECTIVE_2026-05-28.md` 8000 字完整深度回溯 (15 个问题 5 批次)
+- `PENDING.md` 顶部 3 批次完整 + scene_ref thumb wire P1 followup
+- `DECISIONS.md` DEC-055 Canonical 11 维度 Parity + Deploy SOP
+- `.team-brain/sops/DEPLOY_PARITY_CHECK.md` 11 维度强制 checklist (新建)
+- 4 个 memory 新增 + MEMORY.md 索引
+- TEAM_CHAT 各方追加完整
+- PM/Backend/AI-ML/Frontend progress 三件套 (AI-ML 沙箱限制 PM 代补)
+
+**待 DevOps 部署** (Founder 下班, 之后做):
+- commit + push GitHub (按 scope 分 4-5 组, 含 scene_ref thumb wire 补)
+- rsync app/ + frontend/ 到 VPS
+- VPS docker compose rebuild api + frontend
+- 验证 dry-run e2e
+
+---
+
+## 2026-05-28 — VPS test30 portrait 全失败 → 根因 .env SKIP_IMAGE_GENERATION 误开 → 修复
+
+- **现象**: Founder VPS 真机 test30《灯笼与萤火》/characters 三角色全失败, Pipeline `generate_images=True` 但 0 portrait/Seedream call。
+- **铁律 5 维度根因核实** (Founder /xhteam 提醒"地毯式深审 + Ben 维度才能 go"):
+  1. 容器 ACTUAL 代码 (本地源 + 容器 sed 双证) `pipeline_orchestrator.py:598` gate
+  2. 完整调用链: .env=true → settings=True → gate False → portrait 块 silent skip
+  3. 历史: VPS a3966a40-* 有 portrait/shot png, SKIP 非一直 True, 某时点被改; **PM 盲区透明承认**: test29 后看到 VPS 仅 1 output 目录归因 local-origin, 没追"为什么 36 项目只 1 个有图"——那时该挖到 SKIP
+  4. .env 无其他 kill switch (TEXT_ONLY/MOCK 排查全空)
+  5. Ben 维度: 不涉契约/DB/公网/DB-infra, Founder 决策暂不通知
+- **修复**: 备份 + sed `true→false` + `docker compose up -d --force-recreate api` → settings.SKIP=False + /api/health 200 + 三容器健康 ✅
+- **待 Founder 重发新 test30** 才能真生图 (e48baa8a 项目废弃: API 重启 in-memory 丢 + portrait 窗口过)。生图开销 ~$0.78/短篇 恢复。
+- **方法论收获**: dashboard/output 数量背离 = 立即追"是什么开关让 VPS 不生图", 不止停"项目归属"层。.env.production 不入 git 但 .env.production.bak-* 备份留底有价值。
+
+---
+
 ## 2026-05-27 — BGM #8 路径B 审查 + #9 docker-compose 清理 (xhteam 轮)
 
 - **#9 docker-compose mysql 残留删除**: 向 Founder 通俗解释 Ben知会内容 + 校准"哑雷"措辞(实际低风险) → Ben 确认 → DevOps 删(83a576b)+VPS同步 → PM 独立核实 0 mysql+容器健康。完成。
