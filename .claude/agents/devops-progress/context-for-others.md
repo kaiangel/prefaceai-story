@@ -1,7 +1,16 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看其文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-05-28 19:21（test30批 4组commit 884b6b6 + VPS第6次部署 + DEC-055 SOP 11维度全过）
+> **最后更新**: 2026-05-28 22:45 UTC+8（fallback wire commit 4d5ec92 + VPS第7次部署 + SOP spot-check PASS）
+
+---
+
+## ✅ VPS 第 7 次部署完成 (2026-05-28 22:45 UTC+8) — fallback scene_references_list 完美闭环
+
+**commit**: `4d5ec92` — fallback路径scene_references_list持久化 [frontend-impact: no]
+**push**: f7da470→4d5ec92, origin/main=4d5ec92
+**api 镜像**: sha256=298c1e84
+**验证**: api(healthy)+frontend(Up)+redis(healthy) / /api/health 200 / MD5三方一致 / fallback_scene_references_list 容器内命中4次 / 0 ERROR
 
 ---
 

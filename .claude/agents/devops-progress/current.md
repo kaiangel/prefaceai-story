@@ -1,7 +1,7 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-05-28 — TASK-TEST30-DEPLOY 完成: 4组commit(20f5b61/1450dde/1b69862/884b6b6) push(b219d00→884b6b6)。SOP 11维度全过。rsync app/+frontend/src/ → VPS。docker compose build api+frontend --no-cache (api sha256:b4523a62) + force-recreate。三容器api(healthy)+frontend(Up)+redis(healthy)。/api/health 200 + 主页200 + /static/ 200 + 容器内0 ERROR/Traceback。5个关键文件MD5本地=容器内100%一致。SA2.0.50/asyncmy0.2.11/PyMySQL1.1.2 canonical栈不变。ARK_API_KEY len=46 + SKIP_IMAGE_GENERATION=False + IMAGE_GEN_PROVIDER=seedream。
-> **状态**: 🟢 空闲 — GitHub origin/main=884b6b6, VPS 代码=test30整批(884b6b6), api+frontend force-recreate 5/28 约11:20 UTC
+> **最后更新**: 2026-05-28 22:45 UTC+8 — TASK-FALLBACK-WIRE-DEPLOY 完成: commit 4d5ec92 (fallback scene_references_list持久化) push(f7da470→4d5ec92)。rsync 单文件 pipeline_orchestrator.py → VPS。docker build api sha256=298c1e84 + force-recreate。三容器api(healthy)+frontend(Up)+redis(healthy)。外部/api/health 200。容器内MD5一致(1c58c22018f4acb0173d5be0f89025f9)。fallback_scene_references_list 容器内命中4次。0 ERROR/Traceback。
+> **状态**: 🟢 空闲 — GitHub origin/main=4d5ec92, VPS 代码=第7次部署(4d5ec92), api force-recreate 5/28 约14:45 UTC
 > **当前**: 无在途任务
 >
 > SECRET-LEAK 历史: Step 6 (key rotation) 5/22 跳过 (Founder 决策 Google 控制台限额兜底)

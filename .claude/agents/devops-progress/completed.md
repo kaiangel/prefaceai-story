@@ -1,6 +1,7 @@
 # DevOps Agent - 已完成任务
 
 > 按时间倒序记录已完成的工作
+> **2026-05-28 22:45 更新**: TASK-FALLBACK-WIRE-DEPLOY 完成 — commit 4d5ec92 (fallback scene_references_list持久化 [frontend-impact: no]) push(f7da470→4d5ec92)。rsync 单文件 pipeline_orchestrator.py → VPS。docker build api sha256=298c1e84 + force-recreate。三容器api(healthy)+frontend(Up)+redis(healthy)。/api/health 200。容器内MD5=本地=VPS host (1c58c22018f4acb0173d5be0f89025f9)。fallback_scene_references_list 容器内命中4次。0 ERROR/Traceback。
 > **2026-05-28 19:21 更新**: TASK-TEST30-DEPLOY 完成 — 4组commit(20f5b61/1450dde/1b69862/884b6b6) push(b219d00→884b6b6)。DEC-055 SOP 11维度全过。rsync app/+frontend/src/ → VPS。docker compose build api+frontend --no-cache (api sha256:b4523a62) + force-recreate。三容器 api(healthy)+frontend(Up)+redis(healthy)。/api/health 200 + 主页 200 + /static/ 200。5个关键文件MD5本地=容器内100%一致。SA2.0.50/asyncmy0.2.11/PyMySQL1.1.2 canonical栈不变。
 > **2026-05-27 17:20 更新**: TASK-P0-SQLALCHEMY-250-DEPLOY 完成 — commit 8cabaec(SA2.0.50+asyncmy0.2.11+pymysql1.1.2) push(e3ad64b→8cabaec) + VPS build --no-cache api + force-recreate. P0 ping bug 实证消失(120次/30min→0). 容器 pip 坐实新栈, /api/projects 不再500(401), 三容器健康.
 > **2026-05-27 15:45 更新**: TASK-BGM8-DOCS-COMMIT 完成 — 补提交 4 收尾文档 commit b512ada + push(d067916→b512ada), git status 干净, VPS fresh 重启(07:40:47 UTC), api+frontend force-recreate, BGM grep 实证仍在, /api/health 200, 三容器健康。
