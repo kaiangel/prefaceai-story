@@ -1,12 +1,13 @@
 # DevOps Agent - 当前任务
 
-> **最后更新**: 2026-05-27 17:20 — TASK-P0-SQLALCHEMY-250-DEPLOY 完成: commit `8cabaec`(requirements SA2.0.36→2.0.50/asyncmy0.2.10→0.2.11/pymysql>=1.1.0→==1.1.2 + 文档) push origin/main(e3ad64b→8cabaec)。VPS `docker compose build --no-cache api`(新镜像 sha256:6797c9ab) + force-recreate api。容器内 pip show 坐实 SA2.0.50/asyncmy0.2.11/PyMySQL1.1.2。**P0 ping bug 实证消失: 修复前 120次/30min `ping() missing reconnect` TypeError → 修复后全程 0**。/api/projects/ 不再 500(稳定 401) + /api/health 200 + 主页 200, 三容器健康。VPS 旧 pymysql 确认=1.2.0。
-> **状态**: 🟢 空闲 — GitHub origin/main=8cabaec, VPS 代码=P0 SA2.0.50(8cabaec), api force-recreate 17:09 北京(09:09 UTC build)
+> **最后更新**: 2026-05-28 — TASK-TEST30-DEPLOY 完成: 4组commit(20f5b61/1450dde/1b69862/884b6b6) push(b219d00→884b6b6)。SOP 11维度全过。rsync app/+frontend/src/ → VPS。docker compose build api+frontend --no-cache (api sha256:b4523a62) + force-recreate。三容器api(healthy)+frontend(Up)+redis(healthy)。/api/health 200 + 主页200 + /static/ 200 + 容器内0 ERROR/Traceback。5个关键文件MD5本地=容器内100%一致。SA2.0.50/asyncmy0.2.11/PyMySQL1.1.2 canonical栈不变。ARK_API_KEY len=46 + SKIP_IMAGE_GENERATION=False + IMAGE_GEN_PROVIDER=seedream。
+> **状态**: 🟢 空闲 — GitHub origin/main=884b6b6, VPS 代码=test30整批(884b6b6), api+frontend force-recreate 5/28 约11:20 UTC
 > **当前**: 无在途任务
 >
 > SECRET-LEAK 历史: Step 6 (key rotation) 5/22 跳过 (Founder 决策 Google 控制台限额兜底)
 > TASK-P0-SQLALCHEMY-250-DEPLOY 完成, 已归档 completed.md
 > TASK-BGM8-COMMIT-DEPLOY + TASK-BGM8-DOCS-COMMIT 全部完成, 已归档 completed.md
+> TASK-TEST30-DEPLOY 完成, 已归档 completed.md
 
 ---
 

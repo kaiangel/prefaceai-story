@@ -5,7 +5,7 @@
 
 ---
 
-## ✅ P1 followup — Backend scene_ref thumbnail URL wire (代码层完成, 待 DevOps 部署同批)
+## ✅ P1 followup — Backend scene_ref thumbnail URL wire (代码层完成, 已部署 5/28 ~19:21, commit SHA = 20f5b61(Backend)/1450dde(AI-ML)/1b69862(Frontend)/884b6b6(Docs))
 
 **PM 5/28 17:55 地毯式重审 Ben 维度发现** — scene_ref thumbnail 物理落盘了但 API 链路没接通:
 - ✅ `pipeline_orchestrator.py:L1004` scene_ref `_thumb.webp` 真生成
@@ -25,7 +25,7 @@
 
 ---
 
-## 🟢 性能 P0 + Portrait 重生 P1 + Plan A++ progressive enhancement — 代码层完整闭环, 待 DevOps 部署
+## ✅ 性能 P0 + Portrait 重生 P1 + Plan A++ progressive enhancement — 已部署 5/28 ~19:21, commit SHA = 20f5b61(Backend)/1450dde(AI-ML)/1b69862(Frontend)/884b6b6(Docs)
 
 **3 个 agent 并行完工, PM 地毯式审查通过, 集成验证全过**:
 

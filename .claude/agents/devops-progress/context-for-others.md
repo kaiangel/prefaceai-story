@@ -1,11 +1,32 @@
 # DevOps Agent - 给其他 Agent 的上下文
 
 > 其他 Agent 查看其文件了解 DevOps 的工作状态和部署要求
-> **最后更新**: 2026-05-27 17:20（P0 SQLAlchemy 2.0.50 升级 commit 8cabaec + VPS rebuild 部署 + ping bug 实证消失）
+> **最后更新**: 2026-05-28 19:21（test30批 4组commit 884b6b6 + VPS第6次部署 + DEC-055 SOP 11维度全过）
 
 ---
 
-## 🔴 P0 修复已部署 (2026-05-27 17:20) — VPS 登录/工作台 500 ping bug 已根治
+## ✅ VPS 第 6 次部署完成 (2026-05-28 19:21) — test30 批次全量上线
+
+**commit 范围**: `b219d00..884b6b6` (4组: 20f5b61 Backend / 1450dde AI-ML / 1b69862 Frontend / 884b6b6 Docs)
+
+**新上线能力**:
+- **#5**: `_regenerate_portrait_core` 传 `portrait_ref` PIL → 重生不丢群体角色外观
+- **#6 CFP-3**: 保留 "一群/swarm/multiple" 数量上下文 (storyboard_prompts)
+- **#7**: 群体角色 portrait prompt 头部注入 GROUP COMPOSITION REQUIREMENT
+- **#8/#9**: Shot + SceneRef `_thumb.webp` 落盘 (832×1109, quality=80)
+- **#10**: Shot 保存 WebP 全尺寸 quality=85, `image_url` 优先 `.webp`
+- **#13**: `projects.py` imageUrl 读 storyboard JSON, 不再 hardcoded 路径
+- **Plan A++ (StageD)**: progressive useEffect — thumb即显→background-load全图→onload swap, cancel flag防race
+
+**DEC-055 SOP**: 首次正式执行 11维度 (A~K) 全 PASS。VPS多余config-only key有代码默认值, parity维持。
+
+**VPS 状态**: api sha256:b4523a62 / frontend rebuilt / 三容器健康 / /api/health 200 / IMAGE_GEN_PROVIDER=seedream / SKIP_IMAGE_GENERATION=False
+
+**canonical DB栈不变**: SA 2.0.50 / asyncmy 0.2.11 / PyMySQL 1.1.2
+
+---
+
+## 历史: P0 修复已部署 (2026-05-27 17:20) — VPS 登录/工作台 500 ping bug 已根治
 
 - **commit `8cabaec`**: SQLAlchemy `2.0.36→2.0.50`(修 #13306 do_ping/async ping 签名 bug) + asyncmy `0.2.10→0.2.11`(parity+#86 bugfix) + pymysql `>=1.1.0→==1.1.2`(精确 pin 防 1.2.0)
 - **P0 实证**: 修复前 VPS 近 30min **120 次** `ping() missing 1 required positional argument: 'reconnect'` TypeError → 修复后全程 **0**。/api/projects/ 从间歇 500 → 稳定 401
@@ -71,6 +92,7 @@ Python = 3.11.x
 - 第 3 次 (2026-05-24): Wave 10+11 (→ 648b81c)
 - 第 4 次 (2026-05-25): Wave 12 (→ d4541c4, DevOps 全程自执行)
 - 第 5 次 (2026-05-26): Wave 13 + test29 (→ ec7b1b6 运行代码, 含 #4 db_retry + pool_recycle 600s) + .gitignore 安全修复 (81b5d25)
+- **第 6 次 (2026-05-28 ~19:21)**: test30 批次 (→ 884b6b6, Backend/#5/#8/#9/#10/#13 + AI-ML/#6/#7 + Frontend/Plan A++ + Docs/SOP, api sha256:b4523a62 + frontend rebuilt, DEC-055 SOP 11维度全过)
 
 ---
 

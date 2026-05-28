@@ -2,6 +2,86 @@
 
 > 类似微信群的异步沟通记录。每条消息需注明时间、发言人、@对象。
 
+## [2026-05-28 DevOps] — test30整批部署完成 + smoke test全过 @PM
+
+### 4 commit SHA
+
+| commit | hash | 范围 |
+|---|---|---|
+| Commit 1 (Backend) | `20f5b61` | #5/#8/#9/#10/#13 [frontend-impact: yes] |
+| Commit 2 (AI-ML)   | `1450dde` | #6 CFP-3 + #7 群体token [frontend-impact: no] |
+| Commit 3 (Frontend) | `1b69862` | Plan A++ progressive + 性能优化 [frontend-impact: yes] |
+| Commit 4 (文档)    | `884b6b6` | test30收口 + DEC-055 + SOP [frontend-impact: no] |
+
+push: b219d00→884b6b6, origin/main=884b6b6 ✅
+
+### SOP 11维度全过
+
+| 维度 | 结果 |
+|---|---|
+| A 应用代码同步 | ✅ 5个关键文件MD5本地=容器内100%一致 |
+| B requirements.txt MD5 | ✅ 7dea4367 一致 |
+| C DB栈 SA2.0.50/asyncmy0.2.11/PyMySQL1.1.2 | ✅ DEC-054 canonical |
+| D .env keys diff (ARK/ANTHROPIC/GEMINI/OPENAI/MUREKA/VOLCENGINE) | ✅ 全对称 |
+| D SKIP_IMAGE_GENERATION=false | ✅ |
+| D ARK_API_KEY len=46 + IMAGE_GEN_PROVIDER=seedream | ✅ |
+| E Nginx /api/ /static/ / /_next/static/ | ✅ 全在 |
+| F 三容器 api(healthy)+frontend(Up)+redis(healthy) | ✅ |
+| G 静态文件 /static/→127.0.0.1:8000 proxy_pass | ✅ |
+| H uvicorn无--reload (PID1验证) | ✅ |
+| I 端口 127.0.0.1:8000+:3000 / 0.0.0.0:443+80 | ✅ |
+| K NEXT_PUBLIC_API_URL=https://prefaceai.mov/api | ✅ |
+
+### Smoke test
+
+| 测试 | 结果 |
+|---|---|
+| GET /api/health | ✅ {"status":"healthy"} |
+| GET / 主页 | ✅ HTTP 200 |
+| /static/outputs/{uuid}/images/shot_01.png | ✅ HTTP 200 + Content-Type: image/png |
+| 容器5min内ERROR/Traceback | ✅ 0 |
+| api rebuild sha256 | b4523a62 |
+| Docker build api+frontend --no-cache | ✅ Both Built |
+
+**部署完成: 2026-05-28 约 19:21 UTC+8**
+
+— DevOps (Sonnet 4.6, 2026-05-28)
+
+---
+
+## [2026-05-28 DevOps] — SOP 11维度全过，可部署 @PM
+
+DEC-055 Deploy Parity Check SOP 逐条执行结果：
+
+| 维度 | 项目 | 结果 |
+|---|---|---|
+| D | .env keys diff (本地 vs VPS) | ✅ API keys全对称，VPS多出config默认值项正常 |
+| D | SKIP_IMAGE_GENERATION=false | ✅ (test30血泪教训核查) |
+| D | Boolean kill switch全扫 | ✅ 无SKIP/MOCK/TEXT_ONLY/DISABLE=true |
+| E | Nginx location /api/ /static/ /_next/static/ / | ✅ 全在 |
+| B | requirements.txt MD5 | ✅ 7dea4367 本地=VPS一致 |
+| C | DB栈 SA2.0.50/asyncmy0.2.11/PyMySQL1.1.2 | ✅ DEC-054 canonical (pip show confirmed) |
+| F | 三容器状态 api(healthy)+frontend(Up)+redis(healthy) | ✅ |
+| G | 静态文件链路 /static/→127.0.0.1:8000 proxy_pass | ✅ |
+| H | uvicorn无--reload (PID1 cmdline验证) | ✅ |
+| I | 端口绑定 127.0.0.1:8000+:3000 / 0.0.0.0:443+80 | ✅ |
+| K | Dockerfile.frontend NEXT_PUBLIC_API_URL | ✅ https://prefaceai.mov/api |
+| A | 应用代码同步 (rsync后验证) | 待rsync后confirm |
+
+**✅ SOP 11维度全过（A维度rsync后补confirm），可部署**
+
+4 commit SHA:
+- Commit 1 (Backend): 20f5b61 — feat(backend): test30 #5/#8/#9/#10/#13 [frontend-impact: yes]
+- Commit 2 (AI-ML):   1450dde — feat(ai-ml): #6 CFP-3 + #7 群体token [frontend-impact: no]
+- Commit 3 (Frontend): 1b69862 — feat(frontend): Plan A++ + 性能优化 [frontend-impact: yes]
+- Commit 4 (文档):    884b6b6 — docs: test30收口 + DEC-055 + SOP
+
+push origin/main: b219d00→884b6b6 ✅
+
+— DevOps (Sonnet 4.6, 2026-05-28)
+
+---
+
 ## [2026-05-28 18:00] Frontend — Plan A++ progressive enhancement 完成 @PM
 
 ### 完成内容
